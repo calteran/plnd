@@ -13,6 +13,12 @@
 - Next: Core Features Phase (user management, basic planning)
 - Then: AI Enhancements Phase (agentic architecture, LLM integration)
 
+### 2. Dependency Management
+- Always use the latest stable versions of all dependencies
+- Regularly update Rust, Node.js, and other core tools
+- Verify compatibility before major version updates
+- Document version requirements clearly
+
 ### 2. Development Standards
 
 **Backend (Rust/Axum)**:
@@ -76,6 +82,7 @@
 - Bug fixes within existing architecture
 - Documentation updates
 - Minor refactoring
+- Dependency updates to latest stable versions
 
 **Escalate to Human**:
 - Major architectural decisions
@@ -83,6 +90,7 @@
 - Security-related decisions
 - Significant scope changes
 - Complex domain logic questions
+- Major version updates that may break compatibility
 
 ## Current Phase Focus: Foundation
 
@@ -113,6 +121,14 @@
 
 ## Version
 
-**1.0** - Foundation Phase Configuration
-**Last Updated**: 2023-11-15
+**1.2** - Updated Rust Edition to 2024
+**Last Updated**: 2026-02-26
 **Status**: Active
+
+## Dependency Version Requirements
+
+- **Rust**: Latest stable version (currently 1.93.1+) with 2024 edition
+- **Node.js**: Latest LTS version (currently 20.x+)
+- **Angular**: Latest stable version
+- **All npm/Rust dependencies**: Latest stable versions
+- **Docker**: Latest stable version

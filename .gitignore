@@ -1,0 +1,28 @@
+# Rust
+/target/
+**/*.rs.bk
+
+# Node.js
+node_modules/
+plnd_client/node_modules/
+
+# Docker
+docker-compose.override.yml
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Build artifacts
+plnd_api/target/
+plnd_client/dist/
+plnd_client/.angular/
+
+# Logs and databases
+*.log
+*.sqlite
+
+# Environment files
+.env*.local

@@ -16,8 +16,9 @@ PLND is designed to help individuals plan and track their learning and developme
 
 1. Clone the repository
 2. Review the `PLANNING.md` for architecture details
-3. Check `AGENTS.md` for agent configurations
-4. Start planning your learning journey!
+3. Check `AGENTS.md` for agent configurations and dependency requirements
+4. Ensure you have the latest stable versions of Rust, Node.js, and other dependencies
+5. Start planning your learning journey!
 
 ## Documentation
 
