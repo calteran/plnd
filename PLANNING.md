@@ -84,8 +84,6 @@ PLND (pronounced "planned") is a planner/assistant designed for neurodivergent i
 
 ## Architecture
 
-## Development Roadmap
-
 ## User Stories
 
 ### Authentication and Identification
