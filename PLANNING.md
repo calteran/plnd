@@ -237,4 +237,491 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Resources
 
-## Conclusion
+## Conclusion## Architecture
+
+### Technology Stack
+
+PLND uses a modern stack combining Rust's performance with Angular's productivity:
+
+**Frontend:**
+- Angular (TypeScript) with NgRx for state management
+- Capacitor for iOS mobile deployment
+- Angular Material for UI components
+- RxJS for reactive programming
+
+**Backend:**
+- Rust with Axum web framework
+- SQLx for PostgreSQL database access
+- JWT for authentication
+- Mistral LLM API integration
+
+**Database:**
+- Self-hosted PostgreSQL in Docker
+- Single instance deployment
+- Regular automated backups
+
+**AI/ML:**
+- Mistral LLM API for natural language processing
+- Custom Rust tools and skills built around the LLM
+- Prompt engineering for domain-specific tasks
+- Function calling for structured LLM interactions
+
+**Deployment:**
+- Docker Compose for development
+- Kubernetes-ready architecture for production
+- CI/CD pipeline for automated deployments
+
+### System Architecture
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                        Client Applications                    │
+│  ┌───────────────────┐            ┌─────────────────────────┐  │
+│  │ iOS App           │            │ Web App                │  │
+│  │ (Angular +        │            │ (Angular + NgRx)       │  │
+│  │ Capacitor)        │            │                        │  │
+│  └───────────────────┘            └─────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│                        Rust Backend (Axum)                    │
+│  ┌───────────────────┐    ┌───────────────────────────────┐  │
+│  │ Authentication    │    │ Core Services:               │  │
+│  │ (OAuth +         │    │ - Planning Engine            │  │
+│  │ Passwordless)    │    │ - Nutrition Analysis         │  │
+│  └───────────────────┘    │ - Integration Service        │  │
+│                          │ - Mistral LLM Service        │  │
+│                          └───────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│                        PostgreSQL (Docker)                    │
+│  - User authentication and profiles                          │
+│  - Meal and exercise plans                                   │
+│  - Preferences and ratings                                  │
+│  - LLM interaction history                                   │
+└───────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌───────────────────────────────────────────────────────────────┐
+│                        External Services                      │
+│  ┌───────────────────┐    ┌───────────────────────────────┐  │
+│  │ Mistral LLM API  │    │ Third-Party Services:         │  │
+│  │                  │    │ - OAuth Providers            │  │
+│  └───────────────────┘    │ - Calendar APIs              │  │
+│                          │ - Weather APIs               │  │
+│                          └───────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+```
+
+### Mistral LLM Integration
+
+PLND leverages Mistral's LLM capabilities through a structured integration layer:
+
+**Integration Components:**
+1. **LLM Service**: Rust backend service handling all Mistral API calls
+2. **Prompt Templates**: Domain-specific prompts for meal planning, exercise suggestions, etc.
+3. **Function Calling**: Mistral's tool calling feature for structured interactions
+4. **Context Management**: Conversation history stored in PostgreSQL
+
+**Example Workflow:**
+```
+User Request → Angular UI → Rust Backend → Mistral API → Rust Tools → Response
+```
+
+**Custom Rust Tools:**
+- `meal_suggestion_tool`: Generates meal ideas based on preferences and ingredients
+- `nutrition_analysis_tool`: Evaluates meal nutrition against guidelines
+- `schedule_optimizer_tool`: Finds optimal time slots for activities
+- `preference_updater_tool`: Adjusts user preferences based on feedback
+
+### Authentication Architecture
+
+**Passwordless + OAuth Flow:**
+1. User chooses login method (magic link or OAuth provider)
+2. Backend generates magic link or OAuth redirect
+3. User completes authentication flow
+4. Backend validates and issues JWT
+5. All subsequent API calls include JWT for authentication
+
+**Security Features:**
+- Short-lived access tokens with refresh token rotation
+- Rate limiting on authentication endpoints
+- Secure token storage on client devices
+- Regular token validation
+
+### Development Environment
+
+**Docker-Based Development:**
+- Docker Compose for service orchestration
+- Hot reloading for both Rust and Angular
+- Shared volumes for live code updates
+- Mock services for external APIs during development
+
+**Key Containers:**
+- Rust backend with development dependencies
+- PostgreSQL with persistent volume
+- Angular development server
+- Optional: Local Mistral mock for testing
+
+### Production Architecture
+
+**Kubernetes-Ready Design:**
+- Containerized microservices
+- Horizontal pod autoscaling
+- ConfigMaps and Secrets for configuration
+- Persistent volumes for database
+- Ingress controller for routing
+
+**Deployment Strategy:**
+1. Development: Docker Compose
+2. Staging: Minikube or similar
+3. Production: Kubernetes cluster (when ready)
+4. CI/CD: Automated testing and deployment pipeline
+
+### Data Architecture
+
+**Core Data Models:**
+```rust
+// User and Authentication
+struct User {
+    id: Uuid,
+    email: String,
+    auth_method: AuthMethod, // OAuth or Passwordless
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+// Preferences and Profiles
+struct UserPreferences {
+    user_id: Uuid,
+    dietary_restrictions: Vec<DietaryRestriction>,
+    allergies: Vec<Allergy>,
+    fitness_goals: Vec<FitnessGoal>,
+    notification_settings: NotificationSettings,
+}
+
+// Planning Data
+struct MealPlan {
+    id: Uuid,
+    user_id: Uuid,
+    date: Date,
+    meals: Vec<MealAssignment>,
+    is_recurring: bool,
+    recurrence_pattern: Option<RecurrencePattern>,
+}
+
+// LLM Interactions
+struct LLMInteraction {
+    id: Uuid,
+    user_id: Uuid,
+    session_id: Uuid,
+    prompt: String,
+    response: String,
+    tools_used: Vec<String>,
+    created_at: DateTime<Utc>,
+}
+```
+
+### Evolution Path
+
+The architecture is designed to grow with the application:
+
+**V1 (Hobby Scale):**
+- Single backend service
+- Docker Compose development
+- Simple VPS deployment
+- Basic monitoring
+
+**V2 (Growth):**
+- Separate LLM service
+- Redis caching layer
+- Improved monitoring and logging
+- Basic load balancing
+
+**V3 (Scale):**
+- Full Kubernetes deployment
+- Database read replicas
+- Advanced observability
+- A/B testing framework
+
+**V4 (Maturity):**
+- Microservices architecture
+- Advanced caching strategies
+- Multi-region deployment
+- Comprehensive security auditing
+
+### Key Design Principles
+
+1. **Simplicity First**: Start with the simplest solution that works
+2. **Docker Everything**: Consistent environments from dev to prod
+3. **Progressive Enhancement**: Build core features first, add AI enhancements
+4. **Observability**: Instrument from the beginning
+5. **Security by Design**: Implement security best practices early
+6. **Documentation**: Maintain architecture documentation as we build
+
+## Development Roadmap
+
+### Phase 1: Foundation (Core Infrastructure)
+**Goal**: Set up development environment and implement basic authentication
+
+**Tasks:**
+1. **Project Setup**
+   - Initialize Rust backend with Axum
+   - Set up Angular frontend with NgRx
+   - Configure Docker Compose development environment
+   - Create basic project structure and build scripts
+
+2. **Database Foundation**
+   - Set up PostgreSQL with SQLx
+   - Implement database connection pooling
+   - Create initial migration system
+   - Design core database schemas (users, auth)
+
+3. **Authentication System**
+   - Implement passwordless email authentication
+   - Add OAuth provider integration (Google/Apple)
+   - Create JWT token management
+   - Build session handling middleware
+
+4. **Basic API Structure**
+   - Set up Axum router and middleware
+   - Create error handling framework
+   - Implement request validation
+   - Add API documentation (OpenAPI/Swagger)
+
+**Deliverables:**
+- Working development environment
+- Functional authentication system
+- Basic API skeleton
+- Dockerized services
+
+### Phase 2: Core Features (MVP Functionality)
+**Goal**: Implement the minimum viable planning features
+
+**Tasks:**
+1. **User Management**
+   - User profile CRUD operations
+   - Preferences and settings management
+   - Dietary restrictions and allergy tracking
+   - Basic user onboarding flow
+
+2. **Meal Planning Core**
+   - Meal CRUD operations
+   - Basic meal planning interface
+   - Simple scheduling functionality
+   - Recurring meal patterns
+
+3. **Exercise Planning Core**
+   - Exercise CRUD operations
+   - Basic workout planning
+   - Simple scheduling interface
+   - Recurring exercise patterns
+
+4. **Basic LLM Integration**
+   - Set up Mistral API client
+   - Implement basic prompt templates
+   - Create simple meal suggestion tool
+   - Add basic conversation context
+
+**Deliverables:**
+- Functional meal and exercise planning
+- Basic LLM-powered suggestions
+- User profile management
+- Core planning interfaces
+
+### Phase 3: AI Enhancements (Intelligent Features)
+**Goal**: Implement advanced LLM-powered planning capabilities
+
+**Tasks:**
+1. **Advanced LLM Tools**
+   - Nutrition analysis tool
+   - Schedule optimization tool
+   - Preference update tool
+   - Context-aware suggestion engine
+
+2. **Prompt Engineering**
+   - Domain-specific prompt templates
+   - Few-shot learning examples
+   - Structured output requirements
+   - Error handling and retries
+
+3. **Conversational Interface**
+   - Natural language input processing
+   - Intent recognition
+   - Context management across sessions
+   - Multi-turn conversation support
+
+4. **Proactive Suggestions**
+   - Pattern detection from user behavior
+   - Personalized recommendations
+   - Adaptive planning adjustments
+   - Feedback loop integration
+
+**Deliverables:**
+- Intelligent planning assistant
+- Context-aware suggestions
+- Natural language interface
+- Personalized recommendations
+
+### Phase 4: Integration Features
+**Goal**: Connect with external services and enhance functionality
+
+**Tasks:**
+1. **Calendar Integration**
+   - Google Calendar API integration
+   - Apple Calendar API integration
+   - Event synchronization
+   - Conflict detection
+
+2. **Weather Integration**
+   - Weather API client
+   - Weather-aware activity suggestions
+   - Outdoor/indoor activity switching
+   - Weather-based reminders
+
+3. **Nutrition Features**
+   - Nutrition database integration
+   - Meal nutrition analysis
+   - Guideline compliance checking
+   - Personalized nutrition scoring
+
+4. **Advanced Planning**
+   - Drag-and-drop interface
+   - Recurring plan templates
+   - Plan override functionality
+   - Bulk editing capabilities
+
+**Deliverables:**
+- External service integrations
+- Enhanced planning features
+- Weather and calendar awareness
+- Advanced nutrition tracking
+
+### Phase 5: Mobile Implementation
+**Goal**: Develop and polish the iOS application
+
+**Tasks:**
+1. **Capacitor Setup**
+   - Configure Capacitor for iOS
+   - Set up native project structure
+   - Configure build pipelines
+   - Add necessary plugins
+
+2. **Mobile UI/UX**
+   - Responsive design for mobile
+   - Touch-optimized interfaces
+   - Offline capability implementation
+   - Native-like transitions
+
+3. **Mobile-Specific Features**
+   - Push notification setup
+   - Background sync
+   - Local data caching
+   - App store preparation
+
+4. **Testing and Polish**
+   - Device-specific testing
+   - Performance optimization
+   - App store screenshots and metadata
+   - Beta testing setup
+
+**Deliverables:**
+- Functional iOS application
+- App store-ready build
+- Offline-capable mobile experience
+- Polished mobile UI/UX
+
+### Phase 6: Deployment and Operations
+**Goal**: Prepare for production deployment and ongoing operations
+
+**Tasks:**
+1. **Production Infrastructure**
+   - Kubernetes cluster setup
+   - CI/CD pipeline configuration
+   - Monitoring and logging setup
+   - Backup and recovery systems
+
+2. **Security Hardening**
+   - Security audit
+   - Penetration testing
+   - Data protection measures
+   - Compliance checks
+
+3. **Performance Optimization**
+   - Database optimization
+   - Caching strategy implementation
+   - Load testing
+   - Performance monitoring
+
+4. **Deployment Process**
+   - Staging environment setup
+   - Rollback procedures
+   - Zero-downtime deployment
+   - Feature flag system
+
+**Deliverables:**
+- Production-ready infrastructure
+- Secure and optimized application
+- Automated deployment pipeline
+- Monitoring and alerting system
+
+### Phase 7: Polish and Launch
+**Goal**: Final touches and official launch
+
+**Tasks:**
+1. **Final Testing**
+   - End-to-end testing
+   - User acceptance testing
+   - Performance benchmarking
+   - Security validation
+
+2. **Documentation**
+   - User documentation
+   - API documentation
+   - Developer documentation
+   - Support materials
+
+3. **Marketing Preparation**
+   - Landing page
+   - App store listings
+   - Social media setup
+   - Launch materials
+
+4. **Launch Execution**
+   - Coordinated release
+   - Monitoring during launch
+   - User support setup
+   - Feedback collection system
+
+**Deliverables:**
+- Fully tested application
+- Complete documentation
+- Successful launch
+- User feedback mechanisms
+
+## Development Sequence Recommendations
+
+### Recommended Order:
+1. **Foundation Phase** (Blocked by nothing)
+2. **Core Features Phase** (Depends on Foundation)
+3. **AI Enhancements Phase** (Depends on Core Features + LLM setup)
+4. **Integration Features** (Can start after Core Features)
+5. **Mobile Implementation** (Can start after Core Features, parallel with Integration)
+6. **Deployment and Operations** (Start after Core Features, continue throughout)
+7. **Polish and Launch** (Final phase)
+
+### Parallel Development Opportunities:
+- **Frontend/Backend**: Can develop APIs and UI in parallel after contract is defined
+- **Mobile/Web**: Mobile development can start after web core is stable
+- **Integrations**: Calendar/weather integrations can be developed independently
+- **AI Tools**: Different LLM tools can be developed in parallel
+
+### Risk Mitigation Strategy:
+1. **Start with Core**: Ensure basic planning works before AI enhancements
+2. **Validate LLM Early**: Test Mistral integration with simple use cases first
+3. **Mobile Last**: Focus on web first, then adapt to mobile
+4. **Incremental Deployment**: Deploy basic features first, add enhancements later
+5. **Feature Flags**: Allow gradual rollout of new features
