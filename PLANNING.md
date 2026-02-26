@@ -3,7 +3,84 @@
 ## Overview
 PLND (pronounced "planned") is a planner/assistant designed for neurodivergent individuals who are picky eaters or struggle with nutrition and exercise. The goal is to provide a structured yet flexible tool to help users plan meals, track nutrition, and manage exercise routines in a way that accommodates their unique needs.
 
-## Features Brainstorm
+## Features
+
+### Core Features
+- Secure authentication (email/password, OAuth) with persistent sessions
+- User profiles for preferences, dietary restrictions, and exercise routines
+- Weekly planning view with recurring plan options
+- Easy day-by-day adjustments and overrides
+- Drag-and-drop functionality for rearranging plans
+- Notifications and reminders for upcoming plans
+
+### Integration Features
+- Sync with popular calendar services (Google, Apple, Outlook)
+- Display calendar events within the app
+- Link meal/exercise plans to existing calendar events
+
+### Personalization Features
+- Track food preferences, likes, and dislikes
+- Analyze eating habits and patterns
+- Adapt suggestions based on feedback and behavior
+- Incorporate dietary restrictions and allergies
+
+### Meal Planning Features
+- Support for recurring meals (e.g., daily breakfast)
+- Encourage variety in other meals for balanced nutrition
+- Configurable preferences for trying new meals
+- Gentle expansion of food choices through similar meal suggestions
+
+### Food Preference System
+- Rating scale (1-5 stars) for meals and ingredients
+- Allergen marking with strict enforcement
+- Prioritize suggestions based on preferences while avoiding disliked foods
+
+### Safety Features
+- Separate category for allergens/unsafe ingredients
+- Strict exclusion of marked allergens from suggestions
+- Visual warnings for potential allergens
+- Safety restrictions override preference-based suggestions
+
+### Nutrition Features
+- Support for multiple guideline sets (USDA, EU, custom)
+- Configurable adherence levels (strict, moderate, flexible)
+- Visual feedback on guideline alignment
+- Recommendations to improve nutritional balance
+
+### Ingredient Management
+- Input and track ingredients on hand
+- Meal suggestions using available ingredients
+- Priority scheduling for ingredients marked "use soon"
+- Expiration reminders for perishable items
+
+### Exercise Planning
+- Set and track fitness goals (weight loss, muscle gain, endurance)
+- Personalized exercise plans based on goals and preferences
+- Integration with daily schedules considering preferred times
+- Progress tracking and plan adjustments
+- Reminders and motivational support
+
+### Health Integration
+- Medication schedule tracking with effect management
+- Adjust meal timing/portions based on medication effects
+- Avoid intense exercise during medication-sensitive periods
+- Sleep schedule recommendations with alarm reminders
+- Integration of sleep patterns with meal/exercise plans
+
+### Additional Features
+- Current weather display and forecasts
+- Weather-appropriate activity recommendations
+- Indoor alternatives for unfavorable weather
+- Weather-based reminders (e.g., umbrella alerts)
+- Summary of daily schedule and meal plan
+- Weather forecast overview
+- Important reminders (medications, deadlines)
+- Customizable briefing content
+- Log completed tasks and consumed meals
+- Track progress toward daily/weekly goals
+- Automatic adjustments to future plans based on progress
+- Performance feedback and improvement suggestions
+- Manual data input and correction capabilities
 
 ## Architecture
 
@@ -47,7 +124,6 @@ PLND (pronounced "planned") is a planner/assistant designed for neurodivergent i
 ### Food Preference System
 - **As a user, I want a comprehensive rating system** to distinguish between preferred and avoided foods
   - Rating scale (1-5 stars) for meals and ingredients
-  - Quick classification: "Love," "Tolerate," "Avoid"
   - Allergen marking with strict enforcement
   - Prioritize suggestions based on preferences while avoiding disliked foods
 
