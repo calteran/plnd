@@ -133,6 +133,28 @@ PLND (pronounced "planned") is a planner/assistant designed for neurodivergent i
 
 ## Technical Considerations
 
+### Agentic AI Architecture
+To handle "squishy" user input and provide adaptive, personalized planning, PLND should be built on an agentic AI architecture:
+
+- **Natural Language Understanding**: Process unstructured user input (e.g., "I'm feeling tired today" or "I want something comforting but healthy")
+- **Contextual Awareness**: Maintain user context across sessions (mood, energy levels, recent preferences)
+- **Adaptive Decision Making**: Dynamically adjust recommendations based on real-time feedback and changing circumstances
+- **Multi-Modal Interaction**: Support text, voice, and potentially image input for meal logging
+- **Explainable AI**: Provide transparent reasoning for suggestions ("Recommending this meal because you rated similar dishes highly and have these ingredients available")
+
+### Key AI Components:
+1. **Intent Recognition**: Classify user requests (meal planning, exercise adjustment, preference update)
+2. **Preference Modeling**: Maintain and update user preference profiles over time
+3. **Constraint Satisfaction**: Balance multiple factors (nutrition, preferences, ingredients, time) in real-time
+4. **Conversational Memory**: Remember past interactions and references within conversations
+5. **Proactive Suggestions**: Anticipate needs based on patterns and context
+
+### Implementation Approach:
+- Use a modular agent system where different agents handle specific domains (nutrition, exercise, scheduling)
+- Implement a coordinator agent to mediate between domain-specific agents and present unified recommendations
+- Build on foundation models with fine-tuning for health/nutrition domains
+- Include feedback loops for continuous learning and improvement
+
 ## Next Steps
 
 ## Open Questions
