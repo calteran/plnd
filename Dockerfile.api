@@ -1,5 +1,5 @@
 # Rust API Dockerfile
-FROM rust:latest as builder
+FROM rust:latest AS builder
 
 WORKDIR /app
 COPY plnd_api .
