@@ -1,0 +1,11 @@
+# PLND API Development Configuration
+# This file overrides default values for development environment
+
+[api]
+# Longer timeout for development
+timeout = 60000
+
+[logging]
+# More verbose logging for development
+level = "debug"
+pretty_print = true

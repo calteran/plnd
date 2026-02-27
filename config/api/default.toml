@@ -1,0 +1,20 @@
+# PLND API Default Configuration
+# This file contains the default configuration values
+
+[api]
+# Server binding address and port
+base_url = "0.0.0.0:3000"
+# Request timeout in milliseconds
+timeout = 30000
+
+[database]
+# PostgreSQL connection URL
+url = "postgres://plnd:plnd_dev@localhost/plnd_dev"
+# Maximum database connections in the pool
+max_connections = 10
+
+[logging]
+# Log level: debug, info, warn, error
+level = "info"
+# Pretty print logs for development
+pretty_print = true

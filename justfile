@@ -1,7 +1,7 @@
 # Build all services
 build:
     cargo build --manifest-path plnd_api/Cargo.toml
-    cd plnd_client && npm run build
+    cd plnd_client && npx ng build
 
 # Run development environment (PostgreSQL + Client) in detached mode
 dev:

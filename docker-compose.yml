@@ -10,6 +10,22 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "3000:3000"
+    environment:
+      - APP_API__BASE_URL=0.0.0.0:3000
+      - APP_DATABASE__URL=postgres://plnd:plnd_dev@postgres/plnd_dev
+      - APP_API__TIMEOUT=30000
+      - APP_DATABASE__MAX_CONNECTIONS=10
+      - APP_LOGGING__LEVEL=debug
+      - APP_LOGGING__PRETTY_PRINT=true
+    depends_on:
+      - postgres
+
   client:
     image: node:20
     working_dir: /app

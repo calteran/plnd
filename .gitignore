@@ -25,4 +25,5 @@ plnd_client/.angular/
 *.sqlite
 
 # Environment files
-.env*.local
+.env*.local# Configuration templates
+!.env.example

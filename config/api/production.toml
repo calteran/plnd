@@ -1,0 +1,11 @@
+# PLND API Production Configuration
+# This file overrides default values for production environment
+
+[api]
+# Shorter timeout for production
+timeout = 10000
+
+[logging]
+# Less verbose logging for production
+level = "info"
+pretty_print = false

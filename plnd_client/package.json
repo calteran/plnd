@@ -6,7 +6,10 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
+    "test": "ng test",
+    "check-dependencies": "ncu --peer",
+    "check-licenses": "license-checker --summary",
+    "check-circular": "depcruise --validate"
   },
   "prettier": {
     "overrides": [
@@ -57,10 +60,5 @@
     "license-checker": "^25.0.1",
     "npm-check-updates": "^19.6.2",
     "typescript": "^5.4.5"
-  },
-  "scripts": {
-    "check-dependencies": "ncu --peer",
-    "check-licenses": "license-checker --summary",
-    "check-circular": "depcruise --validate"
   }
 }

@@ -1,0 +1,43 @@
+# Ignore node_modules
+node_modules/
+plnd_client/node_modules/
+
+# Ignore build artifacts
+plnd_api/target/
+plnd_client/dist/
+
+# Ignore IDE files
+.idea/
+.vscode/
+*.swp
+
+# Ignore git files
+.git/
+.gitignore
+
+# Ignore logs and temporary files
+*.log
+tmp/
+temp/
+
+# Ignore environment files
+.env
+.env.local
+
+# Ignore build tools
+justfile
+
+# Ignore documentation
+docs/
+*.md
+
+# Ignore test files
+*.spec.ts
+*.test.ts
+
+# Ignore configuration files that shouldn't be in Docker
+config/
+!config/api/
+
+# Ignore Angular cache
+plnd_client/.angular/

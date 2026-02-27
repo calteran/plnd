@@ -1,20 +1,31 @@
 use axum::http::StatusCode;
-use axum::{Extension, Json, Router, routing::get};
+use axum::{routing::get, Extension, Json, Router};
 use chrono::Utc;
-use std::env;
 
+mod config;
 mod db;
 
-use db::Database;
 use db::models::ReadyStatus;
+use db::Database;
 
 #[tokio::main]
 async fn main() {
-    // Initialize database connection
-    let database_url = env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://plnd:plnd_dev@localhost/plnd_dev".to_string());
+    // Load configuration
+    let config = match config::load_config() {
+        Ok(config) => config,
+        Err(e) => {
+            eprintln!("Failed to load configuration: {}", e);
+            std::process::exit(1);
+        }
+    };
 
-    let db = match Database::new(&database_url).await {
+    println!("Loaded configuration:");
+    println!("  API Base URL: {}", config.api.base_url);
+    println!("  Database URL: {}", config.database.url);
+    println!("  Log Level: {}", config.logging.level);
+
+    // Initialize database connection using config
+    let db = match Database::new(&config.database.url).await {
         Ok(db) => db,
         Err(e) => {
             eprintln!("Failed to connect to database: {}", e);
@@ -28,8 +39,10 @@ async fn main() {
         .route("/ready", get(readiness_check))
         .layer(Extension(db));
 
-    // Run it on localhost:3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    // Run it using configured address
+    let listener = tokio::net::TcpListener::bind(&config.api.base_url)
+        .await
+        .unwrap();
     println!("API server listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }

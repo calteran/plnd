@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PLND Configuration Schema (TOML-compatible)",
+  "type": "object",
+  "properties": {
+    "api": {
+      "type": "object",
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "API server base URL"
+        },
+        "timeout": {
+          "type": "number",
+          "default": 30000,
+          "minimum": 1000,
+          "description": "Request timeout in milliseconds"
+        }
+      },
+      "required": ["base_url"]
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "PostgreSQL connection URL"
+        },
+        "max_connections": {
+          "type": "number",
+          "default": 10,
+          "minimum": 1,
+          "description": "Maximum database connections in the pool"
+        }
+      },
+      "required": ["url"]
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info",
+          "description": "Log level"
+        },
+        "pretty_print": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pretty print logs"
+        }
+      }
+    }
+  },
+  "required": ["api", "database"]
+}
