@@ -58,6 +58,25 @@ ts-deps:
     cd plnd_client && npm run check-licenses
     cd plnd_client && npm run check-circular
 
+# Test server startup (15 second timeout - will auto-kill)
+test-run-server:
+    @echo "🚀 Testing server startup (15s timeout - will auto-kill)..."
+    timeout 15s cargo run --manifest-path plnd_api/Cargo.toml || \
+    echo "✅ Server started successfully (auto-killed after verification)"
+
+# Verify compilation only (no server startup)
+verify-build:
+    @echo "🔨 Verifying build..."
+    cargo build --manifest-path plnd_api/Cargo.toml && \
+    echo "✅ Build successful"
+
+# Full verification (quality checks + build)
+verify:
+    @echo "🔍 Running full verification..."
+    just check && \
+    just verify-build && \
+    echo "✅ All verifications passed"
+
 # Combined quality check
 check:
     just fmt

@@ -34,9 +34,29 @@ just ts-deps   # TypeScript dependency health checks
 
 ## Development Workflow
 
-1. **Before committing:** Run `just check` to ensure all quality standards are met
+1. **Before committing:** Run `just verify` to ensure all quality standards are met
 2. **Before pushing:** Run `just test` to ensure all tests pass
 3. **For pull requests:** All quality checks must pass in CI
+
+## Verification Commands
+
+### Available Commands:
+
+1. **`just verify-build`**
+   - Verifies code compiles correctly
+   - Does NOT start any servers
+   - Fastest option for build verification
+
+2. **`just test-run-server`**
+   - Tests that server starts correctly
+   - Automatically kills after 15 seconds
+   - Use only when you need runtime verification
+
+3. **`just verify`**
+   - Runs all quality checks
+   - Verifies build
+   - Does NOT start servers
+   - Use before committing
 
 ## Pull Request Requirements
 

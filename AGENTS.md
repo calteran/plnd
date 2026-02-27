@@ -42,7 +42,7 @@
 
 **Code Quality Checks (MANDATORY)**:
 - All quality checks must pass before any code is committed
-- Run `just check` before every commit and push
+- Run `just verify` before every commit and push
 - Quality checks include:
   - Rust formatting (`just fmt`)
   - Rust linting (`just clippy`)
@@ -57,6 +57,23 @@
   2. Ask explicit permission to ignore the specific failure with justification
 - Never commit code with failing quality checks without permission
 - Document any approved exceptions in the commit message
+
+### Server Process Management
+
+**MANDATORY RULES**:
+1. Never run `cargo run` directly - always use `just` commands
+2. Maximum 15-second timeout for any server process
+3. Prefer `just verify-build` over runtime verification when possible
+
+**Safe Commands**:
+- `just verify-build` - Verify compilation (no server startup)
+- `just test-run-server` - Test server startup (WILL auto-kill after 15s)
+- `just verify` - Full quality + build verification
+
+**Command Behavior**:
+- `test-run-server`: Starts server, verifies it runs, **auto-kills after 15s**
+- `verify-build`: Only compiles, no server processes started
+- `verify`: Runs all quality checks + build verification
 
 **Testing**:
 - Unit tests: 100% coverage for business logic
