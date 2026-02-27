@@ -10,15 +10,15 @@ pub fn load_config() -> Result<AppConfig, error::ConfigError> {
 }
 
 /// Load configuration with optional path prefix for tests
-pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError> {
+pub fn load_config_with_path(_path: &str) -> Result<AppConfig, error::ConfigError> {
     // Load .env file if it exists
     dotenv().ok();
 
     let builder = Config::builder()
         // Load default configuration (required)
-        .add_source(File::with_name(&format!("{}config/api/default", path)).required(true))
+        .add_source(File::with_name("../config/api/default").required(true))
         // Load environment-specific configuration (optional)
-        .add_source(File::with_name(&format!("{}config/api/development", path)).required(false))
+        .add_source(File::with_name("../config/api/development").required(false))
         // Load environment variables with APP_ prefix
         .add_source(Environment::with_prefix("APP").separator("__"));
 
