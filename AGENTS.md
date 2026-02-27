@@ -40,6 +40,24 @@
 
 ### 3. Quality Requirements
 
+**Code Quality Checks (MANDATORY)**:
+- All quality checks must pass before any code is committed
+- Run `just check` before every commit and push
+- Quality checks include:
+  - Rust formatting (`just fmt`)
+  - Rust linting (`just clippy`)
+  - Dependency license/security checks (`just deny`)
+  - Unused dependency detection (`just machete`)
+  - TypeScript linting (`just ts-lint`)
+  - TypeScript dependency health (`just ts-deps`)
+
+**Quality Check Failure Handling**:
+- If any quality check fails, the agent MUST either:
+  1. Fix the issue immediately, OR
+  2. Ask explicit permission to ignore the specific failure with justification
+- Never commit code with failing quality checks without permission
+- Document any approved exceptions in the commit message
+
 **Testing**:
 - Unit tests: 100% coverage for business logic
 - Integration tests: All API endpoints
@@ -121,8 +139,11 @@
 
 ## Version
 
-**1.2** - Updated Rust Edition to 2024
-**Last Updated**: 2026-02-26
+**1.3** - Added comprehensive quality requirements and enforcement
+- Removed all unused dependencies
+- Added mandatory quality check requirements
+- Updated AGENTS.md to enforce quality standards
+**Last Updated**: 2026-02-27
 **Status**: Active
 
 ## Dependency Version Requirements
