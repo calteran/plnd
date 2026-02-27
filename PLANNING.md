@@ -49,6 +49,22 @@ PLND (pronounced "planned") is a planner/assistant designed for neurodivergent i
 - Indoor alternatives for unfavorable weather
 - Weather-based reminders (e.g., umbrella alerts)
 
+### Nutrition Information
+- Barcode scanning for packaged foods with external database integration
+- Photo recognition for food items and nutrition labels
+- Manual entry for custom foods and recipes
+- Comprehensive nutrition tracking and analysis
+- Allergen detection and dietary restriction compliance
+- Plan vs. actual nutrition intake comparison
+
+### Grocery & Shopping
+- Automatic grocery list generation from meal plans
+- Smart shopping list organization by store section
+- Inventory tracking for pantry/fridge items
+- Expiration date tracking with usage reminders
+- Local grocery store integration and deals
+- Barcode scanning for inventory management
+
 ### Personalization & Learning
 - Track food preferences, likes, and dislikes
 - Analyze eating habits and patterns
@@ -60,9 +76,13 @@ PLND (pronounced "planned") is a planner/assistant designed for neurodivergent i
 ### Progress Tracking
 - Log completed tasks and consumed meals
 - Track progress toward daily/weekly goals
+- Plan vs. actual comparison for nutrition, exercise, and tasks
 - Automatic adjustments to future plans based on progress
 - Performance feedback and improvement suggestions
 - Manual data input and correction capabilities
+- Comprehensive analytics and trend analysis
+- Visual progress charts and reports
+- Exportable progress data for healthcare providers
 
 ### User Experience
 - Daily briefing with schedule summary
@@ -71,6 +91,16 @@ PLND (pronounced "planned") is a planner/assistant designed for neurodivergent i
 - Customizable briefing content
 - Context-aware task sequencing
 - Location-aware task prioritization
+
+### Family & Caregiver Support
+- Multi-user family accounts with shared planning
+- Caregiver access with oversight permissions
+- Individual profiles within family accounts
+- Shared grocery lists and meal planning
+- Family nutrition tracking and aggregation
+- Caregiver notifications and alerts
+- Emergency contact integration
+- Progress sharing with healthcare providers
 
 ## Technical Considerations
 
@@ -160,10 +190,16 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - Create simple meal suggestion tool
    - Add basic conversation context
 
+5. **Family Support Foundation**
+   - Multi-user account structure
+   - Basic family profile management
+   - Shared meal planning capabilities
+   - Caregiver access permissions
+
 **Deliverables:**
 - Functional meal and exercise planning
 - Basic LLM-powered suggestions
-- User profile management
+- User and family profile management
 - Core planning interfaces
 
 ### Phase 3: AI Enhancements (Intelligent Features)
@@ -217,12 +253,27 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - Weather-based reminders
 
 3. **Nutrition Features**
-   - Nutrition database integration
-   - Meal nutrition analysis
-   - Guideline compliance checking
-   - Personalized nutrition scoring
+   - USDA FoodData Central API integration for barcode scanning
+   - Barcode scanner implementation with camera access
+   - Photo recognition with OCR for nutrition labels
+   - Manual nutrition entry forms with validation
+   - Product database for saved food items
+   - Nutrition data parsing and storage
 
-4. **Advanced Planning**
+4. **Grocery & Shopping Features**
+   - Grocery list generation from meal plans
+   - Smart list organization by store sections
+   - Pantry inventory tracking system
+   - Expiration date monitoring with alerts
+   - Barcode scanning for inventory management
+
+5. **Advanced Analytics**
+   - Plan vs. actual tracking for nutrition/exercise/tasks
+   - Trend analysis and progress visualization
+   - Exportable reports for healthcare providers
+   - Performance metrics and insights
+
+6. **Advanced Planning**
    - Drag-and-drop interface
    - Recurring plan templates
    - Plan override functionality
@@ -233,6 +284,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - Enhanced planning features
 - Weather and calendar awareness
 - Advanced nutrition tracking
+- Grocery and shopping functionality
+- Comprehensive analytics and reporting
 
 ### Phase 5: Mobile Implementation
 **Goal**: Develop and polish the iOS application
