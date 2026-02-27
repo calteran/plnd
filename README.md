@@ -1,29 +1,60 @@
-# PLND - Personal Learning and Development
+# PLND - Neurodivergent Planner/Assistant
 
-A project focused on personal learning and development planning.
+A structured yet flexible planner/assistant designed for neurodivergent individuals to manage nutrition, exercise, and daily planning.
 
-## Overview
+PLND (pronounced "planned") provides structured planning with extensive customization options, gradual exposure features, and sensory-friendly interfaces to help neurodivergent individuals who are picky eaters or struggle with nutrition and exercise.
 
-PLND is designed to help individuals plan and track their learning and development goals. The project includes architecture planning, agent configurations, and development roadmaps.
+## Development Status
 
-## Features
+### Current Phase: Foundation
+**Status**: In Progress ✅
+**Focus**: Core infrastructure setup (Rust backend, authentication, database)
 
-- **Architecture Planning**: Comprehensive architecture documentation in `PLANNING.md`
-- **Agent Configuration**: Pre-configured agent settings for Mistral Vibe in `AGENTS.md`
-- **Development Roadmap**: Clear development milestones and goals
+#### Project Setup (Completed)
+- ✅ Initialize Rust backend with Axum
+- ✅ Set up Angular frontend with NgRx
+- ✅ Configure Docker Compose development environment
+- ✅ Create basic project structure and build scripts
 
-## Getting Started
+#### Next in Foundation Phase:
+- [ ] Database Foundation (PostgreSQL + SQLx setup)
+- [ ] Authentication System (email/OAuth, JWT)
+- [ ] Basic API Structure (Axum router, error handling)
 
-1. Clone the repository
-2. Review the `PLANNING.md` for architecture details
-3. Check `AGENTS.md` for agent configurations and dependency requirements
-4. Ensure you have the latest stable versions of Rust, Node.js, and other dependencies
-5. Start planning your learning journey!
+### Next Phase: Core Features
+- User Management CRUD operations
+- Basic meal/exercise planning interfaces
+- LLM integration foundation
+
+## Available Commands
+
+```bash
+# Build all services (API + Client)
+just build
+
+# Start full development environment
+just dev
+
+# Run API service locally
+just api
+
+# Run client development server
+just client
+
+# Run all quality checks + build
+just verify
+
+# Run all tests
+just test
+
+# Clean all build artifacts
+just clean
+```
 
 ## Documentation
 
 - [PLANNING.md](PLANNING.md) - Architecture and development roadmap
-- [AGENTS.md](AGENTS.md) - Agent configuration details
+- [AGENTS.md](AGENTS.md) - Agent configuration and maintenance directives
 
 ## License
 

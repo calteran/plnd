@@ -118,6 +118,9 @@
 - Documentation updates
 - Minor refactoring
 - Dependency updates to latest stable versions
+- README.md maintenance and updates based on project progress
+- Automatic task status updates in development dashboard
+- Phase progression tracking and documentation
 
 **Escalate to Human**:
 - Major architectural decisions
