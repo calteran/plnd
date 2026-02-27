@@ -17,7 +17,7 @@ PLND (pronounced "planned") provides structured planning with extensive customiz
 - ✅ Create basic project structure and build scripts
 
 #### Next in Foundation Phase:
-- [ ] Database Foundation (PostgreSQL + SQLx setup)
+- ✅ Database Foundation (PostgreSQL + SQLx setup)
 - [ ] Authentication System (email/OAuth, JWT)
 - [ ] Basic API Structure (Axum router, error handling)
 
