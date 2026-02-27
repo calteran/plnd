@@ -1,5 +1,5 @@
 services:
-  postgres:
+  db:
     image: postgres:15
     environment:
       POSTGRES_USER: plnd
@@ -18,25 +18,24 @@ services:
       - "3000:3000"
     environment:
       - APP_API__BASE_URL=0.0.0.0:3000
-      - APP_DATABASE__URL=postgres://plnd:plnd_dev@postgres/plnd_dev
+      - APP_DATABASE__URL=postgres://plnd:plnd_dev@db/plnd_dev
       - APP_API__TIMEOUT=30000
       - APP_DATABASE__MAX_CONNECTIONS=10
       - APP_LOGGING__LEVEL=debug
       - APP_LOGGING__PRETTY_PRINT=true
     depends_on:
-      - postgres
+      - db
 
   client:
-    image: node:20
-    working_dir: /app
-    volumes:
-      - ./plnd_client:/app
-      - node_modules:/app/node_modules
+    build:
+      context: .
+      dockerfile: Dockerfile.client
     ports:
       - "4200:4200"
     environment:
       - NODE_ENV=development
-    command: sh -c "npm install && npx ng serve --host 0.0.0.0 --poll 2000"
+    depends_on:
+      - api
 
 volumes:
   postgres_data:

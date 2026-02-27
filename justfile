@@ -19,9 +19,9 @@ api-watch:
 client:
     cd plnd_client && npx ng serve
 
-# Run PostgreSQL only in detached mode
-postgres:
-    docker compose up -d postgres
+# Run database only in detached mode
+db:
+    docker compose up -d db
 
 # Stop all containers
 stop:
