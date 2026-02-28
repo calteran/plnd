@@ -31,20 +31,24 @@ stop:
 logs:
     docker compose logs -f
 
-# Run tests
+# Run tests with nextest
 test:
-    cargo test --manifest-path plnd_api/Cargo.toml
+    cargo nextest run --manifest-path plnd_api/Cargo.toml
     cd plnd_client && npm test
+
+# Run tests with nextest (verbose)
+test-verbose:
+    cargo nextest run --manifest-path plnd_api/Cargo.toml --verbose
 
 # Run Angular tests with headless Chrome (automated testing)
 test-ng-headless:
     @echo "🧪 Running Angular tests with headless Chrome..."
     cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
 
-# Comprehensive test suite for CI/automated environments (Rust + Angular headless)
+# Comprehensive test suite for CI/automated environments (Rust with nextest + Angular headless)
 test-ci:
     @echo "🚀 Running comprehensive CI test suite..."
-    cargo test --manifest-path plnd_api/Cargo.toml && \
+    cargo nextest run --manifest-path plnd_api/Cargo.toml && \
     just test-ng-headless && \
     echo "✅ All CI tests passed"
 
@@ -87,7 +91,7 @@ verify:
     @echo "🔍 Running full verification..."
     just check && \
     just verify-build && \
-    cargo test --manifest-path plnd_api/Cargo.toml && \
+    cargo nextest run --manifest-path plnd_api/Cargo.toml && \
     just test-ng-headless && \
     echo "✅ All verifications passed"
 
