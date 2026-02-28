@@ -8,5 +8,5 @@ import { RouterOutlet } from '@angular/router';
   styleUrl: './app.scss'
 })
 export class AppComponent {
-  protected readonly title = signal('plnd_client');
+  readonly title = signal('plnd_client');
 }
