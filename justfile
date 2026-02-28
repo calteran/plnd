@@ -36,6 +36,18 @@ test:
     cargo test --manifest-path plnd_api/Cargo.toml
     cd plnd_client && npm test
 
+# Run Angular tests with headless Chrome (automated testing)
+test-ng-headless:
+    @echo "🧪 Running Angular tests with headless Chrome..."
+    cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
+
+# Comprehensive test suite for CI/automated environments (Rust + Angular headless)
+test-ci:
+    @echo "🚀 Running comprehensive CI test suite..."
+    cargo test --manifest-path plnd_api/Cargo.toml && \
+    just test-ng-headless && \
+    echo "✅ All CI tests passed"
+
 # Rust quality commands
 fmt:
     cargo fmt --manifest-path plnd_api/Cargo.toml --check
@@ -70,11 +82,13 @@ verify-build:
     cargo build --manifest-path plnd_api/Cargo.toml && \
     echo "✅ Build successful"
 
-# Full verification (quality checks + build)
+# Full verification (quality checks + build + comprehensive tests)
 verify:
     @echo "🔍 Running full verification..."
     just check && \
     just verify-build && \
+    cargo test --manifest-path plnd_api/Cargo.toml && \
+    just test-ng-headless && \
     echo "✅ All verifications passed"
 
 # Combined quality check

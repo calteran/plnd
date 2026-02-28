@@ -75,6 +75,24 @@
 - `verify-build`: Only compiles, no server processes started
 - `verify`: Runs all quality checks + build verification
 
+### Testing Rules for Agents
+
+**MANDATORY RULES**:
+1. **NEVER use `just test`** - This runs interactive tests that don't terminate
+2. **ALWAYS use `just test-ci`** for comprehensive automated testing
+3. Use `just test-ng-headless` for Angular-only headless testing
+4. All tests must pass before committing code
+
+**Safe Testing Commands**:
+- `just test-ci` - Comprehensive CI test suite (Rust + Angular headless)
+- `just test-ng-headless` - Angular tests with headless Chrome
+- `just verify` - Full verification including all tests
+
+**Command Behavior**:
+- `test-ci`: Runs Rust tests + Angular headless tests, **terminates automatically**
+- `test-ng-headless`: Runs Angular tests with ChromeHeadless, **terminates automatically**
+- `verify`: Runs quality checks + build + comprehensive tests
+
 **Testing**:
 - Unit tests: 100% coverage for business logic
 - Integration tests: All API endpoints
@@ -159,7 +177,12 @@
 
 ## Version
 
-**1.3** - Added comprehensive quality requirements and enforcement
+**1.4** - Added CI-ready testing commands and agent testing restrictions
+- Added `just test-ci` for comprehensive automated testing
+- Added `just test-ng-headless` for Angular headless testing
+- **BANNED `just test` for agents** - use `test-ci` instead
+- Updated `verify` command to include comprehensive testing
+- Added Testing Rules for Agents section
 - Removed all unused dependencies
 - Added mandatory quality check requirements
 - Updated AGENTS.md to enforce quality standards
