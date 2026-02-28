@@ -72,6 +72,7 @@ feature-depth = 1
 ignore = [
     "RUSTSEC-2021-0141", # dotenv is used only for development/testing
     "RUSTSEC-2024-0320", # yaml-rust is a transitive dependency through config crate
+    "RUSTSEC-2025-0134", # rustls-pemfile is unmaintained but required by reqwest
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
@@ -96,6 +97,7 @@ allow = [
     "Zlib",
     "Unicode-3.0",
     "ISC",
+    "MPL-2.0",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the

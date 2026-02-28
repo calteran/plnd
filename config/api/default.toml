@@ -18,3 +18,35 @@ max_connections = 10
 level = "info"
 # Pretty print logs for development
 pretty_print = true
+
+[auth]
+# JWT configuration
+jwt_secret = "development-secret-change-in-production"
+jwt_expiration = 86400 # 24 hours in seconds
+refresh_token_expiration = 604800 # 7 days in seconds
+
+# OAuth providers configuration
+[[auth.oauth_providers]]
+name = "mock"
+client_id = "mock-client"
+client_secret = "mock-secret"
+redirect_uri = "http://localhost:4200/auth/mock/callback"
+issuer_url = "http://localhost:8080"
+scopes = ["openid", "email", "profile"]
+enabled = true
+
+[[auth.oauth_providers]]
+name = "google"
+client_id = ""
+client_secret = ""
+redirect_uri = "http://localhost:4200/auth/google/callback"
+scopes = ["openid", "email", "profile"]
+enabled = false
+
+[[auth.oauth_providers]]
+name = "apple"
+client_id = ""
+client_secret = ""
+redirect_uri = "http://localhost:4200/auth/apple/callback"
+scopes = ["name", "email"]
+enabled = false

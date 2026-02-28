@@ -1,0 +1,37 @@
+{
+  "issuer": "plnd-dev",
+  "interactiveLogin": true,
+  "users": [
+    {
+      "id": "user1",
+      "username": "testuser@example.com",
+      "password": "password",
+      "name": "Test User",
+      "email": "testuser@example.com",
+      "email_verified": true,
+      "given_name": "Test",
+      "family_name": "User",
+      "picture": "https://example.com/profile.jpg"
+    },
+    {
+      "id": "user2",
+      "username": "anotheruser@example.com",
+      "password": "password",
+      "name": "Another User",
+      "email": "anotheruser@example.com",
+      "email_verified": true,
+      "given_name": "Another",
+      "family_name": "User",
+      "picture": "https://example.com/another.jpg"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "mock-client",
+      "clientSecret": "mock-secret",
+      "redirectUris": ["http://localhost:4200/auth/mock/callback"],
+      "scopes": ["openid", "email", "profile"],
+      "grantTypes": ["authorization_code", "refresh_token"]
+    }
+  ]
+}

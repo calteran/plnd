@@ -3,15 +3,15 @@
 ## Quick Reference
 
 **Project**: PLND - Neurodivergent Planner/Assistant
-**Current Phase**: Foundation (Core infrastructure setup)
+**Current Phase**: Core Features (User management and basic planning)
 **Primary Reference**: PLANNING.md
 
 ## Core Directives
 
 ### 1. Follow PLANNING.md
-- Current focus: Foundation Phase (Rust backend, authentication, database)
-- Next: Core Features Phase (user management, basic planning)
-- Then: AI Enhancements Phase (agentic architecture, LLM integration)
+- ✅ Current focus: Foundation Phase (Rust backend, authentication, database) - COMPLETED
+- 🚧 Current focus: Core Features Phase (user management, basic planning) - IN PROGRESS
+- Next: AI Enhancements Phase (agentic architecture, LLM integration)
 
 ### 2. Dependency Management
 - Always use the latest stable versions of all dependencies

@@ -25,6 +25,24 @@ services:
       - APP_LOGGING__PRETTY_PRINT=true
     depends_on:
       - db
+      - mock-oauth-server
+
+  mock-oauth-server:
+    image: navikt/mock-oauth2-server
+    ports:
+      - "8080:8080"
+    environment:
+      - ISSUER_ID=plnd-dev
+      - INTERACTIVE_LOGIN=true
+      - JSON_CONFIG=true
+    volumes:
+      - ./config/mock-oauth:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/.well-known/openid-configuration"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+=======
 
   client:
     build:

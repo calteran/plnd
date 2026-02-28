@@ -1,6 +1,7 @@
 use axum::http::StatusCode;
 use axum::{routing::get, Extension, Json, Router};
 use chrono::Utc;
+use serde_json::json;
 
 mod config;
 mod db;
@@ -37,6 +38,8 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/ready", get(readiness_check))
+        .route("/auth/oauth/mock/authorize", get(oauth_authorize))
+        .route("/auth/oauth/mock/callback", get(oauth_callback))
         .layer(Extension(db));
 
     // Run it using configured address
@@ -67,4 +70,30 @@ async fn readiness_check(
             Err(StatusCode::SERVICE_UNAVAILABLE)
         }
     }
+}
+
+// OAuth authorization endpoint
+async fn oauth_authorize() -> Result<axum::response::Redirect, StatusCode> {
+    // For now, return a simple redirect to the mock OAuth server
+    // In a real implementation, this would use the provider from extensions
+    Ok(axum::response::Redirect::to("http://localhost:8080/authorize?response_type=code&client_id=mock-client&redirect_uri=http://localhost:4200/auth/mock/callback&state=test&scope=openid%20email%20profile"))
+}
+
+// OAuth callback endpoint
+async fn oauth_callback(
+    query: axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    // Extract code from query parameters
+    let _code = query.get("code").ok_or(StatusCode::BAD_REQUEST)?;
+
+    // For now, return a mock response
+    // In a real implementation, this would exchange the code for a token
+    Ok(Json(json!({
+        "token": "mock-jwt-token",
+        "user": {
+            "sub": "user1",
+            "email": "testuser@example.com",
+            "name": "Test User"
+        }
+    })))
 }
