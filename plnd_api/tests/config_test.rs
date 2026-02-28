@@ -1,6 +1,6 @@
 #[test]
 fn test_load_config() {
-    let config = plnd_api::config::load_config_with_path("../").expect("Failed to load config");
+    let config = plnd_api::config::load_config_with_path("").expect("Failed to load config");
 
     // Test that we can load the configuration
     assert_eq!(config.api.base_url, "0.0.0.0:3000");
@@ -16,7 +16,7 @@ fn test_load_config() {
 
 #[test]
 fn test_config_validation() {
-    let config = plnd_api::config::load_config_with_path("../").expect("Failed to load config");
+    let config = plnd_api::config::load_config_with_path("").expect("Failed to load config");
 
     // Test that validation passes
     assert!(config.validate().is_ok());
