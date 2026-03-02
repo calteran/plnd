@@ -5,7 +5,7 @@ build:
 
 # Run development environment (PostgreSQL + Client) in detached mode
 dev:
-    docker compose up -d
+    docker compose build --no-cache && docker compose up -d --force-recreate
 
 # Run API service locally (requires PostgreSQL)
 api:
