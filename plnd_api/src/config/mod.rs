@@ -16,10 +16,10 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
 
     let builder = Config::builder()
         // Load default configuration (required)
-        .add_source(File::with_name(&format!("{}{}", path, "config/api/default")).required(true))
+        .add_source(File::with_name(&format!("{}{}", path, "../config/api/default")).required(true))
         // Load environment-specific configuration (optional)
         .add_source(
-            File::with_name(&format!("{}{}", path, "config/api/development")).required(false),
+            File::with_name(&format!("{}{}", path, "../config/api/development")).required(false),
         );
 
     let config = builder.build()?;
