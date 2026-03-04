@@ -63,8 +63,12 @@ pub struct OAuthProviderConfig {
     pub client_id: String,
     pub client_secret: String,
     pub redirect_uri: String,
+    /// Browser-facing base URL for the authorize redirect
     #[serde(default)]
     pub issuer_url: Option<String>,
+    /// Internal base URL for server-to-server calls (e.g. inside Docker)
+    #[serde(default)]
+    pub internal_issuer_url: Option<String>,
     pub scopes: Vec<String>,
     #[serde(default = "default_provider_enabled")]
     pub enabled: bool,
@@ -81,6 +85,9 @@ pub struct AuthConfig {
     pub jwt: JwtConfig,
     #[serde(default)]
     pub oauth_providers: Vec<OAuthProviderConfig>,
+    /// Where to redirect the browser after a successful login (Angular frontend)
+    #[serde(default)]
+    pub frontend_callback_url: Option<String>,
 }
 
 impl Default for JwtConfig {

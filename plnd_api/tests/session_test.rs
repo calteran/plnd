@@ -5,7 +5,12 @@ async fn test_session_creation() {
     let session_service = SessionService::new();
 
     let session_id = session_service
-        .create_session("user123", Some("192.168.1.1"), Some("Mozilla/5.0"))
+        .create_session(
+            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+            "mock-token-hash",
+            Some("192.168.1.1"),
+            Some("Mozilla/5.0"),
+        )
         .await
         .expect("Failed to create session");
 
@@ -18,11 +23,10 @@ async fn test_session_creation() {
 async fn test_session_validation() {
     let session_service = SessionService::new();
 
-    // Test with a valid session ID format (UUID)
+    // Stub mode always returns true
     let valid_session_id = "550e8400-e29b-41d4-a716-446655440000";
     let is_valid = session_service.validate_session(valid_session_id).await;
 
-    // Currently this always returns true as it's a mock implementation
     assert!(is_valid.expect("Failed to validate session"));
 }
 
@@ -33,6 +37,5 @@ async fn test_session_revocation() {
     let session_id = "550e8400-e29b-41d4-a716-446655440000";
     let result = session_service.revoke_session(session_id).await;
 
-    // Currently this always succeeds as it's a mock implementation
     assert!(result.is_ok());
 }

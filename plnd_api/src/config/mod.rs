@@ -53,6 +53,21 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         }
     }
 
+    if let Ok(url) = std::env::var("APP_AUTH__MOCK_INTERNAL_ISSUER_URL") {
+        if let Some(mock) = app_config
+            .auth
+            .oauth_providers
+            .iter_mut()
+            .find(|p| p.name == "mock")
+        {
+            mock.internal_issuer_url = Some(url);
+        }
+    }
+
+    if let Ok(url) = std::env::var("APP_AUTH__FRONTEND_CALLBACK_URL") {
+        app_config.auth.frontend_callback_url = Some(url);
+    }
+
     app_config
         .validate()
         .map_err(error::ConfigError::Validation)?;

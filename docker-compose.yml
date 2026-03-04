@@ -23,6 +23,10 @@ services:
       - APP_DATABASE__MAX_CONNECTIONS=10
       - APP_LOGGING__LEVEL=debug
       - APP_LOGGING__PRETTY_PRINT=true
+      # Server-to-server: API → mock OAuth server inside Docker network
+      - APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://mock-oauth-server:8080/plnd-dev
+      # Browser redirect target after successful login
+      - APP_AUTH__FRONTEND_CALLBACK_URL=http://localhost:4200/auth/callback
     depends_on:
       - db
       - mock-oauth-server

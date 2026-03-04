@@ -1,3 +1,44 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
 
-export const routes: Routes = [];
+export const routes: Routes = [
+  // Redirect root to dashboard (auth guard handles unauthenticated redirect to /login)
+  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+
+  // Unauthenticated pages — wrapped in the auth layout shell
+  {
+    path: '',
+    loadComponent: () =>
+      import('./layouts/auth-layout/auth-layout').then(m => m.AuthLayoutComponent),
+    children: [
+      {
+        path: 'login',
+        loadComponent: () =>
+          import('./features/auth/login/login').then(m => m.LoginComponent)
+      },
+      {
+        path: 'auth/callback',
+        loadComponent: () =>
+          import('./features/auth/callback/callback').then(m => m.AuthCallbackComponent)
+      }
+    ]
+  },
+
+  // Authenticated pages — wrapped in the main layout shell, guarded
+  {
+    path: '',
+    loadComponent: () =>
+      import('./layouts/main-layout/main-layout').then(m => m.MainLayoutComponent),
+    canActivate: [authGuard],
+    children: [
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard').then(m => m.DashboardComponent)
+      }
+    ]
+  },
+
+  // Fallback — redirect unknown paths to dashboard (guard will redirect to login if needed)
+  { path: '**', redirectTo: '/dashboard' }
+];

@@ -26,7 +26,12 @@ pub struct OAuthProviderConfig {
     pub client_id: String,
     pub client_secret: String,
     pub redirect_uri: String,
+    /// Browser-facing base URL (used to build the authorize redirect)
     pub issuer_url: Option<String>,
+    /// Internal base URL for server-to-server calls (token exchange, userinfo).
+    /// Use this inside Docker where `localhost` doesn't reach other containers.
+    /// Falls back to `issuer_url` when not set.
+    pub internal_issuer_url: Option<String>,
     pub scopes: Vec<String>,
     pub enabled: bool,
 }

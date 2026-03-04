@@ -29,7 +29,7 @@
     {
       "clientId": "mock-client",
       "clientSecret": "mock-secret",
-      "redirectUris": ["http://localhost:4200/auth/mock/callback"],
+      "redirectUris": ["http://localhost:3000/auth/oauth/mock/callback"],
       "scopes": ["openid", "email", "profile"],
       "grantTypes": ["authorization_code", "refresh_token"]
     }

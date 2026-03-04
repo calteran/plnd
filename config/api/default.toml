@@ -24,14 +24,16 @@ pretty_print = true
 jwt_secret = "development-secret-change-in-production"
 jwt_expiration = 86400 # 24 hours in seconds
 refresh_token_expiration = 604800 # 7 days in seconds
+# Where to redirect the browser after a successful login
+frontend_callback_url = "http://localhost:4200/auth/callback"
 
 # OAuth providers configuration
 [[auth.oauth_providers]]
 name = "mock"
 client_id = "mock-client"
 client_secret = "mock-secret"
-redirect_uri = "http://localhost:4200/auth/mock/callback"
-issuer_url = "http://localhost:8080"
+redirect_uri = "http://localhost:3000/auth/oauth/mock/callback"
+issuer_url = "http://localhost:8080/plnd-dev"
 scopes = ["openid", "email", "profile"]
 enabled = true
 

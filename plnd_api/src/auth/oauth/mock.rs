@@ -4,6 +4,7 @@ use super::{
 use crate::auth::error::AuthError;
 use async_trait::async_trait;
 use reqwest::Client;
+use url::Url;
 
 pub struct MockOAuthProvider {
     base: BaseOAuthProvider,
@@ -23,6 +24,19 @@ impl MockOAuthProvider {
             AuthError::ConfigurationError("Mock provider requires issuer_url".to_string())
         })
     }
+
+    /// Returns the URL to use for server-to-server calls (token exchange, userinfo).
+    /// Uses `internal_issuer_url` if set, otherwise falls back to `issuer_url`.
+    fn get_internal_issuer_url(&self) -> Result<String, AuthError> {
+        self.base
+            .config()
+            .internal_issuer_url
+            .clone()
+            .or_else(|| self.base.config().issuer_url.clone())
+            .ok_or_else(|| {
+                AuthError::ConfigurationError("Mock provider requires issuer_url".to_string())
+            })
+    }
 }
 
 #[async_trait]
@@ -30,15 +44,19 @@ impl OAuthProvider for MockOAuthProvider {
     fn get_auth_url(&self, state: &str, redirect_uri: &str) -> String {
         let issuer_url = self
             .get_issuer_url()
-            .unwrap_or_else(|_| "http://localhost:8080".to_string());
-        format!(
-            "{}/authorize?response_type=code&client_id={}&redirect_uri={}&state={}&scope={}",
-            issuer_url,
-            self.base.config().client_id,
-            redirect_uri,
-            state,
-            self.base.config().scopes.join(" ")
-        )
+            .unwrap_or_else(|_| "http://localhost:8080/plnd-dev".to_string());
+
+        let mut url = Url::parse(&format!("{}/authorize", issuer_url))
+            .expect("issuer_url must be a valid URL");
+
+        url.query_pairs_mut()
+            .append_pair("response_type", "code")
+            .append_pair("client_id", &self.base.config().client_id)
+            .append_pair("redirect_uri", redirect_uri)
+            .append_pair("state", state)
+            .append_pair("scope", &self.base.config().scopes.join(" "));
+
+        url.to_string()
     }
 
     async fn exchange_code_for_token(
@@ -46,7 +64,7 @@ impl OAuthProvider for MockOAuthProvider {
         code: &str,
         redirect_uri: &str,
     ) -> Result<OAuthToken, AuthError> {
-        let issuer_url = self.get_issuer_url()?;
+        let issuer_url = self.get_internal_issuer_url()?;
 
         let response = self
             .client
@@ -62,8 +80,24 @@ impl OAuthProvider for MockOAuthProvider {
             .await
             .map_err(|e| AuthError::OAuthProviderError(format!("Token exchange failed: {}", e)))?;
 
-        let token_response: serde_json::Value = response.json().await.map_err(|e| {
-            AuthError::OAuthProviderError(format!("Failed to parse token response: {}", e))
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<unreadable body>".to_string());
+
+        if !status.is_success() {
+            return Err(AuthError::OAuthProviderError(format!(
+                "Token endpoint returned {}: {}",
+                status, body
+            )));
+        }
+
+        let token_response: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
+            AuthError::OAuthProviderError(format!(
+                "Failed to parse token response: {} — body: {}",
+                e, body
+            ))
         })?;
 
         Ok(OAuthToken {
@@ -85,7 +119,7 @@ impl OAuthProvider for MockOAuthProvider {
     }
 
     async fn get_user_info(&self, token: &OAuthToken) -> Result<OAuthUserInfo, AuthError> {
-        let issuer_url = self.get_issuer_url()?;
+        let issuer_url = self.get_internal_issuer_url()?;
 
         let response = self
             .client
@@ -97,8 +131,26 @@ impl OAuthProvider for MockOAuthProvider {
                 AuthError::OAuthProviderError(format!("User info request failed: {}", e))
             })?;
 
-        let user_info: serde_json::Value = response.json().await.map_err(|e| {
-            AuthError::OAuthProviderError(format!("Failed to parse user info: {}", e))
+        let status = response.status();
+        let body = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "<unreadable body>".to_string());
+
+        if !status.is_success() {
+            return Err(AuthError::OAuthProviderError(format!(
+                "Userinfo endpoint returned {}: {}",
+                status, body
+            )));
+        }
+
+        eprintln!("[mock oauth] userinfo response: {}", body);
+
+        let user_info: serde_json::Value = serde_json::from_str(&body).map_err(|e| {
+            AuthError::OAuthProviderError(format!(
+                "Failed to parse user info: {} — body: {}",
+                e, body
+            ))
         })?;
 
         Ok(OAuthUserInfo {
