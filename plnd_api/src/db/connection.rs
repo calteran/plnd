@@ -11,9 +11,9 @@ pub struct Database {
 
 impl Database {
     /// Create a new database connection pool
-    pub async fn new(database_url: &str) -> Result<Self, DatabaseError> {
+    pub async fn new(database_url: &str, max_connections: u32) -> Result<Self, DatabaseError> {
         let pool = PgPoolOptions::new()
-            .max_connections(10)
+            .max_connections(max_connections)
             .acquire_timeout(Duration::from_secs(30))
             .idle_timeout(Duration::from_secs(600))
             .connect(database_url)

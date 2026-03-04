@@ -9,7 +9,7 @@
     "test": "ng test",
     "check-dependencies": "ncu --peer",
     "check-licenses": "license-checker --summary",
-    "check-circular": "depcruise --validate"
+    "check-circular": "depcruise src"
   },
   "prettier": {
     "overrides": [

@@ -77,7 +77,7 @@ ts-deps:
 # Test server startup (15 second timeout - will auto-kill)
 test-run-server:
     @echo "🚀 Testing server startup (15s timeout - will auto-kill)..."
-    timeout 15s cargo run --manifest-path plnd_api/Cargo.toml || \
+    cd plnd_api && timeout 15s cargo run || \
     echo "✅ Server started successfully (auto-killed after verification)"
 
 # Verify compilation only (no server startup)

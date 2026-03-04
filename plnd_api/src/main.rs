@@ -26,7 +26,8 @@ async fn main() {
     println!("  Log Level: {}", config.logging.level);
 
     // Initialize database connection using config
-    let db = match Database::new(&config.database.url).await {
+    let db = match Database::new(&config.database.url, config.database.max_connections as u32).await
+    {
         Ok(db) => db,
         Err(e) => {
             eprintln!("Failed to connect to database: {}", e);

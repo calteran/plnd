@@ -11,7 +11,7 @@ async fn test_database_connection_creation() {
     let db_url = "postgres://test:test@localhost/test";
 
     // This will fail to connect, but we can test the error handling
-    let result: Result<Database, DatabaseError> = Database::new(db_url).await;
+    let result: Result<Database, DatabaseError> = Database::new(db_url, 10).await;
 
     // Should return an error since the database doesn't exist
     assert!(matches!(result, Err(DatabaseError::ConnectionError(_))));
@@ -22,7 +22,7 @@ async fn test_database_health_check() {
     // Create a mock database (this will fail, but we test the flow)
     let db_url = "postgres://test:test@localhost/test";
 
-    let db_result: Result<Database, DatabaseError> = Database::new(db_url).await;
+    let db_result: Result<Database, DatabaseError> = Database::new(db_url, 10).await;
 
     // Since we can't connect, we can't test health check
     // But we can verify the error handling

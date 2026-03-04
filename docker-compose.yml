@@ -31,7 +31,6 @@ services:
     image: ghcr.io/navikt/mock-oauth2-server:3.0.1
     ports:
       - "8080:8080"
-    hostname: host.docker.internal
     environment:
       - ISSUER_ID=plnd-dev
       - INTERACTIVE_LOGIN=true
