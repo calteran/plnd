@@ -28,6 +28,11 @@ yarn-error.log
 !.vscode/extensions.json
 .history/*
 
+# Playwright
+/test-results
+/playwright-report
+/blob-report
+
 # Miscellaneous
 /.angular/cache
 .sass-cache/

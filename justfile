@@ -104,6 +104,24 @@ check:
     just ts-lint
     just ts-deps
 
+# Install Playwright browser binaries (run once after npm install)
+playwright-install:
+    cd plnd_client && npx playwright install chromium
+
+# Run Playwright e2e tests (CI-safe, requires Docker stack + Angular)
+test-e2e:
+    @echo "Running Playwright e2e tests..."
+    cd plnd_client && npm run e2e:ci
+
+# Run Playwright e2e tests in dev mode (reuses existing ng serve if running)
+test-e2e-dev:
+    @echo "Running Playwright e2e tests (dev mode)..."
+    cd plnd_client && npm run e2e
+
+# Open Playwright HTML report from last run
+test-e2e-report:
+    cd plnd_client && npm run e2e:report
+
 # Clean build artifacts
 clean:
     cargo clean --manifest-path plnd_api/Cargo.toml
