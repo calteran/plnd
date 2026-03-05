@@ -1,6 +1,7 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ConfigService } from './config.service';
+import { UserService } from './user.service';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -8,6 +9,7 @@ const TOKEN_KEY = 'auth_token';
 export class AuthService {
   private readonly router = inject(Router);
   private readonly config = inject(ConfigService);
+  private readonly userService = inject(UserService);
 
   private readonly tokenSignal = signal<string | null>(
     localStorage.getItem(TOKEN_KEY)
@@ -38,6 +40,7 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(TOKEN_KEY);
     this.tokenSignal.set(null);
+    this.userService.clearUser();
     this.router.navigate(['/login']);
   }
 

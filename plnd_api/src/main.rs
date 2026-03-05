@@ -1,4 +1,4 @@
-use axum::http::StatusCode;
+use axum::http::{HeaderValue, Method, StatusCode};
 use axum::{
     extract::State,
     middleware,
@@ -7,6 +7,7 @@ use axum::{
 };
 use chrono::Utc;
 use std::sync::Arc;
+use tower_http::cors::CorsLayer;
 
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::oauth::{MockOAuthProvider, OAuthProviderConfig};
@@ -98,6 +99,16 @@ async fn main() {
         enabled: mock_cfg.enabled,
     }));
 
+    // Derive CORS origin before frontend_callback is moved into AppState.
+    // e.g. "http://localhost:4200/auth/callback" → "http://localhost:4200"
+    let cors_origin: HeaderValue = frontend_callback
+        .split('/')
+        .take(3)
+        .collect::<Vec<_>>()
+        .join("/")
+        .parse()
+        .expect("invalid CORS origin derived from frontend_callback_url");
+
     let state = Arc::new(AppState {
         db: db_conn,
         jwt,
@@ -106,6 +117,20 @@ async fn main() {
         callback_uri,
         frontend_callback,
     });
+
+    let cors = CorsLayer::new()
+        .allow_origin(cors_origin)
+        .allow_methods([
+            Method::GET,
+            Method::POST,
+            Method::PATCH,
+            Method::DELETE,
+            Method::OPTIONS,
+        ])
+        .allow_headers([
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::CONTENT_TYPE,
+        ]);
 
     let protected = Router::new()
         .route("/users/me", get(users::get_me))
@@ -122,7 +147,7 @@ async fn main() {
         .route("/auth/oauth/mock/authorize", get(auth::oauth_authorize))
         .route("/auth/oauth/mock/callback", get(auth::oauth_callback));
 
-    let app = public.merge(protected).with_state(state);
+    let app = public.merge(protected).with_state(state).layer(cors);
 
     let listener = tokio::net::TcpListener::bind(&config.api.base_url)
         .await

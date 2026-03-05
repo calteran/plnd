@@ -95,7 +95,7 @@ pub async fn oauth_callback(
             &user.user_id.to_string(),
             &user.email,
             user.display_name.as_deref(),
-            user.profile_picture_url.as_deref(),
+            user.avatar_url.as_deref(),
         )
         .map_err(|e| {
             eprintln!("JWT generation failed: {}", e);

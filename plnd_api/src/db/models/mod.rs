@@ -18,5 +18,5 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
     pub is_active: bool,
     pub last_login: Option<DateTime<Utc>>,
-    pub profile_picture_url: Option<String>,
+    pub avatar_url: Option<String>,
 }

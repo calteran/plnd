@@ -13,7 +13,7 @@ use uuid::Uuid;
 #[derive(Debug, serde::Deserialize)]
 pub struct UpdateProfileRequest {
     pub display_name: Option<String>,
-    pub profile_picture_url: Option<String>,
+    pub avatar_url: Option<String>,
 }
 
 /// GET /users/me — return the current user's profile
@@ -33,7 +33,7 @@ pub async fn get_me(
     }
 }
 
-/// PATCH /users/me — update display_name and/or profile_picture_url
+/// PATCH /users/me — update display_name and/or avatar_url
 pub async fn patch_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -47,7 +47,7 @@ pub async fn patch_me(
             return Err(StatusCode::UNPROCESSABLE_ENTITY);
         }
     }
-    if let Some(ref url) = body.profile_picture_url {
+    if let Some(ref url) = body.avatar_url {
         if url.len() > 500 {
             return Err(StatusCode::UNPROCESSABLE_ENTITY);
         }
@@ -59,7 +59,7 @@ pub async fn patch_me(
         pool,
         user_id,
         body.display_name.as_deref(),
-        body.profile_picture_url.as_deref(),
+        body.avatar_url.as_deref(),
     )
     .await
     .map_err(|e| {

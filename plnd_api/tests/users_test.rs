@@ -10,7 +10,7 @@ fn test_update_profile_request_all_absent() {
     let json = "{}";
     let req: UpdateProfileRequest = serde_json::from_str(json).expect("deserialize failed");
     assert!(req.display_name.is_none());
-    assert!(req.profile_picture_url.is_none());
+    assert!(req.avatar_url.is_none());
 }
 
 #[test]
@@ -18,16 +18,16 @@ fn test_update_profile_request_display_name_only() {
     let json = r#"{"display_name":"Alice"}"#;
     let req: UpdateProfileRequest = serde_json::from_str(json).expect("deserialize failed");
     assert_eq!(req.display_name.as_deref(), Some("Alice"));
-    assert!(req.profile_picture_url.is_none());
+    assert!(req.avatar_url.is_none());
 }
 
 #[test]
 fn test_update_profile_request_both_fields() {
-    let json = r#"{"display_name":"Bob","profile_picture_url":"https://example.com/bob.jpg"}"#;
+    let json = r#"{"display_name":"Bob","avatar_url":"https://example.com/bob.jpg"}"#;
     let req: UpdateProfileRequest = serde_json::from_str(json).expect("deserialize failed");
     assert_eq!(req.display_name.as_deref(), Some("Bob"));
     assert_eq!(
-        req.profile_picture_url.as_deref(),
+        req.avatar_url.as_deref(),
         Some("https://example.com/bob.jpg")
     );
 }
