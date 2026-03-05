@@ -102,6 +102,41 @@ pub async fn link_oauth_provider(
     .map_err(|e| DatabaseError::QueryError(e.to_string()))
 }
 
+/// Update a user's display_name and/or profile_picture_url.
+/// Fields set to None are left unchanged (COALESCE semantics).
+pub async fn update_profile(
+    pool: &PgPool,
+    user_id: Uuid,
+    display_name: Option<&str>,
+    profile_picture_url: Option<&str>,
+) -> Result<Option<User>, DatabaseError> {
+    sqlx::query_as::<_, User>(
+        "UPDATE users
+         SET display_name = COALESCE($2, display_name),
+             profile_picture_url = COALESCE($3, profile_picture_url),
+             updated_at = NOW()
+         WHERE user_id = $1
+         RETURNING user_id, email, display_name, created_at, updated_at,
+                   is_active, last_login, profile_picture_url",
+    )
+    .bind(user_id)
+    .bind(display_name)
+    .bind(profile_picture_url)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+}
+
+/// Soft-deactivate a user (is_active = FALSE). Returns true if a row was updated.
+pub async fn deactivate_user(pool: &PgPool, user_id: Uuid) -> Result<bool, DatabaseError> {
+    sqlx::query("UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE user_id = $1")
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map(|r| r.rows_affected() > 0)
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))
+}
+
 /// Update a user's last_login timestamp
 pub async fn touch_last_login(pool: &PgPool, user_id: Uuid) -> Result<(), DatabaseError> {
     sqlx::query("UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE user_id = $1")
