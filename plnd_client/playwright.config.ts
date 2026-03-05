@@ -20,7 +20,7 @@ export default defineConfig({
   webServer: {
     command: 'npx ng serve --configuration development',
     url: 'http://localhost:4200',
-    reuseExistingServer: !process.env['CI'],
+    reuseExistingServer: true,
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',

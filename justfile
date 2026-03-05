@@ -50,6 +50,8 @@ test-ci:
     @echo "🚀 Running comprehensive CI test suite..."
     cargo nextest run --manifest-path plnd_api/Cargo.toml && \
     just test-ng-headless && \
+    just services-up && \
+    just test-e2e && \
     echo "✅ All CI tests passed"
 
 # Rust quality commands
@@ -86,6 +88,12 @@ verify-build:
     cargo build --manifest-path plnd_api/Cargo.toml && \
     echo "✅ Build successful"
 
+# Ensure Docker stack is running and all services are healthy (idempotent)
+services-up:
+    @echo "🐳 Ensuring Docker stack is up and healthy..."
+    docker compose up -d --wait
+    @echo "✅ Services ready"
+
 # Full verification (quality checks + build + comprehensive tests)
 verify:
     @echo "🔍 Running full verification..."
@@ -93,6 +101,8 @@ verify:
     just verify-build && \
     cargo nextest run --manifest-path plnd_api/Cargo.toml && \
     just test-ng-headless && \
+    just services-up && \
+    just test-e2e && \
     echo "✅ All verifications passed"
 
 # Combined quality check
