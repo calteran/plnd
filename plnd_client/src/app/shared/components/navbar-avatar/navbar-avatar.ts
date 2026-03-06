@@ -31,6 +31,9 @@ import { AuthService } from '../../../core/services/auth.service';
           <button class="dropdown-item" role="menuitem" (click)="goToProfile()">
             My Profile
           </button>
+          <button class="dropdown-item" role="menuitem" (click)="goToSettings()">
+            Settings
+          </button>
           <div class="dropdown-divider"></div>
           <button class="dropdown-item dropdown-item--danger" role="menuitem" (click)="signOut()">
             Sign out
@@ -155,6 +158,11 @@ export class NavbarAvatarComponent implements OnInit {
   goToProfile(): void {
     this.dropdownOpen.set(false);
     this.router.navigate(['/profile']);
+  }
+
+  goToSettings(): void {
+    this.dropdownOpen.set(false);
+    this.router.navigate(['/settings']);
   }
 
   signOut(): void {

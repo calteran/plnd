@@ -16,7 +16,7 @@ use plnd_api::config;
 use plnd_api::config::settings::OAuthProviderConfig as ConfigOAuthProvider;
 use plnd_api::db::models::ReadyStatus;
 use plnd_api::db::Database;
-use plnd_api::routes::{auth, users};
+use plnd_api::routes::{auth, preferences, users};
 use plnd_api::state::AppState;
 
 #[tokio::main]
@@ -136,6 +136,8 @@ async fn main() {
         .route("/users/me", get(users::get_me))
         .route("/users/me", patch(users::patch_me))
         .route("/users/me", delete(users::delete_me))
+        .route("/preferences/me", get(preferences::get_preferences))
+        .route("/preferences/me", patch(preferences::patch_preferences))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

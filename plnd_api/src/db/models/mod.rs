@@ -10,6 +10,14 @@ pub struct ReadyStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct UserPreferences {
+    pub user_id: Uuid,
+    pub theme: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
     pub user_id: Uuid,
     pub email: String,

@@ -107,7 +107,7 @@ describe('NavbarAvatarComponent', () => {
 
     const authService = TestBed.inject(AuthService);
     const items = fixture.nativeElement.querySelectorAll('.dropdown-item') as NodeListOf<HTMLButtonElement>;
-    items[1].click();
+    items[2].click();
 
     expect(authService.logout).toHaveBeenCalled();
   });
