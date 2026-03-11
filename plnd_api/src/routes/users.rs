@@ -10,12 +10,23 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct UpdateProfileRequest {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/users/me",
+    tag = "Users",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Current user profile", body = User),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+    )
+)]
 /// GET /users/me — return the current user's profile
 pub async fn get_me(
     State(state): State<Arc<AppState>>,
@@ -33,6 +44,19 @@ pub async fn get_me(
     }
 }
 
+#[utoipa::path(
+    patch,
+    path = "/users/me",
+    tag = "Users",
+    security(("bearer_auth" = [])),
+    request_body = UpdateProfileRequest,
+    responses(
+        (status = 200, description = "Updated user profile", body = User),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+        (status = 422, description = "Validation error"),
+    )
+)]
 /// PATCH /users/me — update display_name and/or avatar_url
 pub async fn patch_me(
     State(state): State<Arc<AppState>>,
@@ -71,6 +95,17 @@ pub async fn patch_me(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/users/me/complete-onboarding",
+    tag = "Users",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Onboarding marked complete"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 /// POST /users/me/complete-onboarding — mark onboarding as done, returns 200 OK
 pub async fn post_complete_onboarding(
     State(state): State<Arc<AppState>>,
@@ -87,6 +122,17 @@ pub async fn post_complete_onboarding(
     Ok(StatusCode::OK)
 }
 
+#[utoipa::path(
+    delete,
+    path = "/users/me",
+    tag = "Users",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Account deactivated"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "User not found"),
+    )
+)]
 /// DELETE /users/me — soft-deactivate the account, returns 204 No Content
 pub async fn delete_me(
     State(state): State<Arc<AppState>>,

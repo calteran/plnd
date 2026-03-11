@@ -10,14 +10,14 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct CreateRestrictionRequest {
     pub restriction_type: String,
     pub name: String,
     pub notes: Option<String>,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct UpdateRestrictionRequest {
     pub notes: Option<String>,
 }
@@ -26,6 +26,16 @@ pub const VALID_TYPES: &[&str] = &["allergy", "intolerance", "preference"];
 pub const MAX_NAME_LEN: usize = 100;
 pub const MAX_NOTES_LEN: usize = 500;
 
+#[utoipa::path(
+    get,
+    path = "/dietary-restrictions",
+    tag = "Dietary Restrictions",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "List of dietary restrictions", body = Vec<DietaryRestriction>),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
 /// GET /dietary-restrictions — list all restrictions for the current user
 pub async fn list_restrictions(
     State(state): State<Arc<AppState>>,
@@ -43,6 +53,19 @@ pub async fn list_restrictions(
         })
 }
 
+#[utoipa::path(
+    post,
+    path = "/dietary-restrictions",
+    tag = "Dietary Restrictions",
+    security(("bearer_auth" = [])),
+    request_body = CreateRestrictionRequest,
+    responses(
+        (status = 201, description = "Restriction created", body = DietaryRestriction),
+        (status = 401, description = "Unauthorized"),
+        (status = 409, description = "Duplicate restriction (same type and name)"),
+        (status = 422, description = "Validation error"),
+    )
+)]
 /// POST /dietary-restrictions — create a new restriction
 pub async fn create_restriction(
     State(state): State<Arc<AppState>>,
@@ -88,6 +111,20 @@ pub async fn create_restriction(
     })
 }
 
+#[utoipa::path(
+    patch,
+    path = "/dietary-restrictions/{id}",
+    tag = "Dietary Restrictions",
+    security(("bearer_auth" = [])),
+    params(("id" = uuid::Uuid, Path, description = "Restriction ID")),
+    request_body = UpdateRestrictionRequest,
+    responses(
+        (status = 200, description = "Updated restriction", body = DietaryRestriction),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Restriction not found"),
+        (status = 422, description = "Validation error"),
+    )
+)]
 /// PATCH /dietary-restrictions/:id — update notes on an existing restriction
 pub async fn update_restriction(
     State(state): State<Arc<AppState>>,
@@ -115,6 +152,18 @@ pub async fn update_restriction(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
+#[utoipa::path(
+    delete,
+    path = "/dietary-restrictions/{id}",
+    tag = "Dietary Restrictions",
+    security(("bearer_auth" = [])),
+    params(("id" = uuid::Uuid, Path, description = "Restriction ID")),
+    responses(
+        (status = 204, description = "Restriction deleted"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Restriction not found"),
+    )
+)]
 /// DELETE /dietary-restrictions/:id — remove a restriction
 pub async fn delete_restriction(
     State(state): State<Arc<AppState>>,

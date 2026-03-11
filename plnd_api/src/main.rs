@@ -1,22 +1,23 @@
-use axum::http::{HeaderValue, Method, StatusCode};
+use axum::http::{HeaderValue, Method};
 use axum::{
-    extract::State,
     middleware,
     routing::{delete, get, patch, post},
-    Json, Router,
+    Router,
 };
-use chrono::Utc;
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
+use utoipa::OpenApi;
+use utoipa_scalar::{Scalar, Servable};
+use utoipa_swagger_ui::SwaggerUi;
 
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::oauth::{MockOAuthProvider, OAuthProviderConfig};
 use plnd_api::auth::{JwtService, SessionService};
 use plnd_api::config;
 use plnd_api::config::settings::OAuthProviderConfig as ConfigOAuthProvider;
-use plnd_api::db::models::ReadyStatus;
 use plnd_api::db::Database;
-use plnd_api::routes::{auth, dietary_restrictions, preferences, users};
+use plnd_api::openapi::ApiDoc;
+use plnd_api::routes::{auth, dietary_restrictions, preferences, system, users};
 use plnd_api::state::AppState;
 
 #[tokio::main]
@@ -164,36 +165,21 @@ async fn main() {
         ));
 
     let public = Router::new()
-        .route("/health", get(health_check))
-        .route("/ready", get(readiness_check))
+        .route("/health", get(system::health_check))
+        .route("/ready", get(system::readiness_check))
         .route("/auth/oauth/mock/authorize", get(auth::oauth_authorize))
         .route("/auth/oauth/mock/callback", get(auth::oauth_callback));
 
-    let app = public.merge(protected).with_state(state).layer(cors);
+    let app = public
+        .merge(protected)
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
+        .with_state(state)
+        .layer(cors);
 
     let listener = tokio::net::TcpListener::bind(&config.api.base_url)
         .await
         .unwrap();
     println!("API server listening on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
-}
-
-async fn health_check() -> &'static str {
-    "OK"
-}
-
-async fn readiness_check(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<ReadyStatus>, StatusCode> {
-    match state.db.health_check().await {
-        Ok(_) => Ok(Json(ReadyStatus {
-            status: "ready".to_string(),
-            database: "connected".to_string(),
-            timestamp: Utc::now(),
-        })),
-        Err(e) => {
-            eprintln!("Readiness check failed: {}", e);
-            Err(StatusCode::SERVICE_UNAVAILABLE)
-        }
-    }
 }

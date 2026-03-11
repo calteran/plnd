@@ -4,6 +4,15 @@ use axum::{extract::State, http::StatusCode};
 use std::collections::HashMap;
 use std::sync::Arc;
 
+#[utoipa::path(
+    get,
+    path = "/auth/oauth/mock/authorize",
+    tag = "Auth",
+    responses(
+        (status = 302, description = "Redirect to mock OAuth provider"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn oauth_authorize(
     State(state): State<Arc<AppState>>,
 ) -> Result<axum::response::Redirect, StatusCode> {
@@ -15,6 +24,17 @@ pub async fn oauth_authorize(
     Ok(axum::response::Redirect::to(&auth_url))
 }
 
+#[utoipa::path(
+    get,
+    path = "/auth/oauth/mock/callback",
+    tag = "Auth",
+    params(("code" = String, Query, description = "OAuth authorization code")),
+    responses(
+        (status = 302, description = "Redirect to frontend with JWT token"),
+        (status = 400, description = "Missing code parameter"),
+        (status = 500, description = "Token exchange or user creation failed"),
+    )
+)]
 pub async fn oauth_callback(
     State(state): State<Arc<AppState>>,
     query: axum::extract::Query<HashMap<String, String>>,

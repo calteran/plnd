@@ -10,13 +10,24 @@ use axum::{
 use std::sync::Arc;
 use uuid::Uuid;
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct UpdatePreferencesRequest {
     pub theme: Option<String>,
 }
 
 const VALID_THEMES: &[&str] = &["system", "light", "dark"];
 
+#[utoipa::path(
+    get,
+    path = "/preferences/me",
+    tag = "Preferences",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "User preferences", body = UserPreferences),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 /// GET /preferences/me — return the current user's preferences, creating defaults if absent
 pub async fn get_preferences(
     State(state): State<Arc<AppState>>,
@@ -34,6 +45,19 @@ pub async fn get_preferences(
         })
 }
 
+#[utoipa::path(
+    patch,
+    path = "/preferences/me",
+    tag = "Preferences",
+    security(("bearer_auth" = [])),
+    request_body = UpdatePreferencesRequest,
+    responses(
+        (status = 200, description = "Updated preferences", body = UserPreferences),
+        (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Invalid theme value"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 /// PATCH /preferences/me — update theme and/or other preferences
 pub async fn patch_preferences(
     State(state): State<Arc<AppState>>,
