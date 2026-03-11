@@ -172,41 +172,62 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 ### Phase 2: Core Features (MVP Functionality) 🚧 IN PROGRESS
 **Goal**: Implement the minimum viable planning features
 
+> **Data Model Reference**: See [`DOMAIN_MODEL.md`](./DOMAIN_MODEL.md) for the authoritative domain and scheduling model — entity hierarchy, catalog layer, schedule template/instance pattern, dynamic adjustment, and family coordination. All Phase 2 meal, exercise, and scheduling work should be grounded in that document.
+
 **Tasks:**
-1. **User Management**
-   - User profile CRUD operations
-   - Preferences and settings management
-   - Dietary restrictions and allergy tracking
+0. **Authentication UI & App Shell** ✅
+   - ✅ Login page with Mock OAuth sign-in button
+   - ✅ OAuth callback handler (extracts JWT, stores in localStorage)
+   - ✅ Angular auth guard (functional guard, protects authenticated routes)
+   - ✅ Main layout shell (sidebar + top navbar structure)
+   - ✅ NavbarAvatar component (initials fallback, image support, dropdown menu)
+   - ✅ AuthService, UserService, PreferencesService (signals-based state)
+
+1. **User Management** 🚧
+   - ✅ User profile CRUD operations (display_name, avatar_url)
+   - ✅ Preferences and settings management (theme: system/light/dark)
+   - Add allergen checkboxes and dietary notes to preferences (migration, backend validation, settings UI)
    - Basic user onboarding flow
 
-2. **Meal Planning Core**
-   - Meal CRUD operations
-   - Basic meal planning interface
-   - Simple scheduling functionality
-   - Recurring meal patterns
+2. **Domain Model Database Schema**
+   - Implement catalog layer migrations: `catalog_meals`, `catalog_exercises`
+   - Implement personal library migrations: `user_meals`, `user_exercises`
+   - Implement scheduling migrations: `schedule_templates`, `schedule_entries`
+   - Implement task model migrations: `tasks`, `meal_tasks`, `exercise_tasks`, `work_tasks`, `generic_tasks`
+   - Implement family migrations: `families`, `family_members`, `family_meals`
+   - Seed catalog with basic starter meals and exercises
 
-3. **Exercise Planning Core**
-   - Exercise CRUD operations
-   - Basic workout planning
-   - Simple scheduling interface
-   - Recurring exercise patterns
+3. **Meal Planning Core**
+   - Implement meal CRUD API endpoints
+   - Build meal planning UI (list, add/edit/delete)
+   - Schedule meals onto the weekly plan view
+   - Support recurring meal templates
 
-4. **Basic LLM Integration**
-   - Set up Mistral API client
-   - Implement basic prompt templates
-   - Create simple meal suggestion tool
-   - Add basic conversation context
+4. **Exercise Planning Core**
+   - Implement exercise CRUD API endpoints
+   - Build workout planning UI (list, add/edit/delete)
+   - Schedule workouts onto the weekly plan view
+   - Support recurring exercise templates
 
 5. **Family Support Foundation**
-   - Multi-user account structure
-   - Basic family profile management
-   - Shared meal planning capabilities
-   - Caregiver access permissions
+   - Create family account schema and API
+   - Build family profile management UI
+   - Enable shared meal planning for family members
+   - Implement caregiver access roles and permissions
+
+6. **Basic LLM Integration**
+   - Set up Mistral API client
+   - Implement basic prompt templates
+   - Create simple meal suggestion tool (requires meal catalog data)
+   - Add basic conversation context
 
 **Deliverables:**
+- ✅ Functional authentication UI and app shell
+- ✅ User profile and preferences management
+- Domain model database schema (prerequisite for all CRUD features)
 - Functional meal and exercise planning
-- Basic LLM-powered suggestions
-- User and family profile management
+- Family profile management
+- Basic LLM-powered suggestions (dependent on meal/exercise data being in place)
 - Core planning interfaces
 
 ### Phase 3: AI Enhancements (Intelligent Features)
@@ -214,28 +235,28 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 **Tasks:**
 1. **Advanced LLM Tools**
-   - Nutrition analysis tool
-   - Schedule optimization tool
-   - Preference update tool
-   - Context-aware suggestion engine
+   - Build LLM nutrition analysis tool
+   - Build LLM schedule optimization tool
+   - Build LLM preference-update tool
+   - Implement context-aware suggestion engine
 
 2. **Prompt Engineering**
-   - Domain-specific prompt templates
-   - Few-shot learning examples
-   - Structured output requirements
-   - Error handling and retries
+   - Write domain-specific prompt templates
+   - Add few-shot examples to prompt templates
+   - Enforce structured output in LLM responses
+   - Add LLM error handling and retry logic
 
 3. **Conversational Interface**
-   - Natural language input processing
-   - Intent recognition
-   - Context management across sessions
-   - Multi-turn conversation support
+   - Process natural language user input
+   - Classify user request intent
+   - Persist conversation context across sessions
+   - Support multi-turn conversation flows
 
 4. **Proactive Suggestions**
-   - Pattern detection from user behavior
-   - Personalized recommendations
-   - Adaptive planning adjustments
-   - Feedback loop integration
+   - Detect patterns from user behavior history
+   - Generate personalized meal/exercise recommendations
+   - Auto-adjust plans based on user feedback
+   - Feed user ratings back into the suggestion model
 
 **Deliverables:**
 - Intelligent planning assistant
@@ -255,36 +276,36 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 2. **Weather Integration**
    - Weather API client
-   - Weather-aware activity suggestions
-   - Outdoor/indoor activity switching
+   - Suggest weather-appropriate activities
+   - Switch between indoor/outdoor recommendations based on forecast
    - Weather-based reminders
 
 3. **Nutrition Features**
-   - USDA FoodData Central API integration for barcode scanning
+   - Integrate USDA FoodData Central API for nutrition data
    - Barcode scanner implementation with camera access
-   - Photo recognition with OCR for nutrition labels
+   - Add photo OCR for nutrition label scanning
    - Manual nutrition entry forms with validation
-   - Product database for saved food items
-   - Nutrition data parsing and storage
+   - Create product database for saved foods
+   - Parse and store nutrition data from all input sources
 
 4. **Grocery & Shopping Features**
    - Grocery list generation from meal plans
    - Smart list organization by store sections
-   - Pantry inventory tracking system
+   - Track pantry/fridge inventory
    - Expiration date monitoring with alerts
    - Barcode scanning for inventory management
 
 5. **Advanced Analytics**
-   - Plan vs. actual tracking for nutrition/exercise/tasks
+   - Track plan vs. actual for nutrition, exercise, and tasks
    - Trend analysis and progress visualization
    - Exportable reports for healthcare providers
    - Performance metrics and insights
 
 6. **Advanced Planning**
    - Drag-and-drop interface
-   - Recurring plan templates
-   - Plan override functionality
-   - Bulk editing capabilities
+   - Build recurring plan template system
+   - Allow per-day plan overrides
+   - Support bulk editing of scheduled items
 
 **Deliverables:**
 - External service integrations
@@ -298,23 +319,23 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 **Goal**: Develop and polish the iOS application
 
 **Tasks:**
-1. **Capacitor Setup**
+1. **Set up Capacitor for iOS**
    - Configure Capacitor for iOS
    - Set up native project structure
-   - Configure build pipelines
-   - Add necessary plugins
+   - Configure iOS build pipeline
+   - Add required Capacitor plugins
 
 2. **Mobile UI/UX**
-   - Responsive design for mobile
-   - Touch-optimized interfaces
-   - Offline capability implementation
-   - Native-like transitions
+   - Make all views responsive for mobile
+   - Optimize UI interactions for touch
+   - Implement offline capability
+   - Implement native-like page transitions
 
 3. **Mobile-Specific Features**
    - Push notification setup
    - Background sync
-   - Local data caching
-   - App store preparation
+   - Cache schedule data locally for offline use
+   - Prepare App Store metadata and screenshots
 
 4. **Testing and Polish**
    - Device-specific testing
@@ -335,8 +356,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 1. **Production Infrastructure**
    - Kubernetes cluster setup
    - CI/CD pipeline configuration
-   - Monitoring and logging setup
-   - Backup and recovery systems
+   - Set up monitoring and log aggregation
+   - Implement automated backup and recovery
 
 2. **Security Hardening**
    - Security audit
@@ -381,14 +402,14 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 3. **Marketing Preparation**
    - Landing page
    - App store listings
-   - Social media setup
+   - Create social media presence for launch
    - Launch materials
 
 4. **Launch Execution**
    - Coordinated release
    - Monitoring during launch
    - User support setup
-   - Feedback collection system
+   - Integrate user feedback collection
 
 **Deliverables:**
 - Fully tested application
