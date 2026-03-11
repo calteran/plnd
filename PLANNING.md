@@ -195,27 +195,34 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - Implement scheduling migrations: `schedule_templates`, `schedule_entries`
    - Implement task model migrations: `tasks`, `meal_tasks`, `exercise_tasks`, `work_tasks`, `generic_tasks`
    - Implement family migrations: `families`, `family_members`, `family_meals`
-   - Seed catalog with basic starter meals and exercises
 
-3. **Meal Planning Core**
+3. **Catalog Population Infrastructure**
+   - **Dev/Staging Seed Fixtures**: Static SQL seed script (~20–30 common meals and exercises) covering all `meal_type` and `intensity` categories; idempotent (`INSERT ... ON CONFLICT DO NOTHING`); used by local dev, CI, and staging environments
+   - **Public API Client — Meals**: Integrate USDA FoodData Central API to import foods into `catalog_meals`; normalize FDC nutrient data into the nutrition JSONB schema; tag records with `source = 'usda_fdc'`
+   - **Public API Client — Exercises**: Integrate a public exercise API (e.g., WGER) to import exercises into `catalog_exercises`; normalize muscle groups, intensity, and equipment fields; tag records with `source = 'wger'`
+   - **Search-Through Pattern**: When a user searches for a meal or exercise, query the local catalog first; on insufficient results, fan out to the appropriate external API, cache results into the catalog tables (deduplication by source + external ID), and return the merged set
+   - **Admin Seed Command**: `just seed-catalog` justfile recipe that bulk-imports from external APIs for staging/production initial population; safe to re-run (idempotent)
+   - *(Future — Phase 3)*: AI-agent-guided catalog curation (enriching descriptions, tagging, flagging low-quality entries) deferred to the LLM integration phase
+
+4. **Meal Planning Core**
    - Implement meal CRUD API endpoints
    - Build meal planning UI (list, add/edit/delete)
    - Schedule meals onto the weekly plan view
    - Support recurring meal templates
 
-4. **Exercise Planning Core**
+5. **Exercise Planning Core**
    - Implement exercise CRUD API endpoints
    - Build workout planning UI (list, add/edit/delete)
    - Schedule workouts onto the weekly plan view
    - Support recurring exercise templates
 
-5. **Family Support Foundation**
+6. **Family Support Foundation**
    - Create family account schema and API
    - Build family profile management UI
    - Enable shared meal planning for family members
    - Implement caregiver access roles and permissions
 
-6. **Basic LLM Integration**
+7. **Basic LLM Integration**
    - Set up Mistral API client
    - Implement basic prompt templates
    - Create simple meal suggestion tool (requires meal catalog data)
@@ -227,6 +234,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - ✅ Dietary restrictions management (full CRUD, backend + Angular UI)
 - ✅ User onboarding wizard (multi-step, skip-friendly, DB-persisted completion)
 - Domain model database schema (prerequisite for all CRUD features)
+- Catalog population infrastructure (dev fixtures + public API clients + search-through pattern)
 - Functional meal and exercise planning
 - Family profile management
 - Basic LLM-powered suggestions (dependent on meal/exercise data being in place)
