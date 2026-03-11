@@ -38,4 +38,5 @@ pub struct User {
     pub is_active: bool,
     pub last_login: Option<DateTime<Utc>>,
     pub avatar_url: Option<String>,
+    pub onboarding_completed: bool,
 }

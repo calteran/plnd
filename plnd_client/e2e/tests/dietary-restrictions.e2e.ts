@@ -6,6 +6,18 @@ import { test, expect } from '@playwright/test';
 const API_BASE = 'http://localhost:3000';
 const DR_URL = `${API_BASE}/dietary-restrictions`;
 
+const MOCK_USER_ONBOARDED = {
+  user_id: 'e2e-test-uuid',
+  email: 'test@example.com',
+  display_name: 'Test User',
+  avatar_url: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  is_active: true,
+  last_login: null,
+  onboarding_completed: true
+};
+
 const MOCK_RESTRICTIONS = [
   {
     restriction_id: 'uuid-1',
@@ -34,6 +46,10 @@ test.describe('Dietary Restrictions', () => {
   });
 
   test('list renders restriction names', async ({ page }) => {
+    await page.route(`${API_BASE}/users/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+
     await page.route(`${DR_URL}`, async route => {
       if (route.request().method() === 'GET') {
         await route.fulfill({ status: 200, json: MOCK_RESTRICTIONS });
@@ -65,6 +81,10 @@ test.describe('Dietary Restrictions', () => {
       updated_at: '2026-01-01T00:00:00Z'
     };
 
+    await page.route(`${API_BASE}/users/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+
     await page.route(`${DR_URL}`, async route => {
       const method = route.request().method();
       if (method === 'GET') {
@@ -93,6 +113,10 @@ test.describe('Dietary Restrictions', () => {
 
   test('edit notes shows success and updated notes', async ({ page }) => {
     const updated = { ...MOCK_RESTRICTIONS[1], notes: 'severe' };
+
+    await page.route(`${API_BASE}/users/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
 
     await page.route(`${DR_URL}`, async route => {
       if (route.request().method() === 'GET') {
@@ -130,6 +154,10 @@ test.describe('Dietary Restrictions', () => {
   });
 
   test('delete restriction removes item from list', async ({ page }) => {
+    await page.route(`${API_BASE}/users/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+
     await page.route(`${DR_URL}`, async route => {
       if (route.request().method() === 'GET') {
         await route.fulfill({ status: 200, json: MOCK_RESTRICTIONS });

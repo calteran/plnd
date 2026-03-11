@@ -187,7 +187,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - ✅ User profile CRUD operations (display_name, avatar_url)
    - ✅ Preferences and settings management (theme: system/light/dark)
    - ✅ Dietary restrictions CRUD (allergy/intolerance/preference types, name, notes — backend + Angular UI with signals)
-   - Basic user onboarding flow
+   - ✅ Basic user onboarding flow (4-step wizard: Welcome → Profile → Theme → Dietary Restrictions; all steps skippable; `onboarding_completed` persisted in DB)
 
 2. **Domain Model Database Schema**
    - Implement catalog layer migrations: `catalog_meals`, `catalog_exercises`
@@ -225,6 +225,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - ✅ Functional authentication UI and app shell
 - ✅ User profile and preferences management
 - ✅ Dietary restrictions management (full CRUD, backend + Angular UI)
+- ✅ User onboarding wizard (multi-step, skip-friendly, DB-persisted completion)
 - Domain model database schema (prerequisite for all CRUD features)
 - Functional meal and exercise planning
 - Family profile management

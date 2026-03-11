@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
+import { onboardingNotCompletedGuard, onboardingCompletedGuard } from './core/guards/onboarding.guard';
 
 export const routes: Routes = [
   // Redirect root to dashboard (auth guard handles unauthenticated redirect to /login)
@@ -24,12 +25,20 @@ export const routes: Routes = [
     ]
   },
 
+  // Onboarding wizard — self-contained, no layout shell
+  {
+    path: 'onboarding',
+    canActivate: [authGuard, onboardingNotCompletedGuard],
+    loadComponent: () =>
+      import('./features/onboarding/onboarding').then(m => m.OnboardingComponent)
+  },
+
   // Authenticated pages — wrapped in the main layout shell, guarded
   {
     path: '',
     loadComponent: () =>
       import('./layouts/main-layout/main-layout').then(m => m.MainLayoutComponent),
-    canActivate: [authGuard],
+    canActivate: [authGuard, onboardingCompletedGuard],
     children: [
       {
         path: 'dashboard',

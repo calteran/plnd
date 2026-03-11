@@ -9,7 +9,7 @@ use crate::db::models::User;
 pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, DatabaseError> {
     sqlx::query_as::<_, User>(
         "SELECT user_id, email, display_name, created_at, updated_at,
-                is_active, last_login, avatar_url
+                is_active, last_login, avatar_url, onboarding_completed
          FROM users WHERE email = $1",
     )
     .bind(email)
@@ -22,7 +22,7 @@ pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, D
 pub async fn find_by_id(pool: &PgPool, user_id: Uuid) -> Result<Option<User>, DatabaseError> {
     sqlx::query_as::<_, User>(
         "SELECT user_id, email, display_name, created_at, updated_at,
-                is_active, last_login, avatar_url
+                is_active, last_login, avatar_url, onboarding_completed
          FROM users WHERE user_id = $1",
     )
     .bind(user_id)
@@ -46,7 +46,7 @@ pub async fn create(
                             is_active, avatar_url)
          VALUES ($1, $2, $3, $4, $5, TRUE, $6)
          RETURNING user_id, email, display_name, created_at, updated_at,
-                   is_active, last_login, avatar_url",
+                   is_active, last_login, avatar_url, onboarding_completed",
     )
     .bind(user_id)
     .bind(email)
@@ -67,7 +67,7 @@ pub async fn find_by_provider(
 ) -> Result<Option<User>, DatabaseError> {
     sqlx::query_as::<_, User>(
         "SELECT u.user_id, u.email, u.display_name, u.created_at, u.updated_at,
-                u.is_active, u.last_login, u.avatar_url
+                u.is_active, u.last_login, u.avatar_url, u.onboarding_completed
          FROM users u
          JOIN oauth_providers op ON op.user_id = u.user_id
          WHERE op.provider_type = $1 AND op.provider_user_id = $2",
@@ -117,7 +117,7 @@ pub async fn update_profile(
              updated_at = NOW()
          WHERE user_id = $1
          RETURNING user_id, email, display_name, created_at, updated_at,
-                   is_active, last_login, avatar_url",
+                   is_active, last_login, avatar_url, onboarding_completed",
     )
     .bind(user_id)
     .bind(display_name)
@@ -145,4 +145,18 @@ pub async fn touch_last_login(pool: &PgPool, user_id: Uuid) -> Result<(), Databa
         .await
         .map(|_| ())
         .map_err(|e| DatabaseError::QueryError(e.to_string()))
+}
+
+/// Mark onboarding as completed for the given user.
+/// The AND clause makes this idempotent — already-completed users return false but no error.
+pub async fn complete_onboarding(pool: &PgPool, user_id: Uuid) -> Result<bool, DatabaseError> {
+    sqlx::query(
+        "UPDATE users SET onboarding_completed = TRUE, updated_at = NOW()
+         WHERE user_id = $1 AND onboarding_completed = FALSE",
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected() > 0)
+    .map_err(|e| DatabaseError::QueryError(e.to_string()))
 }

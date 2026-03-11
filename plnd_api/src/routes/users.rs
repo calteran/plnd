@@ -71,6 +71,22 @@ pub async fn patch_me(
     }
 }
 
+/// POST /users/me/complete-onboarding — mark onboarding as done, returns 200 OK
+pub async fn post_complete_onboarding(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<StatusCode, StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let pool = state.db.get_pool();
+    db::users::complete_onboarding(pool, user_id)
+        .await
+        .map_err(|e| {
+            eprintln!("complete_onboarding error: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok(StatusCode::OK)
+}
+
 /// DELETE /users/me — soft-deactivate the account, returns 204 No Content
 pub async fn delete_me(
     State(state): State<Arc<AppState>>,

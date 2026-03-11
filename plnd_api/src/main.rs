@@ -136,6 +136,10 @@ async fn main() {
         .route("/users/me", get(users::get_me))
         .route("/users/me", patch(users::patch_me))
         .route("/users/me", delete(users::delete_me))
+        .route(
+            "/users/me/complete-onboarding",
+            post(users::post_complete_onboarding),
+        )
         .route("/preferences/me", get(preferences::get_preferences))
         .route("/preferences/me", patch(preferences::patch_preferences))
         .route(

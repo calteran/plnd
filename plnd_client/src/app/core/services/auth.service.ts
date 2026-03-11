@@ -38,7 +38,7 @@ export class AuthService {
   handleCallback(token: string): void {
     localStorage.setItem(TOKEN_KEY, token);
     this.tokenSignal.set(token);
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/onboarding']);
   }
 
   /** Remove the stored token and send the user back to login. */

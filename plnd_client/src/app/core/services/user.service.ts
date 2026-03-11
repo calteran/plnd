@@ -33,6 +33,25 @@ export class UserService {
     );
   }
 
+  /** Force-fetch the user from the API (bypasses no-op guard). Used by onboarding guard. */
+  fetchUser(): Observable<User> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.get<User>(`${apiBase}/users/me`).pipe(
+      tap(user => this.userSignal.set(user))
+    );
+  }
+
+  /** POST complete-onboarding and optimistically update the signal. */
+  completeOnboarding(): Observable<void> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.post<void>(`${apiBase}/users/me/complete-onboarding`, {}).pipe(
+      tap(() => {
+        const u = this.userSignal();
+        if (u) this.userSignal.set({ ...u, onboarding_completed: true });
+      })
+    );
+  }
+
   /** Reset the user signal (called on logout) */
   clearUser(): void {
     this.userSignal.set(null);

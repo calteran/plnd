@@ -7,6 +7,7 @@ export interface User {
   updated_at: string;
   is_active: boolean;
   last_login: string | null;
+  onboarding_completed: boolean;
 }
 
 export interface UpdateProfileRequest {

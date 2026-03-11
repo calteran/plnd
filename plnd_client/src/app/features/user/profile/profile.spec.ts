@@ -15,7 +15,8 @@ const mockUser: User = {
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   is_active: true,
-  last_login: '2026-03-01T12:00:00Z'
+  last_login: '2026-03-01T12:00:00Z',
+  onboarding_completed: true
 };
 
 describe('ProfileComponent', () => {

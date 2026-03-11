@@ -16,7 +16,8 @@ const mockUser: User = {
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   is_active: true,
-  last_login: null
+  last_login: null,
+  onboarding_completed: true
 };
 
 describe('NavbarAvatarComponent', () => {

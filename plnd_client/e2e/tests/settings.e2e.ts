@@ -11,6 +11,18 @@ const MOCK_PREFS = {
   updated_at: '2026-01-01T00:00:00Z'
 };
 
+const MOCK_USER_ONBOARDED = {
+  user_id: 'e2e-test-uuid',
+  email: 'test@example.com',
+  display_name: 'Test User',
+  avatar_url: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  is_active: true,
+  last_login: null,
+  onboarding_completed: true
+};
+
 test.describe('Settings', () => {
   test('unauthenticated /settings visit redirects to /login', async ({ page }) => {
     await page.goto('/settings');
@@ -18,6 +30,10 @@ test.describe('Settings', () => {
   });
 
   test('avatar dropdown includes a Settings button', async ({ page }) => {
+    await page.route('http://localhost:3000/users/me', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
     });
@@ -35,6 +51,11 @@ test.describe('Settings', () => {
   });
 
   test('settings page loads preferences and saves theme change', async ({ page }) => {
+    // Intercept /users/me so the onboardingCompletedGuard resolves
+    await page.route('http://localhost:3000/users/me', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+
     // Intercept preferences API so the test works regardless of the Docker image version.
     await page.route('http://localhost:3000/preferences/me', async route => {
       const method = route.request().method();
