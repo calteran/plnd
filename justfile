@@ -77,10 +77,20 @@ ts-deps:
     cd plnd_client && npm run check-circular
 
 # Test server startup (15 second timeout - will auto-kill)
+# timeout exits 124 when it kills the process (success); any other code means the server crashed.
 test-run-server:
-    @echo "🚀 Testing server startup (15s timeout - will auto-kill)..."
-    cd plnd_api && timeout 15s cargo run || \
-    echo "✅ Server started successfully (auto-killed after verification)"
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "🚀 Testing server startup (15s timeout - will auto-kill)..."
+    cd plnd_api
+    timeout 15s cargo run || exit_code=$?
+    exit_code=${exit_code:-0}
+    if [ "$exit_code" -eq 124 ]; then
+        echo "✅ Server started successfully (auto-killed after 15s)"
+    else
+        echo "❌ Server failed to start (exit code: $exit_code)"
+        exit 1
+    fi
 
 # Verify compilation only (no server startup)
 verify-build:

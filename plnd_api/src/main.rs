@@ -2,7 +2,7 @@ use axum::http::{HeaderValue, Method, StatusCode};
 use axum::{
     extract::State,
     middleware,
-    routing::{delete, get, patch},
+    routing::{delete, get, patch, post},
     Json, Router,
 };
 use chrono::Utc;
@@ -16,7 +16,7 @@ use plnd_api::config;
 use plnd_api::config::settings::OAuthProviderConfig as ConfigOAuthProvider;
 use plnd_api::db::models::ReadyStatus;
 use plnd_api::db::Database;
-use plnd_api::routes::{auth, preferences, users};
+use plnd_api::routes::{auth, dietary_restrictions, preferences, users};
 use plnd_api::state::AppState;
 
 #[tokio::main]
@@ -138,6 +138,22 @@ async fn main() {
         .route("/users/me", delete(users::delete_me))
         .route("/preferences/me", get(preferences::get_preferences))
         .route("/preferences/me", patch(preferences::patch_preferences))
+        .route(
+            "/dietary-restrictions",
+            get(dietary_restrictions::list_restrictions),
+        )
+        .route(
+            "/dietary-restrictions",
+            post(dietary_restrictions::create_restriction),
+        )
+        .route(
+            "/dietary-restrictions/{id}",
+            patch(dietary_restrictions::update_restriction),
+        )
+        .route(
+            "/dietary-restrictions/{id}",
+            delete(dietary_restrictions::delete_restriction),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
