@@ -186,7 +186,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 1. **User Management** 🚧
    - ✅ User profile CRUD operations (display_name, avatar_url)
    - ✅ Preferences and settings management (theme: system/light/dark)
-   - Add allergen checkboxes and dietary notes to preferences (migration, backend validation, settings UI)
+   - ✅ Dietary restrictions CRUD (allergy/intolerance/preference types, name, notes — backend + Angular UI with signals)
    - Basic user onboarding flow
 
 2. **Domain Model Database Schema**
@@ -224,6 +224,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 **Deliverables:**
 - ✅ Functional authentication UI and app shell
 - ✅ User profile and preferences management
+- ✅ Dietary restrictions management (full CRUD, backend + Angular UI)
 - Domain model database schema (prerequisite for all CRUD features)
 - Functional meal and exercise planning
 - Family profile management

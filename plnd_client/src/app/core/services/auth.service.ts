@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { ConfigService } from './config.service';
 import { UserService } from './user.service';
 import { PreferencesService } from './preferences.service';
+import { DietaryRestrictionsService } from './dietary-restrictions.service';
 
 const TOKEN_KEY = 'auth_token';
 
@@ -12,6 +13,8 @@ export class AuthService {
   private readonly config = inject(ConfigService);
   private readonly userService = inject(UserService);
   private readonly preferencesService = inject(PreferencesService);
+
+  private readonly dietaryRestrictionsService = inject(DietaryRestrictionsService);
 
   private readonly tokenSignal = signal<string | null>(
     localStorage.getItem(TOKEN_KEY)
@@ -44,6 +47,7 @@ export class AuthService {
     this.tokenSignal.set(null);
     this.userService.clearUser();
     this.preferencesService.clearPreferences();
+    this.dietaryRestrictionsService.clear();
     this.router.navigate(['/login']);
   }
 

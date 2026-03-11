@@ -45,6 +45,11 @@ export const routes: Routes = [
         path: 'settings',
         loadComponent: () =>
           import('./features/settings/settings').then(m => m.SettingsComponent)
+      },
+      {
+        path: 'dietary-restrictions',
+        loadComponent: () =>
+          import('./features/meals/dietary-restrictions/dietary-restrictions').then(m => m.DietaryRestrictionsComponent)
       }
     ]
   },

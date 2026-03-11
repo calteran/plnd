@@ -99,9 +99,14 @@ verify-build:
     echo "✅ Build successful"
 
 # Ensure Docker stack is running and all services are healthy (idempotent)
+# --build client: rebuilds the Angular image so e2e tests always run against
+# the latest compiled code (avoids stale-cache failures).
+# Trade-off: adds a Docker build step on every `just verify` run, even for
+# backend-only changes. If this becomes a bottleneck, move --build to a
+# dedicated e2e recipe and keep services-up as a plain `up -d --wait`.
 services-up:
     @echo "🐳 Ensuring Docker stack is up and healthy..."
-    docker compose up -d --wait
+    docker compose up -d --build client --wait
     @echo "✅ Services ready"
 
 # Full verification (quality checks + build + comprehensive tests)
