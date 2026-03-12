@@ -203,12 +203,13 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - ✅ Note: nutrition and allergens can be entered at any layer (ingredient / dish / meal) with `_overridden` flags to distinguish manual vs. computed values
 
 3. **Catalog Population Infrastructure**
-   - **Dev/Staging Seed Fixtures**: Static SQL seed script (~20–30 common meals and exercises) covering representative `occasion_tags` and `intensity` categories; idempotent (`INSERT ... ON CONFLICT DO NOTHING`); used by local dev, CI, and staging environments
-   - **Public API Client — Meals**: Integrate USDA FoodData Central API to import ingredients into `catalog_ingredients` and dishes into `catalog_dishes`; normalize FDC nutrient data into the nutrition JSONB schema; tag records with `external_source = 'usda_fdc'`
-   - **Public API Client — Exercises**: Integrate a public exercise API (e.g., WGER) to import exercises into `catalog_exercises`; normalize muscle groups, intensity, and equipment fields; tag records with `source = 'wger'`
-   - **Search-Through Pattern**: When a user searches for a meal or exercise, query the local catalog first; on insufficient results, fan out to the appropriate external API, cache results into the catalog tables (deduplication by source + external ID), and return the merged set
-   - **Admin Seed Command**: `just seed-catalog` justfile recipe that bulk-imports from external APIs for staging/production initial population; safe to re-run (idempotent)
-   - *(Future — Phase 3)*: AI-agent-guided catalog curation (enriching descriptions, tagging, flagging low-quality entries) deferred to the LLM integration phase
+   - **Dev/Staging Seed Fixtures**: Static SQL seed script (~20–30 common meals/exercises); idempotent (`INSERT ... ON CONFLICT DO NOTHING`)
+   - ✅ **External Client Traits** (`src/clients/`): `NutritionProvider` + `RecipeProvider` async traits; `search_*` + `get_*_by_id` methods; `ExternalClientError`; `NutritionFacts` typed struct serializes to canonical `nutrition JSONB` shape; `source_name() -> &str` drives `external_source` tagging
+   - **USDA FoodData Central Client**: `UsdaFdcClient` implementing `NutritionProvider`; normalizes FDC nutrient array → `NutritionFacts`; tags `external_source = 'usda_fdc'`
+   - ✅ **Exercise Provider Trait** (`src/clients/exercise.rs`): `ExerciseProvider` async trait; `search_exercises` + `get_exercise_by_id`; `ExternalExercise` DTO with `muscle_groups`, `equipment`, `intensity`; concrete `WgerClient` comes in next task and tags `external_source = 'wger'`
+   - **Search-Through Pattern**: Local catalog first; fan out on cache miss; deduplicate by `(external_source, external_id)` before upsert
+   - **Admin Seed Command**: `just seed-catalog`; safe to re-run (idempotent)
+   - *(Future — Phase 3)*: AI-guided catalog curation deferred to LLM integration phase
 
 4. **Meal Planning Core**
    - Implement meal CRUD API endpoints
