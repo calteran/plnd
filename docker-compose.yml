@@ -3,7 +3,7 @@ services:
     image: postgres:15
     environment:
       POSTGRES_USER: plnd
-      POSTGRES_PASSWORD: plnd_dev
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: plnd_dev
     ports:
       - "5432:5432"
@@ -24,7 +24,7 @@ services:
       - "3000:3000"
     environment:
       - APP_API__BASE_URL=0.0.0.0:3000
-      - APP_DATABASE__URL=postgres://plnd:plnd_dev@db/plnd_dev
+      - APP_DATABASE__URL=postgres://plnd:${DB_PASSWORD}@db/plnd_dev
       - APP_API__TIMEOUT=30000
       - APP_DATABASE__MAX_CONNECTIONS=10
       - APP_LOGGING__LEVEL=debug

@@ -5,15 +5,15 @@ build:
 
 # Run development environment (PostgreSQL + Client) in detached mode
 dev:
-    docker compose build --no-cache && docker compose up -d --force-recreate
+    doppler run -- docker compose build --no-cache && doppler run -- docker compose up -d --force-recreate
 
 # Run API service locally (requires PostgreSQL)
 api:
-    cd plnd_api && cargo run
+    cd plnd_api && doppler run -- cargo run
 
 # Run API service with auto-reload (requires cargo-watch)
 api-watch:
-    cd plnd_api && cargo install cargo-watch && cargo watch -x run
+    cd plnd_api && cargo install cargo-watch && doppler run -- cargo watch -x run
 
 # Run client locally
 client:
@@ -83,7 +83,7 @@ test-run-server:
     set -euo pipefail
     echo "🚀 Testing server startup (15s timeout - will auto-kill)..."
     cd plnd_api
-    timeout 15s cargo run || exit_code=$?
+    timeout 15s doppler run -- cargo run || exit_code=$?
     exit_code=${exit_code:-0}
     if [ "$exit_code" -eq 124 ]; then
         echo "✅ Server started successfully (auto-killed after 15s)"

@@ -21,7 +21,7 @@ pretty_print = true
 
 [auth]
 # JWT configuration
-jwt_secret = "development-secret-change-in-production"
+jwt_secret = ""  # Required — set via APP_AUTH__JWT_SECRET (Doppler)
 jwt_expiration = 86400 # 24 hours in seconds
 refresh_token_expiration = 604800 # 7 days in seconds
 # Where to redirect the browser after a successful login

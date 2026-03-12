@@ -1,198 +1,72 @@
-# Mistral Vibe Agent Configuration for PLND
+# Junie Guidelines for PLND
 
-## Quick Reference
-
-**Project**: PLND - Neurodivergent Planner/Assistant
-**Current Phase**: Core Features (User management and basic planning)
-**Primary Reference**: PLANNING.md
+## Project Overview
+**Project**: PLND - Neurodivergent Planner/Assistant for managing nutrition, exercise, and daily planning.
+**Current Phase**: Phase 2 — Core Features (User management, basic planning, routing, layouts).
+**Primary Reference**: `PLANNING.md`.
+**Architecture**: 
+- **Backend**: Rust/Axum (`plnd_api`) with PostgreSQL/SQLx.
+- **Frontend**: Angular 21/NgRx (`plnd_client`).
+- **Infrastructure**: Docker Compose, PostgreSQL 15, Mock OAuth2 server.
 
 ## Core Directives
 
-### 1. Follow PLANNING.md
-- ✅ Current focus: Foundation Phase (Rust backend, authentication, database) - COMPLETED
-- 🚧 Current focus: Core Features Phase (user management, basic planning) - IN PROGRESS
+### 1. Follow Project Roadmap
+- ✅ Foundation Phase: Rust backend, authentication, database - COMPLETED
+- 🚧 Core Features Phase: User management, meal/exercise planning - IN PROGRESS
 - Next: AI Enhancements Phase (agentic architecture, LLM integration)
 
-### 2. Dependency Management
-- Always use the latest stable versions of all dependencies
-- Regularly update Rust, Node.js, and other core tools
-- Verify compatibility before major version updates
-- Document version requirements clearly
+### 2. Quality & Development Standards
+- **MANDATORY**: Run `just verify` before every commit. All quality checks must pass.
+- **Code Quality**:
+    - Rust: Use `thiserror` for domain errors, `anyhow` for application errors. Use SQLx macros for type-safe queries.
+    - Angular: Strict TypeScript typing, NgRx for state management, signals for component state.
+    - Coverage: Target 100% test coverage for business logic.
+- **Dependency Management**: Use latest stable versions (Rust 1.93.1+, Node 20.x+). Use `just deny` and `just machete` for audits.
 
-### 2. Development Standards
-
-**Backend (Rust/Axum)**:
-- Use `thiserror` for domain errors, `anyhow` for application errors
-- Implement comprehensive error handling at all levels
-- Follow RESTful API design principles
-- 100% test coverage for business logic
-
-**Frontend (Angular/NgRx)**:
-- Strict TypeScript typing everywhere
-- Use NgRx for state management
-- Implement lazy loading for routes
-- Ensure mobile compatibility (Capacitor) from start
-
-**Database (PostgreSQL/SQLx)**:
-- Use SQLx macros for type-safe queries
-- Implement proper migrations
-- Create appropriate indexes for performance
-
-### 3. Quality Requirements
-
-**Code Quality Checks (MANDATORY)**:
-- All quality checks must pass before any code is committed
-- Run `just verify` before every commit and push
-- Quality checks include:
-  - Rust formatting (`just fmt`)
-  - Rust linting (`just clippy`)
-  - Dependency license/security checks (`just deny`)
-  - Unused dependency detection (`just machete`)
-  - TypeScript linting (`just ts-lint`)
-  - TypeScript dependency health (`just ts-deps`)
-
-**Quality Check Failure Handling**:
-- If any quality check fails, the agent MUST either:
-  1. Fix the issue immediately, OR
-  2. Ask explicit permission to ignore the specific failure with justification
-- Never commit code with failing quality checks without permission
-- Document any approved exceptions in the commit message
-
-### Server Process Management
-
-**MANDATORY RULES**:
-1. Never run `cargo run` directly - always use `just` commands
-2. Maximum 15-second timeout for any server process
-3. Prefer `just verify-build` over runtime verification when possible
-
-**Safe Commands**:
-- `just verify-build` - Verify compilation (no server startup)
-- `just test-run-server` - Test server startup (WILL auto-kill after 15s)
-- `just verify` - Full quality + build verification
-
-**Command Behavior**:
-- `test-run-server`: Starts server, verifies it runs, **auto-kills after 15s**
-- `verify-build`: Only compiles, no server processes started
-- `verify`: Runs all quality checks + build verification
-
-### Testing Rules for Agents
-
-**MANDATORY RULES**:
-1. **NEVER use `just test`** - This runs interactive tests that don't terminate
-2. **ALWAYS use `just test-ci`** for comprehensive automated testing
-3. Use `just test-ng-headless` for Angular-only headless testing
-4. All tests must pass before committing code
-
-**Safe Testing Commands**:
-- `just test-ci` - Comprehensive CI test suite (Rust + Angular headless)
-- `just test-ng-headless` - Angular tests with headless Chrome
-- `just verify` - Full verification including all tests
-
-**Command Behavior**:
-- `test-ci`: Runs Rust tests + Angular headless tests, **terminates automatically**
-- `test-ng-headless`: Runs Angular tests with ChromeHeadless, **terminates automatically**
-- `verify`: Runs quality checks + build + comprehensive tests
-
-**Testing**:
-- Unit tests: 100% coverage for business logic
-- Integration tests: All API endpoints
-- E2E tests: Critical user flows
-
-**Security**:
-- Encrypt all health data
-- Validate/sanitize all user input
-- Follow OWASP Top 10
-- Never expose sensitive data in errors
-
-**Documentation**:
-- Document all public APIs
-- Explain complex algorithms
-- Keep documentation current
+### 3. Server & Testing Rules
+- **DO NOT** run `cargo run` directly.
+- **DO NOT** run `just test` (interactive processes do not terminate).
+- **Server Startup**: Use `just test-run-server` (auto-kills after 15s) or `just verify-build`.
+- **Testing**: Use `just test-ci` for full suite or `just test-ng-headless` for Angular only.
 
 ### 4. Domain-Specific Rules
+- **Neurodivergent Support**: Implement gradual exposure, sensory-friendly interfaces, and extensive customization.
+- **Data Security**: Treat health data as sensitive. Encrypt health data and follow OWASP Top 10.
+- **Nutrition/Exercise**: Use scientifically validated data and strict allergen enforcement.
 
-**Neurodivergent Support**:
-- Implement gradual exposure features
-- Provide extensive customization options
-- Design sensory-friendly interfaces
-- Allow multiple input methods
+## Common Commands Reference
 
-**Health Data**:
-- Treat all health data as sensitive
-- Implement strict access controls
-- Provide clear privacy information to users
+```bash
+# Development
+just dev              # Start full Docker stack
+just api              # Run API only
+just client           # Run Angular dev server
 
-**Nutrition/Exercise**:
-- Use scientifically validated data
-- Allow full user customization
-- Handle allergens with strict enforcement
+# Quality & Verification
+just fmt              # Rust formatting
+just clippy           # Rust linting
+just ts-lint          # TypeScript/Angular ESLint
+just verify-build     # Compile check only (safe)
+just test-run-server  # Server startup test (15s timeout)
+just verify           # Full quality + build + tests (MUST PASS)
 
-### 5. Decision Making
+# Testing (CI-safe)
+just test-ci          # All tests (nextest + headless Angular)
+just test-ng-headless # Angular unit tests (headless)
+```
 
-**Agent Can Handle Independently**:
-- Routine coding tasks
-- Test implementation
-- Bug fixes within existing architecture
-- Documentation updates
-- Minor refactoring
-- Dependency updates to latest stable versions
-- README.md maintenance and updates based on project progress
-- Automatic task status updates in development dashboard
-- Phase progression tracking and documentation
+## Environment & Infrastructure
+- **API**: `0.0.0.0:3000`
+- **Database**: `postgres://plnd:plnd_dev@localhost/plnd_dev` (Port 5432)
+- **Auth**: Mock OAuth2 server on port 8080.
+- **Frontend**: Port 4200.
+- **Secrets**: Managed via Doppler (`plnd/dev`). Run `just api` / `just dev` — they already wrap commands with `doppler run --`. Do not hardcode secrets in TOML or compose files.
 
-**Escalate to Human**:
-- Major architectural decisions
-- Core data model changes
-- Security-related decisions
-- Significant scope changes
-- Complex domain logic questions
-- Major version updates that may break compatibility
+## Decision Making
+- **Independent**: Routine coding, bug fixes, tests, documentation, minor refactoring, dependency updates.
+- **Escalate**: Major architectural changes, core data model modifications, security decisions, significant scope changes.
 
-## Current Phase Focus: Foundation
-
-**Priorities**:
-1. Rust backend setup with Axum
-2. Authentication system (email + OAuth)
-3. PostgreSQL database foundation
-4. Basic API structure
-5. Docker Compose development environment
-
-**Technologies**: Rust, Axum, PostgreSQL, SQLx, Docker
-
-## Next Phase: Core Features
-
-**Preparation**:
-- Design user management system
-- Plan basic meal/exercise CRUD operations
-- Consider mobile compatibility requirements
-- Prepare for basic LLM integration
-
-## Communication Protocol
-
-- **Clarity**: Clear, concise responses
-- **Transparency**: Explain reasoning
-- **Constraints**: Follow explicit instructions
-- **Progress**: Regular updates
-- **Errors**: Clear communication with solutions
-
-## Version
-
-**1.4** - Added CI-ready testing commands and agent testing restrictions
-- Added `just test-ci` for comprehensive automated testing
-- Added `just test-ng-headless` for Angular headless testing
-- **BANNED `just test` for agents** - use `test-ci` instead
-- Updated `verify` command to include comprehensive testing
-- Added Testing Rules for Agents section
-- Removed all unused dependencies
-- Added mandatory quality check requirements
-- Updated AGENTS.md to enforce quality standards
-**Last Updated**: 2026-02-27
-**Status**: Active
-
-## Dependency Version Requirements
-
-- **Rust**: Latest stable version (currently 1.93.1+) with 2024 edition
-- **Node.js**: Latest LTS version (currently 20.x+)
-- **Angular**: Latest stable version
-- **All npm/Rust dependencies**: Latest stable versions
-- **Docker**: Latest stable version
+## Version History
+**1.5** - Added Doppler secrets management; removed stale PHASE_TWO.md reference.
+**Last Updated**: 2026-03-12

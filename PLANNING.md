@@ -175,7 +175,14 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 > **Data Model Reference**: See [`DOMAIN_MODEL.md`](./DOMAIN_MODEL.md) for the authoritative domain and scheduling model — entity hierarchy, catalog layer, schedule template/instance pattern, dynamic adjustment, and family coordination. All Phase 2 meal, exercise, and scheduling work should be grounded in that document.
 
 **Tasks:**
-0. **Authentication UI & App Shell** ✅
+0. **Secrets Management (Doppler)** ✅
+   - ✅ All sensitive credentials stored in Doppler (`plnd/dev`): `APP_AUTH__JWT_SECRET`, `APP_DATABASE__URL`, `DB_PASSWORD`, `APP_EXTERNAL__USDA_FDC_API_KEY`, `APP_EXTERNAL__THEMEALDB_API_KEY`
+   - ✅ `config/api/default.toml` sanitized: `jwt_secret` blanked out; non-sensitive values remain in TOML
+   - ✅ `docker-compose.yml` uses `${DB_PASSWORD}` interpolation; credentials injected via `doppler run --`
+   - ✅ `justfile` wraps `api`, `api-watch`, `dev`, and `test-run-server` with `doppler run --`
+   - ✅ `load_config_with_path()` gains env var overrides for `APP_AUTH__JWT_SECRET` and `APP_EXTERNAL__THEMEALDB_API_KEY`
+
+1. **Authentication UI & App Shell** ✅
    - ✅ Login page with Mock OAuth sign-in button
    - ✅ OAuth callback handler (extracts JWT, stores in localStorage)
    - ✅ Angular auth guard (functional guard, protects authenticated routes)
@@ -239,6 +246,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - Add basic conversation context
 
 **Deliverables:**
+- ✅ Secrets management via Doppler (all sensitive values out of TOML/docker-compose)
 - ✅ Functional authentication UI and app shell
 - ✅ User profile and preferences management
 - ✅ Dietary restrictions management (full CRUD, backend + Angular UI)

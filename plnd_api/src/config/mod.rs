@@ -72,6 +72,14 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.external_providers.usda_fdc_api_key = key;
     }
 
+    if let Ok(secret) = std::env::var("APP_AUTH__JWT_SECRET") {
+        app_config.auth.jwt.secret = secret;
+    }
+
+    if let Ok(key) = std::env::var("APP_EXTERNAL__THEMEALDB_API_KEY") {
+        app_config.external_providers.themealdb_api_key = key;
+    }
+
     app_config
         .validate()
         .map_err(error::ConfigError::Validation)?;
