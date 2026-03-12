@@ -22,6 +22,9 @@ url = "2.5"
 uuid = { version = "1.8", features = ["v4", "serde"] }
 async-trait = "0.1"
 serde_json = "1.0"
+moka         = { version = "0.12", features = ["future"] }
+tokio-stream = { version = "0.1",  features = ["sync"]   }
+futures      = "0.3"
 utoipa = { version = "5.4", features = ["uuid", "chrono", "decimal"] }
 utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-scalar = { version = "0.3", features = ["axum"] }
@@ -30,7 +33,7 @@ utoipa-scalar = { version = "0.3", features = ["axum"] }
 tokio = { version = "1.0", features = ["full", "test-util"] }
 
 [package.metadata.cargo-machete]
-ignored = ["oauth2", "url", "utoipa"]
+ignored = ["futures", "oauth2", "url", "utoipa"]
 
 [package.metadata.nextest]
 # Configure nextest for better test execution

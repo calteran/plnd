@@ -4,21 +4,24 @@ use axum::{
     routing::{delete, get, patch, post},
     Router,
 };
-use std::sync::Arc;
 use tower_http::cors::CorsLayer;
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 use utoipa_swagger_ui::SwaggerUi;
 
+use std::sync::Arc;
+
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::oauth::{MockOAuthProvider, OAuthProviderConfig};
 use plnd_api::auth::{JwtService, SessionService};
+use plnd_api::cache::SearchCache;
 use plnd_api::clients::{OpenFoodFactsClient, TheMealDbClient, UsdaFdcClient};
 use plnd_api::config;
 use plnd_api::config::settings::OAuthProviderConfig as ConfigOAuthProvider;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
-use plnd_api::routes::{auth, dietary_restrictions, preferences, system, users};
+use plnd_api::routes::{auth, dietary_restrictions, preferences, search, system, users};
+use plnd_api::search::ProviderSearchService;
 use plnd_api::state::AppState;
 
 #[tokio::main]
@@ -111,19 +114,14 @@ async fn main() {
         .parse()
         .expect("invalid CORS origin derived from frontend_callback_url");
 
-    let state = Arc::new(AppState {
-        db: db_conn,
-        jwt,
-        session,
-        mock_provider,
-        callback_uri,
-        frontend_callback,
-    });
-
-    // Construct external provider clients (no routes yet; validates config is wired correctly)
-    let _nutrition_usda = UsdaFdcClient::new(&config.external_providers.usda_fdc_api_key);
-    let _nutrition_off = OpenFoodFactsClient::new();
-    let _recipe_mdb = TheMealDbClient::new(&config.external_providers.themealdb_api_key);
+    // Construct external provider clients
+    let nutrition_usda = Arc::new(UsdaFdcClient::new(
+        &config.external_providers.usda_fdc_api_key,
+    ));
+    let nutrition_off = Arc::new(OpenFoodFactsClient::new());
+    let recipe_mdb = Arc::new(TheMealDbClient::new(
+        &config.external_providers.themealdb_api_key,
+    ));
     if config.external_providers.usda_fdc_api_key.is_empty() {
         println!("  USDA FDC provider: no API key set (will return ConfigurationError at runtime)");
     } else {
@@ -134,6 +132,24 @@ async fn main() {
         "  TheMealDB provider: ready (key={})",
         config.external_providers.themealdb_api_key
     );
+
+    let search_cache = SearchCache::new(config.external_providers.search_cache_ttl_hours);
+    let provider_search = ProviderSearchService::new(
+        vec![nutrition_usda, nutrition_off],
+        vec![recipe_mdb],
+        vec![],
+        search_cache,
+    );
+
+    let state = Arc::new(AppState {
+        db: db_conn,
+        jwt,
+        session,
+        mock_provider,
+        callback_uri,
+        frontend_callback,
+        provider_search,
+    });
 
     let cors = CorsLayer::new()
         .allow_origin(cors_origin)
@@ -175,6 +191,12 @@ async fn main() {
             "/dietary-restrictions/{id}",
             delete(dietary_restrictions::delete_restriction),
         )
+        .route(
+            "/search/ingredients",
+            get(search::search_ingredients_handler),
+        )
+        .route("/search/dishes", get(search::search_dishes_handler))
+        .route("/search/exercises", get(search::search_exercises_handler))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

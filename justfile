@@ -106,7 +106,7 @@ verify-build:
 # dedicated e2e recipe and keep services-up as a plain `up -d --wait`.
 services-up:
     @echo "🐳 Ensuring Docker stack is up and healthy..."
-    docker compose up -d --build client --wait
+    doppler run -- docker compose up -d --build client --wait
     @echo "✅ Services ready"
 
 # Full verification (quality checks + build + comprehensive tests)

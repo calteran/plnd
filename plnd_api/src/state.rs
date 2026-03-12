@@ -1,6 +1,7 @@
 use crate::auth::oauth::MockOAuthProvider;
 use crate::auth::{JwtService, SessionService};
 use crate::db::Database;
+use crate::search::ProviderSearchService;
 use std::sync::Arc;
 
 /// Shared application state available to all route handlers
@@ -14,4 +15,5 @@ pub struct AppState {
     pub callback_uri: String,
     /// Where to send the browser after a successful login (Angular frontend)
     pub frontend_callback: String,
+    pub provider_search: ProviderSearchService,
 }

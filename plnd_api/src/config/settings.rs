@@ -106,10 +106,16 @@ pub struct ExternalProvidersConfig {
     pub usda_fdc_api_key: String,
     #[serde(default = "default_themealdb_key")]
     pub themealdb_api_key: String,
+    #[serde(default = "default_cache_ttl_hours")]
+    pub search_cache_ttl_hours: u64,
 }
 
 fn default_themealdb_key() -> String {
     "1".to_string()
+}
+
+fn default_cache_ttl_hours() -> u64 {
+    36
 }
 
 #[derive(Debug, Deserialize, Clone)]
