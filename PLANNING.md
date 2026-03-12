@@ -189,16 +189,22 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - ✅ Dietary restrictions CRUD (allergy/intolerance/preference types, name, notes — backend + Angular UI with signals)
    - ✅ Basic user onboarding flow (4-step wizard: Welcome → Profile → Theme → Dietary Restrictions; all steps skippable; `onboarding_completed` persisted in DB)
 
-2. **Domain Model Database Schema**
-   - Implement catalog layer migrations: `catalog_meals`, `catalog_exercises`
-   - Implement personal library migrations: `user_meals`, `user_exercises`
-   - Implement scheduling migrations: `schedule_templates`, `schedule_entries`
-   - Implement task model migrations: `tasks`, `meal_tasks`, `exercise_tasks`, `work_tasks`, `generic_tasks`
-   - Implement family migrations: `families`, `family_members`, `family_meals`
+2. **Domain Model Database Schema** ✅
+   - ✅ Implement ingredient catalog: `catalog_ingredients` (atomic food items with nutrition JSONB, allergens, external DB hooks)
+   - ✅ Implement dish catalog: `catalog_dishes`, `catalog_dish_ingredients` (recipes composed of ingredients; `occasion_tags TEXT[]` replaces `meal_type` enum)
+   - ✅ Implement meal catalog: `catalog_meals` (revised), `catalog_meal_dishes` (eating occasion templates composed of dishes)
+   - ✅ Implement exercise catalog: `catalog_exercises`
+   - ✅ Implement personal dish library: `user_dishes`, `user_dish_ingredients`
+   - ✅ Implement personal meal library: `user_meals` (revised), `user_meal_dishes` (mix of catalog and personal dishes)
+   - ✅ Implement personal exercise library: `user_exercises`
+   - ✅ Implement family model: `families`, `family_members`, `family_meals`
+   - ✅ Implement task model: `tasks`, `meal_tasks` (with `occasion_label TEXT`, `user_dish_id` for single-dish scheduling), `exercise_tasks`, `work_tasks`, `generic_tasks`
+   - ✅ Implement scheduling model: `schedule_templates`, `schedule_entries`
+   - ✅ Note: nutrition and allergens can be entered at any layer (ingredient / dish / meal) with `_overridden` flags to distinguish manual vs. computed values
 
 3. **Catalog Population Infrastructure**
-   - **Dev/Staging Seed Fixtures**: Static SQL seed script (~20–30 common meals and exercises) covering all `meal_type` and `intensity` categories; idempotent (`INSERT ... ON CONFLICT DO NOTHING`); used by local dev, CI, and staging environments
-   - **Public API Client — Meals**: Integrate USDA FoodData Central API to import foods into `catalog_meals`; normalize FDC nutrient data into the nutrition JSONB schema; tag records with `source = 'usda_fdc'`
+   - **Dev/Staging Seed Fixtures**: Static SQL seed script (~20–30 common meals and exercises) covering representative `occasion_tags` and `intensity` categories; idempotent (`INSERT ... ON CONFLICT DO NOTHING`); used by local dev, CI, and staging environments
+   - **Public API Client — Meals**: Integrate USDA FoodData Central API to import ingredients into `catalog_ingredients` and dishes into `catalog_dishes`; normalize FDC nutrient data into the nutrition JSONB schema; tag records with `external_source = 'usda_fdc'`
    - **Public API Client — Exercises**: Integrate a public exercise API (e.g., WGER) to import exercises into `catalog_exercises`; normalize muscle groups, intensity, and equipment fields; tag records with `source = 'wger'`
    - **Search-Through Pattern**: When a user searches for a meal or exercise, query the local catalog first; on insufficient results, fan out to the appropriate external API, cache results into the catalog tables (deduplication by source + external ID), and return the merged set
    - **Admin Seed Command**: `just seed-catalog` justfile recipe that bulk-imports from external APIs for staging/production initial population; safe to re-run (idempotent)
@@ -233,7 +239,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - ✅ User profile and preferences management
 - ✅ Dietary restrictions management (full CRUD, backend + Angular UI)
 - ✅ User onboarding wizard (multi-step, skip-friendly, DB-persisted completion)
-- Domain model database schema (prerequisite for all CRUD features)
+- ✅ Domain model database schema (3-layer Ingredient → Dish → Meal hierarchy; 6 migrations; 20 Rust model structs)
 - Catalog population infrastructure (dev fixtures + public API clients + search-through pattern)
 - Functional meal and exercise planning
 - Family profile management

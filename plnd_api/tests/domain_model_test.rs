@@ -1,0 +1,564 @@
+// Offline tests for domain model structs and constants.
+// No live database required — follows the dietary_restrictions_test.rs pattern.
+use plnd_api::db::models::{
+    CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
+    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, MealTask,
+    ScheduleEntry, ScheduleTemplate, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,
+    UserMealDish, WorkTask,
+};
+use plnd_api::routes::domain_constants::{
+    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_AFTER_MILEPOSTS, VALID_ENERGY_LEVELS,
+    VALID_FAMILY_ROLES, VALID_FOCUS_LEVELS, VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS,
+    VALID_RECURRENCE_TYPES, VALID_TASK_STATUSES, VALID_TASK_TYPES,
+};
+
+// ---------------------------------------------------------------------------
+// Constant assertions
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_valid_task_types_has_seven_values() {
+    assert_eq!(VALID_TASK_TYPES.len(), 7);
+    assert!(VALID_TASK_TYPES.contains(&"meal"));
+    assert!(VALID_TASK_TYPES.contains(&"exercise"));
+    assert!(VALID_TASK_TYPES.contains(&"work"));
+    assert!(VALID_TASK_TYPES.contains(&"leisure"));
+    assert!(VALID_TASK_TYPES.contains(&"appointment"));
+    assert!(VALID_TASK_TYPES.contains(&"medication"));
+    assert!(VALID_TASK_TYPES.contains(&"custom"));
+}
+
+#[test]
+fn test_valid_energy_levels_has_three_values() {
+    assert_eq!(VALID_ENERGY_LEVELS.len(), 3);
+    assert!(VALID_ENERGY_LEVELS.contains(&"low"));
+    assert!(VALID_ENERGY_LEVELS.contains(&"medium"));
+    assert!(VALID_ENERGY_LEVELS.contains(&"high"));
+}
+
+#[test]
+fn test_valid_task_statuses_has_five_values() {
+    assert_eq!(VALID_TASK_STATUSES.len(), 5);
+    assert!(VALID_TASK_STATUSES.contains(&"planned"));
+    assert!(VALID_TASK_STATUSES.contains(&"in_progress"));
+    assert!(VALID_TASK_STATUSES.contains(&"completed"));
+    assert!(VALID_TASK_STATUSES.contains(&"skipped"));
+    assert!(VALID_TASK_STATUSES.contains(&"deferred"));
+}
+
+#[test]
+fn test_valid_intensity_levels_has_three_values() {
+    assert_eq!(VALID_INTENSITY_LEVELS.len(), 3);
+    assert!(VALID_INTENSITY_LEVELS.contains(&"low"));
+    assert!(VALID_INTENSITY_LEVELS.contains(&"moderate"));
+    assert!(VALID_INTENSITY_LEVELS.contains(&"high"));
+}
+
+#[test]
+fn test_valid_family_roles_has_three_values() {
+    assert_eq!(VALID_FAMILY_ROLES.len(), 3);
+    assert!(VALID_FAMILY_ROLES.contains(&"owner"));
+    assert!(VALID_FAMILY_ROLES.contains(&"member"));
+    assert!(VALID_FAMILY_ROLES.contains(&"caregiver"));
+}
+
+#[test]
+fn test_valid_focus_levels_has_three_values() {
+    assert_eq!(VALID_FOCUS_LEVELS.len(), 3);
+    assert!(VALID_FOCUS_LEVELS.contains(&"low"));
+    assert!(VALID_FOCUS_LEVELS.contains(&"medium"));
+    assert!(VALID_FOCUS_LEVELS.contains(&"deep"));
+}
+
+#[test]
+fn test_valid_priority_levels_has_three_values() {
+    assert_eq!(VALID_PRIORITY_LEVELS.len(), 3);
+    assert!(VALID_PRIORITY_LEVELS.contains(&"low"));
+    assert!(VALID_PRIORITY_LEVELS.contains(&"normal"));
+    assert!(VALID_PRIORITY_LEVELS.contains(&"high"));
+}
+
+#[test]
+fn test_valid_recurrence_types_has_four_values() {
+    assert_eq!(VALID_RECURRENCE_TYPES.len(), 4);
+    assert!(VALID_RECURRENCE_TYPES.contains(&"daily"));
+    assert!(VALID_RECURRENCE_TYPES.contains(&"weekdays"));
+    assert!(VALID_RECURRENCE_TYPES.contains(&"weekly"));
+    assert!(VALID_RECURRENCE_TYPES.contains(&"custom"));
+}
+
+#[test]
+fn test_valid_after_mileposts_has_three_values() {
+    assert_eq!(VALID_AFTER_MILEPOSTS.len(), 3);
+    assert!(VALID_AFTER_MILEPOSTS.contains(&"breakfast"));
+    assert!(VALID_AFTER_MILEPOSTS.contains(&"lunch"));
+    assert!(VALID_AFTER_MILEPOSTS.contains(&"dinner"));
+}
+
+#[test]
+fn test_suggested_occasion_tags_has_twelve_values() {
+    assert_eq!(SUGGESTED_OCCASION_TAGS.len(), 12);
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"breakfast-friendly"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"lunch"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"dinner"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"snack"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"quick"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"light"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"hearty"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"comfort"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"weekend"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"festive"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"post-workout"));
+    assert!(SUGGESTED_OCCASION_TAGS.contains(&"meal-prep"));
+}
+
+#[test]
+fn test_suggested_occasion_labels_has_seven_values() {
+    assert_eq!(SUGGESTED_OCCASION_LABELS.len(), 7);
+    assert!(SUGGESTED_OCCASION_LABELS.contains(&"breakfast"));
+    assert!(SUGGESTED_OCCASION_LABELS.contains(&"morning snack"));
+    assert!(SUGGESTED_OCCASION_LABELS.contains(&"lunch"));
+    assert!(SUGGESTED_OCCASION_LABELS.contains(&"afternoon snack"));
+    assert!(SUGGESTED_OCCASION_LABELS.contains(&"dinner"));
+    assert!(SUGGESTED_OCCASION_LABELS.contains(&"late snack"));
+    assert!(SUGGESTED_OCCASION_LABELS.contains(&"post-workout"));
+}
+
+// ---------------------------------------------------------------------------
+// Serde round-trip tests — cover JSONB (Value), Decimal, Vec<String>, Vec<Uuid>
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_catalog_ingredient_serde_round_trip() {
+    let json = r#"{
+        "ingredient_id": "00000000-0000-0000-0000-000000000001",
+        "name": "Apple",
+        "description": null,
+        "serving_size_g": "182.00",
+        "nutrition": {"calories_kcal": 95.0, "protein_g": 0.5, "carbohydrates_g": 25.1},
+        "allergens": [],
+        "occasion_tags": ["snack", "breakfast-friendly"],
+        "external_id": "1750340",
+        "external_source": "usda_fdc",
+        "contributed_by_user_id": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let ingredient: CatalogIngredient = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(ingredient.name, "Apple");
+    assert_eq!(
+        ingredient.occasion_tags,
+        vec!["snack", "breakfast-friendly"]
+    );
+    assert!(ingredient.nutrition.is_some());
+    assert_eq!(ingredient.external_source.as_deref(), Some("usda_fdc"));
+
+    let serialized = serde_json::to_string(&ingredient).expect("serialize failed");
+    let reparsed: CatalogIngredient =
+        serde_json::from_str(&serialized).expect("re-deserialize failed");
+    assert_eq!(reparsed.name, ingredient.name);
+    assert_eq!(reparsed.serving_size_g, ingredient.serving_size_g);
+}
+
+#[test]
+fn test_catalog_dish_serde_with_overridden_flags() {
+    let json = r#"{
+        "dish_id": "00000000-0000-0000-0000-000000000002",
+        "name": "Caesar Salad",
+        "description": "Classic Caesar",
+        "instructions": null,
+        "prep_time_minutes": 15,
+        "cook_time_minutes": 0,
+        "servings": "2.00",
+        "allergens": ["gluten", "dairy", "egg"],
+        "allergens_overridden": true,
+        "occasion_tags": ["lunch", "dinner"],
+        "tags": ["salad", "classic"],
+        "nutrition": {"calories_kcal": 340.0},
+        "nutrition_overridden": false,
+        "contributed_by_user_id": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let dish: CatalogDish = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(dish.name, "Caesar Salad");
+    assert!(dish.allergens_overridden);
+    assert!(!dish.nutrition_overridden);
+    assert_eq!(dish.allergens, vec!["gluten", "dairy", "egg"]);
+}
+
+#[test]
+fn test_catalog_dish_ingredient_serde_round_trip() {
+    let json = r#"{
+        "dish_ingredient_id": "00000000-0000-0000-0000-000000000010",
+        "dish_id": "00000000-0000-0000-0000-000000000002",
+        "ingredient_id": "00000000-0000-0000-0000-000000000001",
+        "quantity": "1.5000",
+        "unit": "cups",
+        "preparation_note": "torn into pieces",
+        "is_optional": false,
+        "sort_order": 0
+    }"#;
+    let dbi: CatalogDishIngredient = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(dbi.unit, "cups");
+    assert!(!dbi.is_optional);
+    assert_eq!(dbi.sort_order, 0);
+}
+
+#[test]
+fn test_catalog_meal_has_no_meal_type_field() {
+    // meal_type was removed; occasion_tags TEXT[] is the replacement
+    let json = r#"{
+        "meal_id": "00000000-0000-0000-0000-000000000003",
+        "name": "Weekend Brunch",
+        "description": null,
+        "servings": "4.00",
+        "allergens": [],
+        "allergens_overridden": false,
+        "occasion_tags": ["breakfast-friendly", "weekend"],
+        "tags": ["brunch"],
+        "nutrition": null,
+        "nutrition_overridden": false,
+        "contributed_by_user_id": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let meal: CatalogMeal = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(meal.occasion_tags, vec!["breakfast-friendly", "weekend"]);
+    assert!(meal.nutrition.is_none());
+}
+
+#[test]
+fn test_catalog_meal_dish_serde_round_trip() {
+    let json = r#"{
+        "meal_dish_id": "00000000-0000-0000-0000-000000000020",
+        "meal_id": "00000000-0000-0000-0000-000000000003",
+        "dish_id": "00000000-0000-0000-0000-000000000002",
+        "dish_servings": "1.00",
+        "notes": null,
+        "sort_order": 1
+    }"#;
+    let cmd: CatalogMealDish = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(cmd.sort_order, 1);
+    assert!(cmd.notes.is_none());
+}
+
+#[test]
+fn test_user_dish_serde_with_rating_and_safe_food() {
+    let json = r#"{
+        "user_dish_id": "00000000-0000-0000-0000-000000000004",
+        "user_id": "00000000-0000-0000-0000-000000000099",
+        "catalog_dish_id": null,
+        "name": "My Chicken Stir Fry",
+        "description": null,
+        "instructions": "Stir fry on high heat",
+        "prep_time_minutes": 10,
+        "cook_time_minutes": 15,
+        "servings": "2.00",
+        "allergens": ["soy"],
+        "allergens_overridden": false,
+        "occasion_tags": ["dinner", "quick"],
+        "tags": ["asian", "chicken"],
+        "nutrition": null,
+        "nutrition_overridden": false,
+        "rating": 5,
+        "is_safe_food": true,
+        "is_blocked": false,
+        "notes": "Add extra ginger",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let dish: UserDish = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(dish.rating, Some(5));
+    assert!(dish.is_safe_food);
+    assert!(!dish.is_blocked);
+    assert!(dish.catalog_dish_id.is_none());
+}
+
+#[test]
+fn test_user_dish_ingredient_serde_round_trip() {
+    let json = r#"{
+        "user_dish_ingredient_id": "00000000-0000-0000-0000-000000000030",
+        "user_dish_id": "00000000-0000-0000-0000-000000000004",
+        "ingredient_id": "00000000-0000-0000-0000-000000000001",
+        "quantity": "200.0000",
+        "unit": "grams",
+        "preparation_note": null,
+        "is_optional": true,
+        "sort_order": 2
+    }"#;
+    let udi: UserDishIngredient = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(udi.unit, "grams");
+    assert!(udi.is_optional);
+    assert_eq!(udi.sort_order, 2);
+}
+
+#[test]
+fn test_user_meal_serde_round_trip() {
+    let json = r#"{
+        "user_meal_id": "00000000-0000-0000-0000-000000000005",
+        "user_id": "00000000-0000-0000-0000-000000000099",
+        "catalog_meal_id": "00000000-0000-0000-0000-000000000003",
+        "name": "My Brunch",
+        "description": null,
+        "servings": "2.00",
+        "allergens": [],
+        "allergens_overridden": false,
+        "occasion_tags": ["breakfast-friendly"],
+        "tags": [],
+        "nutrition": null,
+        "nutrition_overridden": false,
+        "rating": null,
+        "is_safe_food": false,
+        "is_blocked": false,
+        "notes": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let meal: UserMeal = serde_json::from_str(json).expect("deserialize failed");
+    assert!(meal.catalog_meal_id.is_some());
+    assert!(meal.rating.is_none());
+}
+
+#[test]
+fn test_user_meal_dish_exactly_one_source() {
+    // catalog_dish_id set, user_dish_id null
+    let json = r#"{
+        "user_meal_dish_id": "00000000-0000-0000-0000-000000000040",
+        "user_meal_id": "00000000-0000-0000-0000-000000000005",
+        "catalog_dish_id": "00000000-0000-0000-0000-000000000002",
+        "user_dish_id": null,
+        "dish_servings": "1.00",
+        "notes": null,
+        "sort_order": 0
+    }"#;
+    let umd: UserMealDish = serde_json::from_str(json).expect("deserialize failed");
+    assert!(umd.catalog_dish_id.is_some());
+    assert!(umd.user_dish_id.is_none());
+}
+
+#[test]
+fn test_catalog_exercise_serde_with_equipment() {
+    let json = r#"{
+        "exercise_id": "00000000-0000-0000-0000-000000000006",
+        "name": "Barbell Squat",
+        "description": "Compound lower body exercise",
+        "default_duration_minutes": 45,
+        "intensity": "high",
+        "muscle_groups": ["quadriceps", "hamstrings", "glutes"],
+        "equipment_required": ["barbell", "squat rack"],
+        "tags": ["strength", "compound"],
+        "external_id": "123",
+        "external_source": "wger",
+        "contributed_by_user_id": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let ex: CatalogExercise = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(ex.intensity, "high");
+    assert_eq!(ex.equipment_required, vec!["barbell", "squat rack"]);
+    assert_eq!(ex.external_source.as_deref(), Some("wger"));
+}
+
+#[test]
+fn test_user_exercise_serde_round_trip() {
+    let json = r#"{
+        "user_exercise_id": "00000000-0000-0000-0000-000000000007",
+        "user_id": "00000000-0000-0000-0000-000000000099",
+        "catalog_exercise_id": null,
+        "name": "Home HIIT",
+        "description": null,
+        "default_duration_minutes": 20,
+        "intensity": "moderate",
+        "muscle_groups": ["core", "legs"],
+        "equipment_required": [],
+        "tags": ["cardio", "hiit"],
+        "rating": 4,
+        "is_blocked": false,
+        "notes": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let ex: UserExercise = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(ex.rating, Some(4));
+    assert!(ex.equipment_required.is_empty());
+}
+
+#[test]
+fn test_family_serde_round_trip() {
+    let json = r#"{
+        "family_id": "00000000-0000-0000-0000-000000000008",
+        "name": "Smith Family",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let family: Family = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(family.name, "Smith Family");
+}
+
+#[test]
+fn test_family_member_serde_with_uuid_array() {
+    let json = r#"{
+        "family_member_id": "00000000-0000-0000-0000-000000000009",
+        "family_id": "00000000-0000-0000-0000-000000000008",
+        "user_id": "00000000-0000-0000-0000-000000000099",
+        "role": "owner",
+        "can_plan_for": ["00000000-0000-0000-0000-000000000098"],
+        "created_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let member: FamilyMember = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(member.role, "owner");
+    assert_eq!(member.can_plan_for.len(), 1);
+}
+
+#[test]
+fn test_family_meal_serde_with_naive_date_and_participants() {
+    let json = r#"{
+        "family_meal_id": "00000000-0000-0000-0000-000000000011",
+        "family_id": "00000000-0000-0000-0000-000000000008",
+        "planned_by_user_id": "00000000-0000-0000-0000-000000000099",
+        "date": "2026-03-15",
+        "time_window_start": "18:00:00",
+        "time_window_end": "19:30:00",
+        "user_meal_id": null,
+        "title": "Saturday Dinner",
+        "notes": "Everyone bring a dish",
+        "participants": [
+            "00000000-0000-0000-0000-000000000099",
+            "00000000-0000-0000-0000-000000000098"
+        ],
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let fm: FamilyMeal = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(fm.participants.len(), 2);
+    assert!(fm.time_window_start.is_some());
+    assert!(fm.user_meal_id.is_none());
+}
+
+#[test]
+fn test_task_serde_round_trip() {
+    let json = r#"{
+        "task_id": "00000000-0000-0000-0000-000000000012",
+        "user_id": "00000000-0000-0000-0000-000000000099",
+        "title": "Morning Run",
+        "task_type": "exercise",
+        "scheduled_start": "2026-03-15T07:00:00Z",
+        "duration_minutes": 30,
+        "energy_required": "medium",
+        "status": "planned",
+        "is_milepost": false,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let task: Task = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(task.task_type, "exercise");
+    assert_eq!(task.status, "planned");
+    assert!(!task.is_milepost);
+}
+
+#[test]
+fn test_meal_task_serde_with_occasion_label_and_user_dish_id() {
+    // occasion_label replaces meal_type enum; user_dish_id allows scheduling a dish directly
+    let json = r#"{
+        "task_id": "00000000-0000-0000-0000-000000000013",
+        "user_meal_id": null,
+        "user_dish_id": "00000000-0000-0000-0000-000000000004",
+        "family_meal_id": null,
+        "occasion_label": "late snack"
+    }"#;
+    let mt: MealTask = serde_json::from_str(json).expect("deserialize failed");
+    assert!(mt.user_meal_id.is_none());
+    assert!(mt.user_dish_id.is_some());
+    assert_eq!(mt.occasion_label.as_deref(), Some("late snack"));
+}
+
+#[test]
+fn test_exercise_task_serde_round_trip() {
+    let json = r#"{
+        "task_id": "00000000-0000-0000-0000-000000000014",
+        "user_exercise_id": "00000000-0000-0000-0000-000000000007",
+        "intensity": "moderate",
+        "muscle_groups": ["core", "legs"]
+    }"#;
+    let et: ExerciseTask = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(et.intensity.as_deref(), Some("moderate"));
+    assert_eq!(et.muscle_groups, vec!["core", "legs"]);
+}
+
+#[test]
+fn test_work_task_serde_round_trip() {
+    let json = r#"{
+        "task_id": "00000000-0000-0000-0000-000000000015",
+        "project_label": "PLND backend",
+        "focus_level_required": "deep"
+    }"#;
+    let wt: WorkTask = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(wt.project_label.as_deref(), Some("PLND backend"));
+    assert_eq!(wt.focus_level_required.as_deref(), Some("deep"));
+}
+
+#[test]
+fn test_generic_task_serde_round_trip() {
+    let json = r#"{
+        "task_id": "00000000-0000-0000-0000-000000000016",
+        "category": "household",
+        "priority": "normal"
+    }"#;
+    let gt: GenericTask = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(gt.priority, "normal");
+    assert_eq!(gt.category.as_deref(), Some("household"));
+}
+
+#[test]
+fn test_schedule_template_serde_with_task_ref_type() {
+    let json = r#"{
+        "template_id": "00000000-0000-0000-0000-000000000017",
+        "user_id": "00000000-0000-0000-0000-000000000099",
+        "task_type": "meal",
+        "title": "Daily Breakfast",
+        "recurrence": "daily",
+        "recurrence_rule": null,
+        "time_window_start": "07:00:00",
+        "time_window_end": "08:30:00",
+        "duration_minutes": 20,
+        "energy_required": "low",
+        "is_milepost": true,
+        "task_ref_id": "00000000-0000-0000-0000-000000000005",
+        "task_ref_type": "user_meal",
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let tmpl: ScheduleTemplate = serde_json::from_str(json).expect("deserialize failed");
+    assert!(tmpl.is_milepost);
+    assert_eq!(tmpl.task_ref_type.as_deref(), Some("user_meal"));
+    assert_eq!(tmpl.recurrence, "daily");
+}
+
+#[test]
+fn test_schedule_entry_serde_with_after_milepost() {
+    let json = r#"{
+        "entry_id": "00000000-0000-0000-0000-000000000018",
+        "user_id": "00000000-0000-0000-0000-000000000099",
+        "template_id": null,
+        "task_type": "work",
+        "task_ref_id": null,
+        "task_ref_type": null,
+        "date": "2026-03-15",
+        "scheduled_start": "2026-03-15T09:00:00Z",
+        "scheduled_end": "2026-03-15T11:00:00Z",
+        "status": "planned",
+        "actual_start": null,
+        "actual_end": null,
+        "family_meal_id": null,
+        "after_milepost": "breakfast",
+        "after_entry_id": null,
+        "deviation_note": null,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+    }"#;
+    let entry: ScheduleEntry = serde_json::from_str(json).expect("deserialize failed");
+    assert_eq!(entry.after_milepost.as_deref(), Some("breakfast"));
+    assert!(entry.template_id.is_none());
+    assert!(entry.actual_start.is_none());
+}
