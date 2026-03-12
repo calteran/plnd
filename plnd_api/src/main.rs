@@ -13,6 +13,7 @@ use utoipa_swagger_ui::SwaggerUi;
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::oauth::{MockOAuthProvider, OAuthProviderConfig};
 use plnd_api::auth::{JwtService, SessionService};
+use plnd_api::clients::{OpenFoodFactsClient, TheMealDbClient, UsdaFdcClient};
 use plnd_api::config;
 use plnd_api::config::settings::OAuthProviderConfig as ConfigOAuthProvider;
 use plnd_api::db::Database;
@@ -118,6 +119,21 @@ async fn main() {
         callback_uri,
         frontend_callback,
     });
+
+    // Construct external provider clients (no routes yet; validates config is wired correctly)
+    let _nutrition_usda = UsdaFdcClient::new(&config.external_providers.usda_fdc_api_key);
+    let _nutrition_off = OpenFoodFactsClient::new();
+    let _recipe_mdb = TheMealDbClient::new(&config.external_providers.themealdb_api_key);
+    if config.external_providers.usda_fdc_api_key.is_empty() {
+        println!("  USDA FDC provider: no API key set (will return ConfigurationError at runtime)");
+    } else {
+        println!("  USDA FDC provider: ready");
+    }
+    println!("  Open Food Facts provider: ready");
+    println!(
+        "  TheMealDB provider: ready (key={})",
+        config.external_providers.themealdb_api_key
+    );
 
     let cors = CorsLayer::new()
         .allow_origin(cors_origin)

@@ -68,6 +68,10 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.auth.frontend_callback_url = Some(url);
     }
 
+    if let Ok(key) = std::env::var("APP_EXTERNAL__USDA_FDC_API_KEY") {
+        app_config.external_providers.usda_fdc_api_key = key;
+    }
+
     app_config
         .validate()
         .map_err(error::ConfigError::Validation)?;

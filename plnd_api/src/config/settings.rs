@@ -100,6 +100,18 @@ impl Default for JwtConfig {
     }
 }
 
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct ExternalProvidersConfig {
+    #[serde(default)]
+    pub usda_fdc_api_key: String,
+    #[serde(default = "default_themealdb_key")]
+    pub themealdb_api_key: String,
+}
+
+fn default_themealdb_key() -> String {
+    "1".to_string()
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub api: ApiConfig,
@@ -108,6 +120,8 @@ pub struct AppConfig {
     pub logging: LoggingConfig,
     #[serde(default)]
     pub auth: AuthConfig,
+    #[serde(default)]
+    pub external_providers: ExternalProvidersConfig,
 }
 
 impl AppConfig {

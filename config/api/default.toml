@@ -52,3 +52,8 @@ client_secret = ""
 redirect_uri = "http://localhost:4200/auth/apple/callback"
 scopes = ["name", "email"]
 enabled = false
+
+[external_providers]
+# Free key: https://fdc.nal.usda.gov/api-guide.html
+usda_fdc_api_key = ""
+themealdb_api_key = "1"

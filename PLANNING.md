@@ -205,8 +205,11 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 3. **Catalog Population Infrastructure**
    - **Dev/Staging Seed Fixtures**: Static SQL seed script (~20–30 common meals/exercises); idempotent (`INSERT ... ON CONFLICT DO NOTHING`)
    - ✅ **External Client Traits** (`src/clients/`): `NutritionProvider` + `RecipeProvider` async traits; `search_*` + `get_*_by_id` methods; `ExternalClientError`; `NutritionFacts` typed struct serializes to canonical `nutrition JSONB` shape; `source_name() -> &str` drives `external_source` tagging
-   - **USDA FoodData Central Client**: `UsdaFdcClient` implementing `NutritionProvider`; normalizes FDC nutrient array → `NutritionFacts`; tags `external_source = 'usda_fdc'`
    - ✅ **Exercise Provider Trait** (`src/clients/exercise.rs`): `ExerciseProvider` async trait; `search_exercises` + `get_exercise_by_id`; `ExternalExercise` DTO with `muscle_groups`, `equipment`, `intensity`; concrete `WgerClient` comes in next task and tags `external_source = 'wger'`
+   - ✅ **USDA FoodData Central Client** (`src/clients/usda_fdc.rs`): `UsdaFdcClient` implementing `NutritionProvider`; free API key required (env: `APP_EXTERNAL__USDA_FDC_API_KEY`); 14-nutrient ID→field mapping via `apply_nutrient()`; `serving_size_g` from `foodPortions[0]`; returns `ConfigurationError` early if key empty; tags `external_source = 'usda_fdc'`
+   - ✅ **Open Food Facts Client** (`src/clients/open_food_facts.rs`): `OpenFoodFactsClient` implementing `NutritionProvider`; no auth required; all nutrients per-100g with g→mg conversion for minerals; client-side allergen filtering; strips `"en:"` prefix from allergen tags; tags `external_source = 'openfoodfacts'`
+   - ✅ **TheMealDB Recipe Client** (`src/clients/themealdb.rs`): `TheMealDbClient` implementing `RecipeProvider`; free-tier key `"1"` baked in by default; `#[serde(flatten)]` captures strIngredient1–20/strMeasure1–20 dynamically; `parse_measure()` handles fractions ("1/2 cup"), attached units ("250g"), and fallback ("to taste" → ONE serving); category → `occasion_tags` mapping; tags `external_source = 'themealdb'`
+   - ✅ **Config wiring**: `ExternalProvidersConfig` in `settings.rs`; `[external_providers]` section in `config/api/default.toml`; clients constructed at startup in `main.rs` with diagnostic prints
    - **Search-Through Pattern**: Local catalog first; fan out on cache miss; deduplicate by `(external_source, external_id)` before upsert
    - **Admin Seed Command**: `just seed-catalog`; safe to re-run (idempotent)
    - *(Future — Phase 3)*: AI-guided catalog curation deferred to LLM integration phase
@@ -241,7 +244,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - ✅ Dietary restrictions management (full CRUD, backend + Angular UI)
 - ✅ User onboarding wizard (multi-step, skip-friendly, DB-persisted completion)
 - ✅ Domain model database schema (3-layer Ingredient → Dish → Meal hierarchy; 6 migrations; 20 Rust model structs)
-- Catalog population infrastructure (dev fixtures + public API clients + search-through pattern)
+- ✅ External provider clients: USDA FDC + Open Food Facts (`NutritionProvider`) + TheMealDB (`RecipeProvider`); trait-based, offline-testable, config-driven
+- Catalog population infrastructure (dev seed fixtures + search-through pattern + `just seed-catalog` command)
 - Functional meal and exercise planning
 - Family profile management
 - Basic LLM-powered suggestions (dependent on meal/exercise data being in place)

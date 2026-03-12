@@ -5,7 +5,10 @@ use plnd_api::clients::dtos::{
     ExternalDish, ExternalDishIngredient, ExternalExercise, ExternalIngredient, NutritionFacts,
     SearchQuery, SearchResult,
 };
-use plnd_api::clients::{ExerciseProvider, ExternalClientError, NutritionProvider, RecipeProvider};
+use plnd_api::clients::{
+    ExerciseProvider, ExternalClientError, NutritionProvider, OpenFoodFactsClient, RecipeProvider,
+    TheMealDbClient, UsdaFdcClient,
+};
 use rust_decimal::Decimal;
 
 // ---------------------------------------------------------------------------
@@ -283,4 +286,44 @@ fn test_recipe_provider_object_safety() {
 fn test_exercise_provider_object_safety() {
     let provider: Box<dyn ExerciseProvider> = Box::new(MockExerciseProvider);
     assert_eq!(provider.source_name(), "mock_exercise");
+}
+
+// ---------------------------------------------------------------------------
+// Concrete provider source names and object safety
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_usda_fdc_source_name() {
+    let client = UsdaFdcClient::new("test-key");
+    assert_eq!(client.source_name(), "usda_fdc");
+}
+
+#[test]
+fn test_open_food_facts_source_name() {
+    let client = OpenFoodFactsClient::new();
+    assert_eq!(client.source_name(), "openfoodfacts");
+}
+
+#[test]
+fn test_themealdb_source_name() {
+    let client = TheMealDbClient::new("1");
+    assert_eq!(client.source_name(), "themealdb");
+}
+
+#[test]
+fn test_usda_fdc_nutrition_provider_object_safety() {
+    let client: Box<dyn NutritionProvider> = Box::new(UsdaFdcClient::new("test-key"));
+    assert_eq!(client.source_name(), "usda_fdc");
+}
+
+#[test]
+fn test_open_food_facts_nutrition_provider_object_safety() {
+    let client: Box<dyn NutritionProvider> = Box::new(OpenFoodFactsClient::new());
+    assert_eq!(client.source_name(), "openfoodfacts");
+}
+
+#[test]
+fn test_themealdb_recipe_provider_object_safety() {
+    let client: Box<dyn RecipeProvider> = Box::new(TheMealDbClient::new("1"));
+    assert_eq!(client.source_name(), "themealdb");
 }
