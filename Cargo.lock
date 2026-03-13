@@ -1756,6 +1756,7 @@ dependencies = [
  "jsonwebtoken",
  "oauth2",
  "plnd_data",
+ "plnd_seed",
  "reqwest",
  "rust_decimal",
  "serde",
@@ -1785,6 +1786,20 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
+]
+
+[[package]]
+name = "plnd_seed"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "plnd_data",
+ "rust_decimal",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]

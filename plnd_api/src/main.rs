@@ -133,6 +133,21 @@ async fn main() {
         config.external_providers.themealdb_api_key
     );
 
+    // Seed catalog tables in the background so the server binds immediately.
+    // The seed is idempotent — safe to run on every startup.
+    {
+        let seed_pool = db_conn.get_pool().clone();
+        let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::clients::NutritionProvider>> =
+            vec![nutrition_usda.clone(), nutrition_off.clone()];
+        let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::clients::RecipeProvider>> =
+            vec![recipe_mdb.clone()];
+        tokio::spawn(async move {
+            if let Err(e) = plnd_seed::seed(&seed_pool, &seed_nutrition, &seed_recipe).await {
+                eprintln!("Warning: catalog seed failed: {}", e);
+            }
+        });
+    }
+
     let search_cache = SearchCache::new(config.external_providers.search_cache_ttl_hours);
     let provider_search = ProviderSearchService::new(
         vec![nutrition_usda, nutrition_off],

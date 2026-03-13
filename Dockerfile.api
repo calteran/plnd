@@ -5,6 +5,7 @@ WORKDIR /app
 COPY Cargo.toml .
 COPY plnd_api plnd_api
 COPY plnd_data plnd_data
+COPY plnd_seed plnd_seed
 COPY config/api /app/config/api
 
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && \

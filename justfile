@@ -147,6 +147,10 @@ test-e2e-dev:
 test-e2e-report:
     cd plnd_client && npm run e2e:report
 
+# Seed catalog data from external providers (requires running DB)
+seed:
+    doppler run -- cargo run -p plnd_seed
+
 # Clean build artifacts
 clean:
     cargo clean

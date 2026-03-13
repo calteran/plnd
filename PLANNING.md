@@ -209,8 +209,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - ✅ Implement scheduling model: `schedule_templates`, `schedule_entries`
    - ✅ Note: nutrition and allergens can be entered at any layer (ingredient / dish / meal) with `_overridden` flags to distinguish manual vs. computed values
 
-3. **Catalog Population Infrastructure**
-   - **Dev/Staging Seed Fixtures**: Static SQL seed script (~20–30 common meals/exercises); idempotent (`INSERT ... ON CONFLICT DO NOTHING`)
+3. **Catalog Population Infrastructure** ✅
    - ✅ **External Client Traits** (`src/clients/`): `NutritionProvider` + `RecipeProvider` async traits; `search_*` + `get_*_by_id` methods; `ExternalClientError`; `NutritionFacts` typed struct serializes to canonical `nutrition JSONB` shape; `source_name() -> &str` drives `external_source` tagging
    - ✅ **Exercise Provider Trait** (`src/clients/exercise.rs`): `ExerciseProvider` async trait; `search_exercises` + `get_exercise_by_id`; `ExternalExercise` DTO with `muscle_groups`, `equipment`, `intensity`; concrete `WgerClient` comes in next task and tags `external_source = 'wger'`
    - ✅ **USDA FoodData Central Client** (`src/clients/usda_fdc.rs`): `UsdaFdcClient` implementing `NutritionProvider`; free API key required (env: `APP_EXTERNAL__USDA_FDC_API_KEY`); 14-nutrient ID→field mapping via `apply_nutrient()`; `serving_size_g` from `foodPortions[0]`; returns `ConfigurationError` early if key empty; tags `external_source = 'usda_fdc'`
@@ -218,8 +217,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - ✅ **TheMealDB Recipe Client** (`src/clients/themealdb.rs`): `TheMealDbClient` implementing `RecipeProvider`; free-tier key `"1"` baked in by default; `#[serde(flatten)]` captures strIngredient1–20/strMeasure1–20 dynamically; `parse_measure()` handles fractions ("1/2 cup"), attached units ("250g"), and fallback ("to taste" → ONE serving); category → `occasion_tags` mapping; tags `external_source = 'themealdb'`
    - ✅ **Config wiring**: `ExternalProvidersConfig` in `settings.rs`; `[external_providers]` section in `config/api/default.toml`; clients constructed at startup in `main.rs` with diagnostic prints
    - ✅ **Search Infrastructure** (`src/search/`, `src/cache/`, `src/db/search.rs`): `ProviderSearchService` streams results from all providers concurrently via `tokio::spawn` fan-out; TTL-backed `SearchCache` (moka, default 36h); `GET /search/ingredients`, `GET /search/dishes`, `GET /search/exercises` protected routes; local PostgreSQL FTS (`to_tsvector`/`plainto_tsquery`) runs first, external providers fan out in parallel
-   - ✅ **Cargo Workspace + `plnd_data` crate**: `clients/`, `cache/`, `search/` extracted from `plnd_api` into a new `plnd_data` library crate with zero Axum/SQLx deps; root `Cargo.toml` workspace manifest with shared `Cargo.lock` and `target/`; `Dockerfile.api` updated to copy workspace root + both crates; all 119 Rust tests pass across both crates
-   - **Admin Seed Command**: `just seed-catalog`; safe to re-run (idempotent)
+   - ✅ **Cargo Workspace + `plnd_data` + `plnd_seed` crates**: `clients/`, `cache/`, `search/` extracted into `plnd_data` library (zero Axum/SQLx deps); `plnd_seed` is a new workspace crate (`lib` + `seed` binary) that seeds `catalog_ingredients` and `catalog_dishes` from external providers; `Dockerfile.api` copies all three crates; 124 Rust tests pass across all crates
+   - ✅ **Catalog Seed** (`plnd_seed/`): `pub async fn seed(pool, nutrition_providers, recipe_providers)` — checks `catalog_ingredients.external_source IS NOT NULL` for fast idempotency; fetches 8 ingredient terms × top-3 + 5 dish terms × top-2 from configured providers; single DB transaction for all writes; spawned as background `tokio::task` in `main.rs` so server binds immediately; `just seed` standalone command for operator use; 5 offline unit tests
    - *(Future — Phase 3)*: AI-guided catalog curation deferred to LLM integration phase
 
 4. **Meal Planning Core**
@@ -255,8 +254,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - ✅ Domain model database schema (3-layer Ingredient → Dish → Meal hierarchy; 6 migrations; 20 Rust model structs)
 - ✅ External provider clients: USDA FDC + Open Food Facts (`NutritionProvider`) + TheMealDB (`RecipeProvider`); trait-based, offline-testable, config-driven
 - ✅ Search infrastructure: `ProviderSearchService` (streaming fan-out, TTL cache) + local FTS via `db::search` + `GET /search/{ingredients,dishes,exercises}` routes
-- ✅ Cargo workspace: `plnd_data` library crate (`clients/`, `cache/`, `search/`) extracted from `plnd_api`; enforces Axum/SQLx-free boundary at compile time; reusable by future CLI/worker crates
-- Catalog population infrastructure (dev seed fixtures + `just seed-catalog` command)
+- ✅ Cargo workspace: `plnd_data` + `plnd_seed` crates; `plnd_data` enforces Axum/SQLx-free boundary; `plnd_seed` provides idempotent catalog seeding from external providers with background startup task and `just seed` operator command
+- ✅ Catalog population infrastructure (`plnd_seed` crate — dynamic provider seeding, idempotent, background on startup, `just seed` command)
 - Functional meal and exercise planning
 - Family profile management
 - Basic LLM-powered suggestions (dependent on meal/exercise data being in place)
