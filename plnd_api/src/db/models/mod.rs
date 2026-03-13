@@ -82,6 +82,8 @@ pub struct CatalogDish {
     pub tags: Vec<String>,
     pub nutrition: Option<Value>, // per serving; null = compute from ingredients
     pub nutrition_overridden: bool,
+    pub external_id: Option<String>,
+    pub external_source: Option<String>, // 'themealdb' | null
     pub contributed_by_user_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -115,6 +117,8 @@ pub struct CatalogMeal {
     pub tags: Vec<String>,
     pub nutrition: Option<Value>, // per person; null = compute from dishes
     pub nutrition_overridden: bool,
+    pub external_id: Option<String>,
+    pub external_source: Option<String>, // reserved for future meal-level providers
     pub contributed_by_user_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

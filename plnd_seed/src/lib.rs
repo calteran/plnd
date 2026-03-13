@@ -13,7 +13,7 @@ use std::sync::Arc;
 /// the function returns `Ok(())` immediately without making HTTP calls.
 ///
 /// For partial re-runs (e.g. dishes added but ingredients missing), individual
-/// inserts are guarded by ON CONFLICT or name+tag existence checks.
+/// inserts are guarded by ON CONFLICT DO NOTHING on named unique constraints.
 pub async fn seed(
     pool: &sqlx::PgPool,
     nutrition_providers: &[Arc<dyn NutritionProvider>],
@@ -58,8 +58,8 @@ pub async fn seed(
         ingredients_inserted
     );
 
-    let dishes_inserted = dishes::insert_dishes(&mut tx, &fetched_dishes).await?;
-    println!("Catalog seed: inserted {} dish(es).", dishes_inserted);
+    let dishes_upserted = dishes::insert_dishes(&mut tx, &fetched_dishes).await?;
+    println!("Catalog seed: upserted {} dish(es).", dishes_upserted);
 
     tx.commit().await?;
     println!("Catalog seed: complete.");

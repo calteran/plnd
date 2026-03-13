@@ -9,15 +9,17 @@ use crate::error::SeedError;
 
 pub const DISH_TERMS: &[&str] = &["chicken", "pasta", "scrambled eggs", "salad", "porridge"];
 
-/// Tag written on every auto-seeded dish so they can be identified without
-/// a dedicated `external_source` column on `catalog_dishes`.
+/// Informational tag written on every auto-seeded dish so seeded rows can be
+/// queried by tag. Deduplication is handled by the `uq_dish_external` constraint,
+/// not by this tag.
 pub const AUTO_SEEDED_TAG: &str = "auto-seeded";
 
 /// Fetch dishes from all providers for all search terms, deduplicated by
-/// (source_name, external_id). Returns a flat list ready for DB insertion.
-pub async fn fetch_dishes(providers: &[Arc<dyn RecipeProvider>]) -> Vec<ExternalDish> {
+/// (source_name, external_id). Returns a flat list of (source, dish) pairs
+/// ready for DB insertion.
+pub async fn fetch_dishes(providers: &[Arc<dyn RecipeProvider>]) -> Vec<(String, ExternalDish)> {
     let mut seen: HashSet<(String, String)> = HashSet::new();
-    let mut results: Vec<ExternalDish> = Vec::new();
+    let mut results: Vec<(String, ExternalDish)> = Vec::new();
 
     for provider in providers {
         let source = provider.source_name().to_string();
@@ -49,7 +51,7 @@ pub async fn fetch_dishes(providers: &[Arc<dyn RecipeProvider>]) -> Vec<External
                 match provider.get_dish_by_id(&result.external_id).await {
                     Ok(Some(dish)) => {
                         seen.insert(key);
-                        results.push(dish);
+                        results.push((source.clone(), dish));
                     }
                     Ok(None) => {
                         // Provider confirmed it no longer exists — skip silently
@@ -68,28 +70,20 @@ pub async fn fetch_dishes(providers: &[Arc<dyn RecipeProvider>]) -> Vec<External
     results
 }
 
-/// Insert a batch of dishes into `catalog_dishes` + `catalog_dish_ingredients`.
-/// Idempotency: skip any dish whose name already exists in auto-seeded dishes.
+/// Upsert a batch of (source, dish) pairs into `catalog_dishes` + `catalog_dish_ingredients`.
+///
+/// On conflict (`uq_dish_external`), the existing row is updated with the latest
+/// data from the provider. The `_overridden` flags are respected: allergens and
+/// nutrition are only overwritten if the user has NOT manually verified them.
+///
+/// Returns the number of rows upserted (inserted + updated).
 pub async fn insert_dishes(
     tx: &mut PgConnection,
-    dishes: &[ExternalDish],
+    dishes: &[(String, ExternalDish)],
 ) -> Result<usize, SeedError> {
-    let mut inserted = 0usize;
+    let mut upserted = 0usize;
 
-    for dish in dishes {
-        // Idempotency: skip if a same-named auto-seeded dish already exists
-        let existing: Option<Uuid> = sqlx::query_scalar(
-            "SELECT dish_id FROM catalog_dishes WHERE name = $1 AND $2 = ANY(tags) LIMIT 1",
-        )
-        .bind(&dish.name)
-        .bind(AUTO_SEEDED_TAG)
-        .fetch_optional(&mut *tx)
-        .await?;
-
-        if existing.is_some() {
-            continue;
-        }
-
+    for (source, dish) in dishes {
         let dish_id = Uuid::new_v4();
         let nutrition_json: Option<serde_json::Value> = match &dish.nutrition {
             Some(n) => Some(serde_json::to_value(n)?),
@@ -97,13 +91,32 @@ pub async fn insert_dishes(
         };
         let tags = vec![AUTO_SEEDED_TAG.to_string()];
 
-        sqlx::query(
+        // RETURNING dish_id is required: on the DO UPDATE path the row already
+        // exists with its original dish_id — we must use that for ingredient linking,
+        // not the newly-generated UUID above.
+        let (actual_dish_id,): (Uuid,) = sqlx::query_as(
             r#"
             INSERT INTO catalog_dishes
                 (dish_id, name, instructions, prep_time_minutes, cook_time_minutes,
                  servings, allergens, allergens_overridden, occasion_tags,
-                 nutrition, nutrition_overridden, tags)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, false, $10)
+                 nutrition, nutrition_overridden, tags, external_id, external_source)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $9, false, $10, $11, $12)
+            ON CONFLICT ON CONSTRAINT uq_dish_external DO UPDATE SET
+                name              = EXCLUDED.name,
+                instructions      = EXCLUDED.instructions,
+                prep_time_minutes = EXCLUDED.prep_time_minutes,
+                cook_time_minutes = EXCLUDED.cook_time_minutes,
+                servings          = EXCLUDED.servings,
+                allergens         = CASE WHEN catalog_dishes.allergens_overridden
+                                         THEN catalog_dishes.allergens
+                                         ELSE EXCLUDED.allergens END,
+                occasion_tags     = EXCLUDED.occasion_tags,
+                nutrition         = CASE WHEN catalog_dishes.nutrition_overridden
+                                         THEN catalog_dishes.nutrition
+                                         ELSE EXCLUDED.nutrition END,
+                tags              = EXCLUDED.tags,
+                updated_at        = now()
+            RETURNING dish_id
             "#,
         )
         .bind(dish_id)
@@ -116,10 +129,14 @@ pub async fn insert_dishes(
         .bind(&dish.occasion_tags)
         .bind(nutrition_json)
         .bind(&tags)
-        .execute(&mut *tx)
+        .bind(&dish.external_id)
+        .bind(source)
+        .fetch_one(&mut *tx)
         .await?;
 
-        // Link ingredients by name lookup against the just-inserted catalog_ingredients
+        // Link ingredients by name lookup. Run on both insert and update paths so
+        // newly-added ingredients in a recipe revision get picked up. Existing
+        // links are updated in place (quantity/unit may change between provider versions).
         for (sort_idx, dish_ingredient) in dish.ingredients.iter().enumerate() {
             let ingredient_id: Option<Uuid> = sqlx::query_scalar(
                 "SELECT ingredient_id FROM catalog_ingredients WHERE LOWER(name) = LOWER($1) LIMIT 1",
@@ -138,11 +155,16 @@ pub async fn insert_dishes(
                         (dish_ingredient_id, dish_id, ingredient_id, quantity, unit,
                          preparation_note, is_optional, sort_order)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                    ON CONFLICT ON CONSTRAINT uq_dish_ingredient DO NOTHING
+                    ON CONFLICT ON CONSTRAINT uq_dish_ingredient DO UPDATE SET
+                        quantity         = EXCLUDED.quantity,
+                        unit             = EXCLUDED.unit,
+                        preparation_note = EXCLUDED.preparation_note,
+                        is_optional      = EXCLUDED.is_optional,
+                        sort_order       = EXCLUDED.sort_order
                     "#,
                 )
                 .bind(dish_ingredient_id)
-                .bind(dish_id)
+                .bind(actual_dish_id)
                 .bind(ingredient_id)
                 .bind(dish_ingredient.quantity)
                 .bind(&dish_ingredient.unit)
@@ -155,8 +177,8 @@ pub async fn insert_dishes(
             // If ingredient not found by name — skip silently, dish still seeded
         }
 
-        inserted += 1;
+        upserted += 1;
     }
 
-    Ok(inserted)
+    Ok(upserted)
 }
