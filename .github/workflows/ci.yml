@@ -1,0 +1,178 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Job 1: Static analysis ──────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cache cargo bin (machete)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin
+          key: cargo-bin-machete-${{ runner.os }}
+
+      - name: Install cargo-machete
+        run: cargo install cargo-machete --locked
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plnd_client/package-lock.json
+
+      - name: Install Angular dependencies
+        run: cd plnd_client && npm ci
+
+      - name: Rust – check formatting
+        run: cargo fmt --check
+
+      - name: Rust – Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Rust – cargo-deny (licenses + advisories)
+        uses: EmbarkStudios/cargo-deny-action@v1
+
+      - name: Rust – cargo-machete (unused deps)
+        run: cargo machete
+
+      - name: Angular – ESLint
+        run: cd plnd_client && npx eslint "src/**/*.ts"
+
+      - name: Angular – dependency health
+        run: cd plnd_client && npm run check-dependencies && npm run check-licenses && npm run check-circular
+
+  # ── Job 2: Rust build + unit tests ─────────────────────────────────────────
+  test-rust:
+    name: Test (Rust)
+    runs-on: ubuntu-latest
+    needs: lint
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: plnd
+          POSTGRES_PASSWORD: plnd_dev
+          POSTGRES_DB: plnd_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U plnd -d plnd_dev"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Fetch secrets from Doppler
+        uses: doppler/secrets-fetch-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          inject-env-vars: true
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@cargo-nextest
+
+      - name: Build (verify compilation)
+        run: cargo build --workspace
+
+      - name: Run tests
+        run: cargo nextest run --workspace
+
+  # ── Job 3: Angular unit tests ───────────────────────────────────────────────
+  test-angular:
+    name: Test (Angular)
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plnd_client/package-lock.json
+
+      - name: Install dependencies
+        run: cd plnd_client && npm ci
+
+      - name: Run Angular unit tests (headless)
+        run: cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
+
+  # ── Job 4: End-to-end tests ─────────────────────────────────────────────────
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    needs: [test-rust, test-angular]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: plnd_client/package-lock.json
+
+      - name: Install Angular dependencies
+        run: cd plnd_client && npm ci
+
+      - name: Install Playwright browsers
+        run: cd plnd_client && npx playwright install chromium --with-deps
+
+      - name: Fetch secrets from Doppler
+        uses: doppler/secrets-fetch-action@v1
+        with:
+          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
+          inject-env-vars: true
+
+      - name: Build API binary
+        run: cargo build -p plnd_api
+
+      - name: Start infrastructure (DB + mock OAuth)
+        run: docker compose up -d db mock-oauth-server --wait
+
+      - name: Start API server (background)
+        run: |
+          cd plnd_api
+          APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev cargo run &
+          timeout 30s bash -c 'until curl -sf http://localhost:3000/health; do sleep 1; done'
+
+      - name: Run Playwright e2e tests
+        run: cd plnd_client && npm run e2e:ci
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: plnd_client/playwright-report/
+          retention-days: 7

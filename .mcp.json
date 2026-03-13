@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "doppler": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@dopplerhq/mcp-server",
+        "--project",
+        "plnd",
+        "--config",
+        "dev"
+      ],
+      "env": {}
+    }
+  }
+}
