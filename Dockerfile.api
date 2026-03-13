@@ -2,11 +2,13 @@
 FROM rust:latest AS builder
 
 WORKDIR /app
-COPY plnd_api .
+COPY Cargo.toml .
+COPY plnd_api plnd_api
+COPY plnd_data plnd_data
 COPY config/api /app/config/api
 
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && \
-    cargo build --release
+    cargo build --release --package plnd_api
 
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y libssl3 wget && rm -rf /var/lib/apt/lists/*

@@ -10,13 +10,13 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::clients::dtos::{SearchQuery, SearchResult};
 use crate::db::search::{
     search_dishes, search_exercises, search_ingredients, search_user_dishes, LocalDishResult,
     LocalExerciseResult, LocalIngredientResult,
 };
-use crate::search::ProviderSearchEvent;
 use crate::state::AppState;
+use plnd_data::clients::dtos::{SearchQuery, SearchResult};
+use plnd_data::search::ProviderSearchEvent;
 
 fn default_limit() -> u32 {
     20

@@ -217,7 +217,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
    - ✅ **Open Food Facts Client** (`src/clients/open_food_facts.rs`): `OpenFoodFactsClient` implementing `NutritionProvider`; no auth required; all nutrients per-100g with g→mg conversion for minerals; client-side allergen filtering; strips `"en:"` prefix from allergen tags; tags `external_source = 'openfoodfacts'`
    - ✅ **TheMealDB Recipe Client** (`src/clients/themealdb.rs`): `TheMealDbClient` implementing `RecipeProvider`; free-tier key `"1"` baked in by default; `#[serde(flatten)]` captures strIngredient1–20/strMeasure1–20 dynamically; `parse_measure()` handles fractions ("1/2 cup"), attached units ("250g"), and fallback ("to taste" → ONE serving); category → `occasion_tags` mapping; tags `external_source = 'themealdb'`
    - ✅ **Config wiring**: `ExternalProvidersConfig` in `settings.rs`; `[external_providers]` section in `config/api/default.toml`; clients constructed at startup in `main.rs` with diagnostic prints
-   - ✅ **Search Infrastructure** (`src/search/`, `src/cache/`, `src/db/search.rs`): `ProviderSearchService` streams results from all providers concurrently via `tokio::spawn` fan-out; TTL-backed `SearchCache` (moka, default 36h); `GET /search/ingredients`, `GET /search/dishes`, `GET /search/exercises` protected routes; local PostgreSQL FTS (`to_tsvector`/`plainto_tsquery`) runs first, external providers fan out in parallel; `ProviderSearchService` has zero Axum/sqlx deps — extractable to shared seeder crate
+   - ✅ **Search Infrastructure** (`src/search/`, `src/cache/`, `src/db/search.rs`): `ProviderSearchService` streams results from all providers concurrently via `tokio::spawn` fan-out; TTL-backed `SearchCache` (moka, default 36h); `GET /search/ingredients`, `GET /search/dishes`, `GET /search/exercises` protected routes; local PostgreSQL FTS (`to_tsvector`/`plainto_tsquery`) runs first, external providers fan out in parallel
+   - ✅ **Cargo Workspace + `plnd_data` crate**: `clients/`, `cache/`, `search/` extracted from `plnd_api` into a new `plnd_data` library crate with zero Axum/SQLx deps; root `Cargo.toml` workspace manifest with shared `Cargo.lock` and `target/`; `Dockerfile.api` updated to copy workspace root + both crates; all 119 Rust tests pass across both crates
    - **Admin Seed Command**: `just seed-catalog`; safe to re-run (idempotent)
    - *(Future — Phase 3)*: AI-guided catalog curation deferred to LLM integration phase
 
@@ -254,6 +255,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - ✅ Domain model database schema (3-layer Ingredient → Dish → Meal hierarchy; 6 migrations; 20 Rust model structs)
 - ✅ External provider clients: USDA FDC + Open Food Facts (`NutritionProvider`) + TheMealDB (`RecipeProvider`); trait-based, offline-testable, config-driven
 - ✅ Search infrastructure: `ProviderSearchService` (streaming fan-out, TTL cache) + local FTS via `db::search` + `GET /search/{ingredients,dishes,exercises}` routes
+- ✅ Cargo workspace: `plnd_data` library crate (`clients/`, `cache/`, `search/`) extracted from `plnd_api`; enforces Axum/SQLx-free boundary at compile time; reusable by future CLI/worker crates
 - Catalog population infrastructure (dev seed fixtures + `just seed-catalog` command)
 - Functional meal and exercise planning
 - Family profile management

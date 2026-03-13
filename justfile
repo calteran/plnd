@@ -1,6 +1,6 @@
 # Build all services
 build:
-    cargo build --manifest-path plnd_api/Cargo.toml
+    cargo build --workspace
     cd plnd_client && npx ng build
 
 # Run development environment (PostgreSQL + Client) in detached mode
@@ -33,12 +33,12 @@ logs:
 
 # Run tests with nextest
 test:
-    cargo nextest run --manifest-path plnd_api/Cargo.toml
+    cargo nextest run --workspace
     cd plnd_client && npm test
 
 # Run tests with nextest (verbose)
 test-verbose:
-    cargo nextest run --manifest-path plnd_api/Cargo.toml --verbose
+    cargo nextest run --workspace --verbose
 
 # Run Angular tests with headless Chrome (automated testing)
 test-ng-headless:
@@ -48,7 +48,7 @@ test-ng-headless:
 # Comprehensive test suite for CI/automated environments (Rust with nextest + Angular headless)
 test-ci:
     @echo "🚀 Running comprehensive CI test suite..."
-    cargo nextest run --manifest-path plnd_api/Cargo.toml && \
+    cargo nextest run --workspace && \
     just test-ng-headless && \
     just services-up && \
     just test-e2e && \
@@ -56,13 +56,13 @@ test-ci:
 
 # Rust quality commands
 fmt:
-    cargo fmt --manifest-path plnd_api/Cargo.toml --check
+    cargo fmt --check
 
 clippy:
-    cargo clippy --manifest-path plnd_api/Cargo.toml --all-targets --all-features -- -D warnings
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 deny:
-    cargo deny --manifest-path plnd_api/Cargo.toml check
+    cargo deny check
 
 machete:
     cargo machete
@@ -95,7 +95,7 @@ test-run-server:
 # Verify compilation only (no server startup)
 verify-build:
     @echo "🔨 Verifying build..."
-    cargo build --manifest-path plnd_api/Cargo.toml && \
+    cargo build --workspace && \
     echo "✅ Build successful"
 
 # Ensure Docker stack is running and all services are healthy (idempotent)
@@ -114,7 +114,7 @@ verify:
     @echo "🔍 Running full verification..."
     just check && \
     just verify-build && \
-    cargo nextest run --manifest-path plnd_api/Cargo.toml && \
+    cargo nextest run --workspace && \
     just test-ng-headless && \
     just services-up && \
     just test-e2e && \
@@ -149,6 +149,6 @@ test-e2e-report:
 
 # Clean build artifacts
 clean:
-    cargo clean --manifest-path plnd_api/Cargo.toml
+    cargo clean
     cd plnd_client && rm -rf node_modules dist
     docker compose down -v

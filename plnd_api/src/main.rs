@@ -14,15 +14,15 @@ use std::sync::Arc;
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::oauth::{MockOAuthProvider, OAuthProviderConfig};
 use plnd_api::auth::{JwtService, SessionService};
-use plnd_api::cache::SearchCache;
-use plnd_api::clients::{OpenFoodFactsClient, TheMealDbClient, UsdaFdcClient};
 use plnd_api::config;
 use plnd_api::config::settings::OAuthProviderConfig as ConfigOAuthProvider;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{auth, dietary_restrictions, preferences, search, system, users};
-use plnd_api::search::ProviderSearchService;
 use plnd_api::state::AppState;
+use plnd_data::cache::SearchCache;
+use plnd_data::clients::{OpenFoodFactsClient, TheMealDbClient, UsdaFdcClient};
+use plnd_data::search::ProviderSearchService;
 
 #[tokio::main]
 async fn main() {

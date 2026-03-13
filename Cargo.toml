@@ -1,0 +1,3 @@
+[workspace]
+members = ["plnd_api", "plnd_data"]
+resolver = "2"

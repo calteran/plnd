@@ -1,7 +1,7 @@
 use crate::auth::oauth::MockOAuthProvider;
 use crate::auth::{JwtService, SessionService};
 use crate::db::Database;
-use crate::search::ProviderSearchService;
+use plnd_data::search::ProviderSearchService;
 use std::sync::Arc;
 
 /// Shared application state available to all route handlers
