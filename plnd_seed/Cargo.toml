@@ -15,10 +15,10 @@ path = "src/bin/seed.rs"
 [dependencies]
 plnd_data = { path = "../plnd_data" }
 sqlx = { version = "0.8", features = ["postgres", "uuid", "runtime-tokio", "json", "rust_decimal"] }
-uuid = { version = "1.8", features = ["v4"] }
+uuid = { version = "1", features = ["v4"] }
 serde_json = "1.0"
 rust_decimal = { version = "1", features = ["db-postgres"] }
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 thiserror = "2.0"
 anyhow = "1.0"
 

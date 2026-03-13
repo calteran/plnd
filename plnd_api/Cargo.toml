@@ -9,20 +9,19 @@ plnd_data = { path = "../plnd_data" }
 plnd_seed = { path = "../plnd_seed" }
 axum = "0.8"
 tower-http = { version = "0.6", features = ["cors"] }
-tokio = { version = "1.0", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", features = ["postgres", "uuid", "chrono", "runtime-tokio", "migrate", "json", "rust_decimal"] }
 rust_decimal = { version = "1", features = ["db-postgres"] }
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
-config = "0.13"
+config = "0.15"
 dotenv = "0.15"
-oauth2 = "4.4"
-jsonwebtoken = "9.3"
+jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
 url = "2.5"
-uuid = { version = "1.8", features = ["v4", "serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query", "form", "native-tls"] }
 serde_json = "1.0"
 futures      = "0.3"
 utoipa = { version = "5.4", features = ["uuid", "chrono", "decimal"] }
@@ -30,10 +29,10 @@ utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-scalar = { version = "0.3", features = ["axum"] }
 
 [dev-dependencies]
-tokio = { version = "1.0", features = ["full", "test-util"] }
+tokio = { version = "1", features = ["full", "test-util"] }
 
 [package.metadata.cargo-machete]
-ignored = ["futures", "oauth2", "url", "utoipa"]
+ignored = ["futures", "url", "utoipa"]
 
 [package.metadata.nextest]
 # Configure nextest for better test execution
