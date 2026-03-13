@@ -108,10 +108,23 @@ pub struct ExternalProvidersConfig {
     pub themealdb_api_key: String,
     #[serde(default = "default_cache_ttl_hours")]
     pub search_cache_ttl_hours: u64,
+    /// Base URL for Open Food Facts requests. Use the staging server during development.
+    #[serde(default = "default_off_base_url")]
+    pub off_base_url: String,
+    /// Basic-auth username for the OFf staging server (`off`). Leave empty for production.
+    #[serde(default)]
+    pub off_basic_auth_user: String,
+    /// Basic-auth password for the OFf staging server (`off`). Leave empty for production.
+    #[serde(default)]
+    pub off_basic_auth_password: String,
 }
 
 fn default_themealdb_key() -> String {
     "1".to_string()
+}
+
+fn default_off_base_url() -> String {
+    "https://world.openfoodfacts.net".to_string()
 }
 
 fn default_cache_ttl_hours() -> u64 {

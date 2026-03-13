@@ -19,8 +19,14 @@ pub use usda_fdc::UsdaFdcClient;
 pub(crate) const USER_AGENT: &str = concat!("com.tingeese.plnd-dev/", env!("CARGO_PKG_VERSION"));
 
 pub(crate) fn build_http_client() -> reqwest::Client {
+    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT_LANGUAGE};
+
+    let mut headers = HeaderMap::new();
+    headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en"));
+
     reqwest::Client::builder()
         .user_agent(USER_AGENT)
+        .default_headers(headers)
         .build()
         .expect("failed to build HTTP client")
 }

@@ -9,3 +9,9 @@ timeout = 10000
 # Less verbose logging for production
 level = "info"
 pretty_print = false
+
+[external_providers]
+# Open Food Facts: production server requires no basic auth.
+off_base_url = "https://world.openfoodfacts.org"
+off_basic_auth_user = ""
+off_basic_auth_password = ""

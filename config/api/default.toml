@@ -57,3 +57,8 @@ enabled = false
 # Free key: https://fdc.nal.usda.gov/api-guide.html
 usda_fdc_api_key = ""
 themealdb_api_key = "1"
+# Open Food Facts: use staging server with public basic-auth during development.
+# Switch to https://world.openfoodfacts.org with no credentials before production launch.
+off_base_url = "https://world.openfoodfacts.net"
+off_basic_auth_user = "off"
+off_basic_auth_password = "off"

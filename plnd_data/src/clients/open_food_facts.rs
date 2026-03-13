@@ -9,19 +9,28 @@ use crate::clients::nutrition::NutritionProvider;
 
 pub struct OpenFoodFactsClient {
     http: Client,
+    base_url: String,
+    basic_auth: Option<(String, String)>,
 }
 
 impl OpenFoodFactsClient {
-    pub fn new() -> Self {
+    pub fn new(base_url: &str, basic_auth: Option<(String, String)>) -> Self {
         Self {
             http: super::build_http_client(),
+            base_url: base_url.to_string(),
+            basic_auth,
         }
     }
 }
 
 impl Default for OpenFoodFactsClient {
     fn default() -> Self {
-        Self::new()
+        // Staging server with public credentials — switch to production URL with no
+        // basic auth before launch.
+        Self::new(
+            "https://world.openfoodfacts.net",
+            Some(("off".to_string(), "off".to_string())),
+        )
     }
 }
 
@@ -133,17 +142,20 @@ impl NutritionProvider for OpenFoodFactsClient {
         &self,
         query: &SearchQuery,
     ) -> Result<Vec<SearchResult>, ExternalClientError> {
-        let resp = self
-            .http
-            .get("https://world.openfoodfacts.org/cgi/search.pl")
-            .query(&[
-                ("search_terms", query.query.as_str()),
-                ("page_size", &query.limit.to_string()),
-                ("action", "process"),
-                ("json", "1"),
-            ])
-            .send()
-            .await?;
+        let url = format!("{}/cgi/search.pl", self.base_url);
+        let req = self.http.get(&url).query(&[
+            ("search_terms", query.query.as_str()),
+            ("page_size", &query.limit.to_string()),
+            ("action", "process"),
+            ("json", "1"),
+            ("lc", "en"),
+            ("cc", "us"),
+        ]);
+        let req = match &self.basic_auth {
+            Some((user, pass)) => req.basic_auth(user, Some(pass)),
+            None => req,
+        };
+        let resp = req.send().await?;
 
         let status = resp.status();
         if status.as_u16() == 401 || status.as_u16() == 403 {
@@ -204,11 +216,13 @@ impl NutritionProvider for OpenFoodFactsClient {
         &self,
         external_id: &str,
     ) -> Result<Option<ExternalIngredient>, ExternalClientError> {
-        let url = format!(
-            "https://world.openfoodfacts.org/api/v2/product/{}.json",
-            external_id
-        );
-        let resp = self.http.get(&url).send().await?;
+        let url = format!("{}/api/v2/product/{}.json", self.base_url, external_id);
+        let req = self.http.get(&url).query(&[("lc", "en"), ("cc", "us")]);
+        let req = match &self.basic_auth {
+            Some((user, pass)) => req.basic_auth(user, Some(pass)),
+            None => req,
+        };
+        let resp = req.send().await?;
 
         let status = resp.status();
         if status.as_u16() == 404 {

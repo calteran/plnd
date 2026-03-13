@@ -118,7 +118,18 @@ async fn main() {
     let nutrition_usda = Arc::new(UsdaFdcClient::new(
         &config.external_providers.usda_fdc_api_key,
     ));
-    let nutrition_off = Arc::new(OpenFoodFactsClient::new());
+    let off_basic_auth = if config.external_providers.off_basic_auth_user.is_empty() {
+        None
+    } else {
+        Some((
+            config.external_providers.off_basic_auth_user.clone(),
+            config.external_providers.off_basic_auth_password.clone(),
+        ))
+    };
+    let nutrition_off = Arc::new(OpenFoodFactsClient::new(
+        &config.external_providers.off_base_url,
+        off_basic_auth,
+    ));
     let recipe_mdb = Arc::new(TheMealDbClient::new(
         &config.external_providers.themealdb_api_key,
     ));
@@ -127,7 +138,10 @@ async fn main() {
     } else {
         println!("  USDA FDC provider: ready");
     }
-    println!("  Open Food Facts provider: ready");
+    println!(
+        "  Open Food Facts provider: ready ({})",
+        config.external_providers.off_base_url
+    );
     println!(
         "  TheMealDB provider: ready (key={})",
         config.external_providers.themealdb_api_key

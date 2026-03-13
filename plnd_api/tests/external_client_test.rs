@@ -300,7 +300,7 @@ fn test_usda_fdc_source_name() {
 
 #[test]
 fn test_open_food_facts_source_name() {
-    let client = OpenFoodFactsClient::new();
+    let client = OpenFoodFactsClient::default();
     assert_eq!(client.source_name(), "openfoodfacts");
 }
 
@@ -318,7 +318,7 @@ fn test_usda_fdc_nutrition_provider_object_safety() {
 
 #[test]
 fn test_open_food_facts_nutrition_provider_object_safety() {
-    let client: Box<dyn NutritionProvider> = Box::new(OpenFoodFactsClient::new());
+    let client: Box<dyn NutritionProvider> = Box::new(OpenFoodFactsClient::default());
     assert_eq!(client.source_name(), "openfoodfacts");
 }
 
