@@ -14,7 +14,7 @@ pub struct OpenFoodFactsClient {
 impl OpenFoodFactsClient {
     pub fn new() -> Self {
         Self {
-            http: Client::new(),
+            http: super::build_http_client(),
         }
     }
 }

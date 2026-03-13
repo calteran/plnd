@@ -15,7 +15,7 @@ pub struct UsdaFdcClient {
 impl UsdaFdcClient {
     pub fn new(api_key: &str) -> Self {
         Self {
-            http: Client::new(),
+            http: super::build_http_client(),
             api_key: api_key.to_string(),
         }
     }

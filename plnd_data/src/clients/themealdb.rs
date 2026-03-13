@@ -17,7 +17,7 @@ pub struct TheMealDbClient {
 impl TheMealDbClient {
     pub fn new(api_key: &str) -> Self {
         Self {
-            http: Client::new(),
+            http: super::build_http_client(),
             base_url: format!("https://www.themealdb.com/api/json/v1/{}", api_key),
         }
     }
