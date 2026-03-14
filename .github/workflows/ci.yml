@@ -86,7 +86,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Fetch secrets from Doppler
-        uses: doppler/secrets-fetch-action@v1
+        uses: DopplerHQ/secrets-fetch-action@v1
         with:
           doppler-token: ${{ secrets.DOPPLER_TOKEN }}
           inject-env-vars: true
@@ -149,7 +149,7 @@ jobs:
         run: cd plnd_client && npx playwright install chromium --with-deps
 
       - name: Fetch secrets from Doppler
-        uses: doppler/secrets-fetch-action@v1
+        uses: DopplerHQ/secrets-fetch-action@v1
         with:
           doppler-token: ${{ secrets.DOPPLER_TOKEN }}
           inject-env-vars: true
