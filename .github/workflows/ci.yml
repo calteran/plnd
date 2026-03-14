@@ -46,7 +46,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Rust – cargo-deny (licenses + advisories)
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v2
 
       - name: Rust – cargo-machete (unused deps)
         run: cargo machete
