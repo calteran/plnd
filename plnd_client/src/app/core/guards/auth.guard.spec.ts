@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { authGuard } from './auth.guard';
 import { AuthService } from '../services/auth.service';
-import { ActivatedRouteSnapshot, RouterStateSnapshot } from '@angular/router';
+import { ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@angular/router';
 
 describe('authGuard', () => {
   let authService: AuthService;
@@ -31,5 +31,11 @@ describe('authGuard', () => {
     spyOn(authService, 'isAuthenticated').and.returnValue(false);
     const result = runGuard();
     expect(result).not.toBe(true);
+  });
+
+  it('redirect target is specifically /login (not another route)', () => {
+    spyOn(authService, 'isAuthenticated').and.returnValue(false);
+    const result = runGuard();
+    expect((result as UrlTree).toString()).toBe('/login');
   });
 });

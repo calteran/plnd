@@ -78,4 +78,46 @@ describe('UserService', () => {
     service.clearUser();
     expect(service.user()).toBeNull();
   });
+
+  it('fetchUser() makes HTTP request even when signal already has a user', () => {
+    // Load user first so signal is populated
+    service.loadUser();
+    httpMock.expectOne(r => r.url.endsWith('/users/me') && r.method === 'GET').flush(mockUser);
+    expect(service.user()).toEqual(mockUser);
+
+    // fetchUser() bypasses the no-op guard and always fetches
+    service.fetchUser().subscribe();
+    const req = httpMock.expectOne(r => r.url.endsWith('/users/me') && r.method === 'GET');
+    req.flush(mockUser);
+  });
+
+  it('completeOnboarding() POSTs and updates onboarding_completed to true', () => {
+    service.loadUser();
+    httpMock.expectOne(r => r.url.endsWith('/users/me')).flush(mockUser);
+
+    service.completeOnboarding().subscribe();
+    httpMock.expectOne(r => r.url.endsWith('/users/me/complete-onboarding') && r.method === 'POST')
+      .flush(null, { status: 200, statusText: 'OK' });
+
+    expect(service.user()?.onboarding_completed).toBeTrue();
+  });
+
+  it('completeOnboarding() tap does not crash when user signal is null', () => {
+    // userSignal is null (no loadUser call); tap's if (u) guard covers this branch
+    service.completeOnboarding().subscribe();
+    httpMock.expectOne(r => r.url.endsWith('/users/me/complete-onboarding') && r.method === 'POST')
+      .flush(null, { status: 200, statusText: 'OK' });
+
+    expect(service.user()).toBeNull();
+  });
+
+  it('loadUser() handles HTTP error without crashing', () => {
+    spyOn(console, 'error');
+    service.loadUser();
+    httpMock.expectOne(r => r.url.endsWith('/users/me'))
+      .flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
+
+    expect(console.error).toHaveBeenCalled();
+    expect(service.user()).toBeNull();
+  });
 });
