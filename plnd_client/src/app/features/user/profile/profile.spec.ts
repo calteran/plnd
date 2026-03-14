@@ -89,4 +89,48 @@ describe('ProfileComponent', () => {
     component.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
   });
+
+  describe('when user has no last_login', () => {
+    beforeEach(async () => {
+      mockUserSignal.set({ ...mockUser, last_login: null });
+      fixture.detectChanges();
+    });
+
+    it('shows "Never" for last login', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.textContent).toContain('Never');
+    });
+  });
+
+  it('save() no-ops when pending is true', () => {
+    component.pending = true;
+    component.form.setValue({ display_name: 'New Name', avatar_url: '' });
+    component.save();
+    expect(userService.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('save() excludes null form values from the update request', () => {
+    component.form.controls.display_name.setValue(null as unknown as string);
+    component.form.controls.avatar_url.setValue(null as unknown as string);
+    component.save();
+    expect(userService.updateUser).toHaveBeenCalledWith({});
+  });
+
+  it('shows display_name field error when field is touched and too long', () => {
+    component.form.controls.display_name.setValue('x'.repeat(101));
+    component.form.controls.display_name.markAsTouched();
+    fixture.detectChanges();
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.field-error')?.textContent).toContain('100 characters');
+  });
+
+  it('shows avatar_url field error when field is touched and too long', () => {
+    component.form.controls.avatar_url.setValue('x'.repeat(501));
+    component.form.controls.avatar_url.markAsTouched();
+    fixture.detectChanges();
+    const el2 = fixture.nativeElement as HTMLElement;
+    const errors = el2.querySelectorAll<Element>('.field-error');
+    const texts = Array.from(errors).map(e => e.textContent ?? '');
+    expect(texts.some(t => t.includes('500 characters'))).toBeTrue();
+  });
 });

@@ -112,4 +112,32 @@ describe('NavbarAvatarComponent', () => {
 
     expect(authService.logout).toHaveBeenCalled();
   });
+
+  it('initials() returns "?" when user signal is null', () => {
+    // mockUserSignal starts as null from beforeEach
+    expect(component.initials()).toBe('?');
+  });
+
+  it('goToSettings() navigates to /settings', () => {
+    spyOn(router, 'navigate');
+    component.goToSettings();
+    expect(router.navigate).toHaveBeenCalledWith(['/settings']);
+  });
+
+  it('@HostListener closes dropdown on document click', () => {
+    component.dropdownOpen.set(true);
+    fixture.detectChanges();
+    expect(component.dropdownOpen()).toBeTrue();
+
+    document.dispatchEvent(new MouseEvent('click'));
+    fixture.detectChanges();
+
+    expect(component.dropdownOpen()).toBeFalse();
+  });
+
+  it('initials() uses email initial when display_name is null', () => {
+    mockUserSignal.set({ ...mockUser, display_name: null });
+    fixture.detectChanges();
+    expect(component.initials()).toBe('T'); // first char of 'test@example.com'
+  });
 });

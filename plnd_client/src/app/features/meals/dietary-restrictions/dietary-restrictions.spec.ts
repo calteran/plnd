@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
+import { Router } from '@angular/router';
 import { DietaryRestrictionsComponent } from './dietary-restrictions';
 import { DietaryRestriction } from '../../../core/models/dietary-restriction';
 
@@ -146,5 +147,179 @@ describe('DietaryRestrictionsComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Restriction removed.');
+  });
+
+  it('cancelEdit() resets editingId and clears editNotesControl', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_INTOLERANCE]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.startEdit(MOCK_INTOLERANCE);
+    expect(component.editingId).toBe('id-2');
+
+    component.cancelEdit();
+    expect(component.editingId).toBeNull();
+    expect(component.editNotesControl.value).toBeNull();
+  });
+
+  it('saveEdit() shows error on HTTP 500', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_INTOLERANCE]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.startEdit(MOCK_INTOLERANCE);
+    component.saveEdit('id-2');
+    httpMock.expectOne(r => r.url.endsWith('/dietary-restrictions/id-2') && r.method === 'PATCH')
+      .flush('Error', { status: 500, statusText: 'Internal Server Error' });
+    fixture.detectChanges();
+
+    expect(component.errorMessage).toBeTruthy();
+    expect(component.pending).toBeFalse();
+  });
+
+  it('saveEdit() no-ops when pending is true', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_INTOLERANCE]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.startEdit(MOCK_INTOLERANCE);
+    component.pending = true;
+    component.saveEdit('id-2');
+    httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions/id-2') && r.method === 'PATCH');
+    expect(component.pending).toBeTrue();
+  });
+
+  it('deleteRestriction() shows error on HTTP 500', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_ALLERGY]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.deleteRestriction('id-1');
+    httpMock.expectOne(r => r.url.endsWith('/dietary-restrictions/id-1') && r.method === 'DELETE')
+      .flush('Error', { status: 500, statusText: 'Internal Server Error' });
+    fixture.detectChanges();
+
+    expect(component.errorMessage).toBeTruthy();
+    expect(component.pending).toBeFalse();
+  });
+
+  it('deleteRestriction() no-ops when pending is true', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_ALLERGY]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.pending = true;
+    component.deleteRestriction('id-1');
+    httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions/id-1') && r.method === 'DELETE');
+    expect(component.pending).toBeTrue();
+  });
+
+  it('save() no-ops when form invalid (empty name)', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.addForm.setValue({ restriction_type: 'allergy', name: '', notes: null });
+    component.save();
+    httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions') && r.method === 'POST');
+    expect(component.pending).toBeFalse();
+  });
+
+  it('save() shows generic error for non-409 failure', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.addForm.setValue({ restriction_type: 'allergy', name: 'shellfish', notes: null });
+    component.save();
+    httpMock.expectOne(r => r.url.endsWith('/dietary-restrictions') && r.method === 'POST')
+      .flush('Error', { status: 500, statusText: 'Internal Server Error' });
+    fixture.detectChanges();
+
+    expect(component.errorMessage).toBe('Failed to add. Please try again.');
+  });
+
+  it('renders notes span for items with notes', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_INTOLERANCE]);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const notesEl = el.querySelector('.item-notes');
+    expect(notesEl?.textContent?.trim()).toBe('mild');
+  });
+
+  it('only renders sections for types that have items', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    // Only one allergy item — intolerance and preference sections should not render
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_ALLERGY]);
+    fixture.detectChanges();
+
+    const el = fixture.nativeElement as HTMLElement;
+    const sections = el.querySelectorAll('.type-section');
+    expect(sections.length).toBe(1);
+  });
+
+  it('save() shows 409 conflict error for duplicate restriction', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.addForm.setValue({ restriction_type: 'allergy', name: 'peanuts', notes: null });
+    component.save();
+    httpMock.expectOne(r => r.url.endsWith('/dietary-restrictions') && r.method === 'POST')
+      .flush('Conflict', { status: 409, statusText: 'Conflict' });
+    fixture.detectChanges();
+
+    expect(component.errorMessage).toBe('A restriction with this type and name already exists.');
+  });
+
+  it('saveEdit() coerces blank notes to null when saving', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_INTOLERANCE]);
+    fixture.detectChanges();
+
+    const component = fixture.componentInstance;
+    component.startEdit(MOCK_INTOLERANCE);
+    component.editNotesControl.setValue('   '); // blank — should be coerced to null
+    component.saveEdit('id-2');
+
+    const req = httpMock.expectOne(r => r.url.endsWith('/dietary-restrictions/id-2') && r.method === 'PATCH');
+    expect(req.request.body).toEqual({ notes: null });
+    req.flush({ ...MOCK_INTOLERANCE, notes: null });
+    fixture.detectChanges();
+
+    expect(component.successMessage).toBe('Updated successfully.');
+  });
+
+  it('goBack() navigates to /dashboard', () => {
+    const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.method === 'GET').flush([]);
+    fixture.detectChanges();
+
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
+    fixture.componentInstance.goBack();
+    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
   });
 });
