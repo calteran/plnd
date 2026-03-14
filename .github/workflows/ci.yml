@@ -85,12 +85,6 @@ jobs:
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
 
-      - name: Fetch secrets from Doppler
-        uses: DopplerHQ/secrets-fetch-action@v1
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-          inject-env-vars: true
-
       - name: Install cargo-nextest
         uses: taiki-e/install-action@cargo-nextest
 
@@ -147,12 +141,6 @@ jobs:
 
       - name: Install Playwright browsers
         run: cd plnd_client && npx playwright install chromium --with-deps
-
-      - name: Fetch secrets from Doppler
-        uses: DopplerHQ/secrets-fetch-action@v1
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-          inject-env-vars: true
 
       - name: Build API binary
         run: cargo build -p plnd_api
