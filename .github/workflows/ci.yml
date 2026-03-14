@@ -46,7 +46,7 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
       - name: Rust – cargo-deny (licenses + advisories)
-        uses: EmbarkStudios/cargo-deny-action@v1
+        uses: EmbarkStudios/cargo-deny-action@v2
 
       - name: Rust – cargo-machete (unused deps)
         run: cargo machete
@@ -85,12 +85,6 @@ jobs:
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
 
-      - name: Fetch secrets from Doppler
-        uses: doppler/secrets-fetch-action@v1
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-          inject-env-vars: true
-
       - name: Install cargo-nextest
         uses: taiki-e/install-action@cargo-nextest
 
@@ -126,6 +120,20 @@ jobs:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     needs: [test-rust, test-angular]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: plnd
+          POSTGRES_PASSWORD: plnd_dev
+          POSTGRES_DB: plnd_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U plnd -d plnd_dev"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -148,22 +156,27 @@ jobs:
       - name: Install Playwright browsers
         run: cd plnd_client && npx playwright install chromium --with-deps
 
-      - name: Fetch secrets from Doppler
-        uses: doppler/secrets-fetch-action@v1
-        with:
-          doppler-token: ${{ secrets.DOPPLER_TOKEN }}
-          inject-env-vars: true
-
       - name: Build API binary
         run: cargo build -p plnd_api
 
-      - name: Start infrastructure (DB + mock OAuth)
-        run: docker compose up -d db mock-oauth-server --wait
+      - name: Start mock OAuth server
+        run: |
+          docker run -d \
+            --name mock-oauth-server \
+            -p 8080:8080 \
+            -e ISSUER_ID=plnd-dev \
+            -e INTERACTIVE_LOGIN=true \
+            -e JSON_CONFIG=true \
+            -v ${{ github.workspace }}/config/mock-oauth:/config \
+            ghcr.io/navikt/mock-oauth2-server:3.0.1
+          timeout 30s bash -c 'until curl -sf http://localhost:8080/plnd-dev/.well-known/openid-configuration; do sleep 1; done'
 
       - name: Start API server (background)
         run: |
           cd plnd_api
-          APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev cargo run &
+          APP_DATABASE__URL=postgres://plnd:plnd_dev@localhost/plnd_dev \
+          APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev \
+          cargo run &
           timeout 30s bash -c 'until curl -sf http://localhost:3000/health; do sleep 1; done'
 
       - name: Run Playwright e2e tests
