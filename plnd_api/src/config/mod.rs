@@ -53,19 +53,12 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         }
     }
 
-    if let Ok(url) = std::env::var("APP_AUTH__MOCK_INTERNAL_ISSUER_URL") {
-        if let Some(mock) = app_config
-            .auth
-            .oauth_providers
-            .iter_mut()
-            .find(|p| p.name == "mock")
-        {
-            mock.internal_issuer_url = Some(url);
-        }
+    if let Ok(url) = std::env::var("APP_AUTH__OIDC_INTERNAL_ISSUER_URL") {
+        app_config.auth.oidc.internal_issuer_url = url;
     }
 
-    if let Ok(url) = std::env::var("APP_AUTH__FRONTEND_CALLBACK_URL") {
-        app_config.auth.frontend_callback_url = Some(url);
+    if let Ok(origin) = std::env::var("APP_AUTH__FRONTEND_ORIGIN") {
+        app_config.auth.frontend_origin = origin;
     }
 
     if let Ok(key) = std::env::var("APP_EXTERNAL__USDA_FDC_API_KEY") {

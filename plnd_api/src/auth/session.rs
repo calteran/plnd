@@ -25,11 +25,12 @@ impl SessionService {
         Self { pool: Some(pool) }
     }
 
-    /// Create a session record. Returns the session_id (UUID string).
+    /// Create a session record. The `jti` is the JWT ID claim stored in `token_hash`.
+    /// Returns the session_id (UUID string).
     pub async fn create_session(
         &self,
         user_id: &str,
-        token_hash: &str,
+        jti: &str,
         ip_address: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<String, AuthError> {
@@ -47,7 +48,7 @@ impl SessionService {
             )
             .bind(session_id)
             .bind(user_uuid)
-            .bind(token_hash)
+            .bind(jti)
             .bind(expires_at)
             .bind(ip_address)
             .bind(user_agent)
@@ -59,15 +60,12 @@ impl SessionService {
         Ok(session_id.to_string())
     }
 
-    /// Returns true if the session exists, is not expired, and is not revoked.
-    pub async fn validate_session(&self, session_id: &str) -> Result<bool, AuthError> {
+    /// Returns true if a session with the given JTI exists, is not expired, and is not revoked.
+    pub async fn validate_session(&self, jti: &str) -> Result<bool, AuthError> {
         let Some(pool) = &self.pool else {
             // Stub mode: always valid
             return Ok(true);
         };
-
-        let session_uuid = Uuid::parse_str(session_id)
-            .map_err(|e| AuthError::SessionError(format!("Invalid session_id UUID: {}", e)))?;
 
         #[derive(sqlx::FromRow)]
         struct Row {
@@ -76,9 +74,9 @@ impl SessionService {
         }
 
         let row = sqlx::query_as::<_, Row>(
-            "SELECT is_revoked, expires_at FROM auth_sessions WHERE session_id = $1",
+            "SELECT is_revoked, expires_at FROM auth_sessions WHERE token_hash = $1",
         )
-        .bind(session_uuid)
+        .bind(jti)
         .fetch_optional(pool)
         .await
         .map_err(|e| AuthError::SessionError(format!("Failed to validate session: {}", e)))?;
@@ -89,18 +87,15 @@ impl SessionService {
         }
     }
 
-    /// Mark a session as revoked.
-    pub async fn revoke_session(&self, session_id: &str) -> Result<(), AuthError> {
+    /// Mark the session identified by JTI as revoked.
+    pub async fn revoke_session(&self, jti: &str) -> Result<(), AuthError> {
         let Some(pool) = &self.pool else {
             // Stub mode: no-op
             return Ok(());
         };
 
-        let session_uuid = Uuid::parse_str(session_id)
-            .map_err(|e| AuthError::SessionError(format!("Invalid session_id UUID: {}", e)))?;
-
-        sqlx::query("UPDATE auth_sessions SET is_revoked = TRUE WHERE session_id = $1")
-            .bind(session_uuid)
+        sqlx::query("UPDATE auth_sessions SET is_revoked = TRUE WHERE token_hash = $1")
+            .bind(jti)
             .execute(pool)
             .await
             .map_err(|e| AuthError::SessionError(format!("Failed to revoke session: {}", e)))?;

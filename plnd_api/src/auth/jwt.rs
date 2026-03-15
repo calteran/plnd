@@ -68,4 +68,9 @@ impl JwtService {
     pub fn generate_refresh_token(&self) -> String {
         Uuid::new_v4().to_string()
     }
+
+    /// Returns the configured token lifetime in seconds.
+    pub fn expiration(&self) -> u64 {
+        self.expiration
+    }
 }

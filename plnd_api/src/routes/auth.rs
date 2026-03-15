@@ -1,70 +1,71 @@
+use crate::auth::jwt::Claims;
 use crate::db;
 use crate::state::AppState;
-use axum::{extract::State, http::StatusCode};
-use std::collections::HashMap;
+use axum::{
+    extract::{Extension, State},
+    http::{HeaderMap, StatusCode},
+    Json,
+};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-#[utoipa::path(
-    get,
-    path = "/auth/oauth/mock/authorize",
-    tag = "Auth",
-    responses(
-        (status = 302, description = "Redirect to mock OAuth provider"),
-        (status = 500, description = "Internal server error"),
-    )
-)]
-pub async fn oauth_authorize(
-    State(state): State<Arc<AppState>>,
-) -> Result<axum::response::Redirect, StatusCode> {
-    use crate::auth::oauth::OAuthProvider;
-    let oauth_state = uuid::Uuid::new_v4().to_string();
-    let auth_url = state
-        .mock_provider
-        .get_auth_url(&oauth_state, &state.callback_uri);
-    Ok(axum::response::Redirect::to(&auth_url))
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TokenExchangeRequest {
+    pub id_token: String,
+    /// The IdP provider name: "mock" | "google" | "apple"
+    pub provider: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TokenExchangeResponse {
+    pub access_token: String,
+    pub token_type: String,
+    pub expires_in: u64,
 }
 
 #[utoipa::path(
-    get,
-    path = "/auth/oauth/mock/callback",
+    post,
+    path = "/auth/token",
     tag = "Auth",
-    params(("code" = String, Query, description = "OAuth authorization code")),
+    request_body = inline(serde_json::Value),
     responses(
-        (status = 302, description = "Redirect to frontend with JWT token"),
-        (status = 400, description = "Missing code parameter"),
-        (status = 500, description = "Token exchange or user creation failed"),
+        (status = 200, description = "Backend JWT issued successfully"),
+        (status = 401, description = "ID token invalid or untrusted"),
+        (status = 500, description = "Internal server error"),
     )
 )]
-pub async fn oauth_callback(
+/// POST /auth/token — exchange an IdP ID token for a backend JWT.
+///
+/// Angular obtains the ID token from the OIDC library after completing the
+/// authorization code + PKCE flow. The backend validates the token via JWKS,
+/// finds or creates the user, and issues a backend JWT bound to a session record.
+pub async fn token_exchange(
     State(state): State<Arc<AppState>>,
-    query: axum::extract::Query<HashMap<String, String>>,
-) -> Result<axum::response::Redirect, StatusCode> {
-    use crate::auth::oauth::OAuthProvider;
-
-    let code = query.get("code").ok_or(StatusCode::BAD_REQUEST)?;
-
-    let oauth_token = state
-        .mock_provider
-        .exchange_code_for_token(code, &state.callback_uri)
+    headers: HeaderMap,
+    Json(req): Json<TokenExchangeRequest>,
+) -> Result<Json<TokenExchangeResponse>, StatusCode> {
+    // 1. Validate the ID token's RS256 signature via the JWKS cache.
+    let id_claims = state
+        .jwks
+        .validate_id_token(&req.id_token, &state.oidc_client_id)
         .await
         .map_err(|e| {
-            eprintln!("Token exchange failed: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
+            eprintln!("ID token validation failed: {}", e);
+            StatusCode::UNAUTHORIZED
         })?;
 
-    let user_info = state
-        .mock_provider
-        .get_user_info(&oauth_token)
-        .await
-        .map_err(|e| {
-            eprintln!("User info fetch failed: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    let sub = &user_info.sub;
+    // 2. Extract user attributes from ID token claims.
+    let sub = &id_claims.sub;
+    let email = id_claims
+        .email
+        .clone()
+        .unwrap_or_else(|| format!("{}@mock.plnd", sub));
+    let name = id_claims.name.as_deref();
+    let picture = id_claims.picture.as_deref();
     let pool = state.db.get_pool();
 
-    let user = match db::users::find_by_provider(pool, "mock", sub)
+    // 3. Find or create the user, linking the OAuth provider identity.
+    let user = match db::users::find_by_provider(pool, &req.provider, sub)
         .await
         .map_err(|e| {
             eprintln!("Provider lookup failed: {}", e);
@@ -75,11 +76,6 @@ pub async fn oauth_callback(
             existing
         }
         None => {
-            let email = user_info
-                .email
-                .clone()
-                .unwrap_or_else(|| format!("{}@mock.plnd", sub));
-
             let user = match db::users::find_by_email(pool, &email).await.map_err(|e| {
                 eprintln!("Email lookup failed: {}", e);
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -88,20 +84,17 @@ pub async fn oauth_callback(
                     let _ = db::users::touch_last_login(pool, existing.user_id).await;
                     existing
                 }
-                None => db::users::create(
-                    pool,
-                    &email,
-                    user_info.name.as_deref(),
-                    user_info.picture.as_deref(),
-                )
-                .await
-                .map_err(|e| {
-                    eprintln!("User creation failed: {}", e);
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?,
+                None => db::users::create(pool, &email, name, picture)
+                    .await
+                    .map_err(|e| {
+                        eprintln!("User creation failed: {}", e);
+                        StatusCode::INTERNAL_SERVER_ERROR
+                    })?,
             };
 
-            if let Err(e) = db::users::link_oauth_provider(pool, user.user_id, "mock", sub).await {
+            if let Err(e) =
+                db::users::link_oauth_provider(pool, user.user_id, &req.provider, sub).await
+            {
                 eprintln!("Failed to link OAuth provider (non-fatal): {}", e);
             }
 
@@ -109,6 +102,7 @@ pub async fn oauth_callback(
         }
     };
 
+    // 4. Issue the backend JWT.
     let jwt = state
         .jwt
         .generate_token(
@@ -122,25 +116,64 @@ pub async fn oauth_callback(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let token_hash = simple_hash(&jwt);
+    // 5. Decode the backend JWT to extract the JTI for session binding.
+    let backend_claims = state.jwt.validate_token(&jwt).map_err(|e| {
+        eprintln!("JWT self-validation failed: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    let _session_id = state
+    // 6. Extract client metadata for the session record.
+    let ip_string = headers
+        .get("X-Forwarded-For")
+        .or_else(|| headers.get("X-Real-IP"))
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.split(',').next().unwrap_or(s).trim().to_string());
+    let ua_string = headers
+        .get("User-Agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string());
+
+    // 7. Persist the session, binding the JTI so middleware can revoke it.
+    let _ = state
         .session
-        .create_session(&user.user_id.to_string(), &token_hash, None, None)
+        .create_session(
+            &user.user_id.to_string(),
+            &backend_claims.jti,
+            ip_string.as_deref(),
+            ua_string.as_deref(),
+        )
         .await
         .map_err(|e| {
             eprintln!("Session creation failed: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let redirect_url = format!("{}?token={}", state.frontend_callback, jwt);
-    Ok(axum::response::Redirect::to(&redirect_url))
+    Ok(Json(TokenExchangeResponse {
+        access_token: jwt,
+        token_type: "Bearer".to_string(),
+        expires_in: state.jwt.expiration(),
+    }))
 }
 
-fn simple_hash(input: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-    let mut h = DefaultHasher::new();
-    input.hash(&mut h);
-    format!("{:016x}", h.finish())
+#[utoipa::path(
+    post,
+    path = "/auth/logout",
+    tag = "Auth",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Session revoked"),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
+/// POST /auth/logout — revoke the current session by JTI.
+///
+/// The middleware has already validated the token and inserted Claims into
+/// request extensions. We use the JTI from Claims to mark the session revoked,
+/// so subsequent requests with the same JWT are rejected by the middleware.
+pub async fn logout(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> StatusCode {
+    let _ = state.session.revoke_session(&claims.jti).await;
+    StatusCode::NO_CONTENT
 }

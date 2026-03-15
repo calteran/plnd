@@ -1,5 +1,4 @@
-use crate::auth::oauth::MockOAuthProvider;
-use crate::auth::{JwtService, SessionService};
+use crate::auth::{JwksCache, JwtService, SessionService};
 use crate::db::Database;
 use plnd_data::search::ProviderSearchService;
 use std::sync::Arc;
@@ -10,10 +9,9 @@ pub struct AppState {
     pub db: Database,
     pub jwt: JwtService,
     pub session: SessionService,
-    pub mock_provider: Arc<MockOAuthProvider>,
-    /// The redirect_uri registered with the mock OAuth server (points back to this API)
-    pub callback_uri: String,
-    /// Where to send the browser after a successful login (Angular frontend)
-    pub frontend_callback: String,
+    /// JWKS cache for validating RS256 ID tokens from the configured IdP.
+    pub jwks: Arc<JwksCache>,
+    /// OIDC client_id used as the expected `aud` claim in ID tokens.
+    pub oidc_client_id: String,
     pub provider_search: ProviderSearchService,
 }

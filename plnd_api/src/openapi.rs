@@ -35,8 +35,8 @@ impl Modify for BearerSecurityAddon {
     paths(
         crate::routes::system::health_check,
         crate::routes::system::readiness_check,
-        crate::routes::auth::oauth_authorize,
-        crate::routes::auth::oauth_callback,
+        crate::routes::auth::token_exchange,
+        crate::routes::auth::logout,
         crate::routes::users::get_me,
         crate::routes::users::patch_me,
         crate::routes::users::delete_me,
@@ -61,7 +61,7 @@ impl Modify for BearerSecurityAddon {
     modifiers(&BearerSecurityAddon),
     tags(
         (name = "System", description = "Health and readiness endpoints"),
-        (name = "Auth", description = "OAuth2 login flow"),
+        (name = "Auth", description = "Token exchange and session management"),
         (name = "Users", description = "User profile management"),
         (name = "Preferences", description = "User preference settings"),
         (name = "Dietary Restrictions", description = "Dietary restriction management"),

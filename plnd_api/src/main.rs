@@ -12,10 +12,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use std::sync::Arc;
 
 use plnd_api::auth::auth_middleware;
-use plnd_api::auth::oauth::{MockOAuthProvider, OAuthProviderConfig};
-use plnd_api::auth::{JwtService, SessionService};
+use plnd_api::auth::{JwksCache, JwtService, SessionService};
 use plnd_api::config;
-use plnd_api::config::settings::OAuthProviderConfig as ConfigOAuthProvider;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{auth, dietary_restrictions, preferences, search, system, users};
@@ -61,58 +59,24 @@ async fn main() {
 
     let session = SessionService::with_pool(db_conn.get_pool().clone());
 
-    let mock_cfg: ConfigOAuthProvider = config
+    // Build the JWKS cache. The internal_issuer_url (Docker-internal hostname) is used
+    // for server-to-server JWKS fetching; the external issuer_url is used to validate
+    // the `iss` claim that the IdP embeds in tokens.
+    let internal_issuer = if config.auth.oidc.internal_issuer_url.is_empty() {
+        config.auth.oidc.issuer_url.clone()
+    } else {
+        config.auth.oidc.internal_issuer_url.clone()
+    };
+    let jwks = JwksCache::new(config.auth.oidc.issuer_url.clone(), internal_issuer);
+
+    println!("  OIDC issuer: {}", config.auth.oidc.issuer_url);
+    println!("  OIDC client_id: {}", config.auth.oidc.client_id);
+
+    let cors_origin: HeaderValue = config
         .auth
-        .oauth_providers
-        .iter()
-        .find(|p| p.name == "mock" && p.enabled)
-        .cloned()
-        .unwrap_or_else(|| {
-            eprintln!("Warning: no enabled mock OAuth provider found in config, using defaults");
-            ConfigOAuthProvider {
-                name: "mock".to_string(),
-                client_id: "mock-client".to_string(),
-                client_secret: "mock-secret".to_string(),
-                redirect_uri: "http://localhost:3000/auth/oauth/mock/callback".to_string(),
-                issuer_url: Some("http://localhost:8080/plnd-dev".to_string()),
-                internal_issuer_url: None,
-                scopes: vec![
-                    "openid".to_string(),
-                    "email".to_string(),
-                    "profile".to_string(),
-                ],
-                enabled: true,
-            }
-        });
-
-    let callback_uri = mock_cfg.redirect_uri.clone();
-
-    let frontend_callback = config
-        .auth
-        .frontend_callback_url
-        .clone()
-        .unwrap_or_else(|| "http://localhost:4200/auth/callback".to_string());
-
-    let mock_provider = Arc::new(MockOAuthProvider::new(OAuthProviderConfig {
-        name: mock_cfg.name,
-        client_id: mock_cfg.client_id,
-        client_secret: mock_cfg.client_secret,
-        redirect_uri: callback_uri.clone(),
-        issuer_url: mock_cfg.issuer_url,
-        internal_issuer_url: mock_cfg.internal_issuer_url,
-        scopes: mock_cfg.scopes,
-        enabled: mock_cfg.enabled,
-    }));
-
-    // Derive CORS origin before frontend_callback is moved into AppState.
-    // e.g. "http://localhost:4200/auth/callback" → "http://localhost:4200"
-    let cors_origin: HeaderValue = frontend_callback
-        .split('/')
-        .take(3)
-        .collect::<Vec<_>>()
-        .join("/")
+        .frontend_origin
         .parse()
-        .expect("invalid CORS origin derived from frontend_callback_url");
+        .expect("invalid CORS origin in auth.frontend_origin");
 
     // Construct external provider clients
     let nutrition_usda = Arc::new(UsdaFdcClient::new(
@@ -174,9 +138,8 @@ async fn main() {
         db: db_conn,
         jwt,
         session,
-        mock_provider,
-        callback_uri,
-        frontend_callback,
+        jwks,
+        oidc_client_id: config.auth.oidc.client_id.clone(),
         provider_search,
     });
 
@@ -226,6 +189,7 @@ async fn main() {
         )
         .route("/search/dishes", get(search::search_dishes_handler))
         .route("/search/exercises", get(search::search_exercises_handler))
+        .route("/auth/logout", post(auth::logout))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -234,8 +198,7 @@ async fn main() {
     let public = Router::new()
         .route("/health", get(system::health_check))
         .route("/ready", get(system::readiness_check))
-        .route("/auth/oauth/mock/authorize", get(auth::oauth_authorize))
-        .route("/auth/oauth/mock/callback", get(auth::oauth_callback));
+        .route("/auth/token", post(auth::token_exchange));
 
     let app = public
         .merge(protected)
