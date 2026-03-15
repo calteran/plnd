@@ -18,7 +18,6 @@ thiserror = "2.0"
 config = "0.15"
 dotenv = "0.15"
 jsonwebtoken = { version = "10.3", features = ["rust_crypto"] }
-url = "2.5"
 uuid = { version = "1", features = ["v4", "serde"] }
 async-trait = "0.1"
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "form", "native-tls"] }
@@ -32,7 +31,7 @@ utoipa-scalar = { version = "0.3", features = ["axum"] }
 tokio = { version = "1", features = ["full", "test-util"] }
 
 [package.metadata.cargo-machete]
-ignored = ["futures", "url", "utoipa"]
+ignored = ["futures", "utoipa"]
 
 [package.metadata.nextest]
 # Configure nextest for better test execution

@@ -24,34 +24,17 @@ pretty_print = true
 jwt_secret = ""  # Required — set via APP_AUTH__JWT_SECRET (Doppler)
 jwt_expiration = 86400 # 24 hours in seconds
 refresh_token_expiration = 604800 # 7 days in seconds
-# Where to redirect the browser after a successful login
-frontend_callback_url = "http://localhost:4200/auth/callback"
+# Allowed CORS origin for the Angular frontend
+frontend_origin = "http://localhost:4200"
 
-# OAuth providers configuration
-[[auth.oauth_providers]]
-name = "mock"
-client_id = "mock-client"
-client_secret = "mock-secret"
-redirect_uri = "http://localhost:3000/auth/oauth/mock/callback"
+[auth.oidc]
+# Browser-facing OIDC issuer URL (used for iss claim validation in tokens)
 issuer_url = "http://localhost:8080/plnd-dev"
-scopes = ["openid", "email", "profile"]
-enabled = true
-
-[[auth.oauth_providers]]
-name = "google"
-client_id = ""
-client_secret = ""
-redirect_uri = "http://localhost:4200/auth/google/callback"
-scopes = ["openid", "email", "profile"]
-enabled = false
-
-[[auth.oauth_providers]]
-name = "apple"
-client_id = ""
-client_secret = ""
-redirect_uri = "http://localhost:4200/auth/apple/callback"
-scopes = ["name", "email"]
-enabled = false
+# Internal issuer URL for server-to-server JWKS fetching (Docker-internal hostname).
+# Leave empty to fall back to issuer_url (for local dev without Docker).
+internal_issuer_url = ""
+# OIDC client ID registered with the IdP
+client_id = "mock-client"
 
 [external_providers]
 # Free key: https://fdc.nal.usda.gov/api-guide.html

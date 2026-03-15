@@ -23,11 +23,21 @@ pub async fn auth_middleware(
         .strip_prefix("Bearer ")
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    match state.jwt.validate_token(token) {
-        Ok(claims) => {
-            request.extensions_mut().insert(claims);
-            Ok(next.run(request).await)
-        }
-        Err(_) => Err(StatusCode::UNAUTHORIZED),
+    let claims = state
+        .jwt
+        .validate_token(token)
+        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    // Verify the JTI is still valid (not revoked) in the session table.
+    let valid = state
+        .session
+        .validate_session(&claims.jti)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !valid {
+        return Err(StatusCode::UNAUTHORIZED);
     }
+
+    request.extensions_mut().insert(claims);
+    Ok(next.run(request).await)
 }

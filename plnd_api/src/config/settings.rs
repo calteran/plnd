@@ -56,26 +56,18 @@ fn default_refresh_token_expiration() -> u64 {
     604800 // 7 days
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[allow(dead_code)]
-pub struct OAuthProviderConfig {
-    pub name: String,
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct OidcConfig {
+    /// Browser-facing OIDC issuer URL (embedded in the token's `iss` claim by the IdP).
+    #[serde(default)]
+    pub issuer_url: String,
+    /// Internal issuer URL for server-to-server JWKS fetching (e.g. Docker-internal hostname).
+    /// Falls back to `issuer_url` if empty.
+    #[serde(default)]
+    pub internal_issuer_url: String,
+    /// OIDC client ID registered with the IdP.
+    #[serde(default)]
     pub client_id: String,
-    pub client_secret: String,
-    pub redirect_uri: String,
-    /// Browser-facing base URL for the authorize redirect
-    #[serde(default)]
-    pub issuer_url: Option<String>,
-    /// Internal base URL for server-to-server calls (e.g. inside Docker)
-    #[serde(default)]
-    pub internal_issuer_url: Option<String>,
-    pub scopes: Vec<String>,
-    #[serde(default = "default_provider_enabled")]
-    pub enabled: bool,
-}
-
-fn default_provider_enabled() -> bool {
-    false
 }
 
 #[derive(Debug, Deserialize, Clone, Default)]
@@ -84,10 +76,14 @@ pub struct AuthConfig {
     #[serde(default)]
     pub jwt: JwtConfig,
     #[serde(default)]
-    pub oauth_providers: Vec<OAuthProviderConfig>,
-    /// Where to redirect the browser after a successful login (Angular frontend)
-    #[serde(default)]
-    pub frontend_callback_url: Option<String>,
+    pub oidc: OidcConfig,
+    /// Allowed CORS origin for the Angular frontend.
+    #[serde(default = "default_frontend_origin")]
+    pub frontend_origin: String,
+}
+
+fn default_frontend_origin() -> String {
+    "http://localhost:4200".to_string()
 }
 
 impl Default for JwtConfig {

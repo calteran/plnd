@@ -28,4 +28,7 @@ pub enum AuthError {
 
     #[error("Provider disabled: {0}")]
     ProviderDisabled(String),
+
+    #[error("JWKS error: {0}")]
+    JwksError(String),
 }

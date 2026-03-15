@@ -1855,7 +1855,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tower-http",
- "url",
  "utoipa",
  "utoipa-scalar",
  "utoipa-swagger-ui",
