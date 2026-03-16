@@ -128,346 +128,287 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: ✅ Phase 1 COMPLETED | 🚧 Phase 2 IN PROGRESS
+### Current Status: Phase 1 COMPLETED | Phase 2 IN PROGRESS
 
-### Phase 1: Foundation (Core Infrastructure) ✅ COMPLETED
+### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
 
 **Tasks:**
-1. **Project Setup** ✅
-   - Initialize Rust backend with Axum
-   - Set up Angular frontend with NgRx
-   - Configure Docker Compose development environment
-   - Create basic project structure and build scripts
+- [x] **Project Setup**
+  - [x] Initialize Rust backend with Axum
+  - [x] Set up Angular frontend with NgRx
+  - [x] Configure Docker Compose development environment
+  - [x] Create basic project structure and build scripts
 
-2. **Database Foundation** ✅
-   - Set up PostgreSQL with SQLx
-   - Implement database connection pooling
-   - Create initial migration system
-   - Design core database schemas (users, auth)
+- [x] **Database Foundation**
+  - [x] Set up PostgreSQL with SQLx
+  - [x] Implement database connection pooling
+  - [x] Create initial migration system
+  - [x] Design core database schemas (users, auth)
 
-3. **Authentication System** ✅
-   - ✅ **Provider-Agnostic OAuth Architecture**: Trait-based design for multiple providers
-   - ✅ **Mock OAuth Provider**: navikt/mock-oauth2-server integration for development
-   - ✅ **JWT-Based Authentication**: Secure token generation and validation
-   - ✅ **Configuration-Driven**: TOML-based provider configuration
-   - ✅ **Rust Implementation**: Full Axum integration with async support
-   - ✅ **Docker Integration**: Mock OAuth server in development environment
-   - ✅ **API Endpoints**: OAuth authorization and callback routes
-   - ✅ **Middleware**: JWT validation for protected routes
+- [x] **Authentication System**
+  - [x] **Provider-Agnostic OAuth Architecture**: Trait-based design for multiple providers
+  - [x] **Mock OAuth Provider**: navikt/mock-oauth2-server integration for development
+  - [x] **JWT-Based Authentication**: Secure token generation and validation
+  - [x] **Configuration-Driven**: TOML-based provider configuration
+  - [x] **Rust Implementation**: Full Axum integration with async support
+  - [x] **Docker Integration**: Mock OAuth server in development environment
+  - [x] **API Endpoints**: OAuth authorization and callback routes
+  - [x] **Middleware**: JWT validation for protected routes
 
-4. **Basic API Structure** ✅
-   - Set up Axum router and middleware
-   - Create error handling framework
-   - Implement request validation
-   - Add API documentation (OpenAPI/Swagger)
+- [x] **Basic API Structure**
+  - [x] Set up Axum router and middleware
+  - [x] Create error handling framework
+  - [x] Implement request validation
+  - [x] Add API documentation (OpenAPI/Swagger)
 
-**Deliverables:** ✅
-- Working development environment
-- Functional authentication system with mock OAuth provider
-- Basic API skeleton with protected routes
-- Dockerized services including mock OAuth server
-- All quality checks passing (fmt, clippy, deny, machete)
+**Deliverables:**
+- [x] Working development environment
+- [x] Functional authentication system with mock OAuth provider
+- [x] Basic API skeleton with protected routes
+- [x] Dockerized services including mock OAuth server
+- [x] All quality checks passing (fmt, clippy, deny, machete)
 
-### Phase 2: Core Features (MVP Functionality) 🚧 IN PROGRESS
+### Phase 2: Core Features (MVP Functionality) — IN PROGRESS
 **Goal**: Implement the minimum viable planning features
 
 > **Data Model Reference**: See [`DOMAIN_MODEL.md`](./DOMAIN_MODEL.md) for the authoritative domain and scheduling model — entity hierarchy, catalog layer, schedule template/instance pattern, dynamic adjustment, and family coordination. All Phase 2 meal, exercise, and scheduling work should be grounded in that document.
 
 **Tasks:**
-0. **Secrets Management (Doppler)** ✅
-   - ✅ All sensitive credentials stored in Doppler (`plnd/dev`): `APP_AUTH__JWT_SECRET`, `APP_DATABASE__URL`, `DB_PASSWORD`, `APP_EXTERNAL__USDA_FDC_API_KEY`, `APP_EXTERNAL__THEMEALDB_API_KEY`
-   - ✅ `config/api/default.toml` sanitized: `jwt_secret` blanked out; non-sensitive values remain in TOML
-   - ✅ `docker-compose.yml` uses `${DB_PASSWORD}` interpolation; credentials injected via `doppler run --`
-   - ✅ `justfile` wraps `api`, `api-watch`, `dev`, `test-run-server`, and `services-up` with `doppler run --`
-   - ✅ `load_config_with_path()` gains env var overrides for `APP_AUTH__JWT_SECRET` and `APP_EXTERNAL__THEMEALDB_API_KEY`
+- [x] **Secrets Management (Doppler)**
+  - [x] All sensitive credentials stored in Doppler (`plnd/dev`); `justfile` wraps relevant commands with `doppler run --`; `docker-compose.yml` uses env var interpolation; non-sensitive config remains in TOML
 
-1. **Authentication UI & App Shell** ✅
-   - ✅ Login page with Mock OAuth sign-in button
-   - ✅ OAuth callback handler (extracts JWT, stores in localStorage)
-   - ✅ Angular auth guard (functional guard, protects authenticated routes)
-   - ✅ Main layout shell (sidebar + top navbar structure)
-   - ✅ NavbarAvatar component (initials fallback, image support, dropdown menu)
-   - ✅ AuthService, UserService, PreferencesService (signals-based state)
+- [x] **Authentication UI & App Shell**
+  - [x] Login page, OAuth callback handler, Angular auth guard, main layout shell (sidebar + navbar), NavbarAvatar component, and signals-based AuthService/UserService/PreferencesService
 
-1. **User Management** 🚧
-   - ✅ User profile CRUD operations (display_name, avatar_url)
-   - ✅ Preferences and settings management (theme: system/light/dark)
-   - ✅ Dietary restrictions CRUD (allergy/intolerance/preference types, name, notes — backend + Angular UI with signals)
-   - ✅ Basic user onboarding flow (4-step wizard: Welcome → Profile → Theme → Dietary Restrictions; all steps skippable; `onboarding_completed` persisted in DB)
+- [x] **User Management**
+  - [x] User profile CRUD (`display_name`, `avatar_url`), theme preferences, dietary restrictions CRUD (backend + Angular UI), and 4-step onboarding wizard (all steps skippable, `onboarding_completed` persisted in DB)
 
-2. **Domain Model Database Schema** ✅
-   - ✅ Implement ingredient catalog: `catalog_ingredients` (atomic food items with nutrition JSONB, allergens, external DB hooks)
-   - ✅ Implement dish catalog: `catalog_dishes`, `catalog_dish_ingredients` (recipes composed of ingredients; `occasion_tags TEXT[]` replaces `meal_type` enum)
-   - ✅ Implement meal catalog: `catalog_meals` (revised), `catalog_meal_dishes` (eating occasion templates composed of dishes)
-   - ✅ Implement exercise catalog: `catalog_exercises`
-   - ✅ Implement personal dish library: `user_dishes`, `user_dish_ingredients`
-   - ✅ Implement personal meal library: `user_meals` (revised), `user_meal_dishes` (mix of catalog and personal dishes)
-   - ✅ Implement personal exercise library: `user_exercises`
-   - ✅ Implement family model: `families`, `family_members`, `family_meals`
-   - ✅ Implement task model: `tasks`, `meal_tasks` (with `occasion_label TEXT`, `user_dish_id` for single-dish scheduling), `exercise_tasks`, `work_tasks`, `generic_tasks`
-   - ✅ Implement scheduling model: `schedule_templates`, `schedule_entries`
-   - ✅ Note: nutrition and allergens can be entered at any layer (ingredient / dish / meal) with `_overridden` flags to distinguish manual vs. computed values
+- [x] **Domain Model Database Schema**
+  - [x] 3-layer catalog hierarchy: `catalog_ingredients` → `catalog_dishes` → `catalog_meals`; personal libraries (`user_dishes`, `user_meals`, `user_exercises`); family model; task model (`meal_tasks`, `exercise_tasks`, `work_tasks`, `generic_tasks`); scheduling model (`schedule_templates`, `schedule_entries`); nutrition/allergens enterable at any layer with `_overridden` flags
 
-3. **Catalog Population Infrastructure** ✅
-   - ✅ **External Client Traits** (`src/clients/`): `NutritionProvider` + `RecipeProvider` async traits; `search_*` + `get_*_by_id` methods; `ExternalClientError`; `NutritionFacts` typed struct serializes to canonical `nutrition JSONB` shape; `source_name() -> &str` drives `external_source` tagging
-   - ✅ **Exercise Provider Trait** (`src/clients/exercise.rs`): `ExerciseProvider` async trait; `search_exercises` + `get_exercise_by_id`; `ExternalExercise` DTO with `muscle_groups`, `equipment`, `intensity`; concrete `WgerClient` comes in next task and tags `external_source = 'wger'`
-   - ✅ **USDA FoodData Central Client** (`src/clients/usda_fdc.rs`): `UsdaFdcClient` implementing `NutritionProvider`; free API key required (env: `APP_EXTERNAL__USDA_FDC_API_KEY`); 14-nutrient ID→field mapping via `apply_nutrient()`; `serving_size_g` from `foodPortions[0]`; returns `ConfigurationError` early if key empty; tags `external_source = 'usda_fdc'`
-   - ✅ **Open Food Facts Client** (`src/clients/open_food_facts.rs`): `OpenFoodFactsClient` implementing `NutritionProvider`; no auth required; all nutrients per-100g with g→mg conversion for minerals; client-side allergen filtering; strips `"en:"` prefix from allergen tags; tags `external_source = 'openfoodfacts'`
-   - ✅ **TheMealDB Recipe Client** (`src/clients/themealdb.rs`): `TheMealDbClient` implementing `RecipeProvider`; free-tier key `"1"` baked in by default; `#[serde(flatten)]` captures strIngredient1–20/strMeasure1–20 dynamically; `parse_measure()` handles fractions ("1/2 cup"), attached units ("250g"), and fallback ("to taste" → ONE serving); category → `occasion_tags` mapping; tags `external_source = 'themealdb'`
-   - ✅ **Config wiring**: `ExternalProvidersConfig` in `settings.rs`; `[external_providers]` section in `config/api/default.toml`; clients constructed at startup in `main.rs` with diagnostic prints
-   - ✅ **Search Infrastructure** (`src/search/`, `src/cache/`, `src/db/search.rs`): `ProviderSearchService` streams results from all providers concurrently via `tokio::spawn` fan-out; TTL-backed `SearchCache` (moka, default 36h); `GET /search/ingredients`, `GET /search/dishes`, `GET /search/exercises` protected routes; local PostgreSQL FTS (`to_tsvector`/`plainto_tsquery`) runs first, external providers fan out in parallel
-   - ✅ **Cargo Workspace + `plnd_data` + `plnd_seed` crates**: `clients/`, `cache/`, `search/` extracted into `plnd_data` library (zero Axum/SQLx deps); `plnd_seed` is a new workspace crate (`lib` + `seed` binary) that seeds `catalog_ingredients` and `catalog_dishes` from external providers; `Dockerfile.api` copies all three crates; 124 Rust tests pass across all crates
-   - ✅ **Catalog Seed** (`plnd_seed/`): `pub async fn seed(pool, nutrition_providers, recipe_providers)` — checks `catalog_ingredients.external_source IS NOT NULL` for fast idempotency; fetches 8 ingredient terms × top-3 + 5 dish terms × top-2 from configured providers; single DB transaction for all writes; spawned as background `tokio::task` in `main.rs` so server binds immediately; `just seed` standalone command for operator use; 5 offline unit tests
-   - *(Future — Phase 3)*: AI-guided catalog curation deferred to LLM integration phase
+- [x] **Catalog Population Infrastructure**
+  - [x] Trait-based external clients: `NutritionProvider` (USDA FDC, Open Food Facts), `RecipeProvider` (TheMealDB), `ExerciseProvider`; all config-driven and offline-testable
+  - [x] `ProviderSearchService`: concurrent fan-out via `tokio::spawn`, TTL cache (moka, 36h), local PostgreSQL FTS first then external providers; `GET /search/{ingredients,dishes,exercises}` protected routes
+  - [x] `plnd_data` library crate (Axum/SQLx-free); `plnd_seed` crate with idempotent catalog seeding, background startup task, and `just seed` operator command; 124 tests passing
+  - *(Future — Phase 3)*: AI-guided catalog curation deferred to LLM integration phase
 
-4. **Meal Planning Core**
-   - Implement meal CRUD API endpoints
-   - Build meal planning UI (list, add/edit/delete)
-   - Schedule meals onto the weekly plan view
-   - Support recurring meal templates
+- [ ] **Meal Planning Core**
+  - [ ] Implement meal CRUD API endpoints
+  - [ ] Build meal planning UI (list, add/edit/delete)
+  - [ ] Schedule meals onto the weekly plan view
+  - [ ] Support recurring meal templates
 
-5. **Exercise Planning Core**
-   - Implement exercise CRUD API endpoints
-   - Build workout planning UI (list, add/edit/delete)
-   - Schedule workouts onto the weekly plan view
-   - Support recurring exercise templates
+- [ ] **Exercise Planning Core**
+  - [ ] Implement exercise CRUD API endpoints
+  - [ ] Build workout planning UI (list, add/edit/delete)
+  - [ ] Schedule workouts onto the weekly plan view
+  - [ ] Support recurring exercise templates
 
-6. **Family Support Foundation**
-   - Create family account schema and API
-   - Build family profile management UI
-   - Enable shared meal planning for family members
-   - Implement caregiver access roles and permissions
-
-7. **Basic LLM Integration**
-   - Set up Mistral API client
-   - Implement basic prompt templates
-   - Create simple meal suggestion tool (requires meal catalog data)
-   - Add basic conversation context
+- [ ] **Family Support Foundation**
+  - [ ] Create family account schema and API
+  - [ ] Build family profile management UI
+  - [ ] Enable shared meal planning for family members
+  - [ ] Implement caregiver access roles and permissions
 
 **Deliverables:**
-- ✅ Secrets management via Doppler (all sensitive values out of TOML/docker-compose)
-- ✅ Functional authentication UI and app shell
-- ✅ User profile and preferences management
-- ✅ Dietary restrictions management (full CRUD, backend + Angular UI)
-- ✅ User onboarding wizard (multi-step, skip-friendly, DB-persisted completion)
-- ✅ Domain model database schema (3-layer Ingredient → Dish → Meal hierarchy; 6 migrations; 20 Rust model structs)
-- ✅ External provider clients: USDA FDC + Open Food Facts (`NutritionProvider`) + TheMealDB (`RecipeProvider`); trait-based, offline-testable, config-driven
-- ✅ Search infrastructure: `ProviderSearchService` (streaming fan-out, TTL cache) + local FTS via `db::search` + `GET /search/{ingredients,dishes,exercises}` routes
-- ✅ Cargo workspace: `plnd_data` + `plnd_seed` crates; `plnd_data` enforces Axum/SQLx-free boundary; `plnd_seed` provides idempotent catalog seeding from external providers with background startup task and `just seed` operator command
-- ✅ Catalog population infrastructure (`plnd_seed` crate — dynamic provider seeding, idempotent, background on startup, `just seed` command)
-- Functional meal and exercise planning
-- Family profile management
-- Basic LLM-powered suggestions (dependent on meal/exercise data being in place)
-- Core planning interfaces
+- [x] Secrets management via Doppler
+- [x] Authentication UI and app shell
+- [x] User profile, preferences, dietary restrictions, and onboarding wizard
+- [x] Domain model database schema (3-layer catalog hierarchy, personal libraries, family model, task and scheduling models)
+- [x] External provider clients (USDA FDC, Open Food Facts, TheMealDB) with search infrastructure and `plnd_data`/`plnd_seed` workspace crates
+- [ ] Functional meal and exercise planning
+- [ ] Family profile management
+- [ ] Core planning interfaces
 
 ### Phase 3: AI Enhancements (Intelligent Features)
 **Goal**: Implement advanced LLM-powered planning capabilities
 
 **Tasks:**
-1. **Advanced LLM Tools**
-   - Build LLM nutrition analysis tool
-   - Build LLM schedule optimization tool
-   - Build LLM preference-update tool
-   - Implement context-aware suggestion engine
+- [ ] **Basic LLM Integration**
+  - [ ] Set up Mistral API client
+  - [ ] Implement basic prompt templates
+  - [ ] Create simple meal suggestion tool
+  - [ ] Add basic conversation context
 
-2. **Prompt Engineering**
-   - Write domain-specific prompt templates
-   - Add few-shot examples to prompt templates
-   - Enforce structured output in LLM responses
-   - Add LLM error handling and retry logic
+- [ ] **Advanced LLM Tools**
+  - [ ] Build LLM nutrition analysis tool
+  - [ ] Build LLM schedule optimization tool
+  - [ ] Build LLM preference-update tool
+  - [ ] Implement context-aware suggestion engine
 
-3. **Conversational Interface**
-   - Process natural language user input
-   - Classify user request intent
-   - Persist conversation context across sessions
-   - Support multi-turn conversation flows
+- [ ] **Prompt Engineering**
+  - [ ] Write domain-specific prompt templates
+  - [ ] Add few-shot examples to prompt templates
+  - [ ] Enforce structured output in LLM responses
+  - [ ] Add LLM error handling and retry logic
 
-4. **Proactive Suggestions**
-   - Detect patterns from user behavior history
-   - Generate personalized meal/exercise recommendations
-   - Auto-adjust plans based on user feedback
-   - Feed user ratings back into the suggestion model
+- [ ] **Conversational Interface**
+  - [ ] Process natural language user input
+  - [ ] Classify user request intent
+  - [ ] Persist conversation context across sessions
+  - [ ] Support multi-turn conversation flows
+
+- [ ] **Proactive Suggestions**
+  - [ ] Detect patterns from user behavior history
+  - [ ] Generate personalized meal/exercise recommendations
+  - [ ] Auto-adjust plans based on user feedback
+  - [ ] Feed user ratings back into the suggestion model
 
 **Deliverables:**
-- Intelligent planning assistant
-- Context-aware suggestions
-- Natural language interface
-- Personalized recommendations
+- [ ] Intelligent planning assistant
+- [ ] Context-aware suggestions
+- [ ] Natural language interface
+- [ ] Personalized recommendations
 
 ### Phase 4: Integration Features
 **Goal**: Connect with external services and enhance functionality
 
 **Tasks:**
-1. **Calendar Integration**
-   - Google Calendar API integration
-   - Apple Calendar API integration
-   - Event synchronization
-   - Conflict detection
+- [ ] **Calendar Integration**
+  - [ ] Google Calendar API integration
+  - [ ] Apple Calendar API integration
+  - [ ] Event synchronization
+  - [ ] Conflict detection
 
-2. **Weather Integration**
-   - Weather API client
-   - Suggest weather-appropriate activities
-   - Switch between indoor/outdoor recommendations based on forecast
-   - Weather-based reminders
+- [ ] **Weather Integration**
+  - [ ] Weather API client
+  - [ ] Suggest weather-appropriate activities
+  - [ ] Switch between indoor/outdoor recommendations based on forecast
+  - [ ] Weather-based reminders
 
-3. **Nutrition Features**
-   - Integrate USDA FoodData Central API for nutrition data
-   - Barcode scanner implementation with camera access
-   - Add photo OCR for nutrition label scanning
-   - Manual nutrition entry forms with validation
-   - Create product database for saved foods
-   - Parse and store nutrition data from all input sources
+- [ ] **Nutrition Features**
+  - [ ] Barcode scanner implementation with camera access
+  - [ ] Add photo OCR for nutrition label scanning
+  - [ ] Manual nutrition entry forms with validation
+  - [ ] Create product database for saved foods
+  - [ ] Parse and store nutrition data from all input sources
 
-4. **Grocery & Shopping Features**
-   - Grocery list generation from meal plans
-   - Smart list organization by store sections
-   - Track pantry/fridge inventory
-   - Expiration date monitoring with alerts
-   - Barcode scanning for inventory management
+- [ ] **Grocery & Shopping Features**
+  - [ ] Grocery list generation from meal plans
+  - [ ] Smart list organization by store sections
+  - [ ] Track pantry/fridge inventory
+  - [ ] Expiration date monitoring with alerts
+  - [ ] Barcode scanning for inventory management
 
-5. **Advanced Analytics**
-   - Track plan vs. actual for nutrition, exercise, and tasks
-   - Trend analysis and progress visualization
-   - Exportable reports for healthcare providers
-   - Performance metrics and insights
+- [ ] **Advanced Analytics**
+  - [ ] Track plan vs. actual for nutrition, exercise, and tasks
+  - [ ] Trend analysis and progress visualization
+  - [ ] Exportable reports for healthcare providers
+  - [ ] Performance metrics and insights
 
-6. **Advanced Planning**
-   - Drag-and-drop interface
-   - Build recurring plan template system
-   - Allow per-day plan overrides
-   - Support bulk editing of scheduled items
+- [ ] **Advanced Planning**
+  - [ ] Drag-and-drop interface
+  - [ ] Build recurring plan template system
+  - [ ] Allow per-day plan overrides
+  - [ ] Support bulk editing of scheduled items
 
 **Deliverables:**
-- External service integrations
-- Enhanced planning features
-- Weather and calendar awareness
-- Advanced nutrition tracking
-- Grocery and shopping functionality
-- Comprehensive analytics and reporting
+- [ ] External service integrations
+- [ ] Enhanced planning features
+- [ ] Weather and calendar awareness
+- [ ] Advanced nutrition tracking
+- [ ] Grocery and shopping functionality
+- [ ] Comprehensive analytics and reporting
 
 ### Phase 5: Mobile Implementation
 **Goal**: Develop and polish the iOS application
 
 **Tasks:**
-1. **Set up Capacitor for iOS**
-   - Configure Capacitor for iOS
-   - Set up native project structure
-   - Configure iOS build pipeline
-   - Add required Capacitor plugins
+- [ ] **Set up Capacitor for iOS**
+  - [ ] Configure Capacitor for iOS
+  - [ ] Set up native project structure
+  - [ ] Configure iOS build pipeline
+  - [ ] Add required Capacitor plugins
 
-2. **Mobile UI/UX**
-   - Make all views responsive for mobile
-   - Optimize UI interactions for touch
-   - Implement offline capability
-   - Implement native-like page transitions
+- [ ] **Mobile UI/UX**
+  - [ ] Make all views responsive for mobile
+  - [ ] Optimize UI interactions for touch
+  - [ ] Implement offline capability
+  - [ ] Implement native-like page transitions
 
-3. **Mobile-Specific Features**
-   - Push notification setup
-   - Background sync
-   - Cache schedule data locally for offline use
-   - Prepare App Store metadata and screenshots
+- [ ] **Mobile-Specific Features**
+  - [ ] Push notification setup
+  - [ ] Background sync
+  - [ ] Cache schedule data locally for offline use
+  - [ ] Prepare App Store metadata and screenshots
 
-4. **Testing and Polish**
-   - Device-specific testing
-   - Performance optimization
-   - App store screenshots and metadata
-   - Beta testing setup
+- [ ] **Testing and Polish**
+  - [ ] Device-specific testing
+  - [ ] Performance optimization
+  - [ ] App store screenshots and metadata
+  - [ ] Beta testing setup
 
 **Deliverables:**
-- Functional iOS application
-- App store-ready build
-- Offline-capable mobile experience
-- Polished mobile UI/UX
+- [ ] Functional iOS application
+- [ ] App store-ready build
+- [ ] Offline-capable mobile experience
+- [ ] Polished mobile UI/UX
 
 ### Phase 6: Deployment and Operations
 **Goal**: Prepare for production deployment and ongoing operations
 
 **Tasks:**
-1. **Production Infrastructure**
-   - Kubernetes cluster setup
-   - CI/CD pipeline configuration
-   - Set up monitoring and log aggregation
-   - Implement automated backup and recovery
+- [ ] **Production Infrastructure**
+  - [ ] Kubernetes cluster setup
+  - [ ] CI/CD pipeline configuration
+  - [ ] Set up monitoring and log aggregation
+  - [ ] Implement automated backup and recovery
 
-2. **Security Hardening**
-   - Security audit
-   - Penetration testing
-   - Data protection measures
-   - Compliance checks
+- [ ] **Security Hardening**
+  - [ ] Security audit
+  - [ ] Penetration testing
+  - [ ] Data protection measures
+  - [ ] Compliance checks
 
-3. **Performance Optimization**
-   - Database optimization
-   - Caching strategy implementation
-   - Load testing
-   - Performance monitoring
+- [ ] **Performance Optimization**
+  - [ ] Database optimization
+  - [ ] Caching strategy implementation
+  - [ ] Load testing
+  - [ ] Performance monitoring
 
-4. **Deployment Process**
-   - Staging environment setup
-   - Rollback procedures
-   - Zero-downtime deployment
-   - Feature flag system
+- [ ] **Deployment Process**
+  - [ ] Staging environment setup
+  - [ ] Rollback procedures
+  - [ ] Zero-downtime deployment
+  - [ ] Feature flag system
 
 **Deliverables:**
-- Production-ready infrastructure
-- Secure and optimized application
-- Automated deployment pipeline
-- Monitoring and alerting system
+- [ ] Production-ready infrastructure
+- [ ] Secure and optimized application
+- [ ] Automated deployment pipeline
+- [ ] Monitoring and alerting system
 
 ### Phase 7: Polish and Launch
 **Goal**: Final touches and official launch
 
 **Tasks:**
-1. **Final Testing**
-   - End-to-end testing
-   - User acceptance testing
-   - Performance benchmarking
-   - Security validation
+- [ ] **Final Testing**
+  - [ ] End-to-end testing
+  - [ ] User acceptance testing
+  - [ ] Performance benchmarking
+  - [ ] Security validation
 
-2. **Documentation**
-   - User documentation
-   - API documentation
-   - Developer documentation
-   - Support materials
+- [ ] **Documentation**
+  - [ ] User documentation
+  - [ ] API documentation
+  - [ ] Developer documentation
+  - [ ] Support materials
 
-3. **Marketing Preparation**
-   - Landing page
-   - App store listings
-   - Create social media presence for launch
-   - Launch materials
+- [ ] **Marketing Preparation**
+  - [ ] Landing page
+  - [ ] App store listings
+  - [ ] Create social media presence for launch
+  - [ ] Launch materials
 
-4. **Launch Execution**
-   - Coordinated release
-   - Monitoring during launch
-   - User support setup
-   - Integrate user feedback collection
+- [ ] **Launch Execution**
+  - [ ] Coordinated release
+  - [ ] Monitoring during launch
+  - [ ] User support setup
+  - [ ] Integrate user feedback collection
 
 **Deliverables:**
-- Fully tested application
-- Complete documentation
-- Successful launch
-- User feedback mechanisms
-
-## Development Sequence Recommendations
-
-### Recommended Order:
-1. **Foundation Phase** (Blocked by nothing)
-2. **Core Features Phase** (Depends on Foundation)
-3. **AI Enhancements Phase** (Depends on Core Features + LLM setup)
-4. **Integration Features** (Can start after Core Features)
-5. **Mobile Implementation** (Can start after Core Features, parallel with Integration)
-6. **Deployment and Operations** (Start after Core Features, continue throughout)
-7. **Polish and Launch** (Final phase)
-
-### Parallel Development Opportunities:
-- **Frontend/Backend**: Can develop APIs and UI in parallel after contract is defined
-- **Mobile/Web**: Mobile development can start after web core is stable
-- **Integrations**: Calendar/weather integrations can be developed independently
-- **AI Tools**: Different LLM tools can be developed in parallel
-
-### Risk Mitigation Strategy:
-1. **Start with Core**: Ensure basic planning works before AI enhancements
-2. **Validate LLM Early**: Test Mistral integration with simple use cases first
-3. **Mobile Last**: Focus on web first, then adapt to mobile
-4. **Incremental Deployment**: Deploy basic features first, add enhancements later
-5. **Feature Flags**: Allow gradual rollout of new features
+- [ ] Fully tested application
+- [ ] Complete documentation
+- [ ] Successful launch
+- [ ] User feedback mechanisms
