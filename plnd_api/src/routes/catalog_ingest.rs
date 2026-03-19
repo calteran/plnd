@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
@@ -35,14 +35,16 @@ pub async fn ingest_ingredient(
     let occasion_tags = body.occasion_tags.unwrap_or_default();
     let id = catalog_ingest::ingest_ingredient(
         state.db.get_pool(),
-        &body.external_source,
-        &body.external_id,
-        &body.name,
-        body.description.as_deref(),
-        body.serving_size_g,
-        body.nutrition,
-        &allergens,
-        &occasion_tags,
+        catalog_ingest::IngestIngredientParams {
+            external_source: &body.external_source,
+            external_id: &body.external_id,
+            name: &body.name,
+            description: body.description.as_deref(),
+            serving_size_g: body.serving_size_g,
+            nutrition: body.nutrition,
+            allergens: &allergens,
+            occasion_tags: &occasion_tags,
+        },
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;

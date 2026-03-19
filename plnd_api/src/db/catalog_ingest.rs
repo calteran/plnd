@@ -3,16 +3,20 @@ use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+pub struct IngestIngredientParams<'a> {
+    pub external_source: &'a str,
+    pub external_id: &'a str,
+    pub name: &'a str,
+    pub description: Option<&'a str>,
+    pub serving_size_g: Option<Decimal>,
+    pub nutrition: Option<Value>,
+    pub allergens: &'a [String],
+    pub occasion_tags: &'a [String],
+}
+
 pub async fn ingest_ingredient(
     pool: &PgPool,
-    external_source: &str,
-    external_id: &str,
-    name: &str,
-    description: Option<&str>,
-    serving_size_g: Option<Decimal>,
-    nutrition: Option<Value>,
-    allergens: &[String],
-    occasion_tags: &[String],
+    params: IngestIngredientParams<'_>,
 ) -> Result<Uuid, sqlx::Error> {
     // Try to insert; if duplicate (external_source, external_id), DO NOTHING.
     // Then SELECT to get the ID whether we inserted or it already existed.
@@ -33,14 +37,14 @@ pub async fn ingest_ingredient(
         LIMIT 1
         "#,
     )
-    .bind(name)
-    .bind(description)
-    .bind(serving_size_g)
-    .bind(nutrition)
-    .bind(allergens)
-    .bind(occasion_tags)
-    .bind(external_source)
-    .bind(external_id)
+    .bind(params.name)
+    .bind(params.description)
+    .bind(params.serving_size_g)
+    .bind(params.nutrition)
+    .bind(params.allergens)
+    .bind(params.occasion_tags)
+    .bind(params.external_source)
+    .bind(params.external_id)
     .fetch_one(pool)
     .await
     .map(|(id,)| id)

@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -6,6 +5,7 @@ use axum::{
 };
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
@@ -91,10 +91,10 @@ pub async fn create(
 #[derive(Deserialize)]
 pub struct PatchDishBody {
     // Metadata fields
-    pub rating: Option<serde_json::Value>,      // number or null
+    pub rating: Option<serde_json::Value>, // number or null
     pub is_safe_food: Option<bool>,
     pub is_blocked: Option<bool>,
-    pub notes: Option<serde_json::Value>,        // string or null
+    pub notes: Option<serde_json::Value>, // string or null
     // Recipe fields
     pub name: Option<String>,
     pub instructions: Option<serde_json::Value>, // string or null
@@ -117,13 +117,10 @@ pub async fn patch(
 
     if has_recipe_fields {
         // Treat instructions value: null → clear, string → set, absent → keep
-        let instructions: Option<&str> = body.instructions.as_ref().and_then(|v| {
-            if v.is_null() {
-                None
-            } else {
-                v.as_str()
-            }
-        });
+        let instructions: Option<&str> =
+            body.instructions
+                .as_ref()
+                .and_then(|v| if v.is_null() { None } else { v.as_str() });
 
         user_dish_prefs::fork_and_update_recipe(
             state.db.get_pool(),
@@ -211,12 +208,14 @@ pub async fn add_ingredient(
         state.db.get_pool(),
         user_id,
         pref_id,
-        body.catalog_ingredient_id,
-        body.quantity,
-        &body.unit,
-        body.preparation_note.as_deref(),
-        body.is_optional.unwrap_or(false),
-        body.sort_order.unwrap_or(0),
+        user_dish_prefs::AddIngredientParams {
+            ingredient_id: body.catalog_ingredient_id,
+            quantity: body.quantity,
+            unit: body.unit,
+            preparation_note: body.preparation_note,
+            is_optional: body.is_optional.unwrap_or(false),
+            sort_order: body.sort_order.unwrap_or(0),
+        },
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -230,13 +229,8 @@ pub async fn remove_ingredient(
     Path((pref_id, ingredient_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    match user_dish_prefs::remove_ingredient(
-        state.db.get_pool(),
-        user_id,
-        pref_id,
-        ingredient_id,
-    )
-    .await
+    match user_dish_prefs::remove_ingredient(state.db.get_pool(), user_id, pref_id, ingredient_id)
+        .await
     {
         Ok(Some(true)) => Ok(StatusCode::NO_CONTENT),
         Ok(Some(false)) | Ok(None) => Err(StatusCode::NOT_FOUND),

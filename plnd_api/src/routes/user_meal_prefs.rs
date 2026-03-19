@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -6,6 +5,7 @@ use axum::{
 };
 use rust_decimal::Decimal;
 use serde::Deserialize;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
@@ -87,13 +87,13 @@ pub async fn create(
 #[derive(Deserialize)]
 pub struct PatchMealBody {
     // Metadata fields
-    pub rating: Option<serde_json::Value>,      // number or null
+    pub rating: Option<serde_json::Value>, // number or null
     pub is_safe_food: Option<bool>,
     pub is_blocked: Option<bool>,
-    pub notes: Option<serde_json::Value>,        // string or null
+    pub notes: Option<serde_json::Value>, // string or null
     // Recipe fields
     pub name: Option<String>,
-    pub description: Option<serde_json::Value>,  // string or null
+    pub description: Option<serde_json::Value>, // string or null
 }
 
 pub async fn patch(
@@ -108,13 +108,10 @@ pub async fn patch(
 
     if has_recipe_fields {
         // Treat description value: null → clear, string → set, absent → keep
-        let description: Option<&str> = body.description.as_ref().and_then(|v| {
-            if v.is_null() {
-                None
-            } else {
-                v.as_str()
-            }
-        });
+        let description: Option<&str> =
+            body.description
+                .as_ref()
+                .and_then(|v| if v.is_null() { None } else { v.as_str() });
 
         user_meal_prefs::fork_and_update_recipe(
             state.db.get_pool(),
@@ -203,11 +200,13 @@ pub async fn add_dish(
         state.db.get_pool(),
         user_id,
         pref_id,
-        body.catalog_dish_id,
-        body.user_dish_pref_id,
-        body.dish_servings,
-        body.notes.as_deref(),
-        body.sort_order.unwrap_or(0),
+        user_meal_prefs::AddDishParams {
+            catalog_dish_id: body.catalog_dish_id,
+            user_dish_id: body.user_dish_pref_id,
+            dish_servings: body.dish_servings,
+            notes: body.notes,
+            sort_order: body.sort_order.unwrap_or(0),
+        },
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?

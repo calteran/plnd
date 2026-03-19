@@ -26,11 +26,11 @@ const PREF_DETAIL_SELECT: &str = r#"
     LEFT JOIN user_meals    um ON um.user_meal_id = p.user_meal_id
 "#;
 
-pub async fn list(
-    pool: &PgPool,
-    user_id: Uuid,
-) -> Result<Vec<UserMealPrefDetail>, sqlx::Error> {
-    let sql = format!("{} WHERE p.user_id = $1 ORDER BY p.created_at", PREF_DETAIL_SELECT);
+pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserMealPrefDetail>, sqlx::Error> {
+    let sql = format!(
+        "{} WHERE p.user_id = $1 ORDER BY p.created_at",
+        PREF_DETAIL_SELECT
+    );
     sqlx::query_as::<_, UserMealPrefDetail>(&sql)
         .bind(user_id)
         .fetch_all(pool)
@@ -130,11 +130,11 @@ pub async fn update_metadata(
     )
     .bind(user_id)
     .bind(pref_id)
-    .bind(rating.flatten())         // $3: new rating value (or NULL to keep old)
-    .bind(is_safe_food)             // $4
-    .bind(is_blocked)               // $5
-    .bind(notes.is_some())          // $6: whether notes field was provided
-    .bind(notes.flatten())          // $7: new notes value
+    .bind(rating.flatten()) // $3: new rating value (or NULL to keep old)
+    .bind(is_safe_food) // $4
+    .bind(is_blocked) // $5
+    .bind(notes.is_some()) // $6: whether notes field was provided
+    .bind(notes.flatten()) // $7: new notes value
     .execute(pool)
     .await?;
 
@@ -227,11 +227,7 @@ pub async fn fork_and_update_recipe(
     get(pool, user_id, pref_id).await
 }
 
-pub async fn delete(
-    pool: &PgPool,
-    user_id: Uuid,
-    pref_id: Uuid,
-) -> Result<bool, sqlx::Error> {
+pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool, sqlx::Error> {
     // Also delete the personal user_meal (and its dishes) if it exists.
     let mut tx = pool.begin().await?;
 
@@ -265,15 +261,19 @@ pub async fn delete(
     Ok(true)
 }
 
+pub struct AddDishParams {
+    pub catalog_dish_id: Option<Uuid>,
+    pub user_dish_id: Option<Uuid>,
+    pub dish_servings: rust_decimal::Decimal,
+    pub notes: Option<String>,
+    pub sort_order: i16,
+}
+
 pub async fn add_dish(
     pool: &PgPool,
     user_id: Uuid,
     pref_id: Uuid,
-    catalog_dish_id: Option<Uuid>,
-    user_dish_id: Option<Uuid>,
-    dish_servings: rust_decimal::Decimal,
-    notes: Option<&str>,
-    sort_order: i16,
+    params: AddDishParams,
 ) -> Result<Option<UserMealPrefDetail>, sqlx::Error> {
     let mut tx = pool.begin().await?;
 
@@ -290,11 +290,11 @@ pub async fn add_dish(
         "#,
     )
     .bind(user_meal_id)
-    .bind(catalog_dish_id)
-    .bind(user_dish_id)
-    .bind(dish_servings)
-    .bind(notes)
-    .bind(sort_order)
+    .bind(params.catalog_dish_id)
+    .bind(params.user_dish_id)
+    .bind(params.dish_servings)
+    .bind(params.notes)
+    .bind(params.sort_order)
     .execute(&mut *tx)
     .await?;
 
