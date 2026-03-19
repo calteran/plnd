@@ -7,6 +7,10 @@ describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
   let component: AppComponent;
 
+  beforeEach(() => {
+    spyOn(window, 'matchMedia').and.returnValue({ matches: false } as MediaQueryList);
+  });
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [AppComponent, RouterTestingModule],
@@ -24,6 +28,6 @@ describe('AppComponent', () => {
 
   it('should apply a data-theme attribute to document.documentElement', () => {
     const theme = document.documentElement.getAttribute('data-theme');
-    expect(theme).toMatch(/^(dark|light)$/);
+    expect(theme).toBe('light');
   });
 });
