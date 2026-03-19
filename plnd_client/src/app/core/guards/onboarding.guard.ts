@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
-import { map, take } from 'rxjs/operators';
+import { map, take, catchError } from 'rxjs/operators';
 import { UserService } from '../services/user.service';
 import { User } from '../models/user';
 
@@ -15,7 +15,8 @@ function resolveUser(userService: UserService): Observable<User | null> {
   if (current !== null) return of(current);
   return userService.fetchUser().pipe(
     take(1),
-    map(user => user ?? null)
+    map(user => user ?? null),
+    catchError(() => of(null))
   );
 }
 
