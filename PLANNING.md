@@ -128,7 +128,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: Phase 1 COMPLETED | Phase 2 IN PROGRESS
+### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 (UI Design) NEXT
 
 ### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
@@ -169,8 +169,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] Dockerized services including mock OAuth server
 - [x] All quality checks passing (fmt, clippy, deny, machete)
 
-### Phase 2: Core Features (MVP Functionality) — IN PROGRESS
-**Goal**: Implement the minimum viable planning features
+### Phase 2: Core Features — Backend & Infrastructure — COMPLETED
+**Goal**: Implement the minimum viable planning features (backend, data model, and infrastructure). UI features moved to Phase 2.5 pending overall UI design.
 
 > **Data Model Reference**: See [`DOMAIN_MODEL.md`](./DOMAIN_MODEL.md) for the authoritative domain and scheduling model — entity hierarchy, catalog layer, schedule template/instance pattern, dynamic adjustment, and family coordination. All Phase 2 meal, exercise, and scheduling work should be grounded in that document.
 
@@ -196,6 +196,30 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] **Catalog & Library API** *(Ingredient → Dish → Meal)*
   - [x] `user_dish_prefs`/`user_meal_prefs`/`user_ingredient_prefs` tables; catalog detail + ingest endpoints; unified `/my/{dishes,meals}` library with transparent copy-on-write fork; ingredient pref blocking respected in search; Angular signals-based service layer
 
+**Deliverables:**
+- [x] Secrets management via Doppler
+- [x] Authentication UI and app shell
+- [x] User profile, preferences, dietary restrictions, and onboarding wizard
+- [x] Domain model database schema (3-layer catalog hierarchy, personal libraries, family model, task and scheduling models)
+- [x] External provider clients (USDA FDC, Open Food Facts, TheMealDB) with search infrastructure and `plnd_data`/`plnd_seed` workspace crates
+- [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
+
+### Phase 2.5: UI/UX Design & Remaining Planning UI — NOT STARTED
+**Goal**: Establish a cohesive overall UI design before building the remaining planning features, so that meal planning, exercise planning, family support, and the weekly schedule view share consistent navigation, layout, and component patterns.
+
+> **Why this phase exists**: The remaining features all converge on a shared weekly schedule view and sidebar navigation that doesn't yet exist. Designing them ad-hoc risks costly rework. A design sprint here produces a spec that all subsequent UI work follows.
+
+**Tasks:**
+
+- [ ] **Overall UI Design Sprint**
+  - [ ] Define app navigation structure (sidebar shape, primary/secondary routes, mobile nav)
+  - [ ] Design the Dashboard as the real planning home screen
+  - [ ] Establish design system: spacing scale, color tokens, component inventory (cards, modals, tables, forms, badges)
+  - [ ] Define responsive strategy (breakpoints, mobile-first vs. adaptive)
+  - [ ] Wireframe/mockup remaining major pages: Meal Planning, Exercise Planning, Weekly Schedule, Family Support
+  - [ ] Accessibility strategy (focus management, ARIA patterns, color contrast targets)
+  - [ ] Produce design spec committed to `docs/superpowers/specs/`
+
 - [ ] **Meal Planning UI**
   - [ ] Build meal planning UI (list, add/edit/delete dishes and meals)
   - [ ] Schedule meals onto the weekly plan view
@@ -213,16 +237,15 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [ ] Enable shared meal planning for family members
   - [ ] Implement caregiver access roles and permissions
 
+- [ ] **Dashboard (real content)**
+  - [ ] Replace stub with a real planning home screen per the design spec
+
 **Deliverables:**
-- [x] Secrets management via Doppler
-- [x] Authentication UI and app shell
-- [x] User profile, preferences, dietary restrictions, and onboarding wizard
-- [x] Domain model database schema (3-layer catalog hierarchy, personal libraries, family model, task and scheduling models)
-- [x] External provider clients (USDA FDC, Open Food Facts, TheMealDB) with search infrastructure and `plnd_data`/`plnd_seed` workspace crates
-- [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
+- [ ] UI design spec (`docs/superpowers/specs/YYYY-MM-DD-ui-design.md`)
 - [ ] Meal and exercise planning UI
 - [ ] Family profile management
-- [ ] Core planning interfaces
+- [ ] Core planning interfaces (weekly schedule view)
+- [ ] Populated dashboard
 
 ### Phase 3: AI Enhancements (Intelligent Features)
 **Goal**: Implement advanced LLM-powered planning capabilities
