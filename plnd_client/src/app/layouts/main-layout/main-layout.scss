@@ -1,0 +1,112 @@
+// main-layout.scss
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: var(--color-surface-base);
+}
+
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--color-surface-meal);
+  border-bottom: 1.5px solid var(--color-border-meal);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.app-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.main-body {
+  display: flex;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+// ── Sidebar (desktop only) ──────────────────────────────────────────
+.sidebar {
+  width: 52px;
+  flex-shrink: 0;
+  background: var(--color-surface-meal);
+  border-right: 1px solid var(--color-border-meal);
+  overflow: hidden;
+  transition: width 200ms ease;
+  // Overlay (does not push content)
+  position: absolute;
+  top: 0; bottom: 0; left: 0;
+  z-index: 5;
+
+  &.expanded { width: 180px; }
+
+  @media (max-width: 767px) { display: none; }
+}
+
+.sidebar-nav {
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  margin: 0 6px;
+  border-radius: 8px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+
+  &.active {
+    background: var(--color-accent-light);
+    color: var(--color-accent-dark);
+  }
+
+  &:hover:not(.active) { background: var(--color-surface-warm); }
+}
+
+.sidebar-icon { font-size: 18px; flex-shrink: 0; }
+.sidebar-label { font-size: 13px; font-weight: 600; }
+
+// ── Content area ────────────────────────────────────────────────────
+.content-area {
+  flex: 1;
+  @media (min-width: 768px) { margin-left: 52px; }
+  overflow-y: auto;
+}
+
+// ── Bottom tabs (mobile only) ────────────────────────────────────────
+.bottom-tabs {
+  display: none;
+  @media (max-width: 767px) {
+    display: flex;
+    background: var(--color-surface-meal);
+    border-top: 1.5px solid var(--color-border-meal);
+  }
+}
+
+.bottom-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0 4px;
+  min-height: 56px;
+  color: var(--color-text-secondary);
+  gap: 2px;
+
+  &.active { color: var(--color-accent-dark); }
+}
+
+.tab-icon  { font-size: 20px; }
+.tab-label { font-size: 10px; font-weight: 600; }
