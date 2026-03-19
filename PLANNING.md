@@ -128,7 +128,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETE | Phase 2.5 (UI Design) NEXT
+### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 (UI Design) NEXT
 
 ### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
@@ -169,7 +169,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] Dockerized services including mock OAuth server
 - [x] All quality checks passing (fmt, clippy, deny, machete)
 
-### Phase 2: Core Features — Backend & Infrastructure — COMPLETE
+### Phase 2: Core Features — Backend & Infrastructure — COMPLETED
 **Goal**: Implement the minimum viable planning features (backend, data model, and infrastructure). UI features moved to Phase 2.5 pending overall UI design.
 
 > **Data Model Reference**: See [`DOMAIN_MODEL.md`](./DOMAIN_MODEL.md) for the authoritative domain and scheduling model — entity hierarchy, catalog layer, schedule template/instance pattern, dynamic adjustment, and family coordination. All Phase 2 meal, exercise, and scheduling work should be grounded in that document.
@@ -203,9 +203,6 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] Domain model database schema (3-layer catalog hierarchy, personal libraries, family model, task and scheduling models)
 - [x] External provider clients (USDA FDC, Open Food Facts, TheMealDB) with search infrastructure and `plnd_data`/`plnd_seed` workspace crates
 - [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
-- [ ] Meal and exercise planning UI *(Phase 2.5)*
-- [ ] Family profile management *(Phase 2.5)*
-- [ ] Core planning interfaces *(Phase 2.5)*
 
 ### Phase 2.5: UI/UX Design & Remaining Planning UI — NOT STARTED
 **Goal**: Establish a cohesive overall UI design before building the remaining planning features, so that meal planning, exercise planning, family support, and the weekly schedule view share consistent navigation, layout, and component patterns.
