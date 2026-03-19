@@ -7,6 +7,9 @@ import { ConfigService } from './config.service';
 import { UserService } from './user.service';
 import { PreferencesService } from './preferences.service';
 import { DietaryRestrictionsService } from './dietary-restrictions.service';
+import { UserDishesService } from './user-dishes.service';
+import { UserMealsService } from './user-meals.service';
+import { UserIngredientPrefsService } from './user-ingredient-prefs.service';
 import { TokenExchangeRequest, TokenExchangeResponse } from '../models/auth';
 
 const TOKEN_KEY = 'auth_token';
@@ -20,6 +23,9 @@ export class AuthService {
   private readonly userService = inject(UserService);
   private readonly preferencesService = inject(PreferencesService);
   private readonly dietaryRestrictionsService = inject(DietaryRestrictionsService);
+  private readonly userDishesService = inject(UserDishesService);
+  private readonly userMealsService = inject(UserMealsService);
+  private readonly userIngredientPrefsService = inject(UserIngredientPrefsService);
 
   private readonly tokenSignal = signal<string | null>(
     localStorage.getItem(TOKEN_KEY)
@@ -88,6 +94,9 @@ export class AuthService {
     this.userService.clearUser();
     this.preferencesService.clearPreferences();
     this.dietaryRestrictionsService.clear();
+    this.userDishesService.clear();
+    this.userMealsService.clear();
+    this.userIngredientPrefsService.clear();
     // logOut() clears OIDC library's stored tokens (id_token, access_token).
     this.oauthService.logOut(true); // true = do not redirect to IdP logout URL
     this.router.navigate(['/login']);
