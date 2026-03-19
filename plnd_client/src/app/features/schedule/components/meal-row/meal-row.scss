@@ -1,0 +1,85 @@
+.meal-band {
+  background: var(--color-surface-meal);
+  border-top: 1.5px solid var(--color-border-meal);
+  border-bottom: 1.5px solid var(--color-border-meal);
+}
+
+.meal-header {
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+}
+
+.gutter {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.emoji { font-size: 20px; }
+
+.meal-info {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.meal-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+}
+
+.meal-desc {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.meal-badge { margin-left: auto; }
+
+.badge {
+  font-size: 9px;
+  font-weight: 700;
+  border-radius: 4px;
+  padding: 3px 7px;
+
+  &--done {
+    color: var(--color-accent);
+    background: var(--color-accent-light);
+    border: none;
+  }
+
+  &--plan {
+    color: var(--color-text-secondary);
+    background: var(--color-surface-warm);
+    border: 1px solid var(--color-border-meal);
+    @media (max-width: 767px) {
+      min-height: 44px;
+      padding: 0 12px;
+    }
+  }
+}
+
+.during-meal {
+  border-top: 1px solid rgba(253, 230, 138, 0.5);
+}
+
+// Override task-row background when inside meal band
+.during-meal ::ng-deep .task-row {
+  background: transparent;
+  border-bottom-color: rgba(253, 230, 138, 0.3);
+}
+
+.during-meal ::ng-deep .checkbox {
+  border-color: var(--color-accent-dark);
+  opacity: 0.6;
+
+  &.checked {
+    opacity: 1;
+  }
+}
