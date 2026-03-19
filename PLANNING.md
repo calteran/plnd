@@ -193,9 +193,11 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] `plnd_data` library crate (Axum/SQLx-free); `plnd_seed` crate with idempotent catalog seeding, background startup task, and `just seed` operator command; 124 tests passing
   - *(Future — Phase 3)*: AI-guided catalog curation deferred to LLM integration phase
 
-- [ ] **Meal Planning Core**
-  - [ ] Implement meal CRUD API endpoints
-  - [ ] Build meal planning UI (list, add/edit/delete)
+- [x] **Catalog & Library API** *(Ingredient → Dish → Meal)*
+  - [x] `user_dish_prefs`/`user_meal_prefs`/`user_ingredient_prefs` tables; catalog detail + ingest endpoints; unified `/my/{dishes,meals}` library with transparent copy-on-write fork; ingredient pref blocking respected in search; Angular signals-based service layer
+
+- [ ] **Meal Planning UI**
+  - [ ] Build meal planning UI (list, add/edit/delete dishes and meals)
   - [ ] Schedule meals onto the weekly plan view
   - [ ] Support recurring meal templates
 
@@ -217,7 +219,8 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] User profile, preferences, dietary restrictions, and onboarding wizard
 - [x] Domain model database schema (3-layer catalog hierarchy, personal libraries, family model, task and scheduling models)
 - [x] External provider clients (USDA FDC, Open Food Facts, TheMealDB) with search infrastructure and `plnd_data`/`plnd_seed` workspace crates
-- [ ] Functional meal and exercise planning
+- [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
+- [ ] Meal and exercise planning UI
 - [ ] Family profile management
 - [ ] Core planning interfaces
 
