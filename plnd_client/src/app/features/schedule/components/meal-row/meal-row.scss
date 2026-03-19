@@ -66,13 +66,13 @@
 }
 
 .during-meal {
-  border-top: 1px solid rgba(253, 230, 138, 0.5);
+  border-top: 1px solid color-mix(in srgb, var(--color-border-meal) 50%, transparent);
 }
 
 // Override task-row background when inside meal band
 .during-meal ::ng-deep .task-row {
   background: transparent;
-  border-bottom-color: rgba(253, 230, 138, 0.3);
+  border-bottom-color: color-mix(in srgb, var(--color-border-meal) 30%, transparent);
 }
 
 .during-meal ::ng-deep .checkbox {
