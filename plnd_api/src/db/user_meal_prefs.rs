@@ -60,17 +60,8 @@ pub async fn create_from_catalog(
 ) -> Result<UserMealPrefDetail, sqlx::Error> {
     // Insert the pref record. If duplicate, the UNIQUE(user_id, catalog_meal_id) constraint
     // will return a unique violation error — the caller maps this to 409.
-    sqlx::query_as::<_, (Uuid,)>(
-        "INSERT INTO user_meal_prefs (user_id, catalog_meal_id) VALUES ($1, $2) RETURNING user_meal_pref_id",
-    )
-    .bind(user_id)
-    .bind(catalog_meal_id)
-    .fetch_one(pool)
-    .await?;
-
-    // Re-query by (user_id, catalog_meal_id) to get the pref_id we just created.
     let (pref_id,) = sqlx::query_as::<_, (Uuid,)>(
-        "SELECT user_meal_pref_id FROM user_meal_prefs WHERE user_id = $1 AND catalog_meal_id = $2",
+        "INSERT INTO user_meal_prefs (user_id, catalog_meal_id) VALUES ($1, $2) RETURNING user_meal_pref_id",
     )
     .bind(user_id)
     .bind(catalog_meal_id)
@@ -253,7 +244,6 @@ pub async fn delete(
     .await?;
 
     let Some((user_meal_id,)) = row else {
-        tx.rollback().await?;
         return Ok(false);
     };
 
@@ -297,11 +287,6 @@ pub async fn add_dish(
         INSERT INTO user_meal_dishes
             (user_meal_id, catalog_dish_id, user_dish_id, dish_servings, notes, sort_order)
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (user_meal_id, COALESCE(catalog_dish_id, '00000000-0000-0000-0000-000000000000'::uuid),
-                     COALESCE(user_dish_id, '00000000-0000-0000-0000-000000000000'::uuid)) DO UPDATE
-            SET dish_servings = EXCLUDED.dish_servings,
-                notes         = EXCLUDED.notes,
-                sort_order    = EXCLUDED.sort_order
         "#,
     )
     .bind(user_meal_id)

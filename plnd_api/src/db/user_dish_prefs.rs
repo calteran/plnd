@@ -60,17 +60,8 @@ pub async fn create_from_catalog(
 ) -> Result<UserDishPrefDetail, sqlx::Error> {
     // Insert the pref record. If duplicate, the UNIQUE(user_id, catalog_dish_id) constraint
     // will return a unique violation error — the caller maps this to 409.
-    sqlx::query_as::<_, (Uuid,)>(
-        "INSERT INTO user_dish_prefs (user_id, catalog_dish_id) VALUES ($1, $2) RETURNING user_dish_pref_id",
-    )
-    .bind(user_id)
-    .bind(catalog_dish_id)
-    .fetch_one(pool)
-    .await?;
-
-    // Re-query by (user_id, catalog_dish_id) to get the pref_id we just created.
     let (pref_id,) = sqlx::query_as::<_, (Uuid,)>(
-        "SELECT user_dish_pref_id FROM user_dish_prefs WHERE user_id = $1 AND catalog_dish_id = $2",
+        "INSERT INTO user_dish_prefs (user_id, catalog_dish_id) VALUES ($1, $2) RETURNING user_dish_pref_id",
     )
     .bind(user_id)
     .bind(catalog_dish_id)
@@ -265,7 +256,6 @@ pub async fn delete(
     .await?;
 
     let Some((user_dish_id,)) = row else {
-        tx.rollback().await?;
         return Ok(false);
     };
 
