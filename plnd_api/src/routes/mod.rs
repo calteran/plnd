@@ -1,7 +1,12 @@
 pub mod auth;
+pub mod catalog_details;
+pub mod catalog_ingest;
 pub mod dietary_restrictions;
 pub mod domain_constants;
 pub mod preferences;
 pub mod search;
 pub mod system;
+pub mod user_dish_prefs;
+pub mod user_ingredient_prefs;
+pub mod user_meal_prefs;
 pub mod users;

@@ -75,15 +75,17 @@ pub struct ExerciseSearchResponse {
 
 pub async fn search_ingredients_handler(
     State(state): State<Arc<AppState>>,
-    Extension(_claims): Extension<Claims>,
+    Extension(claims): Extension<Claims>,
     Query(params): Query<SearchParams>,
 ) -> Result<Json<IngredientSearchResponse>, StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let sq = params.into_search_query();
     let local = search_ingredients(
         state.db.get_pool(),
         &sq.query,
         sq.limit as i64,
         &sq.exclude_allergens,
+        Some(user_id),
     )
     .await
     .unwrap_or_default();

@@ -155,10 +155,6 @@ pub struct UserDish {
     pub tags: Vec<String>,
     pub nutrition: Option<Value>,
     pub nutrition_overridden: bool,
-    pub rating: Option<i16>, // 1–5
-    pub is_safe_food: bool,  // safe/comfort food — prioritized in suggestions
-    pub is_blocked: bool,    // never suggest this dish
-    pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -193,10 +189,6 @@ pub struct UserMeal {
     pub tags: Vec<String>,
     pub nutrition: Option<Value>,
     pub nutrition_overridden: bool,
-    pub rating: Option<i16>, // 1–5
-    pub is_safe_food: bool,
-    pub is_blocked: bool,
-    pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -210,6 +202,93 @@ pub struct UserMealDish {
     pub dish_servings: Decimal,
     pub notes: Option<String>,
     pub sort_order: i16,
+}
+
+// ---------------------------------------------------------------------------
+// User: Dish and Meal preference records (aggregate roots)
+// ---------------------------------------------------------------------------
+
+/// Stable handle for a user's relationship with a dish.
+/// The client always uses user_dish_pref_id — it never changes even after a fork.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct UserDishPref {
+    pub user_dish_pref_id: Uuid,
+    pub user_id: Uuid,
+    pub catalog_dish_id: Option<Uuid>,
+    pub user_dish_id: Option<Uuid>,
+    pub rating: Option<i16>,
+    pub is_safe_food: bool,
+    pub is_blocked: bool,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// UserDishPref enriched with display fields computed by the list/detail query.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct UserDishPrefDetail {
+    pub user_dish_pref_id: Uuid,
+    pub user_id: Uuid,
+    pub catalog_dish_id: Option<Uuid>,
+    pub user_dish_id: Option<Uuid>,
+    pub rating: Option<i16>,
+    pub is_safe_food: bool,
+    pub is_blocked: bool,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    // Computed fields from JOIN
+    pub name: String,
+    pub source: String, // "catalog" | "personal"
+    pub has_personal_recipe: bool,
+    pub origin_external_source: Option<String>,
+}
+
+/// Stable handle for a user's relationship with a meal.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct UserMealPref {
+    pub user_meal_pref_id: Uuid,
+    pub user_id: Uuid,
+    pub catalog_meal_id: Option<Uuid>,
+    pub user_meal_id: Option<Uuid>,
+    pub rating: Option<i16>,
+    pub is_safe_food: bool,
+    pub is_blocked: bool,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// UserMealPref enriched with display fields computed by the list/detail query.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct UserMealPrefDetail {
+    pub user_meal_pref_id: Uuid,
+    pub user_id: Uuid,
+    pub catalog_meal_id: Option<Uuid>,
+    pub user_meal_id: Option<Uuid>,
+    pub rating: Option<i16>,
+    pub is_safe_food: bool,
+    pub is_blocked: bool,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    // Computed fields from JOIN
+    pub name: String,
+    pub source: String, // "catalog" | "personal"
+    pub has_personal_recipe: bool,
+    pub origin_external_source: Option<String>,
+}
+
+/// User preference for a catalog ingredient (blocked/notes only — no fork concept for ingredients).
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct UserIngredientPref {
+    pub user_ingredient_pref_id: Uuid,
+    pub user_id: Uuid,
+    pub catalog_ingredient_id: Uuid,
+    pub is_blocked: bool,
+    pub notes: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 // ---------------------------------------------------------------------------

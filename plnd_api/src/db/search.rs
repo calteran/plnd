@@ -40,6 +40,7 @@ pub async fn search_ingredients(
     q: &str,
     limit: i64,
     exclude_allergens: &[String],
+    user_id: Option<Uuid>,
 ) -> Result<Vec<LocalIngredientResult>, sqlx::Error> {
     sqlx::query_as::<_, LocalIngredientResult>(
         r#"
@@ -49,6 +50,10 @@ pub async fn search_ingredients(
         WHERE to_tsvector('english', name || ' ' || COALESCE(description, ''))
               @@ plainto_tsquery('english', $1)
           AND ($3::text[] = '{}' OR NOT allergens && $3::text[])
+          AND ($4::uuid IS NULL OR NOT EXISTS (
+              SELECT 1 FROM user_ingredient_prefs
+              WHERE user_id = $4 AND catalog_ingredient_id = ingredient_id AND is_blocked = TRUE
+          ))
         ORDER BY ts_rank(
             to_tsvector('english', name || ' ' || COALESCE(description, '')),
             plainto_tsquery('english', $1)
@@ -59,6 +64,7 @@ pub async fn search_ingredients(
     .bind(q)
     .bind(limit)
     .bind(exclude_allergens)
+    .bind(user_id)
     .fetch_all(pool)
     .await
 }

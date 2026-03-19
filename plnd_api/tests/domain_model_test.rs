@@ -244,7 +244,8 @@ fn test_catalog_meal_dish_serde_round_trip() {
 }
 
 #[test]
-fn test_user_dish_serde_with_rating_and_safe_food() {
+fn test_user_dish_serde_with_occasion_tags() {
+    // rating/is_safe_food/is_blocked/notes moved to UserDishPref (migration 0013)
     let json = r#"{
         "user_dish_id": "00000000-0000-0000-0000-000000000004",
         "user_id": "00000000-0000-0000-0000-000000000099",
@@ -261,17 +262,12 @@ fn test_user_dish_serde_with_rating_and_safe_food() {
         "tags": ["asian", "chicken"],
         "nutrition": null,
         "nutrition_overridden": false,
-        "rating": 5,
-        "is_safe_food": true,
-        "is_blocked": false,
-        "notes": "Add extra ginger",
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
     let dish: UserDish = serde_json::from_str(json).expect("deserialize failed");
-    assert_eq!(dish.rating, Some(5));
-    assert!(dish.is_safe_food);
-    assert!(!dish.is_blocked);
+    assert_eq!(dish.name, "My Chicken Stir Fry");
+    assert_eq!(dish.occasion_tags, vec!["dinner", "quick"]);
     assert!(dish.catalog_dish_id.is_none());
 }
 
@@ -295,6 +291,7 @@ fn test_user_dish_ingredient_serde_round_trip() {
 
 #[test]
 fn test_user_meal_serde_round_trip() {
+    // rating/is_safe_food/is_blocked/notes moved to UserMealPref (migration 0013)
     let json = r#"{
         "user_meal_id": "00000000-0000-0000-0000-000000000005",
         "user_id": "00000000-0000-0000-0000-000000000099",
@@ -308,16 +305,12 @@ fn test_user_meal_serde_round_trip() {
         "tags": [],
         "nutrition": null,
         "nutrition_overridden": false,
-        "rating": null,
-        "is_safe_food": false,
-        "is_blocked": false,
-        "notes": null,
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
     let meal: UserMeal = serde_json::from_str(json).expect("deserialize failed");
     assert!(meal.catalog_meal_id.is_some());
-    assert!(meal.rating.is_none());
+    assert_eq!(meal.occasion_tags, vec!["breakfast-friendly"]);
 }
 
 #[test]
