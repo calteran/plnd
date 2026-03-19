@@ -34,4 +34,4 @@ plnd_client/.angular/
 .worktrees/
 
 # macOS
-.DS_Store
+.DS_Store.superpowers/
