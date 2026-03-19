@@ -1,0 +1,69 @@
+// Column layout: 24px pad | 40px gutter | 12px gap | 16px checkbox | 10px gap | text
+.task-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 24px;
+  background: var(--color-surface-white);
+  border-bottom: 1px solid var(--color-border-row);
+}
+
+.gutter {
+  width: 40px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.time {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 2px solid var(--color-border-row);
+  background: transparent;
+  padding: 0;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+
+  &.checked {
+    background: var(--color-accent-light);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  // 44px touch target for mobile
+  @media (max-width: 767px) {
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -14px;
+    }
+  }
+}
+
+.label {
+  font-size: 12px;
+  color: var(--color-text-body);
+  flex: 1;
+
+  &.struck {
+    text-decoration: line-through;
+    opacity: 0.45;
+  }
+}
+
+.task-row.done .label {
+  color: var(--color-text-primary);
+}
