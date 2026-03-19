@@ -5,6 +5,10 @@ on:
     types: [opened, synchronize, ready_for_review, reopened]
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   review:
     runs-on: ubuntu-latest
