@@ -1,7 +1,9 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::models::{CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish};
+use super::models::{
+    CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
+};
 
 pub async fn get_ingredient(
     pool: &PgPool,

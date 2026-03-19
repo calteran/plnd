@@ -239,7 +239,7 @@ pub struct UserDishPrefDetail {
     pub updated_at: DateTime<Utc>,
     // Computed fields from JOIN
     pub name: String,
-    pub source: String,          // "catalog" | "personal"
+    pub source: String, // "catalog" | "personal"
     pub has_personal_recipe: bool,
     pub origin_external_source: Option<String>,
 }
@@ -274,7 +274,7 @@ pub struct UserMealPrefDetail {
     pub updated_at: DateTime<Utc>,
     // Computed fields from JOIN
     pub name: String,
-    pub source: String,          // "catalog" | "personal"
+    pub source: String, // "catalog" | "personal"
     pub has_personal_recipe: bool,
     pub origin_external_source: Option<String>,
 }

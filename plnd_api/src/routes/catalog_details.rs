@@ -1,10 +1,10 @@
-use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
     Extension, Json,
 };
 use serde::Serialize;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
