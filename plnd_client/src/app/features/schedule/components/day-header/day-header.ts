@@ -6,7 +6,7 @@ import { Component, computed, input, output } from '@angular/core';
   template: `
     <div class="day-header">
       <button class="nav-btn" (click)="prev()" aria-label="Previous day">‹</button>
-      <div class="date-center" role="button" tabindex="0" (click)="onDateClick()" (keydown.enter)="onDateClick()">
+      <div class="date-center" role="button" tabindex="0" (click)="onDateClick()" (keydown.enter)="onDateClick()" (keydown.space)="onDateClick()">
         <span class="date-text">{{ formattedDate() }}</span>
         @if (isToday()) {
           <span class="today-badge">Today</span>
@@ -26,9 +26,11 @@ export class DayHeaderComponent {
     return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   });
 
-  readonly isToday = computed(() =>
-    this.date() === new Date().toISOString().split('T')[0]
-  );
+  readonly isToday = computed(() => {
+    const now = new Date();
+    const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return this.date() === localToday;
+  });
 
   prev(): void {
     this.dateChange.emit(this.offset(-1));
@@ -43,33 +45,9 @@ export class DayHeaderComponent {
   }
 
   private offset(days: number): string {
-    const [yearStr, monthStr, dayStr] = this.date().split('-');
-    const year = parseInt(yearStr, 10);
-    const month = parseInt(monthStr, 10);
-    let day = parseInt(dayStr, 10) + days;
-    let y = year;
-    let m = month;
-
-    // Adjust month/year if needed
-    while (day > 28) {
-      const daysInMonth = new Date(y, m, 0).getDate();
-      if (day <= daysInMonth) break;
-      day -= daysInMonth;
-      m++;
-      if (m > 12) {
-        m = 1;
-        y++;
-      }
-    }
-    while (day < 1) {
-      m--;
-      if (m < 1) {
-        m = 12;
-        y--;
-      }
-      day += new Date(y, m, 0).getDate();
-    }
-
-    return `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const [y, m, d] = this.date().split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    date.setDate(date.getDate() + days);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 }
