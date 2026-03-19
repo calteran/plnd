@@ -1,4 +1,4 @@
-import { Component, output, signal, computed } from '@angular/core';
+import { Component, output, signal, computed, effect } from '@angular/core';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
 
 type ParsedType = 'task' | 'appointment' | 'exercise';
@@ -13,7 +13,7 @@ const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
   template: `
     @if (!isOpen()) {
       <div class="add-row" (click)="open()" role="button" tabindex="0"
-           (keydown.enter)="open()" aria-label="Add something to your day">
+           (keydown.enter)="open()" aria-label="Open entry form">
         <div class="gutter"></div>
         <div class="add-checkbox" aria-hidden="true">+</div>
         <span class="add-label">Add something…</span>
@@ -68,6 +68,15 @@ export class AddEntryComponent {
   readonly locationControl = new FormControl('');
   readonly durationControl = new FormControl<number | null>(null);
 
+  constructor() {
+    effect(() => {
+      this.parsedType(); // track type changes
+      this.timeControl.reset('');
+      this.locationControl.reset('');
+      this.durationControl.reset(null);
+    });
+  }
+
   readonly parsedType = computed<ParsedType>(() => {
     const text = this._text();
     if (TIME_PATTERN.test(text)) return 'appointment';
@@ -76,9 +85,8 @@ export class AddEntryComponent {
   });
 
   readonly parseHint = computed(() => {
-    const text = this._text();
-    if (text.length > 3 && this.parsedType() === 'task') return null;
-    return null; // hint shown only on NL parse failure — deferred to LLM integration
+    // Hint logic deferred to LLM integration
+    return null;
   });
 
   open(): void  { this.isOpen.set(true); }
