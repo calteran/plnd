@@ -17,8 +17,8 @@ use plnd_api::config;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
-    auth, catalog_details, catalog_ingest, dietary_restrictions, preferences,
-    search, system, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    auth, catalog_details, catalog_ingest, dietary_restrictions, preferences, search, system,
+    user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -193,21 +193,36 @@ async fn main() {
         .route("/search/dishes", get(search::search_dishes_handler))
         .route("/search/exercises", get(search::search_exercises_handler))
         // Catalog detail (read-only, auth required)
-        .route("/catalog/ingredients/ingest", post(catalog_ingest::ingest_ingredient))
-        .route("/catalog/ingredients/{id}", get(catalog_details::get_ingredient))
+        .route(
+            "/catalog/ingredients/ingest",
+            post(catalog_ingest::ingest_ingredient),
+        )
+        .route(
+            "/catalog/ingredients/{id}",
+            get(catalog_details::get_ingredient),
+        )
         .route("/catalog/dishes/{id}", get(catalog_details::get_dish))
         .route("/catalog/meals/{id}", get(catalog_details::get_meal))
         // Ingredient preferences
         .route("/my/ingredient-prefs", get(user_ingredient_prefs::list))
-        .route("/my/ingredient-prefs/{id}", put(user_ingredient_prefs::upsert))
-        .route("/my/ingredient-prefs/{id}", delete(user_ingredient_prefs::delete))
+        .route(
+            "/my/ingredient-prefs/{id}",
+            put(user_ingredient_prefs::upsert),
+        )
+        .route(
+            "/my/ingredient-prefs/{id}",
+            delete(user_ingredient_prefs::delete),
+        )
         // Dish library
         .route("/my/dishes", get(user_dish_prefs::list))
         .route("/my/dishes", post(user_dish_prefs::create))
         .route("/my/dishes/{pref_id}", get(user_dish_prefs::get_detail))
         .route("/my/dishes/{pref_id}", patch(user_dish_prefs::patch))
         .route("/my/dishes/{pref_id}", delete(user_dish_prefs::delete))
-        .route("/my/dishes/{pref_id}/ingredients", post(user_dish_prefs::add_ingredient))
+        .route(
+            "/my/dishes/{pref_id}/ingredients",
+            post(user_dish_prefs::add_ingredient),
+        )
         .route(
             "/my/dishes/{pref_id}/ingredients/{ingredient_id}",
             delete(user_dish_prefs::remove_ingredient),
@@ -218,7 +233,10 @@ async fn main() {
         .route("/my/meals/{pref_id}", get(user_meal_prefs::get_detail))
         .route("/my/meals/{pref_id}", patch(user_meal_prefs::patch))
         .route("/my/meals/{pref_id}", delete(user_meal_prefs::delete))
-        .route("/my/meals/{pref_id}/dishes", post(user_meal_prefs::add_dish))
+        .route(
+            "/my/meals/{pref_id}/dishes",
+            post(user_meal_prefs::add_dish),
+        )
         .route(
             "/my/meals/{pref_id}/dishes/{dish_id}",
             delete(user_meal_prefs::remove_dish),
