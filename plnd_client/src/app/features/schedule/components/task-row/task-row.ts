@@ -17,7 +17,7 @@ import { ScheduleTask } from '../../../../core/models/schedule';
         role="checkbox"
         [attr.aria-checked]="item().status === 'done'"
         [attr.aria-label]="'Mark ' + item().label + (item().status === 'done' ? ' as incomplete' : ' as complete')"
-        (click)="toggle.emit(item().id)"
+        (click)="toggled.emit(item().id)"
       >
         @if (item().status === 'done') {
           <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
@@ -34,5 +34,5 @@ import { ScheduleTask } from '../../../../core/models/schedule';
 })
 export class TaskRowComponent {
   readonly item   = input.required<ScheduleTask>();
-  readonly toggle = output<string>();
+  readonly toggled = output<string>();
 }

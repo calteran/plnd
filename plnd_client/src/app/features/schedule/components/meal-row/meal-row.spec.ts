@@ -66,7 +66,7 @@ describe('MealRowComponent', () => {
   it('emits toggle when a during-meal task checkbox fires', async () => {
     const f = await setup(withTasks);
     let emitted: string | undefined;
-    f.componentInstance.toggle.subscribe((id: string) => emitted = id);
+    f.componentInstance.toggled.subscribe((id: string) => emitted = id);
     f.debugElement.query(By.css('app-task-row .checkbox')).nativeElement.click();
     expect(emitted).toBe('dt1');
   });

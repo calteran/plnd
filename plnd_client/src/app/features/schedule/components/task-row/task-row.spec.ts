@@ -35,7 +35,7 @@ describe('TaskRowComponent', () => {
   it('emits toggle with item id when checkbox clicked', async () => {
     const f = await setup(pending);
     let emitted: string | undefined;
-    f.componentInstance.toggle.subscribe((id: string) => emitted = id);
+    f.componentInstance.toggled.subscribe((id: string) => emitted = id);
     f.debugElement.query(By.css('.checkbox')).nativeElement.click();
     expect(emitted).toBe('1');
   });

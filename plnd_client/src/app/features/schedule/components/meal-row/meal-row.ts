@@ -33,7 +33,7 @@ import { TaskRowComponent } from '../task-row/task-row';
       @if (meal().duringMealTasks.length > 0) {
         <div class="during-meal">
           @for (task of meal().duringMealTasks; track task.id) {
-            <app-task-row [item]="task" (toggle)="toggle.emit($event)" />
+            <app-task-row [item]="task" (toggled)="toggled.emit($event)" />
           }
         </div>
       }
@@ -43,6 +43,6 @@ import { TaskRowComponent } from '../task-row/task-row';
 })
 export class MealRowComponent {
   readonly meal     = input.required<MealAnchor>();
-  readonly toggle   = output<string>();
+  readonly toggled  = output<string>();
   readonly planMeal = output<string>();
 }

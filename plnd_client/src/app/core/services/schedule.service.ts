@@ -1,5 +1,5 @@
 import { Injectable, signal } from '@angular/core';
-import { ScheduleItem, MealAnchor, ScheduleTask, ItemStatus, isMealAnchor } from '../models/schedule';
+import { ScheduleItem, ItemStatus, isMealAnchor } from '../models/schedule';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {

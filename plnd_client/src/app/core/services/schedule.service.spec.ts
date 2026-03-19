@@ -1,5 +1,6 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ScheduleService } from './schedule.service';
+import { isMealAnchor, ScheduleTask } from '../models/schedule';
 
 describe('ScheduleService', () => {
   let svc: ScheduleService;
@@ -31,20 +32,21 @@ describe('ScheduleService', () => {
   it('toggleItem flips a task from pending to done', fakeAsync(() => {
     svc.loadDay('2026-04-01');
     tick(300);
-    const task = svc.scheduleItems().find(i => 't3' === i.id);
+    const task = svc.scheduleItems().find(i => 't3' === i.id) as ScheduleTask | undefined;
     expect(task).toBeTruthy();
-    expect((task as any).status).toBe('pending');
+    expect(task?.status).toBe('pending');
     svc.toggleItem('t3');
-    const updated = svc.scheduleItems().find(i => 't3' === i.id);
-    expect((updated as any).status).toBe('done');
+    const updated = svc.scheduleItems().find(i => 't3' === i.id) as ScheduleTask | undefined;
+    expect(updated?.status).toBe('done');
   }));
 
   it('toggleItem flips a during-meal task', fakeAsync(() => {
     svc.loadDay('2026-04-01');
     tick(300);
     svc.toggleItem('t-dm2');
-    const meal = svc.scheduleItems().find(i => 'm1' === i.id) as any;
-    const task = meal.duringMealTasks.find((t: any) => t.id === 't-dm2');
-    expect(task.status).toBe('done');
+    const meal = svc.scheduleItems().find(i => 'm1' === i.id);
+    if (!meal || !isMealAnchor(meal)) { fail('Expected meal anchor'); return; }
+    const task = meal.duringMealTasks.find(t => t.id === 't-dm2');
+    expect(task?.status).toBe('done');
   }));
 });
