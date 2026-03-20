@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a cycle toggle (system → light → dark → system) to the navbar avatar dropdown, backed by `localStorage` instead of the database, and remove `theme` from the backend preferences entirely.
+**Goal:** Add a 2-state toggle (device preference ↔ override) to the navbar avatar dropdown, backed by a `plnd_theme_override` boolean in `localStorage`, and remove `theme` from the backend preferences entirely.
 
-**Architecture:** A new `ThemeService` owns localStorage-backed theme state as an Angular signal. `AppComponent` reads this signal to apply `data-theme` on `<html>`. The dropdown cycle button calls `themeService.cycleTheme()`; the Settings page binds to `ThemeService` directly with no API call. The `theme` column is dropped from `user_preferences` and all related Rust code removed.
+**Architecture:** A new `ThemeService` captures the device OS preference once at init and exposes `effectiveTheme: Signal<'light' | 'dark'>` and `toggle()`. `AppComponent` reads this signal to apply `data-theme` on `<html>`. The dropdown toggle button calls `themeService.toggle()`; the Settings page loses its theme section entirely. The `theme` column is dropped from `user_preferences` and all related Rust code removed.
 
-**Tech Stack:** Angular 21 (signals, `effect()`, standalone components), `localStorage`, Rust/Axum, SQLx migrations.
+**Tech Stack:** Angular 21 (signals, `computed()`, `effect()`, standalone components), `localStorage`, Rust/Axum, SQLx migrations.
 
 ---
 
@@ -21,19 +21,21 @@
 - `plnd_api/src/db/models/mod.rs` — remove `theme` field from `UserPreferences`
 - `plnd_api/src/db/preferences.rs` — remove `upsert()`, simplify `get_or_create()` RETURNING clause
 - `plnd_api/src/routes/preferences.rs` — remove `PATCH` handler, `VALID_THEMES`, `UpdatePreferencesRequest`
-- `plnd_api/src/main.rs` — remove `.route("/preferences/me", patch(...))`
-- `plnd_api/tests/preferences_test.rs` — remove theme assertions; delete both tests (file becomes empty — delete it)
-- `plnd_client/src/app/app.ts` — swap `PreferencesService` → `ThemeService`
-- `plnd_client/src/app/app.spec.ts` — remove HTTP provider; spy on `ThemeService`
-- `plnd_client/src/app/features/settings/settings.ts` — full rewrite (immediate-apply, no Save button)
-- `plnd_client/src/app/features/settings/settings.spec.ts` — full rewrite (no HTTP mocks)
-- `plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.ts` — add cycle row, fix design tokens
-- `plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.spec.ts` — add 3 tests, fix Sign out index
+- `plnd_api/src/main.rs` — remove `.route("/preferences/me", patch(...))` and unused `patch` import
+- `plnd_client/src/app/app.ts` — swap `PreferencesService` → `ThemeService`; simplify effect
+- `plnd_client/src/app/app.spec.ts` — remove HTTP provider; use real `ThemeService`
+- `plnd_client/src/app/features/settings/settings.ts` — full rewrite (remove theme section; minimal placeholder)
+- `plnd_client/src/app/features/settings/settings.spec.ts` — full rewrite (no HTTP mocks, no ThemeService)
+- `plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.ts` — add toggle row, fix design tokens
+- `plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.spec.ts` — update ThemeService mock, fix Sign out index, add 3 tests
 - `plnd_client/src/app/core/models/preferences.ts` — remove `Theme` export, remove `theme` from interfaces, remove `UpdatePreferencesRequest`
 - `plnd_client/src/app/core/services/preferences.service.ts` — remove `updatePreferences()`
 - `plnd_client/src/app/core/services/preferences.service.spec.ts` — remove `updatePreferences` test, update `mockPrefs`
 
-> **Note:** `auth.service.ts` is intentionally not modified. Its `logout()` method calls `preferencesService.clearPreferences()`, which remains valid after Task 6 slims the service — the method is retained.
+**Deleted:**
+- `plnd_api/tests/preferences_test.rs`
+
+> **Note:** `auth.service.ts` is intentionally not modified. Its `logout()` method calls `preferencesService.clearPreferences()`, which remains valid after Task 6 slims the service.
 
 ---
 
@@ -56,7 +58,7 @@ ALTER TABLE user_preferences DROP COLUMN theme;
 
 - [ ] **Step 2: Remove `theme` from the `UserPreferences` model**
 
-In `plnd_api/src/db/models/mod.rs`, find the `UserPreferences` struct (around line 14) and remove the `theme` field:
+In `plnd_api/src/db/models/mod.rs`, find the `UserPreferences` struct and remove the `theme` field:
 
 ```rust
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
@@ -144,17 +146,17 @@ pub async fn get_preferences(
 
 - [ ] **Step 5: Remove the PATCH route from `main.rs`**
 
-Find and remove this line (around line 172):
+Find and remove this line:
 
 ```rust
 .route("/preferences/me", patch(preferences::patch_preferences))
 ```
 
-Also remove `patch` from the axum method imports if it is only used for that route. Search for `use axum::routing::{...}` and verify `patch` is no longer needed.
+Also remove `patch` from the axum routing imports if it is only used for that route. Search for `use axum::routing::{...}` and verify `patch` is no longer needed.
 
 - [ ] **Step 6: Delete `plnd_api/tests/preferences_test.rs`**
 
-Both tests reference `req.theme` which no longer exists on `UpdatePreferencesRequest` (which is itself deleted). Stage the deletion directly with git:
+Both tests reference `req.theme` which no longer exists. Stage the deletion with git:
 
 ```bash
 git rm plnd_api/tests/preferences_test.rs
@@ -162,7 +164,6 @@ git rm plnd_api/tests/preferences_test.rs
 
 - [ ] **Step 7: Verify Rust compiles**
 
-Run from project root:
 ```bash
 just verify-build
 ```
@@ -188,6 +189,8 @@ git commit -m "feat(api): remove theme from user_preferences — localStorage-ba
 - Create: `plnd_client/src/app/core/services/theme.service.spec.ts`
 - Create: `plnd_client/src/app/core/services/theme.service.ts`
 
+The service captures `devicePrefersDark` once at construction (plain boolean, not a signal). `effectiveTheme` is a computed signal that depends only on `isOverriddenSignal`. `toggle()` flips the override and writes/removes the localStorage key.
+
 - [ ] **Step 1: Write the failing tests**
 
 Create `plnd_client/src/app/core/services/theme.service.spec.ts`:
@@ -195,13 +198,15 @@ Create `plnd_client/src/app/core/services/theme.service.spec.ts`:
 ```typescript
 import { TestBed } from '@angular/core/testing';
 import { ThemeService } from './theme.service';
-import { Theme } from './theme.service';
+
+const OVERRIDE_KEY = 'plnd_theme_override';
 
 describe('ThemeService', () => {
   let service: ThemeService;
 
   beforeEach(() => {
     localStorage.clear();
+    spyOn(window, 'matchMedia').and.returnValue({ matches: false } as MediaQueryList);
     TestBed.configureTestingModule({});
     service = TestBed.inject(ThemeService);
   });
@@ -210,32 +215,48 @@ describe('ThemeService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('defaults to "system" when localStorage is empty', () => {
-    expect(service.theme()).toBe('system');
+  it('isOverridden defaults to false when key is absent', () => {
+    expect(service.isOverridden()).toBeFalse();
   });
 
-  it('reads persisted value from localStorage on init', () => {
-    localStorage.setItem('plnd_theme', 'dark');
+  it('isOverridden reads true from localStorage on init', () => {
+    localStorage.setItem(OVERRIDE_KEY, '1');
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
-    const freshService = TestBed.inject(ThemeService);
-    expect(freshService.theme()).toBe('dark');
+    const fresh = TestBed.inject(ThemeService);
+    expect(fresh.isOverridden()).toBeTrue();
   });
 
-  it('cycleTheme() advances system → light → dark → system', () => {
-    expect(service.theme()).toBe('system');
-    service.cycleTheme();
-    expect(service.theme()).toBe('light');
-    service.cycleTheme();
-    expect(service.theme()).toBe('dark');
-    service.cycleTheme();
-    expect(service.theme()).toBe('system');
+  it('toggle() sets isOverridden to true and writes localStorage', () => {
+    service.toggle();
+    expect(service.isOverridden()).toBeTrue();
+    expect(localStorage.getItem(OVERRIDE_KEY)).toBe('1');
   });
 
-  it('setTheme() updates signal and writes to localStorage', () => {
-    service.setTheme('dark');
-    expect(service.theme()).toBe('dark');
-    expect(localStorage.getItem('plnd_theme')).toBe('dark');
+  it('toggle() a second time sets isOverridden to false and removes key', () => {
+    service.toggle();
+    service.toggle();
+    expect(service.isOverridden()).toBeFalse();
+    expect(localStorage.getItem(OVERRIDE_KEY)).toBeNull();
+  });
+
+  it('effectiveTheme() returns "light" when device is light and not overridden', () => {
+    // matchMedia returns { matches: false } (light device) from beforeEach
+    expect(service.effectiveTheme()).toBe('light');
+  });
+
+  it('effectiveTheme() returns "dark" when device is light and overridden', () => {
+    // device = light, override = opposite = dark
+    service.toggle();
+    expect(service.effectiveTheme()).toBe('dark');
+  });
+
+  it('effectiveTheme() returns "dark" when device is dark and not overridden', () => {
+    (window.matchMedia as jasmine.Spy).and.returnValue({ matches: true } as MediaQueryList);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const fresh = TestBed.inject(ThemeService);
+    expect(fresh.effectiveTheme()).toBe('dark');
   });
 });
 ```
@@ -252,31 +273,41 @@ Expected: `ThemeService` tests fail with "Cannot find module './theme.service'".
 Create `plnd_client/src/app/core/services/theme.service.ts`:
 
 ```typescript
-import { Injectable, signal } from '@angular/core';
+import { Injectable, Signal, computed, signal } from '@angular/core';
 
-export type Theme = 'system' | 'light' | 'dark';
+export type EffectiveTheme = 'light' | 'dark';
 
-const THEME_KEY = 'plnd_theme';
-const THEME_CYCLE: Theme[] = ['system', 'light', 'dark'];
+const OVERRIDE_KEY = 'plnd_theme_override';
 
-function readStoredTheme(): Theme {
-  const stored = localStorage.getItem(THEME_KEY);
-  return (THEME_CYCLE.includes(stored as Theme) ? stored : 'system') as Theme;
+function readIsOverridden(): boolean {
+  return localStorage.getItem(OVERRIDE_KEY) === '1';
+}
+
+function devicePrefersDark(): boolean {
+  return typeof window !== 'undefined' &&
+    window.matchMedia?.('(prefers-color-scheme: dark)').matches === true;
 }
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  private readonly themeSignal = signal<Theme>(readStoredTheme());
-  readonly theme = this.themeSignal.asReadonly();
+  private readonly deviceDark = devicePrefersDark();
+  private readonly isOverriddenSignal = signal<boolean>(readIsOverridden());
 
-  setTheme(theme: Theme): void {
-    localStorage.setItem(THEME_KEY, theme);
-    this.themeSignal.set(theme);
-  }
+  readonly isOverridden: Signal<boolean> = this.isOverriddenSignal.asReadonly();
 
-  cycleTheme(): void {
-    const idx = THEME_CYCLE.indexOf(this.themeSignal());
-    this.setTheme(THEME_CYCLE[(idx + 1) % THEME_CYCLE.length]);
+  readonly effectiveTheme: Signal<EffectiveTheme> = computed(() => {
+    const useDark = this.isOverriddenSignal() ? !this.deviceDark : this.deviceDark;
+    return useDark ? 'dark' : 'light';
+  });
+
+  toggle(): void {
+    const newOverridden = !this.isOverriddenSignal();
+    if (newOverridden) {
+      localStorage.setItem(OVERRIDE_KEY, '1');
+    } else {
+      localStorage.removeItem(OVERRIDE_KEY);
+    }
+    this.isOverriddenSignal.set(newOverridden);
   }
 }
 ```
@@ -293,7 +324,7 @@ Expected: all `ThemeService` tests pass.
 ```bash
 git add plnd_client/src/app/core/services/theme.service.ts \
         plnd_client/src/app/core/services/theme.service.spec.ts
-git commit -m "feat(client): ThemeService — localStorage-backed theme signal"
+git commit -m "feat(client): ThemeService — localStorage override toggle, device-aware"
 ```
 
 ---
@@ -304,24 +335,25 @@ git commit -m "feat(client): ThemeService — localStorage-backed theme signal"
 - Modify: `plnd_client/src/app/app.ts`
 - Modify: `plnd_client/src/app/app.spec.ts`
 
+`AppComponent` no longer needs matchMedia logic — `effectiveTheme` is always `'light'` or `'dark'`. Use the real `ThemeService` in tests (no HTTP deps, no mocking needed).
+
 - [ ] **Step 1: Update `app.spec.ts`**
 
-`AppComponent` will no longer inject `PreferencesService` (which needed `HttpClient`). Replace the full file:
+Replace the full file:
 
 ```typescript
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AppComponent } from './app';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ThemeService } from './core/services/theme.service';
-import { signal } from '@angular/core';
 
 describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
   let component: AppComponent;
 
   beforeEach(() => {
-    spyOn(window, 'matchMedia').and.returnValue({ matches: false } as MediaQueryList);
     localStorage.clear();
+    spyOn(window, 'matchMedia').and.returnValue({ matches: false } as MediaQueryList);
   });
 
   beforeEach(async () => {
@@ -338,24 +370,14 @@ describe('AppComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('applies data-theme="light" when theme is "light"', () => {
-    const themeService = TestBed.inject(ThemeService);
-    themeService.setTheme('light');
-    fixture.detectChanges();
+  it('applies data-theme="light" when effectiveTheme is "light"', () => {
+    // device = light (matchMedia.matches = false), no override
     expect(document.documentElement.getAttribute('data-theme')).toBe('light');
   });
 
-  it('applies data-theme="dark" when theme is "dark"', () => {
+  it('applies data-theme="dark" after toggle (device light → override → dark)', () => {
     const themeService = TestBed.inject(ThemeService);
-    themeService.setTheme('dark');
-    fixture.detectChanges();
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
-  });
-
-  it('applies data-theme="dark" when theme is "system" and matchMedia prefers dark', () => {
-    (window.matchMedia as jasmine.Spy).and.returnValue({ matches: true } as MediaQueryList);
-    const themeService = TestBed.inject(ThemeService);
-    themeService.setTheme('system');
+    themeService.toggle();
     fixture.detectChanges();
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
@@ -388,11 +410,7 @@ export class AppComponent {
 
   constructor() {
     effect(() => {
-      const theme = this.themeService.theme();
-      const prefersDark = typeof window !== 'undefined' &&
-        window.matchMedia?.('(prefers-color-scheme: dark)').matches === true;
-      const useDark = theme === 'dark' || (theme === 'system' && prefersDark);
-      document.documentElement.setAttribute('data-theme', useDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', this.themeService.effectiveTheme());
     });
   }
 }
@@ -410,7 +428,7 @@ Expected: all `AppComponent` tests pass.
 ```bash
 git add plnd_client/src/app/app.ts \
         plnd_client/src/app/app.spec.ts
-git commit -m "refactor(client): AppComponent uses ThemeService instead of PreferencesService"
+git commit -m "refactor(client): AppComponent uses ThemeService.effectiveTheme()"
 ```
 
 ---
@@ -421,30 +439,22 @@ git commit -m "refactor(client): AppComponent uses ThemeService instead of Prefe
 - Modify: `plnd_client/src/app/features/settings/settings.ts`
 - Modify: `plnd_client/src/app/features/settings/settings.spec.ts`
 
-The Settings page theme select becomes immediate-apply (no Save button). `PreferencesService` is removed entirely from this component.
+Theme section is removed entirely from Settings. The component becomes a minimal placeholder with back navigation. No `ThemeService` or `PreferencesService` dependency.
 
 - [ ] **Step 1: Rewrite `settings.spec.ts`**
 
-Replace the full file (9 tests gone, replaced with 5 new ones):
+Replace the full file:
 
 ```typescript
 import { TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { Router } from '@angular/router';
 import { SettingsComponent } from './settings';
-import { ThemeService } from '../../core/services/theme.service';
 
 describe('SettingsComponent', () => {
-  let themeServiceSpy: jasmine.SpyObj<ThemeService>;
-
   beforeEach(async () => {
-    themeServiceSpy = jasmine.createSpyObj('ThemeService', ['setTheme'], {
-      theme: jasmine.createSpy('theme').and.returnValue('system')
-    });
-
     await TestBed.configureTestingModule({
-      imports: [SettingsComponent, RouterTestingModule],
-      providers: [{ provide: ThemeService, useValue: themeServiceSpy }]
+      imports: [SettingsComponent, RouterTestingModule]
     }).compileComponents();
   });
 
@@ -454,28 +464,11 @@ describe('SettingsComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('renders the theme select immediately (no loading state)', () => {
+  it('renders immediately with no loading guard', () => {
     const fixture = TestBed.createComponent(SettingsComponent);
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('select#theme')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('h1').textContent).toContain('Settings');
     expect(fixture.nativeElement.querySelector('.loading-text')).toBeNull();
-  });
-
-  it('theme select has correct options', () => {
-    const fixture = TestBed.createComponent(SettingsComponent);
-    fixture.detectChanges();
-    const options = fixture.nativeElement.querySelectorAll('select#theme option') as NodeListOf<HTMLOptionElement>;
-    const values = Array.from(options).map(o => o.value);
-    expect(values).toEqual(['system', 'light', 'dark']);
-  });
-
-  it('changing theme select calls themeService.setTheme()', () => {
-    const fixture = TestBed.createComponent(SettingsComponent);
-    fixture.detectChanges();
-    const select = fixture.nativeElement.querySelector('select#theme') as HTMLSelectElement;
-    select.value = 'dark';
-    select.dispatchEvent(new Event('change'));
-    expect(themeServiceSpy.setTheme).toHaveBeenCalledWith('dark');
   });
 
   it('goBack() navigates to /dashboard', () => {
@@ -503,7 +496,6 @@ Replace the full file:
 ```typescript
 import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { ThemeService, Theme } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-settings',
@@ -514,17 +506,7 @@ import { ThemeService, Theme } from '../../core/services/theme.service';
         <button class="back-btn" (click)="goBack()">← Back</button>
         <h1>Settings</h1>
       </div>
-
-      <form class="settings-form">
-        <div class="form-field">
-          <label for="theme">Theme</label>
-          <select id="theme" [value]="themeService.theme()" (change)="onThemeChange($event)">
-            <option value="system">System default</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </div>
-      </form>
+      <p class="placeholder">More settings coming soon.</p>
     </div>
   `,
   styles: [`
@@ -554,43 +536,17 @@ import { ThemeService, Theme } from '../../core/services/theme.service';
 
     h1 { margin: 0; font-size: 1.5rem; }
 
-    .settings-form { display: flex; flex-direction: column; gap: 1.25rem; }
-
-    .form-field { display: flex; flex-direction: column; gap: 0.375rem; }
-
-    label { font-size: 0.875rem; font-weight: 500; color: var(--color-text-body); }
-
-    select {
-      padding: 0.5rem 0.75rem;
-      border: 1px solid var(--color-border-row);
-      border-radius: 6px;
-      font-size: 0.875rem;
-      background: var(--color-surface-white);
-      color: var(--color-text-body);
-      outline: none;
-      cursor: pointer;
-      transition: border-color 0.15s ease;
-    }
-
-    select:focus { border-color: var(--color-accent); }
+    .placeholder { color: var(--color-text-muted); font-size: 0.875rem; }
   `]
 })
 export class SettingsComponent {
-  readonly themeService = inject(ThemeService);
   private readonly router = inject(Router);
-
-  onThemeChange(event: Event): void {
-    const value = (event.target as HTMLSelectElement).value as Theme;
-    this.themeService.setTheme(value);
-  }
 
   goBack(): void {
     this.router.navigate(['/dashboard']);
   }
 }
 ```
-
-Note: `OnInit` and `ReactiveFormsModule` imports are removed. The component no longer has pending state, error messages, or a Save button.
 
 - [ ] **Step 4: Run tests to confirm they pass**
 
@@ -604,23 +560,20 @@ Expected: all `SettingsComponent` tests pass.
 ```bash
 git add plnd_client/src/app/features/settings/settings.ts \
         plnd_client/src/app/features/settings/settings.spec.ts
-git commit -m "refactor(client): SettingsComponent — immediate-apply theme via ThemeService"
+git commit -m "refactor(client): SettingsComponent — remove theme section, placeholder page"
 ```
 
 ---
 
-## Task 5: Angular — `NavbarAvatarComponent` cycle row + design tokens
+## Task 5: Angular — `NavbarAvatarComponent` toggle row + design tokens
 
 **Files:**
 - Modify: `plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.ts`
 - Modify: `plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.spec.ts`
 
-- [ ] **Step 1: Update `navbar-avatar.spec.ts`**
+The theme row shows the current effective theme (☀️ / 🌙) and calls `themeService.toggle()`. No "system" state is shown.
 
-Three changes to the existing spec:
-1. Add `ThemeService` mock to `providers`
-2. Fix the Sign out test: `items[2]` → `items[3]` (Theme row is now at index 2)
-3. Add three new tests for theme cycle behaviour
+- [ ] **Step 1: Update `navbar-avatar.spec.ts`**
 
 Replace the full file:
 
@@ -632,7 +585,7 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { NavbarAvatarComponent } from './navbar-avatar';
 import { UserService } from '../../../core/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { ThemeService, Theme } from '../../../core/services/theme.service';
+import { ThemeService, EffectiveTheme } from '../../../core/services/theme.service';
 import { signal } from '@angular/core';
 import { User } from '../../../core/models/user';
 
@@ -652,13 +605,13 @@ describe('NavbarAvatarComponent', () => {
   let fixture: ComponentFixture<NavbarAvatarComponent>;
   let component: NavbarAvatarComponent;
   let mockUserSignal: ReturnType<typeof signal<User | null>>;
-  let mockThemeSignal: ReturnType<typeof signal<Theme>>;
+  let mockEffectiveThemeSignal: ReturnType<typeof signal<EffectiveTheme>>;
   let themeServiceSpy: jasmine.SpyObj<ThemeService>;
   let router: Router;
 
   beforeEach(async () => {
     mockUserSignal = signal<User | null>(null);
-    mockThemeSignal = signal<Theme>('system');
+    mockEffectiveThemeSignal = signal<EffectiveTheme>('light');
 
     const userServiceMock = {
       user: mockUserSignal.asReadonly(),
@@ -669,8 +622,8 @@ describe('NavbarAvatarComponent', () => {
       logout: jasmine.createSpy('logout')
     };
 
-    themeServiceSpy = jasmine.createSpyObj('ThemeService', ['cycleTheme'], {
-      theme: mockThemeSignal.asReadonly()
+    themeServiceSpy = jasmine.createSpyObj('ThemeService', ['toggle'], {
+      effectiveTheme: mockEffectiveThemeSignal.asReadonly()
     });
 
     await TestBed.configureTestingModule({
@@ -766,31 +719,31 @@ describe('NavbarAvatarComponent', () => {
     expect(component.initials()).toBe('T');
   });
 
-  // --- Theme cycle row tests ---
+  // --- Theme toggle row tests ---
 
-  it('renders theme icon ⚙️ when theme is "system"', () => {
-    mockThemeSignal.set('system');
-    component.dropdownOpen.set(true);
-    fixture.detectChanges();
-    const icon = fixture.nativeElement.querySelector('.theme-icon') as HTMLElement;
-    expect(icon?.textContent?.trim()).toBe('⚙️');
-  });
-
-  it('renders theme icon ☀️ when theme is "light"', () => {
-    mockThemeSignal.set('light');
+  it('renders ☀️ when effectiveTheme is "light"', () => {
+    mockEffectiveThemeSignal.set('light');
     component.dropdownOpen.set(true);
     fixture.detectChanges();
     const icon = fixture.nativeElement.querySelector('.theme-icon') as HTMLElement;
     expect(icon?.textContent?.trim()).toBe('☀️');
   });
 
-  it('clicking the theme row calls themeService.cycleTheme() and keeps dropdown open', () => {
+  it('renders 🌙 when effectiveTheme is "dark"', () => {
+    mockEffectiveThemeSignal.set('dark');
+    component.dropdownOpen.set(true);
+    fixture.detectChanges();
+    const icon = fixture.nativeElement.querySelector('.theme-icon') as HTMLElement;
+    expect(icon?.textContent?.trim()).toBe('🌙');
+  });
+
+  it('clicking the theme row calls themeService.toggle() and keeps dropdown open', () => {
     component.dropdownOpen.set(true);
     fixture.detectChanges();
     const items = fixture.nativeElement.querySelectorAll('.dropdown-item') as NodeListOf<HTMLButtonElement>;
     items[2].click(); // Theme row is index 2
     fixture.detectChanges();
-    expect(themeServiceSpy.cycleTheme).toHaveBeenCalled();
+    expect(themeServiceSpy.toggle).toHaveBeenCalled();
     expect(component.dropdownOpen()).toBeTrue();
   });
 });
@@ -801,7 +754,7 @@ describe('NavbarAvatarComponent', () => {
 ```bash
 just test-ng-headless
 ```
-Expected: new theme tests fail; Sign out test at old index fails.
+Expected: new theme tests fail (no `effectiveTheme` or `toggle` on service); Sign out test at old index fails.
 
 - [ ] **Step 3: Update `navbar-avatar.ts`**
 
@@ -812,10 +765,9 @@ import { Component, HostListener, OnInit, inject, signal, computed } from '@angu
 import { Router } from '@angular/router';
 import { UserService } from '../../../core/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
-import { ThemeService, Theme } from '../../../core/services/theme.service';
+import { ThemeService, EffectiveTheme } from '../../../core/services/theme.service';
 
-const THEME_ICONS: Record<Theme, string> = {
-  system: '⚙️',
+const THEME_ICONS: Record<EffectiveTheme, string> = {
   light: '☀️',
   dark: '🌙'
 };
@@ -851,10 +803,10 @@ const THEME_ICONS: Record<Theme, string> = {
           <button class="dropdown-item" role="menuitem" (click)="goToSettings()">
             Settings
           </button>
-          <button class="dropdown-item dropdown-item--theme" role="menuitem" (click)="cycleTheme($event)">
+          <button class="dropdown-item dropdown-item--theme" role="menuitem" (click)="toggleTheme($event)">
             <span class="theme-label">Theme</span>
             <span class="theme-right">
-              <span class="theme-name">{{ themeService.theme() }}</span>
+              <span class="theme-name">{{ themeService.effectiveTheme() }}</span>
               <span class="theme-icon">{{ themeIcon() }}</span>
             </span>
           </button>
@@ -882,7 +834,7 @@ const THEME_ICONS: Record<Theme, string> = {
       padding: 0;
       overflow: hidden;
       background: var(--color-accent);
-      color: #fff;
+      color: var(--color-surface-white);
       font-size: 0.875rem;
       font-weight: 600;
       display: flex;
@@ -891,9 +843,7 @@ const THEME_ICONS: Record<Theme, string> = {
       transition: opacity 0.15s ease;
     }
 
-    .avatar-btn:hover {
-      opacity: 0.85;
-    }
+    .avatar-btn:hover { opacity: 0.85; }
 
     .avatar-img {
       width: 100%;
@@ -932,9 +882,7 @@ const THEME_ICONS: Record<Theme, string> = {
       transition: background 0.1s ease;
     }
 
-    .dropdown-item:hover {
-      background: var(--color-border-row);
-    }
+    .dropdown-item:hover { background: var(--color-border-row); }
 
     .dropdown-item--theme {
       display: flex;
@@ -970,9 +918,7 @@ const THEME_ICONS: Record<Theme, string> = {
       font-size: 0.875rem;
     }
 
-    .dropdown-item--danger {
-      color: var(--color-destructive);
-    }
+    .dropdown-item--danger { color: var(--color-destructive); }
 
     .dropdown-item--danger:hover {
       background: color-mix(in srgb, var(--color-destructive) 10%, transparent);
@@ -992,7 +938,7 @@ export class NavbarAvatarComponent implements OnInit {
   private readonly router = inject(Router);
 
   readonly dropdownOpen = signal(false);
-  readonly themeIcon = computed(() => THEME_ICONS[this.themeService.theme()]);
+  readonly themeIcon = computed(() => THEME_ICONS[this.themeService.effectiveTheme()]);
 
   ngOnInit(): void {
     this.userService.loadUser();
@@ -1015,9 +961,9 @@ export class NavbarAvatarComponent implements OnInit {
     this.dropdownOpen.set(false);
   }
 
-  cycleTheme(event: Event): void {
+  toggleTheme(event: Event): void {
     event.stopPropagation(); // keep dropdown open
-    this.themeService.cycleTheme();
+    this.themeService.toggle();
   }
 
   goToProfile(): void {
@@ -1049,7 +995,7 @@ Expected: all `NavbarAvatarComponent` tests pass.
 ```bash
 git add plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.ts \
         plnd_client/src/app/shared/components/navbar-avatar/navbar-avatar.spec.ts
-git commit -m "feat(client): add theme cycle toggle to navbar avatar dropdown"
+git commit -m "feat(client): add theme toggle to navbar avatar dropdown"
 ```
 
 ---
@@ -1061,7 +1007,7 @@ git commit -m "feat(client): add theme cycle toggle to navbar avatar dropdown"
 - Modify: `plnd_client/src/app/core/services/preferences.service.ts`
 - Modify: `plnd_client/src/app/core/services/preferences.service.spec.ts`
 
-`Theme` now lives in `ThemeService`. `UpdatePreferencesRequest` is gone (no PATCH route). `updatePreferences()` is removed from the service.
+`Theme` no longer exists in the preferences model. `UpdatePreferencesRequest` is gone. `updatePreferences()` is removed from the service.
 
 - [ ] **Step 1: Update `preferences.ts`**
 
@@ -1074,8 +1020,6 @@ export interface UserPreferences {
   updated_at: string;
 }
 ```
-
-`Theme` and `UpdatePreferencesRequest` are removed. `Theme` is exported from `theme.service.ts`.
 
 - [ ] **Step 2: Update `preferences.service.ts`**
 
@@ -1117,7 +1061,7 @@ export class PreferencesService {
 
 - [ ] **Step 3: Update `preferences.service.spec.ts`**
 
-Replace the full file (remove `updatePreferences` test and `theme` from mock):
+Replace the full file:
 
 ```typescript
 import { TestBed } from '@angular/core/testing';
@@ -1205,8 +1149,9 @@ git commit -m "chore(client): remove theme from preferences model and service"
 
 1. `just verify` passes cleanly
 2. Manual smoke test:
-   - Open the app and click the avatar — see the Theme row with ⚙️ / "system"
-   - Click Theme row several times — icon cycles ⚙️ → ☀️ → 🌙 → ⚙️, `data-theme` attribute on `<html>` updates instantly, dropdown stays open
-   - Refresh the page — theme persists from `localStorage`
-   - Navigate to Settings — theme select reflects current theme, changing it applies instantly
-   - Sign out and back in — theme is not reset (it's device-local)
+   - Open the app and click the avatar — see the Theme row with ☀️ / "light" (or 🌙 / "dark" if OS prefers dark)
+   - Click Theme row → icon flips (☀️↔🌙), `data-theme` attribute on `<html>` toggles instantly, dropdown stays open
+   - Click again → back to following device preference
+   - Refresh the page — override state persists from `localStorage`
+   - Navigate to Settings — no theme control visible
+   - Sign out and back in — theme override is not reset (it's device-local)
