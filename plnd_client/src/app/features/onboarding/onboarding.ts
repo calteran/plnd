@@ -5,7 +5,7 @@ import { ReactiveFormsModule, FormControl, FormGroup, Validators } from '@angula
 import { UserService } from '../../core/services/user.service';
 import { PreferencesService } from '../../core/services/preferences.service';
 import { DietaryRestrictionsService } from '../../core/services/dietary-restrictions.service';
-import { Theme } from '../../core/models/preferences';
+import { ThemeService, EffectiveTheme } from '../../core/services/theme.service';
 import { RestrictionType, RESTRICTION_TYPES } from '../../core/models/dietary-restriction';
 
 type OnboardingStep = 'welcome' | 'profile' | 'preferences' | 'restrictions';
@@ -342,6 +342,7 @@ const TOTAL_STEPS = 4;
 export class OnboardingComponent implements OnInit {
   private readonly userService = inject(UserService);
   private readonly preferencesService = inject(PreferencesService);
+  private readonly themeService = inject(ThemeService);
   readonly dietaryService = inject(DietaryRestrictionsService);
   private readonly router = inject(Router);
 
@@ -359,7 +360,7 @@ export class OnboardingComponent implements OnInit {
     display_name: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] })
   });
 
-  readonly themeControl = new FormControl<Theme>('system', { nonNullable: true });
+  readonly themeControl = new FormControl<EffectiveTheme | 'system'>('system', { nonNullable: true });
 
   readonly addRestrictionForm = new FormGroup({
     restriction_type: new FormControl<RestrictionType>('allergy', { nonNullable: true }),
@@ -374,11 +375,8 @@ export class OnboardingComponent implements OnInit {
       this.profileForm.controls.display_name.setValue(user.display_name);
     }
 
-    // Pre-populate theme if preferences are already loaded
-    const prefs = this.preferencesService.preferences();
-    if (prefs) {
-      this.themeControl.setValue(prefs.theme);
-    }
+    // Pre-populate theme based on current effective theme
+    this.themeControl.setValue(this.themeService.effectiveTheme());
 
     // Kick off lazy loads so data is ready by the time user reaches those steps
     this.preferencesService.loadPreferences();
@@ -423,18 +421,16 @@ export class OnboardingComponent implements OnInit {
 
   savePreferences(): void {
     if (this.pending) return;
-    this.pending = true;
     this.errorMessage = '';
-    this.preferencesService.updatePreferences({ theme: this.themeControl.value }).subscribe({
-      next: () => {
-        this.pending = false;
-        this.step.set('restrictions');
-      },
-      error: () => {
-        this.pending = false;
-        this.errorMessage = 'Failed to save theme. Please try again.';
-      }
-    });
+    const selected = this.themeControl.value;
+    const current = this.themeService.effectiveTheme();
+    // Apply override if the user explicitly chose a theme that differs from current effective
+    if (selected !== 'system' && selected !== current) {
+      this.themeService.toggle();
+    } else if (selected === 'system' && this.themeService.isOverridden()) {
+      this.themeService.toggle();
+    }
+    this.step.set('restrictions');
   }
 
   addRestriction(): void {

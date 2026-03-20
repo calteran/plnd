@@ -1,8 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
 import { ConfigService } from './config.service';
-import { UserPreferences, UpdatePreferencesRequest } from '../models/preferences';
+import { UserPreferences } from '../models/preferences';
 
 @Injectable({ providedIn: 'root' })
 export class PreferencesService {
@@ -23,14 +22,6 @@ export class PreferencesService {
       next: prefs => this.preferencesSignal.set(prefs),
       error: err => console.error('Failed to load preferences', err)
     });
-  }
-
-  /** PATCH /preferences/me and update the signal on success */
-  updatePreferences(req: UpdatePreferencesRequest): Observable<UserPreferences> {
-    const apiBase = this.config.getConfig().api.baseUrl;
-    return this.http.patch<UserPreferences>(`${apiBase}/preferences/me`, req).pipe(
-      tap(prefs => this.preferencesSignal.set(prefs))
-    );
   }
 
   /** Reset the preferences signal (called on logout) */
