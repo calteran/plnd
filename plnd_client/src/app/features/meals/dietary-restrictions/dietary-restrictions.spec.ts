@@ -311,7 +311,7 @@ describe('DietaryRestrictionsComponent', () => {
     expect(component.successMessage).toBe('Updated successfully.');
   });
 
-  it('goBack() navigates to /dashboard', () => {
+  it('goBack() navigates to /today', () => {
     const fixture = TestBed.createComponent(DietaryRestrictionsComponent);
     fixture.detectChanges();
     httpMock.expectOne(r => r.method === 'GET').flush([]);
@@ -320,6 +320,6 @@ describe('DietaryRestrictionsComponent', () => {
     const router = TestBed.inject(Router);
     spyOn(router, 'navigate');
     fixture.componentInstance.goBack();
-    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+    expect(router.navigate).toHaveBeenCalledWith(['/today']);
   });
 });

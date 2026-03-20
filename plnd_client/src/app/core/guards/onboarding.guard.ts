@@ -22,7 +22,7 @@ function resolveUser(userService: UserService): Observable<User | null> {
 
 /**
  * Guard for /onboarding — allows access only when onboarding is NOT yet complete.
- * Already-onboarded users are redirected to /dashboard.
+ * Already-onboarded users are redirected to /today.
  */
 export const onboardingNotCompletedGuard: CanActivateFn = () => {
   const userService = inject(UserService);
@@ -30,7 +30,7 @@ export const onboardingNotCompletedGuard: CanActivateFn = () => {
   return resolveUser(userService).pipe(
     map(user => {
       if (!user) return true;
-      if (user.onboarding_completed) return router.createUrlTree(['/dashboard']);
+      if (user.onboarding_completed) return router.createUrlTree(['/today']);
       return true;
     })
   );

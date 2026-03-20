@@ -1,5 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { ScheduleService, todayIso } from '../../core/services/schedule.service';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ScheduleService } from '../../core/services/schedule.service';
 import { isMealAnchor } from '../../core/models/schedule';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
 import { MealRowComponent } from '../schedule/components/meal-row/meal-row';
@@ -7,7 +9,7 @@ import { TaskRowComponent } from '../schedule/components/task-row/task-row';
 import { AddEntryComponent, AddedEntry } from '../schedule/components/add-entry/add-entry';
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-day-view',
   standalone: true,
   imports: [DayHeaderComponent, MealRowComponent, TaskRowComponent, AddEntryComponent],
   template: `
@@ -55,17 +57,22 @@ import { AddEntryComponent, AddedEntry } from '../schedule/components/add-entry/
       }
     </div>
   `,
-  styleUrl: './dashboard.scss'
+  styleUrl: './day-view.scss'
 })
-export class DashboardComponent implements OnInit {
+export class DayViewComponent implements OnInit {
   protected readonly scheduleService = inject(ScheduleService);
   protected readonly isMealAnchor    = isMealAnchor;
+  private  readonly route            = inject(ActivatedRoute);
+  private  readonly router           = inject(Router);
+  private  readonly destroyRef       = inject(DestroyRef);
 
   ngOnInit(): void {
-    this.scheduleService.loadDay(todayIso());
+    this.route.params
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(params => this.scheduleService.loadDay(params['date']));
   }
 
-  onDateChange(date: string): void { this.scheduleService.loadDay(date); }
+  onDateChange(date: string): void { this.router.navigate(['/day', date]); }
   retry(): void { this.scheduleService.loadDay(this.scheduleService.date()); }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onPlanMeal(mealId: string): void { /* TODO: open meal planning panel */ }

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { DashboardPage } from '../pages/dashboard.page';
+import { DayViewPage } from '../pages/day-view.page';
 
 // Test 1 requires full Docker stack: docker compose up -d db api mock-oauth-server
 // Test 2 can run with only ng serve (uses addInitScript + route mocks).
@@ -57,7 +57,7 @@ test.describe('OAuth login flow', () => {
     // mock-oauth2-server redirects to /auth/callback?code=...
     // AuthCallbackComponent exchanges the code for an ID token via the OIDC lib,
     // then POSTs to /auth/token (mocked above) to get the backend JWT.
-    await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
+    await page.waitForURL(/\/day\//, { timeout: 15_000 });
     await expect(page.locator('.schedule-view')).toBeVisible();
   });
 
@@ -68,7 +68,7 @@ test.describe('OAuth login flow', () => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
     });
 
-    // Mock /users/me for the onboardingCompletedGuard on /dashboard.
+    // Mock /users/me for the onboardingCompletedGuard on /today.
     await page.route('http://localhost:3000/users/me', route =>
       route.fulfill({
         status: 200,
@@ -82,11 +82,11 @@ test.describe('OAuth login flow', () => {
       route.fulfill({ status: 204 })
     );
 
-    await page.goto('/dashboard');
-    await expect(page).toHaveURL(/\/dashboard/);
+    await page.goto('/today');
+    await expect(page).toHaveURL(/\/day\//);
 
-    const dashboard = new DashboardPage(page);
-    await dashboard.signOut();
+    const dayView = new DayViewPage(page);
+    await dayView.signOut();
 
     await expect(page).toHaveURL(/\/login/);
 

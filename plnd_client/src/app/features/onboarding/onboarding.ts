@@ -472,7 +472,7 @@ export class OnboardingComponent implements OnInit {
     this.userService.completeOnboarding().subscribe({
       next: () => {
         this.pending = false;
-        this.router.navigate(['/dashboard']);
+        this.router.navigate(['/today']);
       },
       error: () => {
         this.pending = false;
