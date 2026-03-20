@@ -1,20 +1,20 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { AppComponent } from './app';
 import { RouterTestingModule } from '@angular/router/testing';
+import { ThemeService } from './core/services/theme.service';
 
 describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
   let component: AppComponent;
 
   beforeEach(() => {
+    localStorage.clear();
     spyOn(window, 'matchMedia').and.returnValue({ matches: false } as MediaQueryList);
   });
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AppComponent, RouterTestingModule],
-      providers: [provideHttpClientTesting()]
+      imports: [AppComponent, RouterTestingModule]
     }).compileComponents();
 
     fixture = TestBed.createComponent(AppComponent);
@@ -26,8 +26,15 @@ describe('AppComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should apply a data-theme attribute to document.documentElement', () => {
-    const theme = document.documentElement.getAttribute('data-theme');
-    expect(theme).toBe('light');
+  it('applies data-theme="light" when effectiveTheme is "light"', () => {
+    // device = light (matchMedia.matches = false), no override
+    expect(document.documentElement.getAttribute('data-theme')).toBe('light');
+  });
+
+  it('applies data-theme="dark" after toggle (device light → override → dark)', () => {
+    const themeService = TestBed.inject(ThemeService);
+    themeService.toggle();
+    fixture.detectChanges();
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
   });
 });

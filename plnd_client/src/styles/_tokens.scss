@@ -16,6 +16,7 @@
   --color-accent-dark:    #92400e;
   --color-destructive:    #dc2626;
   --color-success:        #16a34a;
+  --shadow-dropdown:      0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 [data-theme="dark"] {
@@ -35,4 +36,5 @@
   --color-accent-dark:    #a5b4fc;
   --color-destructive:    #ef4444;
   --color-success:        #22c55e;
+  --shadow-dropdown:      0 4px 12px rgba(0, 0, 0, 0.40);
 }

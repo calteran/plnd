@@ -1,7 +1,13 @@
-import { Component, HostListener, OnInit, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, inject, signal, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { UserService } from '../../../core/services/user.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { ThemeService, EffectiveTheme } from '../../../core/services/theme.service';
+
+const THEME_ICONS: Record<EffectiveTheme, string> = {
+  light: '☀️',
+  dark: '🌙'
+};
 
 @Component({
   selector: 'app-navbar-avatar',
@@ -34,6 +40,13 @@ import { AuthService } from '../../../core/services/auth.service';
           <button class="dropdown-item" role="menuitem" (click)="goToSettings()">
             Settings
           </button>
+          <button class="dropdown-item dropdown-item--theme" role="menuitem" (click)="toggleTheme($event)">
+            <span class="theme-label">Theme</span>
+            <span class="theme-right">
+              <span class="theme-name">{{ themeService.effectiveTheme() }}</span>
+              <span class="theme-icon">{{ themeIcon() }}</span>
+            </span>
+          </button>
           <div class="dropdown-divider"></div>
           <button class="dropdown-item dropdown-item--danger" role="menuitem" (click)="signOut()">
             Sign out
@@ -57,8 +70,8 @@ import { AuthService } from '../../../core/services/auth.service';
       cursor: pointer;
       padding: 0;
       overflow: hidden;
-      background: #6366f1;
-      color: #fff;
+      background: var(--color-accent);
+      color: var(--color-surface-white);
       font-size: 0.875rem;
       font-weight: 600;
       display: flex;
@@ -67,9 +80,7 @@ import { AuthService } from '../../../core/services/auth.service';
       transition: opacity 0.15s ease;
     }
 
-    .avatar-btn:hover {
-      opacity: 0.85;
-    }
+    .avatar-btn:hover { opacity: 0.85; }
 
     .avatar-img {
       width: 100%;
@@ -86,11 +97,11 @@ import { AuthService } from '../../../core/services/auth.service';
       position: absolute;
       top: calc(100% + 8px);
       right: 0;
-      min-width: 160px;
-      background: #fff;
-      border: 1px solid #e0e0e0;
+      min-width: 180px;
+      background: var(--color-surface-white);
+      border: 1px solid var(--color-border-row);
       border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      box-shadow: var(--shadow-dropdown);
       z-index: 100;
       overflow: hidden;
     }
@@ -104,35 +115,67 @@ import { AuthService } from '../../../core/services/auth.service';
       border: none;
       cursor: pointer;
       font-size: 0.875rem;
-      color: #374151;
+      color: var(--color-text-body);
       transition: background 0.1s ease;
     }
 
-    .dropdown-item:hover {
-      background: #f3f4f6;
+    .dropdown-item:hover { background: var(--color-border-row); }
+
+    .dropdown-item--theme {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
-    .dropdown-item--danger {
-      color: #dc2626;
+    .theme-label {
+      color: var(--color-text-muted);
+      font-size: 0.8125rem;
     }
+
+    .theme-right {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .theme-name {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      text-transform: lowercase;
+    }
+
+    .theme-icon {
+      width: 26px;
+      height: 26px;
+      background: var(--color-surface-base);
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+    }
+
+    .dropdown-item--danger { color: var(--color-destructive); }
 
     .dropdown-item--danger:hover {
-      background: #fef2f2;
+      background: color-mix(in srgb, var(--color-destructive) 10%, transparent);
     }
 
     .dropdown-divider {
       height: 1px;
-      background: #e0e0e0;
+      background: var(--color-border-row);
       margin: 0;
     }
   `]
 })
 export class NavbarAvatarComponent implements OnInit {
   readonly userService = inject(UserService);
+  readonly themeService = inject(ThemeService);
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
 
   readonly dropdownOpen = signal(false);
+  readonly themeIcon = computed(() => THEME_ICONS[this.themeService.effectiveTheme()]);
 
   ngOnInit(): void {
     this.userService.loadUser();
@@ -153,6 +196,11 @@ export class NavbarAvatarComponent implements OnInit {
   @HostListener('document:click')
   closeDropdown(): void {
     this.dropdownOpen.set(false);
+  }
+
+  toggleTheme(event: Event): void {
+    event.stopPropagation(); // keep dropdown open
+    this.themeService.toggle();
   }
 
   goToProfile(): void {

@@ -4,7 +4,6 @@ use utoipa::{Modify, OpenApi};
 use crate::db::models::{DietaryRestriction, ReadyStatus, User, UserPreferences};
 use crate::routes::{
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
-    preferences::UpdatePreferencesRequest,
     users::UpdateProfileRequest,
 };
 
@@ -42,7 +41,6 @@ impl Modify for BearerSecurityAddon {
         crate::routes::users::delete_me,
         crate::routes::users::post_complete_onboarding,
         crate::routes::preferences::get_preferences,
-        crate::routes::preferences::patch_preferences,
         crate::routes::dietary_restrictions::list_restrictions,
         crate::routes::dietary_restrictions::create_restriction,
         crate::routes::dietary_restrictions::update_restriction,
@@ -54,7 +52,6 @@ impl Modify for BearerSecurityAddon {
         DietaryRestriction,
         ReadyStatus,
         UpdateProfileRequest,
-        UpdatePreferencesRequest,
         CreateRestrictionRequest,
         UpdateRestrictionRequest,
     )),

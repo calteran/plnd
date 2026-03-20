@@ -6,7 +6,6 @@ import { test, expect } from '@playwright/test';
 
 const MOCK_PREFS = {
   user_id: 'e2e-test-uuid',
-  theme: 'system',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z'
 };
@@ -50,22 +49,15 @@ test.describe('Settings', () => {
     await expect(panel.getByRole('menuitem', { name: 'Settings' })).toBeVisible();
   });
 
-  test('settings page loads preferences and saves theme change', async ({ page }) => {
+  test('settings page loads and shows placeholder', async ({ page }) => {
     // Intercept /users/me so the onboardingCompletedGuard resolves
     await page.route('http://localhost:3000/users/me', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
     );
 
-    // Intercept preferences API so the test works regardless of the Docker image version.
+    // Intercept preferences API
     await page.route('http://localhost:3000/preferences/me', async route => {
-      const method = route.request().method();
-      if (method === 'GET') {
-        await route.fulfill({ status: 200, json: MOCK_PREFS });
-      } else if (method === 'PATCH') {
-        await route.fulfill({ status: 200, json: { ...MOCK_PREFS, theme: 'dark' } });
-      } else {
-        await route.continue();
-      }
+      await route.fulfill({ status: 200, json: MOCK_PREFS });
     });
 
     await page.addInitScript(() => {
@@ -74,23 +66,6 @@ test.describe('Settings', () => {
     await page.goto('/settings');
 
     await expect(page.locator('h1')).toHaveText('Settings');
-
-    // Preferences signal is populated from the mocked GET → form appears.
-    // Wait for Angular to finish its initial writeValue() pass before interacting —
-    // otherwise selectOption() races with Angular's DOM initialization.
-    const select = page.locator('select#theme');
-    await expect(select).toHaveValue('system', { timeout: 5_000 });
-
-    await select.selectOption('dark');
-    await expect(select).toHaveValue('dark');
-
-    // eventCoalescing batches Angular's change detection until rAF, which is
-    // slow in headless Chrome. Wait explicitly for the FormControl to turn dirty
-    // (Save button becomes enabled) before proceeding.
-    const saveBtn = page.getByRole('button', { name: 'Save' });
-    await expect(saveBtn).toBeEnabled({ timeout: 10_000 });
-
-    await saveBtn.click();
-    await expect(page.locator('.status-success')).toHaveText('Settings saved.', { timeout: 10_000 });
+    await expect(page.locator('.placeholder')).toBeVisible();
   });
 });

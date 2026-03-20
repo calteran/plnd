@@ -169,7 +169,6 @@ async fn main() {
             post(users::post_complete_onboarding),
         )
         .route("/preferences/me", get(preferences::get_preferences))
-        .route("/preferences/me", patch(preferences::patch_preferences))
         .route(
             "/dietary-restrictions",
             get(dietary_restrictions::list_restrictions),

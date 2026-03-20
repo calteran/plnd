@@ -3,10 +3,8 @@ import { HttpClientTestingModule, HttpTestingController } from '@angular/common/
 import { RouterTestingModule } from '@angular/router/testing';
 import { OnboardingComponent } from './onboarding';
 import { UserService } from '../../core/services/user.service';
-import { PreferencesService } from '../../core/services/preferences.service';
 import { User } from '../../core/models/user';
 import { DietaryRestriction } from '../../core/models/dietary-restriction';
-import { UserPreferences } from '../../core/models/preferences';
 
 const MOCK_USER: User = {
   user_id: 'test-uuid',
@@ -31,7 +29,7 @@ describe('OnboardingComponent', () => {
     httpMock.match(r => r.url.endsWith('/preferences/me') || r.url.endsWith('/dietary-restrictions'))
       .forEach(req => {
         if (req.request.url.endsWith('/preferences/me')) {
-          req.flush({ user_id: 'test-uuid', theme: 'system', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' });
+          req.flush({ user_id: 'test-uuid', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' });
         } else {
           req.flush([]);
         }
@@ -159,16 +157,10 @@ describe('OnboardingComponent', () => {
     expect(component.profileForm.controls.display_name.value).toBe('Bob');
   });
 
-  it('ngOnInit pre-populates themeControl when preferences already in signal', () => {
-    const prefsSvc = TestBed.inject(PreferencesService);
-    const svc = prefsSvc as unknown as { preferencesSignal: { set: (v: UserPreferences) => void } };
-    svc.preferencesSignal.set({
-      user_id: 'test-uuid', theme: 'dark',
-      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z'
-    });
-
+  it('ngOnInit pre-populates themeControl from current effectiveTheme', () => {
+    // ThemeService defaults to device preference (light in test env) — never 'system'
     const { component } = setup();
-    expect(component.themeControl.value).toBe('dark');
+    expect(['light', 'dark']).toContain(component.themeControl.value);
   });
 
   it('saveProfile() advances to preferences when display_name is blank/whitespace', () => {
@@ -195,29 +187,13 @@ describe('OnboardingComponent', () => {
     expect(component.step()).toBe('profile');
   });
 
-  it('savePreferences() shows error and holds step on HTTP 500', () => {
-    const { fixture, component } = setup();
-    component.advanceFromWelcome();
-    component.skipProfile();
-    fixture.detectChanges();
-
-    component.savePreferences();
-    httpMock.expectOne(r => r.url.endsWith('/preferences/me') && r.method === 'PATCH')
-      .flush('Error', { status: 500, statusText: 'Internal Server Error' });
-    fixture.detectChanges();
-
-    expect(component.step()).toBe('preferences');
-    expect(component.errorMessage).toBeTruthy();
-    expect(component.pending).toBeFalse();
-  });
-
   it('savePreferences() no-ops when pending is true', () => {
     const { component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
     component.pending = true;
     component.savePreferences();
-    httpMock.expectNone(r => r.url.endsWith('/preferences/me') && r.method === 'PATCH');
+    expect(component.step()).toBe('preferences');
     expect(component.pending).toBeTrue();
   });
 
@@ -313,16 +289,13 @@ describe('OnboardingComponent', () => {
     expect(component.pending).toBeTrue();
   });
 
-  it('savePreferences() success advances to restrictions step', () => {
+  it('savePreferences() advances to restrictions step synchronously', () => {
     const { fixture, component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
     fixture.detectChanges();
 
     component.savePreferences();
-    httpMock.expectOne(r => r.url.endsWith('/preferences/me') && r.method === 'PATCH')
-      .flush({ user_id: 'test-uuid', theme: 'system',
-               created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' });
     fixture.detectChanges();
 
     expect(component.step()).toBe('restrictions');
