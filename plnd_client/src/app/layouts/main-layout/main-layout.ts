@@ -12,7 +12,7 @@ import { todayIso } from '../../core/services/schedule.service';
 })
 export class MainLayoutComponent {
   protected readonly sidebarExpanded = signal(false);
-  protected readonly todayIso = todayIso;
+  protected readonly todayDate = todayIso();
 
   expandSidebar(): void  { this.sidebarExpanded.set(true); }
   collapseSidebar(): void { this.sidebarExpanded.set(false); }
