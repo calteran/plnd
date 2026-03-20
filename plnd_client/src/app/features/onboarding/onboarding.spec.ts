@@ -158,9 +158,9 @@ describe('OnboardingComponent', () => {
   });
 
   it('ngOnInit pre-populates themeControl from current effectiveTheme', () => {
-    // ThemeService defaults to device preference (light in test env)
+    // ThemeService defaults to device preference (light in test env) — never 'system'
     const { component } = setup();
-    expect(['light', 'dark', 'system']).toContain(component.themeControl.value);
+    expect(['light', 'dark']).toContain(component.themeControl.value);
   });
 
   it('saveProfile() advances to preferences when display_name is blank/whitespace', () => {

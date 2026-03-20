@@ -118,7 +118,7 @@ const TOTAL_STEPS = 4;
                 <button type="button" class="btn btn--primary"
                         [disabled]="pending"
                         (click)="savePreferences()">
-                  {{ pending ? 'Saving…' : 'Next Step →' }}
+                  Next Step →
                 </button>
               </div>
             </div>
