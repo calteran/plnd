@@ -1,5 +1,5 @@
 import { Component, computed, input, output } from '@angular/core';
-import { todayIso } from '../../../../core/services/schedule.service';
+import { todayIso, toIsoDate } from '../../../../core/services/schedule.service';
 
 @Component({
   selector: 'app-day-header',
@@ -45,6 +45,6 @@ export class DayHeaderComponent {
     const [y, m, d] = this.date().split('-').map(Number);
     const date = new Date(y, m - 1, d);
     date.setDate(date.getDate() + days);
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return toIsoDate(date);
   }
 }

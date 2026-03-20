@@ -14,7 +14,7 @@
            (focusin)="expandSidebar()"
            (focusout)="collapseSidebar()">
       <nav class="sidebar-nav" aria-label="Sidebar navigation">
-        <a routerLink="/today" routerLinkActive="active"
+        <a [routerLink]="['/day', todayIso()]" routerLinkActive="active"
            class="sidebar-item" aria-label="Today">
           <span class="sidebar-icon" aria-hidden="true">📅</span>
           <span class="sidebar-label">Today</span>
@@ -29,7 +29,7 @@
 
   <!-- Mobile bottom tabs -->
   <nav class="bottom-tabs" aria-label="Tab bar">
-    <a routerLink="/today" routerLinkActive="active"
+    <a [routerLink]="['/day', todayIso()]" routerLinkActive="active"
        class="bottom-tab" aria-label="Today">
       <span class="tab-icon" aria-hidden="true">📅</span>
       <span class="tab-label">Today</span>

@@ -54,7 +54,7 @@ export const routes: Routes = [
       },
 
       // Backwards compatibility
-      { path: 'dashboard', redirectTo: '/today' },
+      { path: 'dashboard', redirectTo: '/today', pathMatch: 'full' },
 
       {
         path: 'profile',
