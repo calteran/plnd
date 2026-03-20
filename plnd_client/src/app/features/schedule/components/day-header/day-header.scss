@@ -1,0 +1,47 @@
+.day-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--color-surface-meal);
+  border-bottom: 1.5px solid var(--color-border-meal);
+}
+
+.nav-btn {
+  background: var(--color-accent-light);
+  border: 1.5px solid var(--color-accent-border);
+  border-radius: 8px;
+  padding: 5px 14px;
+  color: var(--color-accent-dark);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.date-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.date-text {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.today-badge {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}

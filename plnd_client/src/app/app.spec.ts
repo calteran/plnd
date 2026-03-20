@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { AppComponent } from './app';
 import { RouterTestingModule } from '@angular/router/testing';
 
@@ -6,9 +7,14 @@ describe('AppComponent', () => {
   let fixture: ComponentFixture<AppComponent>;
   let component: AppComponent;
 
+  beforeEach(() => {
+    spyOn(window, 'matchMedia').and.returnValue({ matches: false } as MediaQueryList);
+  });
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AppComponent, RouterTestingModule]
+      imports: [AppComponent, RouterTestingModule],
+      providers: [provideHttpClientTesting()]
     }).compileComponents();
 
     fixture = TestBed.createComponent(AppComponent);
@@ -18,5 +24,10 @@ describe('AppComponent', () => {
 
   it('should create the app', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('should apply a data-theme attribute to document.documentElement', () => {
+    const theme = document.documentElement.getAttribute('data-theme');
+    expect(theme).toBe('light');
   });
 });

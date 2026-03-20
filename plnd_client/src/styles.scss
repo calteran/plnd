@@ -1,1 +1,4 @@
-/* You can add global styles to this file, and also import other style files */
+@use 'styles/tokens';
+@use 'styles/reset';
+
+/* Global styles: design tokens and reset are imported above. Add app-wide overrides below. */

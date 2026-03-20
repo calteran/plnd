@@ -1,0 +1,38 @@
+// plnd_client/src/styles/_tokens.scss
+:root {
+  --color-surface-base:   #fafafa;
+  --color-surface-warm:   #fef9f0;
+  --color-surface-meal:   #fffbf0;
+  --color-surface-white:  #ffffff;
+  --color-border-meal:    #fde68a;
+  --color-border-row:     #f3f4f6;
+  --color-text-primary:   #78350f;
+  --color-text-body:      #374151;
+  --color-text-secondary: #b45309;
+  --color-text-muted:     #9ca3af;
+  --color-accent:         #d97706;
+  --color-accent-light:   #fef3c7;
+  --color-accent-border:  #fde68a;
+  --color-accent-dark:    #92400e;
+  --color-destructive:    #dc2626;
+  --color-success:        #16a34a;
+}
+
+[data-theme="dark"] {
+  --color-surface-base:   #1e1e2e;
+  --color-surface-warm:   #222235;
+  --color-surface-meal:   #252538;
+  --color-surface-white:  #2a2a3e;
+  --color-border-meal:    #4a4a7a;
+  --color-border-row:     #333350;
+  --color-text-primary:   #e0e0f0;
+  --color-text-body:      #c0c0d8;
+  --color-text-secondary: #a0a0c0;
+  --color-text-muted:     #606080;
+  --color-accent:         #6366f1;
+  --color-accent-light:   rgba(99, 102, 241, 0.15);
+  --color-accent-border:  #4f46e5;
+  --color-accent-dark:    #a5b4fc;
+  --color-destructive:    #ef4444;
+  --color-success:        #22c55e;
+}

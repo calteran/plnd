@@ -1,0 +1,116 @@
+.add-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 24px;
+  background: var(--color-surface-white);
+  cursor: pointer;
+  opacity: 0.5;
+
+  &:hover { opacity: 0.8; }
+}
+
+.gutter {
+  width: 40px;
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+
+.add-checkbox {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  border: 2px dashed var(--color-border-row);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.add-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.entry-panel {
+  padding: 12px 24px 16px;
+  background: var(--color-surface-white);
+  border-top: 1px solid var(--color-border-row);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.entry-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--color-border-meal);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  background: var(--color-surface-warm);
+  color: var(--color-text-body);
+  outline: none;
+
+  &:focus { border-color: var(--color-accent); }
+}
+
+.morph-form {
+  display: flex;
+  gap: 8px;
+  animation: fadeIn 150ms ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.morph-field {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border-row);
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--color-surface-white);
+  color: var(--color-text-body);
+  outline: none;
+
+  &:focus { border-color: var(--color-accent); }
+}
+
+.parse-hint {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.entry-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-cancel {
+  background: none;
+  border: 1px solid var(--color-border-row);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.btn-add {
+  background: var(--color-accent-light);
+  border: 1.5px solid var(--color-accent-border);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent-dark);
+
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}

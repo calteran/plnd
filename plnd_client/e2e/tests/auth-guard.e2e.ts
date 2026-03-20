@@ -33,6 +33,6 @@ test.describe('Auth guard', () => {
     });
     await page.goto('/dashboard');
     await expect(page).toHaveURL(/\/dashboard/);
-    await expect(page.locator('h2')).toHaveText('Dashboard');
+    await expect(page.locator('.schedule-view')).toBeVisible();
   });
 });

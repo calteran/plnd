@@ -1,37 +1,89 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { RouterTestingModule } from '@angular/router/testing';
 import { DashboardComponent } from './dashboard';
-import { AuthService } from '../../core/services/auth.service';
+import { ScheduleService } from '../../core/services/schedule.service';
+import { ScheduleItem } from '../../core/models/schedule';
+import { signal } from '@angular/core';
 
-describe('DashboardComponent', () => {
-  let authServiceMock: { logout: jasmine.Spy };
+function makeScheduleServiceMock(overrides: Partial<{
+  scheduleItems: ScheduleItem[];
+  isLoading: boolean;
+  loadError: string | null;
+  date: string;
+}> = {}) {
+  const items   = signal(overrides.scheduleItems ?? []);
+  const loading = signal(overrides.isLoading     ?? false);
+  const error   = signal(overrides.loadError     ?? null);
+  const date    = signal(overrides.date          ?? '2026-03-19');
+  return {
+    scheduleItems: items.asReadonly(),
+    isLoading:     loading.asReadonly(),
+    loadError:     error.asReadonly(),
+    date:          date.asReadonly(),
+    loadDay:    jasmine.createSpy('loadDay'),
+    toggleItem: jasmine.createSpy('toggleItem'),
+  };
+}
 
-  beforeEach(async () => {
-    authServiceMock = { logout: jasmine.createSpy('logout') };
+describe('DashboardComponent (schedule view)', () => {
+  it('shows skeleton rows while loading', async () => {
+    const svc = makeScheduleServiceMock({ isLoading: true });
     await TestBed.configureTestingModule({
       imports: [DashboardComponent, RouterTestingModule],
-      providers: [{ provide: AuthService, useValue: authServiceMock }]
+      providers: [{ provide: ScheduleService, useValue: svc }]
     }).compileComponents();
+    const f = TestBed.createComponent(DashboardComponent);
+    f.detectChanges();
+    expect(f.debugElement.queryAll(By.css('.skeleton')).length).toBeGreaterThan(0);
   });
 
-  it('should create', () => {
-    const fixture = TestBed.createComponent(DashboardComponent);
-    fixture.detectChanges();
-    expect(fixture.componentInstance).toBeTruthy();
+  it('shows error state when loadError is set', async () => {
+    const svc = makeScheduleServiceMock({ loadError: 'Network error' });
+    await TestBed.configureTestingModule({
+      imports: [DashboardComponent, RouterTestingModule],
+      providers: [{ provide: ScheduleService, useValue: svc }]
+    }).compileComponents();
+    const f = TestBed.createComponent(DashboardComponent);
+    f.detectChanges();
+    expect(f.nativeElement.textContent).toContain("Couldn't load");
   });
 
-  it('renders dashboard heading', () => {
-    const fixture = TestBed.createComponent(DashboardComponent);
-    fixture.detectChanges();
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('h2')?.textContent).toContain('Dashboard');
+  it('shows empty state when no items', async () => {
+    const svc = makeScheduleServiceMock({ scheduleItems: [] });
+    await TestBed.configureTestingModule({
+      imports: [DashboardComponent, RouterTestingModule],
+      providers: [{ provide: ScheduleService, useValue: svc }]
+    }).compileComponents();
+    const f = TestBed.createComponent(DashboardComponent);
+    f.detectChanges();
+    expect(f.nativeElement.textContent).toContain('Nothing planned yet');
   });
 
-  it('clicking sign-out button calls auth.logout()', () => {
-    const fixture = TestBed.createComponent(DashboardComponent);
-    fixture.detectChanges();
-    const btn = fixture.nativeElement.querySelector('button') as HTMLButtonElement;
-    btn.click();
-    expect(authServiceMock.logout).toHaveBeenCalled();
+  it('renders meal and task rows when items are present', async () => {
+    const items: ScheduleItem[] = [
+      { id: 'm1', name: 'Breakfast', emoji: '🥑', status: 'done', duringMealTasks: [] },
+      { id: 't1', type: 'task', label: '💊 Vitamins', status: 'pending' }
+    ];
+    const svc = makeScheduleServiceMock({ scheduleItems: items });
+    await TestBed.configureTestingModule({
+      imports: [DashboardComponent, RouterTestingModule],
+      providers: [{ provide: ScheduleService, useValue: svc }]
+    }).compileComponents();
+    const f = TestBed.createComponent(DashboardComponent);
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('app-meal-row'))).toBeTruthy();
+    expect(f.debugElement.query(By.css('app-task-row'))).toBeTruthy();
+  });
+
+  it('calls loadDay with today on init', async () => {
+    const svc = makeScheduleServiceMock();
+    await TestBed.configureTestingModule({
+      imports: [DashboardComponent, RouterTestingModule],
+      providers: [{ provide: ScheduleService, useValue: svc }]
+    }).compileComponents();
+    const f = TestBed.createComponent(DashboardComponent);
+    f.detectChanges();
+    expect(svc.loadDay).toHaveBeenCalled();
   });
 });

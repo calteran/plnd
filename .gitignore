@@ -32,6 +32,7 @@ plnd_client/.angular/
 # Agent / tooling state
 .junie/
 .worktrees/
+.superpowers/
 
 # macOS
 .DS_Store

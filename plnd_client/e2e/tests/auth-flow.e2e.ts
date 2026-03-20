@@ -58,7 +58,7 @@ test.describe('OAuth login flow', () => {
     // AuthCallbackComponent exchanges the code for an ID token via the OIDC lib,
     // then POSTs to /auth/token (mocked above) to get the backend JWT.
     await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
-    await expect(page.locator('h2')).toHaveText('Dashboard');
+    await expect(page.locator('.schedule-view')).toBeVisible();
   });
 
   test('logout clears token and returns to /login', async ({ page }) => {
@@ -86,7 +86,7 @@ test.describe('OAuth login flow', () => {
     await expect(page).toHaveURL(/\/dashboard/);
 
     const dashboard = new DashboardPage(page);
-    await dashboard.getSignOutButton().click();
+    await dashboard.signOut();
 
     await expect(page).toHaveURL(/\/login/);
 

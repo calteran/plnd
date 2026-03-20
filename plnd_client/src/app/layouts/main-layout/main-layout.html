@@ -1,0 +1,39 @@
+<!-- main-layout.html -->
+<div class="main-layout">
+
+  <header class="top-bar">
+    <span class="app-title">PLND</span>
+    <app-navbar-avatar />
+  </header>
+
+  <div class="main-body">
+    <aside class="sidebar"
+           [class.expanded]="sidebarExpanded()"
+           (mouseenter)="expandSidebar()"
+           (mouseleave)="collapseSidebar()"
+           (focusin)="expandSidebar()"
+           (focusout)="collapseSidebar()">
+      <nav class="sidebar-nav" aria-label="Sidebar navigation">
+        <a routerLink="/dashboard" routerLinkActive="active"
+           class="sidebar-item" aria-label="Today">
+          <span class="sidebar-icon" aria-hidden="true">📅</span>
+          <span class="sidebar-label">Today</span>
+        </a>
+      </nav>
+    </aside>
+
+    <main class="content-area">
+      <router-outlet />
+    </main>
+  </div>
+
+  <!-- Mobile bottom tabs -->
+  <nav class="bottom-tabs" aria-label="Tab bar">
+    <a routerLink="/dashboard" routerLinkActive="active"
+       class="bottom-tab" aria-label="Today">
+      <span class="tab-icon" aria-hidden="true">📅</span>
+      <span class="tab-label">Today</span>
+    </a>
+  </nav>
+
+</div>
