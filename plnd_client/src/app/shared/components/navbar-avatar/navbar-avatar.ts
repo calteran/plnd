@@ -101,7 +101,7 @@ const THEME_ICONS: Record<EffectiveTheme, string> = {
       background: var(--color-surface-white);
       border: 1px solid var(--color-border-row);
       border-radius: 6px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+      box-shadow: var(--shadow-dropdown);
       z-index: 100;
       overflow: hidden;
     }
