@@ -1,7 +1,14 @@
-import { Component, output, signal, computed, effect } from '@angular/core';
+import { Component, ElementRef, ViewChild, output, signal, computed } from '@angular/core';
 import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { ItemType } from '../../../../core/models/schedule';
 
-type ParsedType = 'task' | 'appointment' | 'exercise';
+export interface AddedEntry {
+  label: string;
+  type: ItemType;
+  time?: string;
+  location?: string;
+  duration?: number;
+}
 
 const EXERCISE_KEYWORDS = /\b(run|walk|jog|cycle|swim|workout|gym|stretch|yoga|hike|bike)\b/i;
 const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
@@ -21,6 +28,7 @@ const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
     } @else {
       <div class="entry-panel">
         <input
+          #entryInput
           class="entry-input"
           [value]="_text()"
           (input)="_text.set($any($event.target).value)"
@@ -28,7 +36,6 @@ const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
           (keydown.escape)="close()"
           (keydown.enter)="submit()"
           aria-label="Add something to your day"
-          autofocus
         />
 
         @if (parsedType() === 'appointment') {
@@ -59,7 +66,9 @@ const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
   styleUrl: './add-entry.scss'
 })
 export class AddEntryComponent {
-  readonly added = output<{ label: string; type: ParsedType; time?: string; location?: string; duration?: number }>();
+  @ViewChild('entryInput') private entryInput?: ElementRef<HTMLInputElement>;
+
+  readonly added = output<AddedEntry>();
 
   readonly isOpen          = signal(false);
   // _text is a signal (not FormControl) so computed() tracks it reactively on every keystroke
@@ -68,16 +77,7 @@ export class AddEntryComponent {
   readonly locationControl = new FormControl('');
   readonly durationControl = new FormControl<number | null>(null);
 
-  constructor() {
-    effect(() => {
-      this.parsedType(); // track type changes
-      this.timeControl.reset('');
-      this.locationControl.reset('');
-      this.durationControl.reset(null);
-    });
-  }
-
-  readonly parsedType = computed<ParsedType>(() => {
+  readonly parsedType = computed<ItemType>(() => {
     const text = this._text();
     if (TIME_PATTERN.test(text)) return 'appointment';
     if (EXERCISE_KEYWORDS.test(text)) return 'exercise';
@@ -89,19 +89,31 @@ export class AddEntryComponent {
     return null;
   });
 
-  open(): void  { this.isOpen.set(true); }
-  close(): void { this.isOpen.set(false); this._text.set(''); }
+  open(): void {
+    this.isOpen.set(true);
+    setTimeout(() => this.entryInput?.nativeElement.focus(), 0);
+  }
+
+  close(): void {
+    this.isOpen.set(false);
+    this._text.set('');
+    this.timeControl.reset('');
+    this.locationControl.reset('');
+    this.durationControl.reset(null);
+  }
 
   submit(): void {
     const label = this._text().trim();
     if (!label) return;
-    this.added.emit({
-      label,
-      type: this.parsedType(),
-      time:     this.timeControl.value     || undefined,
-      location: this.locationControl.value || undefined,
-      duration: this.durationControl.value ?? undefined
-    });
+    const type = this.parsedType();
+    const entry: AddedEntry = { label, type };
+    if (type === 'appointment') {
+      entry.time     = this.timeControl.value     || undefined;
+      entry.location = this.locationControl.value || undefined;
+    } else if (type === 'exercise') {
+      entry.duration = this.durationControl.value ?? undefined;
+    }
+    this.added.emit(entry);
     this.close();
   }
 }

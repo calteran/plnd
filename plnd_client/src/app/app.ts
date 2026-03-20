@@ -11,6 +11,7 @@ export class AppComponent {
   private readonly preferencesService = inject(PreferencesService);
 
   constructor() {
+    this.preferencesService.loadPreferences();
     effect(() => {
       const prefs = this.preferencesService.preferences();
       const theme = prefs?.theme ?? 'system';

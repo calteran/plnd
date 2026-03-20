@@ -10,7 +10,9 @@
     <aside class="sidebar"
            [class.expanded]="sidebarExpanded()"
            (mouseenter)="expandSidebar()"
-           (mouseleave)="collapseSidebar()">
+           (mouseleave)="collapseSidebar()"
+           (focusin)="expandSidebar()"
+           (focusout)="collapseSidebar()">
       <nav class="sidebar-nav" aria-label="Sidebar navigation">
         <a routerLink="/dashboard" routerLinkActive="active"
            class="sidebar-item" aria-label="Today">

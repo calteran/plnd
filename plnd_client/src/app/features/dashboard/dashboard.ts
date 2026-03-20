@@ -1,10 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { ScheduleService } from '../../core/services/schedule.service';
+import { ScheduleService, todayIso } from '../../core/services/schedule.service';
 import { isMealAnchor } from '../../core/models/schedule';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
 import { MealRowComponent } from '../schedule/components/meal-row/meal-row';
 import { TaskRowComponent } from '../schedule/components/task-row/task-row';
-import { AddEntryComponent } from '../schedule/components/add-entry/add-entry';
+import { AddEntryComponent, AddedEntry } from '../schedule/components/add-entry/add-entry';
 
 @Component({
   selector: 'app-dashboard',
@@ -62,7 +62,7 @@ export class DashboardComponent implements OnInit {
   protected readonly isMealAnchor    = isMealAnchor;
 
   ngOnInit(): void {
-    this.scheduleService.loadDay(new Date().toISOString().split('T')[0]);
+    this.scheduleService.loadDay(todayIso());
   }
 
   onDateChange(date: string): void { this.scheduleService.loadDay(date); }
@@ -70,5 +70,5 @@ export class DashboardComponent implements OnInit {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   onPlanMeal(mealId: string): void { /* TODO: open meal planning panel */ }
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onItemAdded(entry: unknown): void { /* TODO: add item to service */ }
+  onItemAdded(entry: AddedEntry): void { /* TODO: add item to service */ }
 }

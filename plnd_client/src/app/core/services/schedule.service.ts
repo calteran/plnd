@@ -20,6 +20,7 @@ export class ScheduleService {
 
     // TODO: replace with HttpClient GET /schedule?date=<date>
     setTimeout(() => {
+      if (this._date() !== date) return; // guard against stale callback
       this._items.set(mockItems(date));
       this._loading.set(false);
     }, 300);
@@ -28,6 +29,8 @@ export class ScheduleService {
   toggleItem(id: string): void {
     this._items.update(items => items.map(item => {
       if (isMealAnchor(item)) {
+        const hasMatch = item.duringMealTasks.some(t => t.id === id);
+        if (!hasMatch) return item; // preserve reference — no signal notification
         return {
           ...item,
           duringMealTasks: item.duringMealTasks.map(t =>
@@ -40,8 +43,9 @@ export class ScheduleService {
   }
 }
 
-function todayIso(): string {
-  return new Date().toISOString().split('T')[0];
+export function todayIso(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 function flip(status: ItemStatus): ItemStatus {

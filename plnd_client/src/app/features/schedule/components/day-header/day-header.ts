@@ -1,4 +1,5 @@
 import { Component, computed, input, output } from '@angular/core';
+import { todayIso } from '../../../../core/services/schedule.service';
 
 @Component({
   selector: 'app-day-header',
@@ -26,11 +27,7 @@ export class DayHeaderComponent {
     return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
   });
 
-  readonly isToday = computed(() => {
-    const now = new Date();
-    const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    return this.date() === localToday;
-  });
+  readonly isToday = computed(() => this.date() === todayIso());
 
   prev(): void {
     this.dateChange.emit(this.offset(-1));
