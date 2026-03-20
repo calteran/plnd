@@ -60,4 +60,13 @@ describe('ThemeService', () => {
     const fresh = TestBed.inject(ThemeService);
     expect(fresh.effectiveTheme()).toBe('dark');
   });
+
+  it('effectiveTheme() returns "light" when device is dark and overridden', () => {
+    (window.matchMedia as jasmine.Spy).and.returnValue({ matches: true } as MediaQueryList);
+    localStorage.setItem(OVERRIDE_KEY, '1');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({});
+    const fresh = TestBed.inject(ThemeService);
+    expect(fresh.effectiveTheme()).toBe('light');
+  });
 });
