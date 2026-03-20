@@ -1,10 +1,11 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { onboardingNotCompletedGuard, onboardingCompletedGuard } from './core/guards/onboarding.guard';
+import { todayRedirectGuard, yesterdayRedirectGuard, tomorrowRedirectGuard } from './core/guards/day-redirect.guard';
 
 export const routes: Routes = [
-  // Redirect root to dashboard (auth guard handles unauthenticated redirect to /login)
-  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+  // Redirect root to /today (auth guard handles unauthenticated redirect to /login)
+  { path: '', redirectTo: '/today', pathMatch: 'full' },
 
   // Unauthenticated pages — wrapped in the auth layout shell
   {
@@ -40,11 +41,21 @@ export const routes: Routes = [
       import('./layouts/main-layout/main-layout').then(m => m.MainLayoutComponent),
     canActivate: [authGuard, onboardingCompletedGuard],
     children: [
+      // Shortcut routes — redirect to canonical /day/:date
+      { path: 'today',     canActivate: [todayRedirectGuard],     children: [] },
+      { path: 'yesterday', canActivate: [yesterdayRedirectGuard], children: [] },
+      { path: 'tomorrow',  canActivate: [tomorrowRedirectGuard],  children: [] },
+
+      // Canonical day view
       {
-        path: 'dashboard',
+        path: 'day/:date',
         loadComponent: () =>
-          import('./features/dashboard/dashboard').then(m => m.DashboardComponent)
+          import('./features/day-view/day-view').then(m => m.DayViewComponent)
       },
+
+      // Backwards compatibility
+      { path: 'dashboard', redirectTo: '/today' },
+
       {
         path: 'profile',
         loadComponent: () =>
@@ -63,6 +74,6 @@ export const routes: Routes = [
     ]
   },
 
-  // Fallback — redirect unknown paths to dashboard (guard will redirect to login if needed)
-  { path: '**', redirectTo: '/dashboard' }
+  // Fallback — redirect unknown paths to /today (guard will redirect to login if needed)
+  { path: '**', redirectTo: '/today' }
 ];

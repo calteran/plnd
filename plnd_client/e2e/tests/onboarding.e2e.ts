@@ -45,7 +45,7 @@ test.describe('Onboarding', () => {
     await expect(page.locator('h1')).toHaveText('Welcome to PLND!');
   });
 
-  test('authenticated returning user navigating to /onboarding redirects to /dashboard', async ({ page }) => {
+  test('authenticated returning user navigating to /onboarding redirects to /today', async ({ page }) => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
     );
@@ -54,10 +54,10 @@ test.describe('Onboarding', () => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
     });
     await page.goto('/onboarding');
-    await expect(page).toHaveURL(/\/dashboard/);
+    await expect(page).toHaveURL(/\/day\//);
   });
 
-  test('non-onboarded user navigating to /dashboard is redirected to /onboarding', async ({ page }) => {
+  test('non-onboarded user navigating to /today is redirected to /onboarding', async ({ page }) => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
     );
@@ -65,11 +65,11 @@ test.describe('Onboarding', () => {
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
     });
-    await page.goto('/dashboard');
+    await page.goto('/today');
     await expect(page).toHaveURL(/\/onboarding/);
   });
 
-  test('user can skip all steps and land on /dashboard', async ({ page }) => {
+  test('user can skip all steps and land on /day/:date', async ({ page }) => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
     );
@@ -104,7 +104,7 @@ test.describe('Onboarding', () => {
     await expect(page.locator('h1')).toHaveText('Dietary Restrictions');
     await page.getByRole('button', { name: 'Skip' }).click();
 
-    // Should land on dashboard after complete-onboarding POST
-    await expect(page).toHaveURL(/\/dashboard/, { timeout: 10_000 });
+    // Should land on /day/:date after complete-onboarding POST
+    await expect(page).toHaveURL(/\/day\//, { timeout: 10_000 });
   });
 });

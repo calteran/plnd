@@ -13,13 +13,13 @@ const MOCK_USER_ONBOARDED = {
 };
 
 test.describe('Auth guard', () => {
-  test('unauthenticated /dashboard visit redirects to /login', async ({ page }) => {
+  test('unauthenticated /today visit redirects to /login', async ({ page }) => {
     // No token → guard sends to /login
-    await page.goto('/dashboard');
+    await page.goto('/today');
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('authenticated user can access /dashboard', async ({ page }) => {
+  test('authenticated user can access /today and lands on /day/:date', async ({ page }) => {
     // Mock /users/me so onboardingCompletedGuard resolves to true
     await page.route('http://localhost:3000/users/me', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
@@ -31,8 +31,8 @@ test.describe('Auth guard', () => {
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
     });
-    await page.goto('/dashboard');
-    await expect(page).toHaveURL(/\/dashboard/);
+    await page.goto('/today');
+    await expect(page).toHaveURL(/\/day\//);
     await expect(page.locator('.schedule-view')).toBeVisible();
   });
 });

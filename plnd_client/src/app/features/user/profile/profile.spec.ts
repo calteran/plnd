@@ -84,10 +84,10 @@ describe('ProfileComponent', () => {
     expect(component.form.value.avatar_url).toBe('');
   });
 
-  it('goBack navigates to /dashboard', () => {
+  it('goBack navigates to /today', () => {
     spyOn(router, 'navigate');
     component.goBack();
-    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+    expect(router.navigate).toHaveBeenCalledWith(['/today']);
   });
 
   describe('when user has no last_login', () => {

@@ -60,14 +60,14 @@ describe('onboardingNotCompletedGuard', () => {
     expect(result).toBe(true);
   });
 
-  it('redirects to /dashboard when onboarding_completed: true', async () => {
+  it('redirects to /today when onboarding_completed: true', async () => {
     setUser(userService, { ...BASE_USER, onboarding_completed: true });
 
     const result = await TestBed.runInInjectionContext(() =>
       resolveGuard(() => onboardingNotCompletedGuard(mockRoute, mockState))
     );
     expect(result instanceof UrlTree).toBeTrue();
-    expect((result as UrlTree).toString()).toBe('/dashboard');
+    expect((result as UrlTree).toString()).toBe('/today');
   });
 
   it('fetches user when signal is null and allows when not completed', async () => {

@@ -30,7 +30,7 @@ export const onboardingNotCompletedGuard: CanActivateFn = () => {
   return resolveUser(userService).pipe(
     map(user => {
       if (!user) return true;
-      if (user.onboarding_completed) return router.createUrlTree(['/dashboard']);
+      if (user.onboarding_completed) return router.createUrlTree(['/today']);
       return true;
     })
   );

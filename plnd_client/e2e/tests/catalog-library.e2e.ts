@@ -86,8 +86,8 @@ async function seedAuthAndNavigate(page: Parameters<Parameters<typeof test>[1]>[
     localStorage.setItem('auth_token', 'synthetic.test.token');
   });
 
-  await page.goto('/dashboard');
-  await expect(page).toHaveURL(/\/dashboard/);
+  await page.goto('/today');
+  await expect(page).toHaveURL(/\/day\//);
 }
 
 test.describe('Catalog Library — API Contract', () => {

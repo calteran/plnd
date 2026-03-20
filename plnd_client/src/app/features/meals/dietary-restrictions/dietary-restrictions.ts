@@ -455,6 +455,6 @@ export class DietaryRestrictionsComponent implements OnInit {
   }
 
   goBack(): void {
-    this.router.navigate(['/dashboard']);
+    this.router.navigate(['/today']);
   }
 }

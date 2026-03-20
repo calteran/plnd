@@ -23,12 +23,12 @@ describe('SettingsComponent', () => {
     expect(fixture.nativeElement.querySelector('.loading-text')).toBeNull();
   });
 
-  it('goBack() navigates to /dashboard', () => {
+  it('goBack() navigates to /today', () => {
     const fixture = TestBed.createComponent(SettingsComponent);
     fixture.detectChanges();
     const router = TestBed.inject(Router);
     spyOn(router, 'navigate');
     fixture.componentInstance.goBack();
-    expect(router.navigate).toHaveBeenCalledWith(['/dashboard']);
+    expect(router.navigate).toHaveBeenCalledWith(['/today']);
   });
 });

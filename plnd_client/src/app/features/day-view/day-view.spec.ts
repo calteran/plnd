@@ -1,7 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { RouterTestingModule } from '@angular/router/testing';
-import { DashboardComponent } from './dashboard';
+import { ActivatedRoute } from '@angular/router';
+import { of } from 'rxjs';
+import { DayViewComponent } from './day-view';
 import { ScheduleService } from '../../core/services/schedule.service';
 import { ScheduleItem } from '../../core/models/schedule';
 import { signal } from '@angular/core';
@@ -26,14 +28,20 @@ function makeScheduleServiceMock(overrides: Partial<{
   };
 }
 
-describe('DashboardComponent (schedule view)', () => {
+const TEST_DATE = '2026-03-20';
+const mockActivatedRoute = { params: of({ date: TEST_DATE }) };
+
+describe('DayViewComponent (schedule view)', () => {
   it('shows skeleton rows while loading', async () => {
     const svc = makeScheduleServiceMock({ isLoading: true });
     await TestBed.configureTestingModule({
-      imports: [DashboardComponent, RouterTestingModule],
-      providers: [{ provide: ScheduleService, useValue: svc }]
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute }
+      ]
     }).compileComponents();
-    const f = TestBed.createComponent(DashboardComponent);
+    const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
     expect(f.debugElement.queryAll(By.css('.skeleton')).length).toBeGreaterThan(0);
   });
@@ -41,10 +49,13 @@ describe('DashboardComponent (schedule view)', () => {
   it('shows error state when loadError is set', async () => {
     const svc = makeScheduleServiceMock({ loadError: 'Network error' });
     await TestBed.configureTestingModule({
-      imports: [DashboardComponent, RouterTestingModule],
-      providers: [{ provide: ScheduleService, useValue: svc }]
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute }
+      ]
     }).compileComponents();
-    const f = TestBed.createComponent(DashboardComponent);
+    const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
     expect(f.nativeElement.textContent).toContain("Couldn't load");
   });
@@ -52,10 +63,13 @@ describe('DashboardComponent (schedule view)', () => {
   it('shows empty state when no items', async () => {
     const svc = makeScheduleServiceMock({ scheduleItems: [] });
     await TestBed.configureTestingModule({
-      imports: [DashboardComponent, RouterTestingModule],
-      providers: [{ provide: ScheduleService, useValue: svc }]
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute }
+      ]
     }).compileComponents();
-    const f = TestBed.createComponent(DashboardComponent);
+    const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
     expect(f.nativeElement.textContent).toContain('Nothing planned yet');
   });
@@ -67,23 +81,29 @@ describe('DashboardComponent (schedule view)', () => {
     ];
     const svc = makeScheduleServiceMock({ scheduleItems: items });
     await TestBed.configureTestingModule({
-      imports: [DashboardComponent, RouterTestingModule],
-      providers: [{ provide: ScheduleService, useValue: svc }]
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute }
+      ]
     }).compileComponents();
-    const f = TestBed.createComponent(DashboardComponent);
+    const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
     expect(f.debugElement.query(By.css('app-meal-row'))).toBeTruthy();
     expect(f.debugElement.query(By.css('app-task-row'))).toBeTruthy();
   });
 
-  it('calls loadDay with today on init', async () => {
+  it('calls loadDay with the route date param on init', async () => {
     const svc = makeScheduleServiceMock();
     await TestBed.configureTestingModule({
-      imports: [DashboardComponent, RouterTestingModule],
-      providers: [{ provide: ScheduleService, useValue: svc }]
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute }
+      ]
     }).compileComponents();
-    const f = TestBed.createComponent(DashboardComponent);
+    const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
-    expect(svc.loadDay).toHaveBeenCalled();
+    expect(svc.loadDay).toHaveBeenCalledWith(TEST_DATE);
   });
 });
