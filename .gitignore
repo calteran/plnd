@@ -30,6 +30,7 @@ plnd_client/.angular/
 !.env.example
 
 # Agent / tooling state
+.claude/
 .junie/
 .worktrees/
 .superpowers/
