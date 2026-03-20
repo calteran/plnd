@@ -25,15 +25,8 @@ describe('OnboardingComponent', () => {
     const fixture = TestBed.createComponent(OnboardingComponent);
     const component = fixture.componentInstance;
     fixture.detectChanges();
-    // Flush lazy loads triggered by ngOnInit
-    httpMock.match(r => r.url.endsWith('/preferences/me') || r.url.endsWith('/dietary-restrictions'))
-      .forEach(req => {
-        if (req.request.url.endsWith('/preferences/me')) {
-          req.flush({ user_id: 'test-uuid', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' });
-        } else {
-          req.flush([]);
-        }
-      });
+    // Flush lazy load triggered by ngOnInit
+    httpMock.expectOne(r => r.url.endsWith('/dietary-restrictions')).flush([]);
     fixture.detectChanges();
     return { fixture, component };
   }
@@ -66,20 +59,10 @@ describe('OnboardingComponent', () => {
     expect(el.querySelector('h1')?.textContent).toBe('Your Profile');
   });
 
-  it('Skip on profile step advances to preferences step', () => {
+  it('Skip on profile step advances to restrictions step', () => {
     const { fixture, component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    fixture.detectChanges();
-    const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('h1')?.textContent).toBe('Theme');
-  });
-
-  it('Skip on preferences step advances to restrictions step', () => {
-    const { fixture, component } = setup();
-    component.advanceFromWelcome();
-    component.skipProfile();
-    component.skipPreferences();
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
     expect(el.querySelector('h1')?.textContent).toBe('Dietary Restrictions');
@@ -89,7 +72,6 @@ describe('OnboardingComponent', () => {
     const { component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
 
     component.finish();
     const req = httpMock.expectOne(r => r.url.endsWith('/users/me/complete-onboarding') && r.method === 'POST');
@@ -111,7 +93,7 @@ describe('OnboardingComponent', () => {
     fixture.detectChanges();
 
     const el = fixture.nativeElement as HTMLElement;
-    expect(el.querySelector('h1')?.textContent).toBe('Theme');
+    expect(el.querySelector('h1')?.textContent).toBe('Dietary Restrictions');
     expect(component.errorMessage).toBe('');
   });
 
@@ -135,7 +117,6 @@ describe('OnboardingComponent', () => {
     const { fixture, component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
     fixture.detectChanges();
 
     component.addRestrictionForm.setValue({ restriction_type: 'allergy', name: 'peanuts', notes: null });
@@ -157,13 +138,7 @@ describe('OnboardingComponent', () => {
     expect(component.profileForm.controls.display_name.value).toBe('Bob');
   });
 
-  it('ngOnInit pre-populates themeControl from current effectiveTheme', () => {
-    // ThemeService defaults to device preference (light in test env) — never 'system'
-    const { component } = setup();
-    expect(['light', 'dark']).toContain(component.themeControl.value);
-  });
-
-  it('saveProfile() advances to preferences when display_name is blank/whitespace', () => {
+  it('saveProfile() advances to restrictions when display_name is blank/whitespace', () => {
     const { fixture, component } = setup();
     component.advanceFromWelcome();
     fixture.detectChanges();
@@ -174,7 +149,7 @@ describe('OnboardingComponent', () => {
     httpMock.expectNone(r => r.url.endsWith('/users/me') && r.method === 'PATCH');
     fixture.detectChanges();
 
-    expect(component.step()).toBe('preferences');
+    expect(component.step()).toBe('restrictions');
   });
 
   it('saveProfile() no-ops when pending is true', () => {
@@ -187,21 +162,10 @@ describe('OnboardingComponent', () => {
     expect(component.step()).toBe('profile');
   });
 
-  it('savePreferences() no-ops when pending is true', () => {
-    const { component } = setup();
-    component.advanceFromWelcome();
-    component.skipProfile();
-    component.pending = true;
-    component.savePreferences();
-    expect(component.step()).toBe('preferences');
-    expect(component.pending).toBeTrue();
-  });
-
   it('addRestriction() success path resets form', () => {
     const { fixture, component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
     fixture.detectChanges();
 
     component.addRestrictionForm.setValue({ restriction_type: 'allergy', name: 'peanuts', notes: null });
@@ -227,7 +191,6 @@ describe('OnboardingComponent', () => {
     const { fixture, component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
     fixture.detectChanges();
 
     component.addRestrictionForm.setValue({ restriction_type: 'allergy', name: 'peanuts', notes: null });
@@ -243,7 +206,6 @@ describe('OnboardingComponent', () => {
     const { component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
     component.addRestrictionForm.setValue({ restriction_type: 'allergy', name: '', notes: null });
     component.addRestriction();
     httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions') && r.method === 'POST');
@@ -254,7 +216,6 @@ describe('OnboardingComponent', () => {
     const { component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
 
     component.skipRestrictions();
     httpMock.expectOne(r => r.url.endsWith('/users/me/complete-onboarding') && r.method === 'POST')
@@ -266,7 +227,6 @@ describe('OnboardingComponent', () => {
     const { fixture, component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
     fixture.detectChanges();
 
     component.finish();
@@ -282,31 +242,16 @@ describe('OnboardingComponent', () => {
     const { component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
     component.pending = true;
     component.finish();
     httpMock.expectNone(r => r.url.endsWith('/complete-onboarding'));
     expect(component.pending).toBeTrue();
   });
 
-  it('savePreferences() advances to restrictions step synchronously', () => {
-    const { fixture, component } = setup();
-    component.advanceFromWelcome();
-    component.skipProfile();
-    fixture.detectChanges();
-
-    component.savePreferences();
-    fixture.detectChanges();
-
-    expect(component.step()).toBe('restrictions');
-    expect(component.pending).toBeFalse();
-  });
-
   it('addRestriction() no-ops when pending is true', () => {
     const { component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
-    component.skipPreferences();
     component.addRestrictionForm.setValue({ restriction_type: 'allergy', name: 'peanuts', notes: null });
     component.pending = true;
     component.addRestriction();
