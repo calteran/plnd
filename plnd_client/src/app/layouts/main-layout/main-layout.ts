@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { NavbarAvatarComponent } from '../../shared/components/navbar-avatar/navbar-avatar';
+import { todayIso } from '../../core/services/schedule.service';
 
 @Component({
   selector: 'app-main-layout',
@@ -11,6 +12,7 @@ import { NavbarAvatarComponent } from '../../shared/components/navbar-avatar/nav
 })
 export class MainLayoutComponent {
   protected readonly sidebarExpanded = signal(false);
+  protected readonly todayDate = todayIso();
 
   expandSidebar(): void  { this.sidebarExpanded.set(true); }
   collapseSidebar(): void { this.sidebarExpanded.set(false); }

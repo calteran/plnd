@@ -36,8 +36,8 @@ test.describe('Settings', () => {
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
     });
-    await page.goto('/dashboard');
-    await expect(page).toHaveURL(/\/dashboard/);
+    await page.goto('/today');
+    await expect(page).toHaveURL(/\/day\//);
 
     // dispatchEvent with bubbles:false opens the dropdown via Angular's (click) binding
     // but prevents the event reaching @HostListener('document:click') which closes it.

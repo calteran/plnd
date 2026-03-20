@@ -85,7 +85,7 @@ describe('OnboardingComponent', () => {
     expect(el.querySelector('h1')?.textContent).toBe('Dietary Restrictions');
   });
 
-  it('finish() POSTs to complete-onboarding and navigates to /dashboard', () => {
+  it('finish() POSTs to complete-onboarding and navigates to /today', () => {
     const { component } = setup();
     component.advanceFromWelcome();
     component.skipProfile();
