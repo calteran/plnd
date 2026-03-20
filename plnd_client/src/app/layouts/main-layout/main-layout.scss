@@ -75,7 +75,14 @@
 }
 
 .sidebar-icon { font-size: 18px; flex-shrink: 0; }
-.sidebar-label { font-size: 13px; font-weight: 600; }
+.sidebar-label {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 200ms ease;
+
+  .expanded & { opacity: 1; }
+}
 
 // ── Content area ────────────────────────────────────────────────────
 .content-area {
