@@ -20,7 +20,7 @@ const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
   template: `
     @if (!isOpen()) {
       <div class="add-row" (click)="open()" role="button" tabindex="0"
-           (keydown.enter)="open()" aria-label="Open entry form">
+           (keydown.enter)="open()" (keydown.space)="open()" aria-label="Open entry form">
         <div class="gutter"></div>
         <div class="add-checkbox" aria-hidden="true">+</div>
         <span class="add-label">Add something…</span>
