@@ -29,7 +29,7 @@ export const onboardingNotCompletedGuard: CanActivateFn = () => {
   const router = inject(Router);
   return resolveUser(userService).pipe(
     map(user => {
-      if (!user) return router.createUrlTree(['/login']);
+      if (!user) return true;
       if (user.onboarding_completed) return router.createUrlTree(['/dashboard']);
       return true;
     })
@@ -45,7 +45,7 @@ export const onboardingCompletedGuard: CanActivateFn = () => {
   const router = inject(Router);
   return resolveUser(userService).pipe(
     map(user => {
-      if (!user) return router.createUrlTree(['/login']);
+      if (!user) return router.createUrlTree(['/onboarding']);
       if (!user.onboarding_completed) return router.createUrlTree(['/onboarding']);
       return true;
     })

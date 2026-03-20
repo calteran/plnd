@@ -30,9 +30,9 @@ services:
       - APP_LOGGING__LEVEL=debug
       - APP_LOGGING__PRETTY_PRINT=true
       # Server-to-server: API → mock OAuth server inside Docker network
-      - APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://mock-oauth-server:8080/plnd-dev
-      # Browser redirect target after successful login
-      - APP_AUTH__FRONTEND_CALLBACK_URL=http://localhost:4200/auth/callback
+      - APP_AUTH__OIDC_INTERNAL_ISSUER_URL=http://mock-oauth-server:8080/plnd-dev
+      # Allowed CORS origin for the Angular frontend
+      - APP_AUTH__FRONTEND_ORIGIN=http://localhost:4200
     depends_on:
       db:
         condition: service_healthy
