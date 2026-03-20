@@ -22,7 +22,7 @@ function resolveUser(userService: UserService): Observable<User | null> {
 
 /**
  * Guard for /onboarding — allows access only when onboarding is NOT yet complete.
- * Already-onboarded users are redirected to /dashboard.
+ * Already-onboarded users are redirected to /today.
  */
 export const onboardingNotCompletedGuard: CanActivateFn = () => {
   const userService = inject(UserService);
