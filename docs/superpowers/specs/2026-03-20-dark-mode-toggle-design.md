@@ -63,6 +63,7 @@ effect(() => {
 ### `SettingsComponent` (`settings.ts`)
 
 - Remove `PreferencesService` dependency; inject `ThemeService`
+- Remove the `@if (!preferencesService.preferences())` loading guard (and any associated loading text) — the form no longer waits on an HTTP call
 - Theme `<select>` becomes immediate-apply: `(change)` calls `themeService.setTheme(value)` directly
 - Remove Save button, pending state, success/error messages (no API call)
 - Remove `ReactiveFormsModule` dependency if theme was its only use
@@ -109,8 +110,8 @@ ALTER TABLE user_preferences DROP COLUMN theme;
 3. Dropdown stays open after theme row click
 
 ### Updated: `settings.spec.ts`
-- Remove HTTP mock for `PATCH /preferences/me`
-- Add `ThemeService` spy; assert `setTheme()` called on select change
+- Full rewrite — all existing tests relied on `PreferencesService` HTTP mocks (both `GET /preferences/me` for initial load and `PATCH /preferences/me` for save). With `PreferencesService` fully removed, all nine tests need to be replaced.
+- New tests: provide `ThemeService` spy; assert `setTheme()` called on select change for each theme value; assert no loading guard / form renders immediately.
 
 ### Backend
 - Update `tests/preferences_test.rs` to remove any theme field assertions
