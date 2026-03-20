@@ -19,13 +19,6 @@ const MOCK_USER_ONBOARDED = {
   onboarding_completed: true
 };
 
-const MOCK_PREFS = {
-  user_id: 'e2e-test-uuid',
-  theme: 'system',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z'
-};
-
 test.describe('Onboarding', () => {
   test('unauthenticated /onboarding visit redirects to /login', async ({ page }) => {
     await page.goto('/onboarding');
@@ -73,9 +66,6 @@ test.describe('Onboarding', () => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
     );
-    await page.route(`${API_BASE}/preferences/me`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
-    );
     await page.route(`${API_BASE}/dietary-restrictions`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
     );
@@ -94,10 +84,6 @@ test.describe('Onboarding', () => {
 
     // Profile step — skip
     await expect(page.locator('h1')).toHaveText('Your Profile');
-    await page.getByRole('button', { name: 'Skip' }).click();
-
-    // Preferences step — skip
-    await expect(page.locator('h1')).toHaveText('Theme');
     await page.getByRole('button', { name: 'Skip' }).click();
 
     // Restrictions step — skip (also calls finish)

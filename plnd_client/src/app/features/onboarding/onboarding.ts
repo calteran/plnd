@@ -3,20 +3,17 @@ import { Router } from '@angular/router';
 import { TitleCasePipe } from '@angular/common';
 import { ReactiveFormsModule, FormControl, FormGroup, Validators } from '@angular/forms';
 import { UserService } from '../../core/services/user.service';
-import { PreferencesService } from '../../core/services/preferences.service';
 import { DietaryRestrictionsService } from '../../core/services/dietary-restrictions.service';
-import { ThemeService, EffectiveTheme } from '../../core/services/theme.service';
 import { RestrictionType, RESTRICTION_TYPES } from '../../core/models/dietary-restriction';
 
-type OnboardingStep = 'welcome' | 'profile' | 'preferences' | 'restrictions';
+type OnboardingStep = 'welcome' | 'profile' | 'restrictions';
 
 const STEP_NUMBERS: Record<OnboardingStep, number> = {
   welcome: 1,
   profile: 2,
-  preferences: 3,
-  restrictions: 4
+  restrictions: 3
 };
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 3;
 
 @Component({
   selector: 'app-onboarding',
@@ -84,41 +81,6 @@ const TOTAL_STEPS = 4;
                         [disabled]="pending || profileForm.invalid"
                         (click)="saveProfile()">
                   {{ pending ? 'Saving…' : 'Next Step →' }}
-                </button>
-              </div>
-            </div>
-          }
-
-          @case ('preferences') {
-            <div class="step-content">
-              <h1 class="step-title">Theme</h1>
-              <p class="step-desc">Choose your preferred colour scheme.</p>
-
-              <form class="step-form">
-                <div class="form-field">
-                  <label for="theme">Theme</label>
-                  <select id="theme" [formControl]="themeControl">
-                    <option value="system">System default</option>
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                  </select>
-                </div>
-              </form>
-
-              @if (errorMessage) {
-                <p class="status-error">{{ errorMessage }}</p>
-              }
-
-              <div class="step-actions step-actions--two">
-                <button type="button" class="btn btn--secondary"
-                        [disabled]="pending"
-                        (click)="skipPreferences()">
-                  Skip
-                </button>
-                <button type="button" class="btn btn--primary"
-                        [disabled]="pending"
-                        (click)="savePreferences()">
-                  Next Step →
                 </button>
               </div>
             </div>
@@ -341,8 +303,6 @@ const TOTAL_STEPS = 4;
 })
 export class OnboardingComponent implements OnInit {
   private readonly userService = inject(UserService);
-  private readonly preferencesService = inject(PreferencesService);
-  private readonly themeService = inject(ThemeService);
   readonly dietaryService = inject(DietaryRestrictionsService);
   private readonly router = inject(Router);
 
@@ -360,8 +320,6 @@ export class OnboardingComponent implements OnInit {
     display_name: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] })
   });
 
-  readonly themeControl = new FormControl<EffectiveTheme | 'system'>('system', { nonNullable: true });
-
   readonly addRestrictionForm = new FormGroup({
     restriction_type: new FormControl<RestrictionType>('allergy', { nonNullable: true }),
     name: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(100)] }),
@@ -375,11 +333,7 @@ export class OnboardingComponent implements OnInit {
       this.profileForm.controls.display_name.setValue(user.display_name);
     }
 
-    // Pre-populate theme based on current effective theme
-    this.themeControl.setValue(this.themeService.effectiveTheme());
-
-    // Kick off lazy loads so data is ready by the time user reaches those steps
-    this.preferencesService.loadPreferences();
+    // Kick off lazy load so data is ready by the time user reaches the restrictions step
     this.dietaryService.load();
   }
 
@@ -389,14 +343,14 @@ export class OnboardingComponent implements OnInit {
 
   skipProfile(): void {
     this.errorMessage = '';
-    this.step.set('preferences');
+    this.step.set('restrictions');
   }
 
   saveProfile(): void {
     if (this.pending || this.profileForm.invalid) return;
     const name = this.profileForm.controls.display_name.value.trim();
     if (!name) {
-      this.step.set('preferences');
+      this.step.set('restrictions');
       return;
     }
 
@@ -405,32 +359,13 @@ export class OnboardingComponent implements OnInit {
     this.userService.updateUser({ display_name: name }).subscribe({
       next: () => {
         this.pending = false;
-        this.step.set('preferences');
+        this.step.set('restrictions');
       },
       error: () => {
         this.pending = false;
         this.errorMessage = 'Failed to save profile. Please try again.';
       }
     });
-  }
-
-  skipPreferences(): void {
-    this.errorMessage = '';
-    this.step.set('restrictions');
-  }
-
-  savePreferences(): void {
-    if (this.pending) return;
-    this.errorMessage = '';
-    const selected = this.themeControl.value;
-    const current = this.themeService.effectiveTheme();
-    // Apply override if the user explicitly chose a theme that differs from current effective
-    if (selected !== 'system' && selected !== current) {
-      this.themeService.toggle();
-    } else if (selected === 'system' && this.themeService.isOverridden()) {
-      this.themeService.toggle();
-    }
-    this.step.set('restrictions');
   }
 
   addRestriction(): void {
