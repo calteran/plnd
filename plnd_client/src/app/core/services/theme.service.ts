@@ -1,4 +1,4 @@
-import { Injectable, Signal, computed, signal } from '@angular/core';
+import { DestroyRef, Injectable, Signal, computed, inject, signal } from '@angular/core';
 
 export type EffectiveTheme = 'light' | 'dark';
 
@@ -15,15 +15,28 @@ function devicePrefersDark(): boolean {
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
-  private readonly deviceDark = devicePrefersDark();
+  private readonly deviceDarkSignal = signal<boolean>(devicePrefersDark());
   private readonly isOverriddenSignal = signal<boolean>(readIsOverridden());
 
   readonly isOverridden: Signal<boolean> = this.isOverriddenSignal.asReadonly();
 
   readonly effectiveTheme: Signal<EffectiveTheme> = computed(() => {
-    const useDark = this.isOverriddenSignal() ? !this.deviceDark : this.deviceDark;
+    const useDark = this.isOverriddenSignal() ? !this.deviceDarkSignal() : this.deviceDarkSignal();
     return useDark ? 'dark' : 'light';
   });
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      const mql = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent): void => {
+        this.deviceDarkSignal.set(e.matches);
+        this.isOverriddenSignal.set(false);
+        localStorage.removeItem(OVERRIDE_KEY);
+      };
+      mql.addEventListener('change', handler);
+      inject(DestroyRef).onDestroy(() => mql.removeEventListener('change', handler));
+    }
+  }
 
   toggle(): void {
     const newOverridden = !this.isOverriddenSignal();
