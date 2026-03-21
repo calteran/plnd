@@ -9,7 +9,9 @@ describe('AppComponent', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    spyOn(window, 'matchMedia').and.returnValue({ matches: false } as MediaQueryList);
+    const mql = jasmine.createSpyObj('MediaQueryList', ['addEventListener', 'removeEventListener']);
+    mql.matches = false;
+    spyOn(window, 'matchMedia').and.returnValue(mql as unknown as MediaQueryList);
   });
 
   beforeEach(async () => {
