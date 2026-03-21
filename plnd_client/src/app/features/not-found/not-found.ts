@@ -1,14 +1,15 @@
-import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-not-found',
   standalone: true,
+  imports: [RouterLink],
   template: `
     <div class="not-found">
       <h1>Page not found</h1>
       <p>The page you requested doesn't exist. If you followed a date link, the date may be invalid or out of range.</p>
-      <button type="button" (click)="goToToday()">Go to today</button>
+      <a routerLink="/today" class="btn">Go to today</a>
     </div>
   `,
   styles: [`
@@ -33,25 +34,18 @@ import { Router } from '@angular/router';
       max-width: 40ch;
     }
 
-    button {
+    .btn {
       padding: 0.5rem 1.5rem;
       background: var(--color-accent);
       color: #fff;
-      border: none;
       border-radius: 4px;
-      cursor: pointer;
       font-size: 1rem;
+      text-decoration: none;
     }
 
-    button:hover {
+    .btn:hover {
       opacity: 0.9;
     }
   `]
 })
-export class NotFoundComponent {
-  private readonly router = inject(Router);
-
-  goToToday(): void {
-    this.router.navigate(['/today']);
-  }
-}
+export class NotFoundComponent {}
