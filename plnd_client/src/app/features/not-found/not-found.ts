@@ -25,11 +25,11 @@ import { Router } from '@angular/router';
 
     h1 {
       font-size: 2rem;
-      color: var(--color-text, #1a1a1a);
+      color: var(--color-text-primary);
     }
 
     p {
-      color: var(--color-text-muted, #666);
+      color: var(--color-text-muted);
       max-width: 40ch;
     }
 

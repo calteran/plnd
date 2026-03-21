@@ -71,15 +71,15 @@ export const routes: Routes = [
         path: 'dietary-restrictions',
         loadComponent: () =>
           import('./features/meals/dietary-restrictions/dietary-restrictions').then(m => m.DietaryRestrictionsComponent)
+      },
+
+      // Not found — shown within the main layout shell
+      {
+        path: 'not-found',
+        loadComponent: () =>
+          import('./features/not-found/not-found').then(m => m.NotFoundComponent)
       }
     ]
-  },
-
-  // Not found — accessible unauthenticated (e.g. invalid /day/:date redirects here)
-  {
-    path: 'not-found',
-    loadComponent: () =>
-      import('./features/not-found/not-found').then(m => m.NotFoundComponent)
   },
 
   // Fallback — redirect unknown paths to /not-found
