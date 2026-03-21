@@ -35,7 +35,7 @@ import { Router } from '@angular/router';
 
     button {
       padding: 0.5rem 1.5rem;
-      background: var(--color-accent, #5c6ac4);
+      background: var(--color-accent);
       color: #fff;
       border: none;
       border-radius: 4px;
