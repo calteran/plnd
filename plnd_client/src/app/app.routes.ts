@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { onboardingNotCompletedGuard, onboardingCompletedGuard } from './core/guards/onboarding.guard';
-import { todayRedirectGuard, yesterdayRedirectGuard, tomorrowRedirectGuard } from './core/guards/day-redirect.guard';
+import { todayRedirectGuard, yesterdayRedirectGuard, tomorrowRedirectGuard, validateDayDateGuard } from './core/guards/day-redirect.guard';
 
 export const routes: Routes = [
   // Redirect root to /today (auth guard handles unauthenticated redirect to /login)
@@ -49,6 +49,7 @@ export const routes: Routes = [
       // Canonical day view
       {
         path: 'day/:date',
+        canActivate: [validateDayDateGuard],
         loadComponent: () =>
           import('./features/day-view/day-view').then(m => m.DayViewComponent)
       },
@@ -70,10 +71,17 @@ export const routes: Routes = [
         path: 'dietary-restrictions',
         loadComponent: () =>
           import('./features/meals/dietary-restrictions/dietary-restrictions').then(m => m.DietaryRestrictionsComponent)
+      },
+
+      // Not found — shown within the main layout shell
+      {
+        path: 'not-found',
+        loadComponent: () =>
+          import('./features/not-found/not-found').then(m => m.NotFoundComponent)
       }
     ]
   },
 
-  // Fallback — redirect unknown paths to /today (guard will redirect to login if needed)
-  { path: '**', redirectTo: '/today' }
+  // Fallback — redirect unknown paths to /not-found
+  { path: '**', redirectTo: '/not-found' }
 ];
