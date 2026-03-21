@@ -3,6 +3,9 @@
   flex-direction: column;
   min-height: 100%;
   background: var(--color-surface-warm);
+  max-width: 860px;
+  margin-inline: auto;
+  width: 100%;
 }
 
 .schedule-list {
