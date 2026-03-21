@@ -15,6 +15,7 @@ function devicePrefersDark(): boolean {
 
 @Injectable({ providedIn: 'root' })
 export class ThemeService {
+  private readonly destroyRef = inject(DestroyRef);
   private readonly deviceDarkSignal = signal<boolean>(devicePrefersDark());
   private readonly isOverriddenSignal = signal<boolean>(readIsOverridden());
 
@@ -26,7 +27,7 @@ export class ThemeService {
   });
 
   constructor() {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && window.matchMedia) {
       const mql = window.matchMedia('(prefers-color-scheme: dark)');
       const handler = (e: MediaQueryListEvent): void => {
         this.deviceDarkSignal.set(e.matches);
@@ -34,7 +35,7 @@ export class ThemeService {
         localStorage.removeItem(OVERRIDE_KEY);
       };
       mql.addEventListener('change', handler);
-      inject(DestroyRef).onDestroy(() => mql.removeEventListener('change', handler));
+      this.destroyRef.onDestroy(() => mql.removeEventListener('change', handler));
     }
   }
 
