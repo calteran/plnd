@@ -27,9 +27,9 @@ import { AuthService } from '../../../core/services/auth.service';
       cursor: pointer;
     }
     .session-notice {
-      color: #b45309;
-      background: #fef3c7;
-      border: 1px solid #fcd34d;
+      color: var(--color-text-secondary);
+      background: var(--color-accent-light);
+      border: 1px solid var(--color-accent-border);
       border-radius: 4px;
       padding: 0.5rem 1rem;
       margin-top: 1rem;
