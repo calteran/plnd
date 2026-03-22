@@ -4,6 +4,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideOAuthClient } from 'angular-oauth2-oidc';
 import { ConfigService } from './core/services/config.service';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { authErrorInterceptor } from './core/interceptors/auth-error.interceptor';
 
 import { routes } from './app.routes';
 
@@ -12,7 +13,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([authInterceptor])),
+    provideHttpClient(withInterceptors([authInterceptor, authErrorInterceptor])),
     // Register the OIDC client with sendAccessToken disabled so the library's
     // own interceptor does not attach IdP tokens to backend requests.
     // Our authInterceptor handles backend JWT attachment.

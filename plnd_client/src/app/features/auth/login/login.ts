@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -8,6 +9,9 @@ import { AuthService } from '../../../core/services/auth.service';
     <div class="login-page">
       <h1>Welcome to PLND</h1>
       <p>Your neurodivergent-friendly planner</p>
+      @if (sessionExpired) {
+        <p class="session-notice">Your session has expired. Please sign in again.</p>
+      }
       <button (click)="signIn()">Sign in with Mock OAuth</button>
     </div>
   `,
@@ -22,10 +26,21 @@ import { AuthService } from '../../../core/services/auth.service';
       font-size: 1rem;
       cursor: pointer;
     }
+    .session-notice {
+      color: var(--color-text-secondary);
+      background: var(--color-accent-light);
+      border: 1px solid var(--color-accent-border);
+      border-radius: 4px;
+      padding: 0.5rem 1rem;
+      margin-top: 1rem;
+      display: inline-block;
+    }
   `]
 })
 export class LoginComponent {
   private readonly auth = inject(AuthService);
+  readonly sessionExpired =
+    inject(ActivatedRoute).snapshot.queryParamMap.get('reason') === 'session_expired';
 
   signIn(): void {
     this.auth.login();

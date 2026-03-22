@@ -86,8 +86,12 @@ export class AuthService {
   /**
    * Clear local auth state immediately (optimistic logout), then revoke the
    * session server-side as a fire-and-forget call.
+   *
+   * @param reason - Optional reason code passed as a query param to /login.
+   *   Use 'session_expired' when the backend rejected a stale token so the
+   *   login page can show an explanatory notice.
    */
-  logout(): void {
+  logout(reason?: string): void {
     // Clear local state synchronously so the UI responds immediately.
     localStorage.removeItem(TOKEN_KEY);
     this.tokenSignal.set(null);
@@ -99,7 +103,7 @@ export class AuthService {
     this.userIngredientPrefsService.clear();
     // logOut() clears OIDC library's stored tokens (id_token, access_token).
     this.oauthService.logOut(true); // true = do not redirect to IdP logout URL
-    this.router.navigate(['/login']);
+    this.router.navigate(['/login'], reason ? { queryParams: { reason } } : {});
 
     // Revoke the server-side session (fire-and-forget — errors are swallowed).
     const apiBase = this.config.getConfig().api.baseUrl;

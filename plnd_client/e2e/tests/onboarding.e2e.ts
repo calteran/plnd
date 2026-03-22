@@ -29,6 +29,9 @@ test.describe('Onboarding', () => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
     );
+    await page.route(`${API_BASE}/dietary-restrictions`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+    );
 
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
@@ -53,6 +56,9 @@ test.describe('Onboarding', () => {
   test('non-onboarded user navigating to /today is redirected to /onboarding', async ({ page }) => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
+    );
+    await page.route(`${API_BASE}/dietary-restrictions`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
     );
 
     await page.addInitScript(() => {
