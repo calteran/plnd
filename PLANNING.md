@@ -128,7 +128,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 (UI Design) NEXT
+### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 IN PROGRESS
 
 ### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
@@ -204,12 +204,18 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] External provider clients (USDA FDC, Open Food Facts, TheMealDB) with search infrastructure and `plnd_data`/`plnd_seed` workspace crates
 - [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
 
-### Phase 2.5: UI/UX Design & Remaining Planning UI — NOT STARTED
+### Phase 2.5: UI/UX Design & Remaining Planning UI — IN PROGRESS
 **Goal**: Establish a cohesive overall UI design before building the remaining planning features, so that meal planning, exercise planning, family support, and the weekly schedule view share consistent navigation, layout, and component patterns.
 
 > **Why this phase exists**: The remaining features all converge on a shared weekly schedule view and sidebar navigation that doesn't yet exist. Designing them ad-hoc risks costly rework. A design sprint here produces a spec that all subsequent UI work follows.
 
 **Tasks:**
+
+- [x] **Day View & Schedule UI**
+  - [x] `DayViewComponent` — daily schedule view; serves as the primary planning surface
+  - [x] Schedule sub-components: `AddEntryComponent`, `DayHeaderComponent`, `MealRowComponent`, `TaskRowComponent`
+  - [x] Route aliases `/today`, `/yesterday`, `/tomorrow` → `/day/:date` with date-validation guard
+  - [x] `ScheduleService` — signals-based daily schedule state (meals, tasks, exercises)
 
 - [ ] **Overall UI Design Sprint**
   - [ ] Define app navigation structure (sidebar shape, primary/secondary routes, mobile nav)
@@ -239,8 +245,10 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 - [ ] **Dashboard (real content)**
   - [ ] Replace stub with a real planning home screen per the design spec
+  - *Note: `/dashboard` currently redirects to `/today` (day view)*
 
 **Deliverables:**
+- [x] Day view with daily schedule (meals, tasks, exercises) and `/today`/`/yesterday`/`/tomorrow` route aliases
 - [ ] UI design spec (`docs/superpowers/specs/YYYY-MM-DD-ui-design.md`)
 - [ ] Meal and exercise planning UI
 - [ ] Family profile management
