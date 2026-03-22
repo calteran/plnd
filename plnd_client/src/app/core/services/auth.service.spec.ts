@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { AuthService } from './auth.service';
@@ -129,6 +130,22 @@ describe('AuthService', () => {
     spyOn(dietaryService, 'clear');
     service.logout();
     expect(dietaryService.clear).toHaveBeenCalled();
+  });
+
+  it('logout() with a reason navigates to /login with that reason as a query param', () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
+    service.logout('session_expired');
+    expect(router.navigate).toHaveBeenCalledWith(
+      ['/login'], { queryParams: { reason: 'session_expired' } }
+    );
+  });
+
+  it('logout() without a reason navigates to /login without query params', () => {
+    const router = TestBed.inject(Router);
+    spyOn(router, 'navigate');
+    service.logout();
+    expect(router.navigate).toHaveBeenCalledWith(['/login']);
   });
 
   describe('when localStorage already has a token on startup', () => {
