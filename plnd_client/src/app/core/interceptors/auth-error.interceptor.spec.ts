@@ -10,7 +10,8 @@ describe('authErrorInterceptor', () => {
   let authService: jasmine.SpyObj<AuthService>;
 
   beforeEach(() => {
-    authService = jasmine.createSpyObj('AuthService', ['logout']);
+    authService = jasmine.createSpyObj('AuthService', ['logout', 'isAuthenticated']);
+    authService.isAuthenticated.and.returnValue(true);
 
     TestBed.configureTestingModule({
       providers: [
@@ -55,6 +56,13 @@ describe('authErrorInterceptor', () => {
     const oidcUrl = 'http://localhost:8080/plnd-dev/token';
     http.get(oidcUrl).subscribe({ error: () => {} });
     httpMock.expectOne(oidcUrl).flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(authService.logout).not.toHaveBeenCalled();
+  });
+
+  it('does not call logout when already unauthenticated (prevents loop on /auth/logout 401)', () => {
+    authService.isAuthenticated.and.returnValue(false);
+    http.get('/api/test').subscribe({ error: () => {} });
+    httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(authService.logout).not.toHaveBeenCalled();
   });
 

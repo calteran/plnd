@@ -145,7 +145,7 @@ describe('AuthService', () => {
     const router = TestBed.inject(Router);
     spyOn(router, 'navigate');
     service.logout();
-    expect(router.navigate).toHaveBeenCalledWith(['/login']);
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {});
   });
 
   describe('when localStorage already has a token on startup', () => {

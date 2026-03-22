@@ -103,11 +103,7 @@ export class AuthService {
     this.userIngredientPrefsService.clear();
     // logOut() clears OIDC library's stored tokens (id_token, access_token).
     this.oauthService.logOut(true); // true = do not redirect to IdP logout URL
-    if (reason) {
-      this.router.navigate(['/login'], { queryParams: { reason } });
-    } else {
-      this.router.navigate(['/login']);
-    }
+    this.router.navigate(['/login'], reason ? { queryParams: { reason } } : {});
 
     // Revoke the server-side session (fire-and-forget — errors are swallowed).
     const apiBase = this.config.getConfig().api.baseUrl;

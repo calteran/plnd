@@ -27,7 +27,8 @@ export const authErrorInterceptor: HttpInterceptorFn = (
       if (
         error instanceof HttpErrorResponse &&
         error.status === 401 &&
-        !req.url.includes(environment.oidc.issuerUrl)
+        !req.url.includes(environment.oidc.issuerUrl) &&
+        authService.isAuthenticated()
       ) {
         authService.logout('session_expired');
       }
