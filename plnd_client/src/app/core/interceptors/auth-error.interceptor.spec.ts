@@ -59,6 +59,16 @@ describe('authErrorInterceptor', () => {
     expect(authService.logout).not.toHaveBeenCalled();
   });
 
+  it('calls logout on a 401 when issuerUrl is an empty string (production default)', () => {
+    // String.prototype.includes('') is always true, so without the truthiness
+    // guard the OIDC check would bypass logout for every request in production.
+    // This test uses a backend URL and relies on the truthiness guard to allow
+    // logout when issuerUrl is falsy (empty string is the prod default).
+    http.get('/api/test').subscribe({ error: () => {} });
+    httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(authService.logout).toHaveBeenCalledWith('session_expired');
+  });
+
   it('does not call logout when already unauthenticated (prevents loop on /auth/logout 401)', () => {
     authService.isAuthenticated.and.returnValue(false);
     http.get('/api/test').subscribe({ error: () => {} });
