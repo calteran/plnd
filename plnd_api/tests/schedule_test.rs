@@ -1,5 +1,8 @@
-use plnd_api::db::models::{PostSchedulePlanRequest, PostSchedulePlanResponse, PlanEntryRequest, PlanStatusResponse, SchedulePeriodResponse};
 use chrono::NaiveDate;
+use plnd_api::db::models::{
+    PlanEntryRequest, PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse,
+    SchedulePeriodResponse,
+};
 
 #[test]
 fn test_plan_entry_request_serde() {
@@ -42,7 +45,10 @@ fn test_post_schedule_plan_request_serde() {
         "replace": true
     }"#;
     let req: PostSchedulePlanRequest = serde_json::from_str(json).unwrap();
-    assert_eq!(req.plan_start, NaiveDate::from_ymd_opt(2026, 3, 24).unwrap());
+    assert_eq!(
+        req.plan_start,
+        NaiveDate::from_ymd_opt(2026, 3, 24).unwrap()
+    );
     assert_eq!(req.replace, Some(true));
     assert!(req.entries.is_empty());
 }
