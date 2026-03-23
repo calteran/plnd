@@ -79,7 +79,7 @@ readonly yesterdayError = this._yesterdayError.asReadonly(); // string | null
 - **Left card (weather):** icon, current temperature, condition label, high/low for the day
 - **Right card (news):** "Headlines" label + 2–3 headline strings
 
-`YesterdaySnapshotComponent` renders a light muted strip below the schedule list: e.g. "Yesterday: 4 of 6 tasks done · All 3 meals logged". No nutrition figures, no calorie framing.
+`YesterdaySnapshotComponent` renders a light muted strip below the schedule list: e.g. "Yesterday: 4 of 6 tasks done · 2 of 3 meals logged". Both counts always use the `X of Y` format for consistency. No nutrition figures, no calorie framing.
 
 ---
 
@@ -118,7 +118,7 @@ Proxies a configurable news/RSS source. Returns 3–5 headline strings:
 
 Backend caches response with ~30 min TTL. Personalisation is deferred — generic feed only for this phase.
 
-News source is configurable via a new `news_feed_url` key in `[external_providers]` in `default.toml`, with a corresponding field in the `ExternalProvidersConfig` struct in `settings.rs` — matching the pattern used for `usda_fdc_api_key` and `themealdb_api_key`. This config key is added as part of the backend routes task (task 2).
+News source is configurable via a new `news_feed_url` key in `[external_providers]` in `default.toml`, with a corresponding field in the `ExternalProvidersConfig` struct in `plnd_api/src/config/settings.rs` — matching the pattern used for `usda_fdc_api_key` and `themealdb_api_key`. This config key is added as part of the backend routes task (task 2).
 
 ### `GET /briefing/yesterday`
 
