@@ -17,8 +17,8 @@ use plnd_api::config;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
-    auth, catalog_details, catalog_ingest, dietary_restrictions, preferences, search, system,
-    tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    auth, catalog_details, catalog_ingest, dietary_restrictions, preferences, schedule, search,
+    system, tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -247,6 +247,8 @@ async fn main() {
             "/tasks/weekly-plan",
             post(tasks::post_weekly_plan_task),
         )
+        .route("/schedule/period", get(schedule::get_period))
+        .route("/schedule/plan/status", get(schedule::get_plan_status))
         .route("/auth/logout", post(auth::logout))
         .layer(middleware::from_fn_with_state(
             state.clone(),

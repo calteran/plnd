@@ -1,4 +1,4 @@
-use plnd_api::db::models::{PostSchedulePlanRequest, PlanEntryRequest, PlanStatusResponse};
+use plnd_api::db::models::{PostSchedulePlanRequest, PlanEntryRequest, PlanStatusResponse, SchedulePeriodResponse};
 use chrono::NaiveDate;
 
 #[test]
@@ -53,4 +53,12 @@ fn test_plan_status_response_serde() {
     let resp: PlanStatusResponse = serde_json::from_str(json).unwrap();
     assert!(!resp.planned);
     assert_eq!(resp.entry_count, 0);
+}
+
+#[test]
+fn test_schedule_period_response_empty() {
+    let json = r#"{"entries":[],"carryover":[]}"#;
+    let resp: SchedulePeriodResponse = serde_json::from_str(json).unwrap();
+    assert!(resp.entries.is_empty());
+    assert!(resp.carryover.is_empty());
 }
