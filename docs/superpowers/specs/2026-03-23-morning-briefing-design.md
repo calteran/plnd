@@ -50,8 +50,8 @@ When `isToday` is false (any past or future date), `DayViewComponent` renders ex
 
 | Component | Location | Responsibility |
 |---|---|---|
-| `BriefingHeaderComponent` | `features/schedule/components/briefing-header/` | Weather card + news headlines card, side by side |
-| `YesterdaySnapshotComponent` | `features/schedule/components/yesterday-snapshot/` | Light yesterday recap (tasks done, meals logged) |
+| `BriefingHeaderComponent` | `features/day-view/components/briefing-header/` | Weather card + news headlines card, side by side |
+| `YesterdaySnapshotComponent` | `features/day-view/components/yesterday-snapshot/` | Light yesterday recap (tasks done, meals logged) |
 
 ### New service
 
@@ -133,9 +133,13 @@ Computes a summary from existing schedule data for the previous day:
 
 No nutrition figures. Count-only, intentionally light.
 
+**Field definitions:** `meals_planned` = count of `schedule_entries` with `task_type = 'meal'` for yesterday's date (regardless of whether a food item is linked to the entry). `meals_logged` = count of those entries where `status = 'completed'`. This means an "unplanned" meal slot that was never filled counts as planned but not logged — consistent with user expectation.
+
 ### Wake time (for future push notifications)
 
 A new `wake_time TIME` column on `user_preferences`, defaulting to `07:00`. Not used for anything in this phase — added now so it can be exposed in Settings and consumed by the Phase 5 push scheduler without a schema migration later.
+
+The Rust `UserPreferences` struct and the Angular `UserPreferences` TypeScript interface should be updated to include `wake_time` so `GET /preferences/me` returns it. However, **no Settings UI for wake time is added in this phase** — that is deferred to Phase 5 when the field is actually consumed by the push scheduler.
 
 ---
 
