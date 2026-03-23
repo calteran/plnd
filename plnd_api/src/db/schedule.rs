@@ -102,8 +102,7 @@ pub async fn commit_plan(
         sqlx::query(
             "DELETE FROM schedule_entries
              WHERE user_id = $1
-               AND date >= $2
-               AND date >= $3
+               AND date >= GREATEST($2, $3)
                AND date <= $4
                AND status = 'planned'
                AND date != ALL($5)",
