@@ -19,6 +19,14 @@
           <span class="sidebar-icon" aria-hidden="true">📅</span>
           <span class="sidebar-label">Today</span>
         </a>
+        <a routerLink="/plan/week" routerLinkActive="active"
+           class="sidebar-item" aria-label="Plan Week">
+          <span class="sidebar-icon" aria-hidden="true">📋</span>
+          <span class="sidebar-label">Plan Week</span>
+          @if (weekPlanService.hasUnplannedHorizon()) {
+            <span class="sidebar-badge" aria-label="Week not yet planned"></span>
+          }
+        </a>
       </nav>
     </aside>
 
@@ -33,6 +41,11 @@
        class="bottom-tab" aria-label="Today">
       <span class="tab-icon" aria-hidden="true">📅</span>
       <span class="tab-label">Today</span>
+    </a>
+    <a routerLink="/plan/week" routerLinkActive="active"
+       class="bottom-tab" aria-label="Plan Week">
+      <span class="tab-icon" aria-hidden="true">📋</span>
+      <span class="tab-label">Plan</span>
     </a>
   </nav>
 
