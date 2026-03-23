@@ -14,7 +14,7 @@ interface WeeklyPlanTaskResponse { task_id: string; }
 @Injectable({ providedIn: 'root' })
 export class WeekPlanService {
   private readonly http = inject(HttpClient);
-  private readonly config = inject(ConfigService);
+  private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
 
   private readonly DRAFT_KEY = 'plnd:plan-draft';
   private readonly SCHEMA_VERSION = 1;
@@ -94,16 +94,14 @@ export class WeekPlanService {
   }
 
   loadPeriod(start: string, end: string): Observable<SchedulePeriodResponse> {
-    const apiBase = this.config.getConfig().api.baseUrl;
     return this.http
-      .get<SchedulePeriodResponse>(`${apiBase}/schedule/period?start=${start}&end=${end}`)
+      .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period?start=${start}&end=${end}`)
       .pipe(tap(resp => this.carryoverItemsSignal.set(resp.carryover)));
   }
 
   checkPlanStatus(start: string, end: string): void {
-    const apiBase = this.config.getConfig().api.baseUrl;
     this.http
-      .get<PlanStatusResponse>(`${apiBase}/schedule/plan/status?start=${start}&end=${end}`)
+      .get<PlanStatusResponse>(`${this.apiBase}/schedule/plan/status?start=${start}&end=${end}`)
       .subscribe({
         next: resp => this.hasUnplannedHorizonSignal.set(!resp.planned),
         error: () => {},
@@ -112,9 +110,8 @@ export class WeekPlanService {
 
   commitPlan(taskId: string, replace = false): Observable<PostSchedulePlanResponse> {
     this.isSubmittingSignal.set(true);
-    const apiBase = this.config.getConfig().api.baseUrl;
     const req = this.buildCommitRequest(taskId, replace);
-    return this.http.post<PostSchedulePlanResponse>(`${apiBase}/schedule/plan`, req).pipe(
+    return this.http.post<PostSchedulePlanResponse>(`${this.apiBase}/schedule/plan`, req).pipe(
       tap(() => {
         this.clearDraft();
         this.hasUnplannedHorizonSignal.set(false);
@@ -129,9 +126,8 @@ export class WeekPlanService {
 
   /** Calls POST /tasks/weekly-plan to create or fetch the planning task for the horizon. */
   createOrFetchPlanTask(planStart: string): Observable<WeeklyPlanTaskResponse> {
-    const apiBase = this.config.getConfig().api.baseUrl;
     return this.http
-      .post<WeeklyPlanTaskResponse>(`${apiBase}/tasks/weekly-plan?plan_start=${planStart}`, {})
+      .post<WeeklyPlanTaskResponse>(`${this.apiBase}/tasks/weekly-plan?plan_start=${planStart}`, {})
       .pipe(tap(resp => this.planningTaskIdSignal.set(resp.task_id)));
   }
 

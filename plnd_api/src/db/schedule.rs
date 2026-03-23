@@ -173,28 +173,50 @@ pub async fn commit_plan(
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-    // Apply carryover decisions: update statuses of carry-over entries
+    // Apply carryover decisions: update carry-over entries
     for (entry_id_str, decision) in &req.carryover_decisions {
         let entry_id = match uuid::Uuid::parse_str(entry_id_str) {
             Ok(id) => id,
             Err(_) => continue,
         };
-        let new_status = match decision.as_str() {
-            "defer" => "deferred",
-            "dismiss" => "skipped",
-            "accept" => continue, // accepted items remain; wizard adds them explicitly via entries
+        match decision.as_str() {
+            "accept" => {
+                // Reschedule to the new horizon start, keeping status 'planned'
+                sqlx::query(
+                    "UPDATE schedule_entries SET date = $1, updated_at = NOW()
+                     WHERE entry_id = $2 AND user_id = $3",
+                )
+                .bind(req.plan_start)
+                .bind(entry_id)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+            }
+            "defer" => {
+                sqlx::query(
+                    "UPDATE schedule_entries SET status = 'deferred', updated_at = NOW()
+                     WHERE entry_id = $1 AND user_id = $2",
+                )
+                .bind(entry_id)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+            }
+            "dismiss" => {
+                sqlx::query(
+                    "UPDATE schedule_entries SET status = 'skipped', updated_at = NOW()
+                     WHERE entry_id = $1 AND user_id = $2",
+                )
+                .bind(entry_id)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+            }
             _ => continue,
-        };
-        sqlx::query(
-            "UPDATE schedule_entries SET status = $1, updated_at = NOW()
-             WHERE entry_id = $2 AND user_id = $3",
-        )
-        .bind(new_status)
-        .bind(entry_id)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        }
     }
 
     tx.commit()

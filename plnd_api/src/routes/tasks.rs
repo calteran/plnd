@@ -22,6 +22,9 @@ pub struct WeeklyPlanQuery {
     path = "/tasks/weekly-plan",
     tag = "Tasks",
     security(("bearer_auth" = [])),
+    params(
+        ("plan_start" = NaiveDate, Query, description = "ISO date of the planning horizon start"),
+    ),
     responses(
         (status = 200, description = "Existing or newly created planning task", body = Task),
         (status = 401, description = "Unauthorized"),
