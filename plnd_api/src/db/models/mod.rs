@@ -513,7 +513,7 @@ pub struct PlanEntryRequest {
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
-    pub scheduled_start: String, // "HH:MM" local time
+    pub scheduled_start: String, // "HH:MM" UTC wall-clock time
     pub after_milepost: Option<String>,
 }
 

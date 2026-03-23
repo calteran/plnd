@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, OnInit, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { PreferencesService } from '../../core/services/preferences.service';
@@ -101,16 +101,21 @@ export class SettingsComponent implements OnInit {
 
   pending = false;
 
-  ngOnInit(): void {
-    this.preferencesService.loadPreferences();
-    const prefs = this.preferencesService.preferences();
-    if (prefs) {
+  constructor() {
+    // Sync form when preferences load — they arrive asynchronously after ngOnInit.
+    effect(() => {
+      const prefs = this.preferencesService.preferences();
+      if (!prefs) return;
       this.form.patchValue({
         weekStartDay: prefs.week_start_day,
         planLengthDays: prefs.default_plan_length_days,
         planningTriggerOffset: prefs.planning_trigger_offset,
       });
-    }
+    });
+  }
+
+  ngOnInit(): void {
+    this.preferencesService.loadPreferences();
   }
 
   goBack(): void {

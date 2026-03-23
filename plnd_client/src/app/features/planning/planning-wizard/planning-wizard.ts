@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
@@ -77,28 +77,39 @@ export class PlanningWizardComponent implements OnInit {
 
   readonly steps = [1, 2, 3, 4, 5];
 
+  private sessionInitialized = false;
+
+  constructor() {
+    // React when preferences load (may arrive after ngOnInit due to async HTTP).
+    effect(() => {
+      const prefs = this.preferencesService.preferences();
+      if (!prefs || this.sessionInitialized) return;
+      this.sessionInitialized = true;
+
+      // Compute horizon start = next occurrence of configured week_start_day.
+      // triggerOffset only controls when the "Plan your week" TASK appears
+      // (handled by POST /tasks/weekly-plan) — it does NOT shift the horizon start.
+      const today = new Date();
+      const weekStartDay = prefs.week_start_day;
+      const planLengthDays = prefs.default_plan_length_days;
+
+      // Days until the next occurrence of weekStartDay (minimum 1 — never today if today is that day)
+      const daysUntilStart = ((weekStartDay - today.getDay()) + 7) % 7 || 7;
+      const planStart = new Date(today);
+      planStart.setDate(today.getDate() + daysUntilStart);
+      const planEnd = new Date(planStart);
+      planEnd.setDate(planStart.getDate() + planLengthDays - 1);
+
+      const planStartIso = toIsoDate(planStart);
+      this.weekPlanService.initSession(planStartIso, toIsoDate(planEnd));
+      this.weekPlanService.createOrFetchPlanTask(planStartIso).subscribe({
+        error: err => console.error('Failed to create planning task', err),
+      });
+    });
+  }
+
   ngOnInit(): void {
     this.preferencesService.loadPreferences();
-    const prefs = this.preferencesService.preferences();
-    // Compute horizon start = next occurrence of configured week_start_day.
-    // triggerOffset only controls when the "Plan your week" TASK appears
-    // (handled by POST /tasks/weekly-plan) — it does NOT shift the horizon start.
-    const today = new Date();
-    const weekStartDay = prefs?.week_start_day ?? 1; // default Monday
-    const planLengthDays = prefs?.default_plan_length_days ?? 7;
-
-    // Days until the next occurrence of weekStartDay (minimum 1 — never today if today is that day)
-    const daysUntilStart = ((weekStartDay - today.getDay()) + 7) % 7 || 7;
-    const planStart = new Date(today);
-    planStart.setDate(today.getDate() + daysUntilStart);
-    const planEnd = new Date(planStart);
-    planEnd.setDate(planStart.getDate() + planLengthDays - 1);
-
-    const planStartIso = toIsoDate(planStart);
-    this.weekPlanService.initSession(planStartIso, toIsoDate(planEnd));
-    this.weekPlanService.createOrFetchPlanTask(planStartIso).subscribe({
-      error: err => console.error('Failed to create planning task', err),
-    });
   }
 
   next(): void {

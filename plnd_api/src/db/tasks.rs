@@ -16,9 +16,15 @@ pub async fn create_weekly_plan_task(
 ) -> Result<Task, DatabaseError> {
     let trigger_date = plan_start + chrono::Duration::days(trigger_offset as i64);
     // Midnight UTC on the trigger date
-    let scheduled_start = Utc.from_utc_datetime(&trigger_date.and_hms_opt(0, 0, 0).unwrap());
+    let scheduled_start = Utc.from_utc_datetime(
+        &trigger_date
+            .and_hms_opt(0, 0, 0)
+            .ok_or_else(|| DatabaseError::QueryError("invalid trigger time".into()))?,
+    );
 
-    // Idempotency: check for existing weekly_plan task at this horizon
+    // Idempotency: check for existing weekly_plan task at this horizon.
+    // Lower bound uses trigger_date (not plan_start) to handle negative offsets correctly —
+    // when trigger_offset < 0 the task is scheduled before plan_start.
     let existing: Option<Task> = sqlx::query_as::<_, Task>(
         "SELECT t.task_id, t.user_id, t.title, t.task_type, t.scheduled_start,
                 t.duration_minutes, t.energy_required, t.status, t.is_milepost,
@@ -32,12 +38,18 @@ pub async fn create_weekly_plan_task(
          LIMIT 1",
     )
     .bind(user_id)
-    .bind(Utc.from_utc_datetime(&plan_start.and_hms_opt(0, 0, 0).unwrap()))
+    .bind(
+        Utc.from_utc_datetime(
+            &trigger_date
+                .and_hms_opt(0, 0, 0)
+                .ok_or_else(|| DatabaseError::QueryError("invalid trigger time".into()))?,
+        ),
+    )
     .bind(
         Utc.from_utc_datetime(
             &(plan_start + chrono::Duration::days(90))
                 .and_hms_opt(0, 0, 0)
-                .unwrap(),
+                .ok_or_else(|| DatabaseError::QueryError("invalid plan end time".into()))?,
         ),
     )
     .fetch_optional(pool)
