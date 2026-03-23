@@ -243,10 +243,7 @@ async fn main() {
             "/my/meals/{pref_id}/dishes/{dish_id}",
             delete(user_meal_prefs::remove_dish),
         )
-        .route(
-            "/tasks/weekly-plan",
-            post(tasks::post_weekly_plan_task),
-        )
+        .route("/tasks/weekly-plan", post(tasks::post_weekly_plan_task))
         .route("/schedule/period", get(schedule::get_period))
         .route("/schedule/plan/status", get(schedule::get_plan_status))
         .route("/schedule/plan", post(schedule::post_plan))

@@ -44,11 +44,16 @@ pub async fn post_weekly_plan_task(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    db::tasks::create_weekly_plan_task(pool, user_id, params.plan_start, prefs.planning_trigger_offset)
-        .await
-        .map(Json)
-        .map_err(|e| {
-            eprintln!("post_weekly_plan_task error: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
+    db::tasks::create_weekly_plan_task(
+        pool,
+        user_id,
+        params.plan_start,
+        prefs.planning_trigger_offset,
+    )
+    .await
+    .map(Json)
+    .map_err(|e| {
+        eprintln!("post_weekly_plan_task error: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })
 }

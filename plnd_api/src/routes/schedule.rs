@@ -1,6 +1,8 @@
 use crate::auth::jwt::Claims;
 use crate::db;
-use crate::db::models::{PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse, SchedulePeriodResponse};
+use crate::db::models::{
+    PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse, SchedulePeriodResponse,
+};
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Query, State},

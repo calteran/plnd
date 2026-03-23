@@ -16,8 +16,7 @@ pub async fn create_weekly_plan_task(
 ) -> Result<Task, DatabaseError> {
     let trigger_date = plan_start + chrono::Duration::days(trigger_offset as i64);
     // Midnight UTC on the trigger date
-    let scheduled_start = Utc
-        .from_utc_datetime(&trigger_date.and_hms_opt(0, 0, 0).unwrap());
+    let scheduled_start = Utc.from_utc_datetime(&trigger_date.and_hms_opt(0, 0, 0).unwrap());
 
     // Idempotency: check for existing weekly_plan task at this horizon
     let existing: Option<Task> = sqlx::query_as::<_, Task>(
@@ -34,9 +33,13 @@ pub async fn create_weekly_plan_task(
     )
     .bind(user_id)
     .bind(Utc.from_utc_datetime(&plan_start.and_hms_opt(0, 0, 0).unwrap()))
-    .bind(Utc.from_utc_datetime(
-        &(plan_start + chrono::Duration::days(90)).and_hms_opt(0, 0, 0).unwrap(),
-    ))
+    .bind(
+        Utc.from_utc_datetime(
+            &(plan_start + chrono::Duration::days(90))
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+        ),
+    )
     .fetch_optional(pool)
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
@@ -46,7 +49,10 @@ pub async fn create_weekly_plan_task(
     }
 
     // Create in a transaction: tasks + generic_tasks
-    let mut tx = pool.begin().await.map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     let task: Task = sqlx::query_as::<_, Task>(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, energy_required, status)
@@ -69,7 +75,9 @@ pub async fn create_weekly_plan_task(
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-    tx.commit().await.map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    tx.commit()
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     Ok(task)
 }
