@@ -143,6 +143,8 @@ A new `wake_time TIME` column on `user_preferences`, defaulting to `07:00`. Not 
 
 The Rust `UserPreferences` struct and the Angular `UserPreferences` TypeScript interface should be updated to include `wake_time` so `GET /preferences/me` returns it. However, **no Settings UI for wake time is added in this phase** — that is deferred to Phase 5 when the field is actually consumed by the push scheduler.
 
+> **Future consideration:** A static `wake_time` is a simplification. In practice, wake time should likely be inferred dynamically per day from the user's schedule history and daily plan (e.g. first scheduled item, calendar events). The static column serves as a seed value / manual override; the Phase 5 scheduler should treat it as a fallback rather than the source of truth.
+
 ---
 
 ## Quick-Adjust
