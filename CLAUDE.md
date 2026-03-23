@@ -6,8 +6,11 @@ Claude Code configuration for the PLND project. See AGENTS.md for full agent dir
 
 PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutrition, exercise, and daily planning. It consists of a Rust/Axum backend (`plnd_api`) and an Angular frontend (`plnd_client`).
 
-- **Current Phase**: Phase 2 — Core Features (in progress)
+- **Current Phase**: Phase 2.5 — Remaining Planning UI (in progress)
 - **Phase 1**: Foundation — COMPLETED (auth, database, basic API, Angular shell)
+- **Phase 2**: Core Features — COMPLETED (domain model, catalog/library API, external providers)
+
+> See [DOMAIN_MODEL.md](DOMAIN_MODEL.md) for domain architecture.
 
 ## Critical Rules
 
@@ -20,6 +23,9 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - **NEVER run `cargo run` directly**
 - Use `just verify-build` to check compilation
 - Use `just test-run-server` to test startup (auto-kills after 15s)
+
+### Branch Discipline
+- **NEVER commit directly to `main`** — always work on a feature or fix branch and open a PR
 
 ### Before Every Commit
 Run `just verify` — this executes the full quality suite and must pass cleanly.
@@ -56,50 +62,6 @@ just stop             # Stop running services
 just logs             # View service logs
 ```
 
-## Architecture
-
-### Backend: `plnd_api/` (Rust + Axum)
-
-```
-src/
-├── main.rs              # Entry point, router setup, server bind
-├── lib.rs               # Library root
-├── config/              # Settings loading, config errors
-├── auth/                # JWT, middleware, session, OAuth
-│   └── oauth/           # Provider trait, models, mock provider
-└── db/                  # Connection pooling, DB errors, models
-```
-
-Key routes: `/health`, `/ready`, `/auth/oauth/mock/authorize`, `/auth/oauth/mock/callback`
-
-- Use `thiserror` for domain errors, `anyhow` for application errors
-- SQLx macros for type-safe queries with migrations
-- Provider-agnostic OAuth via traits
-
-### Frontend: `plnd_client/` (Angular 21 + NgRx)
-
-```
-src/app/
-├── app.ts / app.config.ts / app.routes.ts
-└── core/
-    ├── services/         # ConfigService (reactive, validated)
-    └── models/           # TypeScript interfaces
-```
-
-- Strict TypeScript typing required
-- NgRx for state management
-- Angular signals for component state
-
-### Infrastructure
-
-- PostgreSQL 15 (port 5432)
-- API on port 3000
-- Mock OAuth2 server on port 8080 (navikt/mock-oauth2-server)
-- Angular dev server on port 4200
-- Nginx reverse proxy (production)
-
-Docker Compose handles the full development stack.
-
 ## Development Standards
 
 - Always use latest stable versions of Rust and Node.js dependencies
@@ -114,20 +76,4 @@ Docker Compose handles the full development stack.
 
 ## Environment Variables
 
-See `.env.example`:
-
-```
-APP_API__BASE_URL=0.0.0.0:3000
-APP_DATABASE__URL=postgres://plnd:plnd_dev@localhost/plnd_dev
-APP_DATABASE__MAX_CONNECTIONS=10
-APP_LOGGING__LEVEL=info
-```
-
-## Phase 2 Work
-
-Five parallel feature tracks (see `PHASE_TWO.md`):
-- **Team A**: Core infrastructure, routing, layouts, theming
-- **Team B**: Authentication UI, user profile management
-- **Team C**: Meal planning CRUD and UI
-- **Team D**: Exercise planning CRUD and UI
-- **Team E**: LLM integration and family support
+See `.env.example` for local development defaults. Secrets are managed via Doppler (`plnd/dev`) — do not hardcode credentials in TOML or compose files.
