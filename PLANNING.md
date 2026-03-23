@@ -245,7 +245,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [ ] Meal and exercise planning UI
 - [ ] Family profile management
 - [ ] Core planning interfaces (weekly schedule view)
-- [ ] Populated dashboard
+- [ ] Morning briefing
 
 ### Phase 3: AI Enhancements (Intelligent Features)
 **Goal**: Implement advanced LLM-powered planning capabilities

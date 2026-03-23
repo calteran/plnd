@@ -120,6 +120,8 @@ Backend caches response with ~30 min TTL. Personalisation is deferred — generi
 
 News source is configurable via a new `news_feed_url` key in `[external_providers]` in `default.toml`, with a corresponding field in the `ExternalProvidersConfig` struct in `plnd_api/src/config/settings.rs` — matching the pattern used for `usda_fdc_api_key` and `themealdb_api_key`. This config key is added as part of the backend routes task (task 2).
 
+RSS/Atom parsing requires a new Cargo dependency (e.g. the `feed-rs` crate). This is added as part of the backend routes task.
+
 ### `GET /briefing/yesterday`
 
 Computes a summary from existing schedule data for the previous day:
