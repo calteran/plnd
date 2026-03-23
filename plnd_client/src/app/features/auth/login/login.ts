@@ -33,7 +33,7 @@ import { AuthService } from '../../../core/services/auth.service';
       border-radius: 4px;
       padding: 0.5rem 1rem;
       margin-top: 1rem;
-      display: inline-block;
+      display: block;
     }
   `]
 })
