@@ -20,8 +20,8 @@ The planning todo appears in the day view like any other task. Completing the wi
 |---|---|
 | Wizard container | Full-page route — `/plan/week` replaces content while header + sidebar remain |
 | Planning horizon | Flexible: `plan_start_date` + `plan_end_date`, not fixed 7 days |
-| Horizon defaults | User-configurable: start day, plan length, trigger day (stored in `user_preferences`) |
-| Meal suggestions | Hardcoded stubs from user's library (Phase 3 LLM slot) |
+| Horizon defaults | User-configurable: start day, plan length, trigger offset (stored in `user_preferences`) |
+| Meal suggestions | Client-side mock data only — no API call (Phase 3 LLM slot) |
 | Day review UI | 7-day grid on desktop; horizontal swipe cards on mobile |
 | Re-plan scope | Skip past days — wizard only shows today + future days in horizon |
 | Planning task | Regular `task_type='custom'` task with `category='weekly_plan'` in day view |
@@ -34,7 +34,7 @@ The planning todo appears in the day view like any other task. Completing the wi
 
 ### Step 1 — Review (Carry-over)
 - Shows any tasks from the previous planning horizon that were not completed
-- User can: **Defer** (push to this horizon), **Dismiss** (mark as skipped), or **Accept** (include as-is)
+- User can: **Defer** (push to the *following* horizon — item gets `status = 'deferred'` and will reappear in the next planning session's carry-over list), **Dismiss** (mark as `skipped`, never resurfaces), or **Accept** (include in the current horizon as a new entry)
 - Also shows the horizon date range with a date-range picker to adjust: "Planning [Mon Mar 24] → [Sun Mar 30] — change?"
 - Auto-defaults: start = next occurrence of configured plan start day, end = start + `default_plan_length_days - 1`
 
@@ -46,10 +46,11 @@ The planning todo appears in the day view like any other task. Completing the wi
 
 ### Step 3 — Meals
 - For each day × slot (Breakfast, Lunch, Dinner, optional Snack):
-  - Shows a stub-suggested meal drawn from the user's `user_meals` library (hardcoded rotation logic)
-  - User can: **Accept**, **Swap** (pick from library), or **Skip** (leave slot empty)
-- Dietary restrictions are respected in stub filtering
-- LLM suggestion slot is intentionally left empty with a placeholder comment for Phase 3
+  - Shows a stub-suggested meal from a **client-side hardcoded mock array** — no API call, no user library lookup
+  - User can: **Accept**, **Swap** (pick from library via search/browse), or **Skip** (leave slot empty)
+- The mock array is a small static list of placeholder meal names (e.g. "Oatmeal", "Salad", "Pasta") cycled across slots
+- A `// TODO(phase-3): replace mock array with WeekPlanService.getMealSuggestions()` comment marks the LLM hook point
+- The swap picker (browse user_meals) does hit the real API; only the *suggestions* are mocked
 
 ### Step 4 — Day Review
 - **Desktop**: 7-day (or N-day) grid — one card per day showing meal summary + task count
@@ -77,32 +78,38 @@ The planning todo appears in the day view like any other task. Completing the wi
 
 ```sql
 ALTER TABLE user_preferences
-  ADD COLUMN week_start_day    SMALLINT NOT NULL DEFAULT 1,  -- 0=Sun ... 6=Sat
-  ADD COLUMN planning_trigger_day SMALLINT NOT NULL DEFAULT 0, -- day the task appears (0=same as week_start_day is handled in app logic)
+  ADD COLUMN week_start_day           SMALLINT NOT NULL DEFAULT 1,  -- 0=Sun ... 6=Sat
+  ADD COLUMN planning_trigger_offset  SMALLINT NOT NULL DEFAULT 0,  -- days relative to plan_start: -1=day before, 0=first day, 1=second day, etc.
   ADD COLUMN default_plan_length_days SMALLINT NOT NULL DEFAULT 7;
 
 -- CHECK constraints:
 -- week_start_day BETWEEN 0 AND 6
--- planning_trigger_day BETWEEN 0 AND 6
+-- planning_trigger_offset BETWEEN -14 AND 14
 -- default_plan_length_days BETWEEN 1 AND 90
 ```
 
-### `planning_trigger_day` Semantics
+### `planning_trigger_offset` Semantics
 
-`planning_trigger_day` stores values 0–6 (Sun–Sat). A stored value of **0 is special**: it means "same day as `week_start_day`" and is resolved to the actual day-of-week in application logic (both backend and frontend). This allows users to change their week start and have the trigger follow automatically without a second preference update.
+`planning_trigger_offset` is a signed day count **relative to `plan_start`** (the first day of the horizon):
 
-Consequence: a user who genuinely wants Sunday as their trigger day but has Monday as their week start cannot express this directly (their Sunday preference would be misread as "follow week_start_day"). This is an intentional Phase 2.5 trade-off — the sentinel covers the common case. A Phase 3 settings improvement could replace the sentinel with an explicit boolean `trigger_same_as_week_start`.
+| Value | Meaning |
+|---|---|
+| `-1` | Day before the horizon starts — plan ahead |
+| `0` | First day of the horizon (default) |
+| `1` | Second day of the horizon |
+
+The "Plan your week" task's `scheduled_start` = `plan_start + planning_trigger_offset days`. A value of `-1` means the task appears the day before the new period begins, prompting the user to plan ahead.
 
 ### Planning Task Auto-creation
 
-When a user loads the day view on or after `planning_trigger_day` and no `weekly_plan` task exists for the current horizon:
+When a user loads the day view on or after `plan_start + planning_trigger_offset` and no `weekly_plan` task exists for the current horizon:
 - Frontend checks `WeekPlanService.hasActivePlanTask()` (signal, loaded on auth)
 - If absent, calls `POST /tasks/weekly-plan` to auto-create the task
 - Backend inserts into **both** tables in a transaction:
-  - `tasks`: `task_id` (new UUID), `user_id`, `task_type = 'custom'`, `title = 'Plan your week'`, `scheduled_start` = midnight on `planning_trigger_day` of the current horizon, `status = 'planned'`
+  - `tasks`: `task_id` (new UUID), `user_id`, `task_type = 'custom'`, `title = 'Plan your week'`, `scheduled_start` = midnight on `plan_start + planning_trigger_offset`, `status = 'planned'`
   - `generic_tasks`: same `task_id`, `category = 'weekly_plan'`, `priority = 'normal'`
 - Endpoint is idempotent: checks `generic_tasks WHERE category = 'weekly_plan' AND tasks.scheduled_start >= plan_start` before inserting; returns existing task if found
-- Appears in the day view like any other task on `planning_trigger_day`
+- Appears in the day view like any other task on the trigger date
 
 ### Optional: `week_plan_drafts`
 
@@ -276,9 +283,10 @@ Mobile bottom tab: add "Plan" tab alongside "Today".
 
 ## Settings Page Changes
 
-Add two fields to `settings.ts`:
+Add three fields to `settings.ts`:
 1. **Week starts on** — `<select>` for `week_start_day` (Sun/Mon/Tue…)
 2. **Plan horizon length** — numeric input for `default_plan_length_days` (default 7, min 1, max 90)
+3. **Planning reminder** — numeric input for `planning_trigger_offset` with label "days before/after horizon start" (default 0; negative = before, positive = after)
 
 Wired to `preferences.service.ts` via `PATCH /preferences/me`.
 
@@ -311,7 +319,7 @@ When the user clicks "Plan Week" from the sidebar and a committed plan already e
 
 End-to-end test flow:
 1. Load app as authenticated, onboarded user
-2. Navigate to the day view on `planning_trigger_day` — confirm "Plan your week" task appears
+2. Navigate to the day view on `plan_start + planning_trigger_offset` — confirm "Plan your week" task appears
 3. Tap the task → wizard loads at `/plan/week`, Step 1 shows
 4. Adjust horizon dates → step persists updated range throughout wizard
 5. Complete all 5 steps — confirm localStorage draft is written after each step
