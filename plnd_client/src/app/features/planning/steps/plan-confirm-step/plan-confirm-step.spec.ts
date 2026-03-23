@@ -39,7 +39,6 @@ describe('PlanConfirmStepComponent', () => {
     spyOn(service, 'commitPlan').and.returnValue(
       of({ committed: 0, planning_task_status: 'completed' })
     );
-    fixture.componentInstance.planningTaskId = 'task-uuid';
     fixture.detectChanges();
     const btn = fixture.nativeElement.querySelector('.btn-finish');
     btn.click();

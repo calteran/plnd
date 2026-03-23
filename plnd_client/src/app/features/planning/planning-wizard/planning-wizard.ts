@@ -43,7 +43,7 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
           @case (2) { <app-plan-tasks-step /> }
           @case (3) { <app-plan-meals-step /> }
           @case (4) { <app-plan-day-grid-step /> }
-          @case (5) { <app-plan-confirm-step [planningTaskId]="weekPlanService.planningTaskId()" /> }
+          @case (5) { <app-plan-confirm-step /> }
         }
       </div>
 
@@ -93,8 +93,8 @@ export class PlanningWizardComponent implements OnInit {
       const weekStartDay = prefs.week_start_day;
       const planLengthDays = prefs.default_plan_length_days;
 
-      // Days until the next occurrence of weekStartDay (minimum 1 — never today if today is that day)
-      const daysUntilStart = ((weekStartDay - today.getDay()) + 7) % 7 || 7;
+      // Days until the next occurrence of weekStartDay (0 = today is the start day)
+      const daysUntilStart = ((weekStartDay - today.getDay()) + 7) % 7;
       const planStart = new Date(today);
       planStart.setDate(today.getDate() + daysUntilStart);
       const planEnd = new Date(planStart);

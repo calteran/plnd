@@ -96,7 +96,42 @@ export class WeekPlanService {
   loadPeriod(start: string, end: string): Observable<SchedulePeriodResponse> {
     return this.http
       .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period?start=${start}&end=${end}`)
-      .pipe(tap(resp => this.carryoverItemsSignal.set(resp.carryover)));
+      .pipe(tap(resp => {
+        this.carryoverItemsSignal.set(resp.carryover);
+        // Populate plan state from server entries when no local draft is loaded.
+        // This supports re-plan mode (spec §298): existing entries pre-fill the wizard
+        // so the user edits the current plan rather than starting from scratch.
+        if (
+          this.scheduledTasksSignal().length === 0 &&
+          Object.keys(this.scheduledMealsSignal()).length === 0
+        ) {
+          const tasks: PlannedTask[] = [];
+          const meals: Record<string, Partial<Record<MealSlot, PlannedMeal>>> = {};
+          for (const entry of resp.entries) {
+            if (entry.task_type === 'meal' && entry.after_milepost) {
+              const slot = entry.after_milepost as MealSlot;
+              meals[entry.date] ??= {};
+              meals[entry.date][slot] = {
+                type: entry.task_ref_type === 'user_meal' ? 'user_meal' : 'mock',
+                id: entry.task_ref_id,
+                title: entry.title ?? slot,
+              };
+            } else {
+              tasks.push({
+                date: entry.date,
+                title: entry.title ?? entry.task_type,
+                energy: 'medium',
+                task_type: entry.task_type,
+                task_ref_id: entry.task_ref_id,
+                task_ref_type: entry.task_ref_type,
+                scheduled_start: entry.scheduled_start?.slice(11, 16),
+              });
+            }
+          }
+          if (tasks.length) this.scheduledTasksSignal.set(tasks);
+          if (Object.keys(meals).length) this.scheduledMealsSignal.set(meals);
+        }
+      }));
   }
 
   checkPlanStatus(start: string, end: string): void {

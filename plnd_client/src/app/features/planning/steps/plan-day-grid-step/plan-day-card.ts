@@ -1,4 +1,4 @@
-import { Component, Input, inject } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealSlot } from '../../../../core/models/week-plan';
@@ -12,9 +12,9 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
   template: `
     <div class="day-card" [class.expanded]="expanded" (click)="toggle()">
       <div class="card-header">
-        <strong>{{ date }}</strong>
-        <span class="task-count">{{ taskCount }} task(s)</span>
-        <span class="meal-count">{{ mealCount }} meal(s)</span>
+        <strong>{{ date() }}</strong>
+        <span class="task-count">{{ taskCount() }} task(s)</span>
+        <span class="meal-count">{{ mealCount() }} meal(s)</span>
       </div>
       @if (expanded) {
         <div class="card-body">
@@ -30,7 +30,7 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
           </ul>
           <h4>Tasks</h4>
           <ul>
-            @for (task of tasks; track $index) {
+            @for (task of tasks(); track $index) {
               <li>{{ task.title }} ({{ task.energy }})</li>
             }
           </ul>
@@ -40,7 +40,7 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
   `
 })
 export class PlanDayCardComponent {
-  @Input({ required: true }) date!: string;
+  readonly date = input.required<string>();
 
   private readonly weekPlanService = inject(WeekPlanService);
   expanded = false;
@@ -48,8 +48,10 @@ export class PlanDayCardComponent {
 
   toggle(): void { this.expanded = !this.expanded; }
 
-  get tasks() { return this.weekPlanService.scheduledTasks().filter(t => t.date === this.date); }
-  get taskCount() { return this.tasks.length; }
-  getMeal(slot: MealSlot) { return this.weekPlanService.scheduledMeals()[this.date]?.[slot]; }
-  get mealCount() { return this.slots.filter(s => this.getMeal(s)).length; }
+  readonly tasks = computed(() =>
+    this.weekPlanService.scheduledTasks().filter(t => t.date === this.date())
+  );
+  readonly taskCount = computed(() => this.tasks().length);
+  getMeal(slot: MealSlot) { return this.weekPlanService.scheduledMeals()[this.date()]?.[slot]; }
+  readonly mealCount = computed(() => this.slots.filter(s => this.getMeal(s)).length);
 }

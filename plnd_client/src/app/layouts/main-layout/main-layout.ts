@@ -28,7 +28,7 @@ export class MainLayoutComponent implements OnInit {
       if (!prefs || this.statusChecked) return;
       this.statusChecked = true;
       const today = new Date();
-      const daysUntilStart = ((prefs.week_start_day - today.getDay()) + 7) % 7 || 7;
+      const daysUntilStart = ((prefs.week_start_day - today.getDay()) + 7) % 7;
       const planStart = new Date(today);
       planStart.setDate(today.getDate() + daysUntilStart);
       const planEnd = new Date(planStart);

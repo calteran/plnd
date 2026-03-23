@@ -1,4 +1,4 @@
-import { Component, Input, computed, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealSlot } from '../../../../core/models/week-plan';
@@ -46,8 +46,6 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
   `
 })
 export class PlanConfirmStepComponent {
-  @Input() planningTaskId = '';
-
   readonly weekPlanService = inject(WeekPlanService);
   private readonly router = inject(Router);
 
@@ -70,7 +68,7 @@ export class PlanConfirmStepComponent {
 
   finish(): void {
     this.errorMessage = '';
-    this.weekPlanService.commitPlan(this.planningTaskId).subscribe({
+    this.weekPlanService.commitPlan(this.weekPlanService.planningTaskId()).subscribe({
       next: () => {
         this.router.navigate(['/day', this.weekPlanService.planStart()]);
       },
