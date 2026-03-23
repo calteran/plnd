@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, TimeZone};
+use chrono::{NaiveDate, NaiveTime};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -83,36 +83,21 @@ pub async fn commit_plan(
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-    // If replace=true, delete planned entries for unstarted days only
+    // If replace=true, delete all planned entries in the horizon from today onward.
+    // in_progress and completed entries are unaffected by the status = 'planned' filter.
     if replace {
-        // Find days with any in_progress or completed entry (these are "started")
-        let started_days: Vec<NaiveDate> = sqlx::query_scalar(
-            "SELECT DISTINCT date FROM schedule_entries
-             WHERE user_id = $1 AND date >= $2 AND date <= $3
-               AND status IN ('in_progress', 'completed')",
-        )
-        .bind(user_id)
-        .bind(req.plan_start)
-        .bind(req.plan_end)
-        .fetch_all(&mut *tx)
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-        // Delete planned entries for unstarted days from today onward
         sqlx::query(
             "DELETE FROM schedule_entries
              WHERE user_id = $1
                AND date >= $2
                AND date >= $3
                AND date <= $4
-               AND status = 'planned'
-               AND date != ALL($5)",
+               AND status = 'planned'",
         )
         .bind(user_id)
         .bind(today)
         .bind(req.plan_start)
         .bind(req.plan_end)
-        .bind(&started_days)
         .execute(&mut *tx)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
@@ -122,24 +107,9 @@ pub async fn commit_plan(
     let mut committed: i64 = 0;
     for entry in &req.entries {
         // Parse "HH:MM" + date into TIMESTAMPTZ (UTC)
-        let time_parts: Vec<&str> = entry.scheduled_start.split(':').collect();
-        if time_parts.len() != 2 {
-            return Err(DatabaseError::QueryError(
-                "invalid scheduled_start format".into(),
-            ));
-        }
-        let hour: u32 = time_parts[0]
-            .parse()
-            .map_err(|_| DatabaseError::QueryError("invalid hour".into()))?;
-        let minute: u32 = time_parts[1]
-            .parse()
-            .map_err(|_| DatabaseError::QueryError("invalid minute".into()))?;
-        let scheduled_start = chrono::Utc.from_utc_datetime(
-            &entry
-                .date
-                .and_hms_opt(hour, minute, 0)
-                .ok_or_else(|| DatabaseError::QueryError("invalid time".into()))?,
-        );
+        let naive_time = NaiveTime::parse_from_str(&entry.scheduled_start, "%H:%M")
+            .map_err(|_| DatabaseError::QueryError("invalid scheduled_start format".into()))?;
+        let scheduled_start = entry.date.and_time(naive_time).and_utc();
 
         sqlx::query(
             "INSERT INTO schedule_entries
@@ -181,9 +151,14 @@ pub async fn commit_plan(
         };
         match decision.as_str() {
             "accept" => {
-                // Reschedule to the new horizon start, keeping status 'planned'
+                // Reschedule to the new horizon start, keeping status 'planned'.
+                // Update both `date` and `scheduled_start` so the absolute TIMESTAMPTZ
+                // moves to the new date while preserving the wall-clock time (UTC).
                 sqlx::query(
-                    "UPDATE schedule_entries SET date = $1, updated_at = NOW()
+                    "UPDATE schedule_entries
+                     SET date = $1,
+                         scheduled_start = ($1 + (scheduled_start AT TIME ZONE 'UTC')::time) AT TIME ZONE 'UTC',
+                         updated_at = NOW()
                      WHERE entry_id = $2 AND user_id = $3",
                 )
                 .bind(req.plan_start)

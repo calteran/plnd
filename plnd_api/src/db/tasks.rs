@@ -33,25 +33,11 @@ pub async fn create_weekly_plan_task(
          JOIN generic_tasks gt USING (task_id)
          WHERE t.user_id = $1
            AND gt.category = 'weekly_plan'
-           AND t.scheduled_start >= $2
-           AND t.scheduled_start < $3
+           AND t.scheduled_start = $2
          LIMIT 1",
     )
     .bind(user_id)
-    .bind(
-        Utc.from_utc_datetime(
-            &trigger_date
-                .and_hms_opt(0, 0, 0)
-                .ok_or_else(|| DatabaseError::QueryError("invalid trigger time".into()))?,
-        ),
-    )
-    .bind(
-        Utc.from_utc_datetime(
-            &(plan_start + chrono::Duration::days(90))
-                .and_hms_opt(0, 0, 0)
-                .ok_or_else(|| DatabaseError::QueryError("invalid plan end time".into()))?,
-        ),
-    )
+    .bind(scheduled_start)
     .fetch_optional(pool)
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
