@@ -36,4 +36,11 @@ describe('PlanMealsStepComponent', () => {
     acceptBtn?.click();
     expect(service.setMeal).toHaveBeenCalled();
   });
+
+  it('should call clearMeal when Skip is clicked', () => {
+    spyOn(service, 'clearMeal');
+    const skipBtn = fixture.nativeElement.querySelector('button:not([data-action])');
+    skipBtn?.click();
+    expect(service.clearMeal).toHaveBeenCalled();
+  });
 });
