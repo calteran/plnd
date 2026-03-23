@@ -240,10 +240,6 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [ ] YesterdaySnapshotComponent (light recap strip)
   - [ ] DayViewComponent `isToday` wiring
 
-- [ ] **Dashboard (real content)**
-  - [ ] Replace stub with a real planning home screen per the design spec
-  - *Note: `/dashboard` currently redirects to `/today` (day view)*
-
 **Deliverables:**
 - [x] Day view with daily schedule (meals, tasks, exercises) and `/today`/`/yesterday`/`/tomorrow` route aliases
 - [ ] Meal and exercise planning UI
