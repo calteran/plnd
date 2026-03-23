@@ -249,6 +249,7 @@ async fn main() {
         )
         .route("/schedule/period", get(schedule::get_period))
         .route("/schedule/plan/status", get(schedule::get_plan_status))
+        .route("/schedule/plan", post(schedule::post_plan))
         .route("/auth/logout", post(auth::logout))
         .layer(middleware::from_fn_with_state(
             state.clone(),

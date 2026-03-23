@@ -1,4 +1,4 @@
-use plnd_api::db::models::{PostSchedulePlanRequest, PlanEntryRequest, PlanStatusResponse, SchedulePeriodResponse};
+use plnd_api::db::models::{PostSchedulePlanRequest, PostSchedulePlanResponse, PlanEntryRequest, PlanStatusResponse, SchedulePeriodResponse};
 use chrono::NaiveDate;
 
 #[test]
@@ -61,4 +61,15 @@ fn test_schedule_period_response_empty() {
     let resp: SchedulePeriodResponse = serde_json::from_str(json).unwrap();
     assert!(resp.entries.is_empty());
     assert!(resp.carryover.is_empty());
+}
+
+#[test]
+fn test_post_schedule_plan_response_serde() {
+    let resp = PostSchedulePlanResponse {
+        committed: 14,
+        planning_task_status: "completed".to_string(),
+    };
+    let json = serde_json::to_string(&resp).unwrap();
+    assert!(json.contains("14"));
+    assert!(json.contains("completed"));
 }

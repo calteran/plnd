@@ -1,6 +1,6 @@
 use crate::auth::jwt::Claims;
 use crate::db;
-use crate::db::models::{PlanStatusResponse, SchedulePeriodResponse};
+use crate::db::models::{PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse, SchedulePeriodResponse};
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Query, State},
@@ -80,6 +80,39 @@ pub async fn get_plan_status(
         .map(Json)
         .map_err(|e| {
             eprintln!("get_plan_status error: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
+}
+
+#[utoipa::path(
+    post,
+    path = "/schedule/plan",
+    tag = "Schedule",
+    request_body = PostSchedulePlanRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Plan committed", body = PostSchedulePlanResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+pub async fn post_plan(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(body): Json<PostSchedulePlanRequest>,
+) -> Result<Json<PostSchedulePlanResponse>, StatusCode> {
+    if body.plan_end < body.plan_start {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let pool = state.db.get_pool();
+
+    db::schedule::commit_plan(pool, user_id, &body)
+        .await
+        .map(Json)
+        .map_err(|e| {
+            eprintln!("post_plan error: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }
