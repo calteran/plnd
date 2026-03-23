@@ -24,6 +24,9 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - Use `just verify-build` to check compilation
 - Use `just test-run-server` to test startup (auto-kills after 15s)
 
+### Branch Discipline
+- **NEVER commit directly to `main`** — always work on a feature or fix branch and open a PR
+
 ### Before Every Commit
 Run `just verify` — this executes the full quality suite and must pass cleanly.
 
