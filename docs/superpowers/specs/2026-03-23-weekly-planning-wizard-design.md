@@ -87,14 +87,21 @@ ALTER TABLE user_preferences
 -- default_plan_length_days BETWEEN 1 AND 90
 ```
 
+### `planning_trigger_day` Semantics
+
+`planning_trigger_day` stores values 0–6 (Sun–Sat). A stored value of **0 is special**: it means "same day as `week_start_day`" and is resolved to the actual day-of-week in application logic (both backend and frontend). This allows users to change their week start and have the trigger follow automatically without a second preference update.
+
+Consequence: a user who genuinely wants Sunday as their trigger day but has Monday as their week start cannot express this directly (their Sunday preference would be misread as "follow week_start_day"). This is an intentional Phase 2.5 trade-off — the sentinel covers the common case. A Phase 3 settings improvement could replace the sentinel with an explicit boolean `trigger_same_as_week_start`.
+
 ### Planning Task Auto-creation
 
 When a user loads the day view on or after `planning_trigger_day` and no `weekly_plan` task exists for the current horizon:
 - Frontend checks `WeekPlanService.hasActivePlanTask()` (signal, loaded on auth)
-- If absent, calls `POST /tasks/weekly-plan` to auto-create a `generic_tasks` row:
-  - `task_type = 'custom'`, `category = 'weekly_plan'`
-  - `scheduled_start` = start of the current planning horizon
-  - `title = 'Plan your week'`
+- If absent, calls `POST /tasks/weekly-plan` to auto-create the task
+- Backend inserts into **both** tables in a transaction:
+  - `tasks`: `task_id` (new UUID), `user_id`, `task_type = 'custom'`, `title = 'Plan your week'`, `scheduled_start` = midnight on `planning_trigger_day` of the current horizon, `status = 'planned'`
+  - `generic_tasks`: same `task_id`, `category = 'weekly_plan'`, `priority = 'normal'`
+- Endpoint is idempotent: checks `generic_tasks WHERE category = 'weekly_plan' AND tasks.scheduled_start >= plan_start` before inserting; returns existing task if found
 - Appears in the day view like any other task on `planning_trigger_day`
 
 ### Optional: `week_plan_drafts`
@@ -123,9 +130,11 @@ Returns existing `schedule_entries` for the period (for the Review and Day Revie
 ```json
 {
   "entries": [ /* ScheduleEntry[] */ ],
-  "carryover": [ /* incomplete tasks from previous horizon */ ]
+  "carryover": [ /* incomplete tasks from before `start` */ ]
 }
 ```
+
+**Carryover definition**: The backend returns all `schedule_entries` for the user where `date < start` AND `status IN ('planned', 'deferred')`. No knowledge of previous horizon boundaries is required — "carryover" simply means any unfinished planned item from before the requested period. The client does not need to send `prev_start`/`prev_end`.
 
 ### `POST /schedule/plan`
 
@@ -151,6 +160,20 @@ Batch-creates schedule entries for all days in the horizon and marks the plannin
 ```
 
 Returns: `{ "committed": <count>, "planning_task": { "status": "completed" } }`
+
+Note on `scheduled_start`: the request body sends a plain time string (`"08:00"`). The backend combines `date` + `scheduled_start` time into a full `TIMESTAMPTZ` using the user's timezone (from preferences or UTC default). The client always sends time as `HH:MM` local time; timezone resolution is the backend's responsibility.
+
+### `GET /schedule/plan/status`
+
+**Query params**: `start=2026-03-24&end=2026-03-30`
+
+Lightweight status check called on login to drive the sidebar badge. Returns whether a committed plan exists for the given horizon.
+
+```json
+{ "planned": false, "entry_count": 0 }
+```
+
+`planned: true` means at least one committed `schedule_entry` exists for the period. `entry_count` is the total number of entries (informational). This endpoint does not return entry details — use `GET /schedule/period` for that.
 
 ### `PUT /schedule/plan/draft` *(optional, Phase 3)*
 
@@ -187,6 +210,9 @@ Signals:
 - `scheduledMeals: Signal<PlannedMeal[]>` (keyed by date + slot)
 - `isSubmitting: Signal<boolean>`
 
+Signals (additional):
+- `hasUnplannedHorizon: Signal<boolean>` — true when the current horizon has no committed plan; drives the sidebar badge. Safe to inject globally (derived from a lightweight API check on auth, not from wizard session state).
+
 Methods:
 - `initSession(start, end)` — sets horizon, loads draft from localStorage
 - `saveDraft()` — writes to `localStorage` key `plnd:plan-draft`
@@ -194,6 +220,8 @@ Methods:
 - `commitPlan()` — calls `POST /schedule/plan`, clears draft
 - `clearDraft()` — on cancel
 - `hasActivePlanTask()` — checks for existing `weekly_plan` task this horizon
+
+Note: `hasUnplannedHorizon` is computed from a lightweight `GET /schedule/plan/status?start=&end=` query on login (not from the full wizard state), so the sidebar badge does not require the wizard to be active.
 
 **localStorage draft shape**:
 ```json
@@ -262,7 +290,9 @@ When the user clicks "Plan Week" from the sidebar and a committed plan already e
 1. Load existing entries for the remaining horizon (today → `plan_end`)
 2. Wizard starts at Step 1 (Review) but carry-over section is replaced with "Existing plan for remaining days"
 3. Past days are excluded — wizard only covers today and forward
-4. On Finish: `POST /schedule/plan` with `replace: true` replaces entries for unstarted days only
+4. On Finish: `POST /schedule/plan` with `replace: true`
+
+**`replace: true` semantics**: The backend replaces entries for **unstarted days** only. An unstarted day is defined as: `date >= today AND no schedule_entries for that date have status IN ('in_progress', 'completed')`. For each such day, the handler DELETEs all existing entries with `status = 'planned'` for that date, then INSERTs the new entries from the request. Days with any `in_progress` or `completed` entries are left untouched even if `replace: true` is set.
 
 ---
 
