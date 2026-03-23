@@ -232,16 +232,20 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [ ] Enable shared meal planning for family members
   - [ ] Implement caregiver access roles and permissions
 
-- [ ] **Dashboard (real content)**
-  - [ ] Replace stub with a real planning home screen per the design spec
-  - *Note: `/dashboard` currently redirects to `/today` (day view)*
+- [ ] **Morning Briefing** — *See `docs/superpowers/specs/2026-03-23-morning-briefing-design.md`*
+  - [ ] Briefing data model (`wake_time` on user_preferences)
+  - [ ] Briefing backend routes (`/briefing/weather`, `/briefing/news`, `/briefing/yesterday`)
+  - [ ] BriefingService (Angular)
+  - [ ] BriefingHeaderComponent (weather + news cards)
+  - [ ] YesterdaySnapshotComponent (light recap strip)
+  - [ ] DayViewComponent `isToday` wiring
 
 **Deliverables:**
 - [x] Day view with daily schedule (meals, tasks, exercises) and `/today`/`/yesterday`/`/tomorrow` route aliases
 - [ ] Meal and exercise planning UI
 - [ ] Family profile management
 - [ ] Core planning interfaces (weekly schedule view)
-- [ ] Populated dashboard
+- [ ] Morning briefing
 
 ### Phase 3: AI Enhancements (Intelligent Features)
 **Goal**: Implement advanced LLM-powered planning capabilities
