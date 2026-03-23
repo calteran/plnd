@@ -50,6 +50,10 @@ export class PlanReviewStepComponent implements OnInit {
   loading = true;
 
   ngOnInit(): void {
+    if (!this.weekPlanService.planStart()) {
+      this.loading = false;
+      return;
+    }
     this.weekPlanService
       .loadPeriod(this.weekPlanService.planStart(), this.weekPlanService.planEnd())
       .subscribe({ next: () => (this.loading = false), error: () => (this.loading = false) });
