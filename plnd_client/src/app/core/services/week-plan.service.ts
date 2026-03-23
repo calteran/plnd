@@ -9,6 +9,8 @@ import {
   PlanStatusResponse, SchedulePeriodResponse,
 } from '../models/week-plan';
 
+interface WeeklyPlanTaskResponse { task_id: string; }
+
 @Injectable({ providedIn: 'root' })
 export class WeekPlanService {
   private readonly http = inject(HttpClient);
@@ -26,6 +28,7 @@ export class WeekPlanService {
   private readonly carryoverDecisionsSignal = signal<Record<string, CarryoverDecision>>({});
   private readonly hasUnplannedHorizonSignal = signal<boolean>(false);
   private readonly isSubmittingSignal = signal<boolean>(false);
+  private readonly planningTaskIdSignal = signal<string>('');
 
   readonly planStart = this.planStartSignal.asReadonly();
   readonly planEnd = this.planEndSignal.asReadonly();
@@ -36,12 +39,13 @@ export class WeekPlanService {
   readonly carryoverDecisions = this.carryoverDecisionsSignal.asReadonly();
   readonly hasUnplannedHorizon = this.hasUnplannedHorizonSignal.asReadonly();
   readonly isSubmitting = this.isSubmittingSignal.asReadonly();
+  readonly planningTaskId = this.planningTaskIdSignal.asReadonly();
 
   initSession(start: string, end: string): void {
     this.planStartSignal.set(start);
     this.planEndSignal.set(end);
     const draft = this.loadDraft();
-    if (draft && draft.planStart === start) {
+    if (draft && draft.planStart === start && draft.planEnd === end) {
       this.currentStepSignal.set(draft.currentStep);
       this.carryoverDecisionsSignal.set(draft.carryoverDecisions);
       this.scheduledMealsSignal.set(draft.scheduledMeals);
@@ -123,6 +127,14 @@ export class WeekPlanService {
     );
   }
 
+  /** Calls POST /tasks/weekly-plan to create or fetch the planning task for the horizon. */
+  createOrFetchPlanTask(planStart: string): Observable<WeeklyPlanTaskResponse> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http
+      .post<WeeklyPlanTaskResponse>(`${apiBase}/tasks/weekly-plan?plan_start=${planStart}`, {})
+      .pipe(tap(resp => this.planningTaskIdSignal.set(resp.task_id)));
+  }
+
   setCarryoverDecision(entryId: string, decision: CarryoverDecision): void {
     this.carryoverDecisionsSignal.update(d => ({ ...d, [entryId]: decision }));
   }
@@ -179,6 +191,7 @@ export class WeekPlanService {
     this.carryoverDecisionsSignal.set({});
     this.hasUnplannedHorizonSignal.set(false);
     this.isSubmittingSignal.set(false);
+    this.planningTaskIdSignal.set('');
   }
 
   private buildCommitRequest(taskId: string, replace: boolean): PostSchedulePlanRequest {

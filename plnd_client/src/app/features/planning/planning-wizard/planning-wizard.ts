@@ -1,5 +1,4 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
@@ -13,7 +12,6 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
   selector: 'app-planning-wizard',
   standalone: true,
   imports: [
-    CommonModule,
     PlanReviewStepComponent,
     PlanTasksStepComponent,
     PlanMealsStepComponent,
@@ -45,7 +43,7 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
           @case (2) { <app-plan-tasks-step /> }
           @case (3) { <app-plan-meals-step /> }
           @case (4) { <app-plan-day-grid-step /> }
-          @case (5) { <app-plan-confirm-step /> }
+          @case (5) { <app-plan-confirm-step [planningTaskId]="weekPlanService.planningTaskId()" /> }
         }
       </div>
 
@@ -96,10 +94,11 @@ export class PlanningWizardComponent implements OnInit {
     const planEnd = new Date(planStart);
     planEnd.setDate(planStart.getDate() + planLengthDays - 1);
 
-    this.weekPlanService.initSession(
-      toIsoDate(planStart),
-      toIsoDate(planEnd)
-    );
+    const planStartIso = toIsoDate(planStart);
+    this.weekPlanService.initSession(planStartIso, toIsoDate(planEnd));
+    this.weekPlanService.createOrFetchPlanTask(planStartIso).subscribe({
+      error: err => console.error('Failed to create planning task', err),
+    });
   }
 
   next(): void {
