@@ -177,6 +177,7 @@ export class WeekPlanService {
     this.scheduledTasksSignal.set([]);
     this.scheduledMealsSignal.set({});
     this.carryoverDecisionsSignal.set({});
+    this.hasUnplannedHorizonSignal.set(false);
     this.isSubmittingSignal.set(false);
   }
 
