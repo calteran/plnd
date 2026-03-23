@@ -205,9 +205,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
 
 ### Phase 2.5: UI/UX Design & Remaining Planning UI — IN PROGRESS
-**Goal**: Establish a cohesive overall UI design before building the remaining planning features, so that meal planning, exercise planning, family support, and the weekly schedule view share consistent navigation, layout, and component patterns.
-
-> **Why this phase exists**: The remaining features all converge on a shared weekly schedule view and sidebar navigation that doesn't yet exist. Designing them ad-hoc risks costly rework. A design sprint here produces a spec that all subsequent UI work follows.
+**Goal**: Build the remaining planning UI features (meal planning, exercise planning, family support) using the design language established during day-view development.
 
 **Tasks:**
 
@@ -216,15 +214,6 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] Schedule sub-components: `AddEntryComponent`, `DayHeaderComponent`, `MealRowComponent`, `TaskRowComponent`
   - [x] Route aliases `/today`, `/yesterday`, `/tomorrow` → `/day/:date` with date-validation guard
   - [x] `ScheduleService` — signals-based daily schedule state (meals, tasks, exercises)
-
-- [ ] **Overall UI Design Sprint**
-  - [ ] Define app navigation structure (sidebar shape, primary/secondary routes, mobile nav)
-  - [ ] Design the Dashboard as the real planning home screen
-  - [ ] Establish design system: spacing scale, color tokens, component inventory (cards, modals, tables, forms, badges)
-  - [ ] Define responsive strategy (breakpoints, mobile-first vs. adaptive)
-  - [ ] Wireframe/mockup remaining major pages: Meal Planning, Exercise Planning, Weekly Schedule, Family Support
-  - [ ] Accessibility strategy (focus management, ARIA patterns, color contrast targets)
-  - [ ] Produce design spec committed to `docs/superpowers/specs/`
 
 - [ ] **Meal Planning UI**
   - [ ] Build meal planning UI (list, add/edit/delete dishes and meals)
@@ -249,7 +238,6 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 **Deliverables:**
 - [x] Day view with daily schedule (meals, tasks, exercises) and `/today`/`/yesterday`/`/tomorrow` route aliases
-- [ ] UI design spec (`docs/superpowers/specs/YYYY-MM-DD-ui-design.md`)
 - [ ] Meal and exercise planning UI
 - [ ] Family profile management
 - [ ] Core planning interfaces (weekly schedule view)
