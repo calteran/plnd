@@ -7,11 +7,16 @@ describe('PlanningWizardComponent', () => {
   let fixture: ComponentFixture<PlanningWizardComponent>;
 
   beforeEach(async () => {
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [PlanningWizardComponent, HttpClientTestingModule, RouterTestingModule]
     }).compileComponents();
     fixture = TestBed.createComponent(PlanningWizardComponent);
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   it('should create', () => {

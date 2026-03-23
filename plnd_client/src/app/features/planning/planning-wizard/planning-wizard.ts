@@ -96,9 +96,6 @@ export class PlanningWizardComponent implements OnInit {
     const planEnd = new Date(planStart);
     planEnd.setDate(planStart.getDate() + planLengthDays - 1);
 
-    // Always start fresh on mount — clear any stale draft before initialising the session.
-    // Draft-resume will be an explicit opt-in feature once the wizard is stable.
-    this.weekPlanService.clearDraft();
     this.weekPlanService.initSession(
       toIsoDate(planStart),
       toIsoDate(planEnd)
