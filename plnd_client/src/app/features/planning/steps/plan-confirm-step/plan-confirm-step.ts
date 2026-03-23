@@ -1,4 +1,82 @@
-// plan-confirm-step.ts (stub — replaced in Task 15)
-import { Component } from '@angular/core';
-@Component({ selector: 'app-plan-confirm-step', standalone: true, template: '<p>Step 5</p>' })
-export class PlanConfirmStepComponent {}
+import { Component, Input, computed, inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { MealSlot } from '../../../../core/models/week-plan';
+
+const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
+
+@Component({
+  selector: 'app-plan-confirm-step',
+  standalone: true,
+  imports: [],
+  template: `
+    <div class="plan-confirm">
+      <h2>Confirm Your Plan</h2>
+
+      <div class="summary-stats">
+        <div class="stat">
+          <span class="stat-value">{{ totalDays() }}</span>
+          <span class="stat-label">Days planned</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{ mealCoverage() }}%</span>
+          <span class="stat-label">Meal coverage</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">{{ taskCount() }}</span>
+          <span class="stat-label">Tasks</span>
+        </div>
+      </div>
+
+      @if (errorMessage) {
+        <p class="error-message" role="alert">{{ errorMessage }}</p>
+      }
+
+      <button class="btn-finish"
+              type="button"
+              [disabled]="weekPlanService.isSubmitting()"
+              (click)="finish()">
+        @if (weekPlanService.isSubmitting()) {
+          Saving…
+        } @else {
+          Finish Week Plan
+        }
+      </button>
+    </div>
+  `
+})
+export class PlanConfirmStepComponent {
+  @Input() planningTaskId = '';
+
+  readonly weekPlanService = inject(WeekPlanService);
+  private readonly router = inject(Router);
+
+  errorMessage = '';
+
+  readonly totalDays = computed(() => this.weekPlanService.horizonDays().length);
+
+  readonly taskCount = computed(() => this.weekPlanService.scheduledTasks().length);
+
+  readonly mealCoverage = computed(() => {
+    const days = this.weekPlanService.horizonDays();
+    if (days.length === 0) return 0;
+    const meals = this.weekPlanService.scheduledMeals();
+    const filled = days.reduce((acc, d) => {
+      const daySlots = meals[d] ?? {};
+      return acc + MEAL_SLOTS.filter(s => daySlots[s]).length;
+    }, 0);
+    return Math.round((filled / (days.length * MEAL_SLOTS.length)) * 100);
+  });
+
+  finish(): void {
+    this.errorMessage = '';
+    this.weekPlanService.commitPlan(this.planningTaskId).subscribe({
+      next: () => {
+        this.router.navigate(['/day', this.weekPlanService.planStart()]);
+      },
+      error: () => {
+        this.errorMessage = 'Failed to save plan — please try again.';
+      },
+    });
+  }
+}
