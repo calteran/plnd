@@ -1,8 +1,8 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormControl, FormGroup, Validators } from '@angular/forms';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { EnergyLevel } from '../../../../core/models/week-plan';
+import { EnergyLevel, PlannedTask } from '../../../../core/models/week-plan';
 
 @Component({
   selector: 'app-plan-tasks-step',
@@ -16,7 +16,7 @@ import { EnergyLevel } from '../../../../core/models/week-plan';
         <div class="day-tasks-row">
           <h3>{{ day }}</h3>
           <ul>
-            @for (task of tasksForDay(day); track $index) {
+            @for (task of (tasksByDay()[day] ?? []); track $index) {
               <li class="task-item">
                 <span class="task-energy energy-{{ task.energy }}">●</span>
                 {{ task.title }}
@@ -51,6 +51,14 @@ export class PlanTasksStepComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   horizonDays: string[] = [];
 
+  readonly tasksByDay = computed(() => {
+    const byDay: Record<string, PlannedTask[]> = {};
+    for (const task of this.weekPlanService.scheduledTasks()) {
+      (byDay[task.date] ??= []).push(task);
+    }
+    return byDay;
+  });
+
   readonly addTaskForm = new FormGroup({
     date: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
     title: new FormControl<string>('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(200)] }),
@@ -63,10 +71,6 @@ export class PlanTasksStepComponent implements OnInit {
     if (this.horizonDays.length) {
       this.addTaskForm.patchValue({ date: this.horizonDays[0] });
     }
-  }
-
-  tasksForDay(date: string) {
-    return this.weekPlanService.scheduledTasks().filter(t => t.date === date);
   }
 
   removeTask(date: string, localIndex: number): void {

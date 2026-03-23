@@ -83,21 +83,36 @@ pub async fn commit_plan(
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
-    // If replace=true, delete all planned entries in the horizon from today onward.
-    // in_progress and completed entries are unaffected by the status = 'planned' filter.
+    // If replace=true, delete planned entries for unstarted days only (spec §303).
+    // An unstarted day has no in_progress or completed entries; started days are
+    // left completely untouched even if replace=true.
     if replace {
+        let started_days: Vec<NaiveDate> = sqlx::query_scalar(
+            "SELECT DISTINCT date FROM schedule_entries
+             WHERE user_id = $1 AND date >= $2 AND date <= $3
+               AND status IN ('in_progress', 'completed')",
+        )
+        .bind(user_id)
+        .bind(req.plan_start)
+        .bind(req.plan_end)
+        .fetch_all(&mut *tx)
+        .await
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+
         sqlx::query(
             "DELETE FROM schedule_entries
              WHERE user_id = $1
                AND date >= $2
                AND date >= $3
                AND date <= $4
-               AND status = 'planned'",
+               AND status = 'planned'
+               AND date != ALL($5)",
         )
         .bind(user_id)
         .bind(today)
         .bind(req.plan_start)
         .bind(req.plan_end)
+        .bind(&started_days)
         .execute(&mut *tx)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
