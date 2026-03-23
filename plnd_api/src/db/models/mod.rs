@@ -14,6 +14,9 @@ pub struct ReadyStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
 pub struct UserPreferences {
     pub user_id: Uuid,
+    pub week_start_day: i16,
+    pub planning_trigger_offset: i16,
+    pub default_plan_length_days: i16,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -461,6 +464,7 @@ pub struct ScheduleEntry {
     pub task_type: String,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
+    pub title: Option<String>,
     pub date: NaiveDate,
     pub scheduled_start: DateTime<Utc>,
     pub scheduled_end: Option<DateTime<Utc>>,
@@ -473,4 +477,60 @@ pub struct ScheduleEntry {
     pub deviation_note: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+// ---------------------------------------------------------------------------
+// Weekly planning — response types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SchedulePeriodResponse {
+    pub entries: Vec<ScheduleEntry>,
+    pub carryover: Vec<ScheduleEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PlanStatusResponse {
+    pub planned: bool,
+    pub entry_count: i64,
+}
+
+// ---------------------------------------------------------------------------
+// Weekly planning — request types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct PatchPreferencesRequest {
+    pub week_start_day: Option<i16>,
+    pub planning_trigger_offset: Option<i16>,
+    pub default_plan_length_days: Option<i16>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct PlanEntryRequest {
+    pub date: NaiveDate,
+    pub task_type: String,
+    pub task_ref_id: Option<Uuid>,
+    pub task_ref_type: Option<String>,
+    pub title: Option<String>,
+    pub scheduled_start: String, // "HH:MM" local time
+    pub after_milepost: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct PostSchedulePlanRequest {
+    pub plan_start: NaiveDate,
+    pub plan_end: NaiveDate,
+    pub planning_task_id: Uuid,
+    pub entries: Vec<PlanEntryRequest>,
+    pub replace: Option<bool>,
+    /// Carryover decisions keyed by entry_id: "defer" | "dismiss" | "accept"
+    #[serde(default)]
+    pub carryover_decisions: std::collections::HashMap<String, String>,
+}
+
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct PostSchedulePlanResponse {
+    pub committed: i64,
+    pub planning_task_status: String,
 }
