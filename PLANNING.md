@@ -232,14 +232,13 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [ ] Enable shared meal planning for family members
   - [ ] Implement caregiver access roles and permissions
 
-- [ ] **Morning Briefing**
-  - [ ] **Task 1 — Briefing data model**: Add `wake_time TIME DEFAULT '07:00'` to `user_preferences` (migration); update Rust `UserPreferences` struct and Angular `UserPreferences` interface so `GET /preferences/me` returns the field. No Settings UI — deferred to Phase 5. *(Note: `wake_time` is a static seed/fallback; Phase 5 push scheduler should infer dynamically from schedule history.)*
-  - [ ] **Task 2 — Briefing backend routes**: New `/briefing` protected router with three endpoints: `GET /briefing/weather` (Open-Meteo proxy, ~1h moka cache), `GET /briefing/news` (configurable RSS/news proxy, ~30 min cache), `GET /briefing/yesterday` (schedule-derived counts: tasks done/total, meals logged/planned). Add `news_feed_url` key to `[external_providers]` in `default.toml` and `ExternalProvidersConfig` in `plnd_api/src/config/settings.rs`.
-  - [ ] **Task 3 — BriefingService (Angular)**: Signals-based service (`core/services/briefing.service.ts`); parallel fetch of all three sections; per-section loading + error signals so failures are independent.
-  - [ ] **Task 4 — BriefingHeaderComponent**: Card panel layout (`features/day-view/components/briefing-header/`) — side-by-side weather card (icon, temp, condition, hi/lo) and news card (headlines list); per-section unavailable state.
-  - [ ] **Task 5 — YesterdaySnapshotComponent**: Light recap strip (`features/day-view/components/yesterday-snapshot/`) — "Yesterday: X of Y tasks done · Z meals logged"; unavailable state; no nutrition framing.
-  - [ ] **Task 6 — DayViewComponent `isToday` wiring**: Add `isToday` computed signal; conditionally render `BriefingHeaderComponent` above the day header and `YesterdaySnapshotComponent` below the schedule list; call `briefingService.load()` when `isToday`; update existing `DayViewComponent` spec.
-  - *Note: Push notifications deferred to Phase 5 (native app / Capacitor). See `docs/superpowers/specs/2026-03-23-morning-briefing-design.md` for full spec.*
+- [ ] **Morning Briefing** — *See `docs/superpowers/specs/2026-03-23-morning-briefing-design.md`*
+  - [ ] Briefing data model (`wake_time` on user_preferences)
+  - [ ] Briefing backend routes (`/briefing/weather`, `/briefing/news`, `/briefing/yesterday`)
+  - [ ] BriefingService (Angular)
+  - [ ] BriefingHeaderComponent (weather + news cards)
+  - [ ] YesterdaySnapshotComponent (light recap strip)
+  - [ ] DayViewComponent `isToday` wiring
 
 - [ ] **Dashboard (real content)**
   - [ ] Replace stub with a real planning home screen per the design spec
