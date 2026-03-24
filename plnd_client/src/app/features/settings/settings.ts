@@ -21,13 +21,13 @@ import { PreferencesService } from '../../core/services/preferences.service';
 
             <label for="weekStartDay">Week starts on</label>
             <select id="weekStartDay" formControlName="weekStartDay">
-              <option [value]="0">Sunday</option>
-              <option [value]="1">Monday</option>
-              <option [value]="2">Tuesday</option>
-              <option [value]="3">Wednesday</option>
-              <option [value]="4">Thursday</option>
-              <option [value]="5">Friday</option>
-              <option [value]="6">Saturday</option>
+              <option [ngValue]="0">Sunday</option>
+              <option [ngValue]="1">Monday</option>
+              <option [ngValue]="2">Tuesday</option>
+              <option [ngValue]="3">Wednesday</option>
+              <option [ngValue]="4">Thursday</option>
+              <option [ngValue]="5">Friday</option>
+              <option [ngValue]="6">Saturday</option>
             </select>
 
             <label for="planLengthDays">Plan horizon length (days)</label>

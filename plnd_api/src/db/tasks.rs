@@ -14,7 +14,9 @@ pub async fn create_weekly_plan_task(
     plan_start: NaiveDate,
     trigger_offset: i16,
 ) -> Result<Task, DatabaseError> {
-    let trigger_date = plan_start + chrono::Duration::days(trigger_offset as i64);
+    let trigger_date = plan_start
+        + chrono::TimeDelta::try_days(trigger_offset as i64)
+            .ok_or_else(|| DatabaseError::QueryError("invalid trigger_offset".into()))?;
     // Midnight UTC on the trigger date
     let scheduled_start = Utc.from_utc_datetime(
         &trigger_date
