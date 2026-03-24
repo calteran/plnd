@@ -2,6 +2,7 @@ import { Component, OnInit, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
+import { toIsoDate } from '../../../core/services/schedule.service';
 import { PlanReviewStepComponent } from '../steps/plan-review-step/plan-review-step';
 import { PlanTasksStepComponent } from '../steps/plan-tasks-step/plan-tasks-step';
 import { PlanMealsStepComponent } from '../steps/plan-meals-step/plan-meals-step';
@@ -38,12 +39,16 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
       </div>
 
       <div class="wizard-content">
-        @switch (weekPlanService.currentStep()) {
-          @case (1) { <app-plan-review-step /> }
-          @case (2) { <app-plan-tasks-step /> }
-          @case (3) { <app-plan-meals-step /> }
-          @case (4) { <app-plan-day-grid-step /> }
-          @case (5) { <app-plan-confirm-step /> }
+        @if (weekPlanService.planStart()) {
+          @switch (weekPlanService.currentStep()) {
+            @case (1) { <app-plan-review-step /> }
+            @case (2) { <app-plan-tasks-step /> }
+            @case (3) { <app-plan-meals-step /> }
+            @case (4) { <app-plan-day-grid-step /> }
+            @case (5) { <app-plan-confirm-step /> }
+          }
+        } @else {
+          <p>Initializing session…</p>
         }
       </div>
 
@@ -126,12 +131,4 @@ export class PlanningWizardComponent implements OnInit {
     this.weekPlanService.clearDraft();
     this.router.navigate(['/today']);
   }
-}
-
-/** Converts a Date to ISO date string (YYYY-MM-DD) in local time, avoiding UTC-offset rollback. */
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }

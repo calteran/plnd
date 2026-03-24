@@ -1,7 +1,7 @@
 import { Component, OnInit, effect, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { NavbarAvatarComponent } from '../../shared/components/navbar-avatar/navbar-avatar';
-import { todayIso } from '../../core/services/schedule.service';
+import { todayIso, toIsoDate } from '../../core/services/schedule.service';
 import { WeekPlanService } from '../../core/services/week-plan.service';
 import { PreferencesService } from '../../core/services/preferences.service';
 
@@ -43,11 +43,4 @@ export class MainLayoutComponent implements OnInit {
 
   expandSidebar(): void  { this.sidebarExpanded.set(true); }
   collapseSidebar(): void { this.sidebarExpanded.set(false); }
-}
-
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
