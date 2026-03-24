@@ -48,19 +48,11 @@ pub async fn patch_preferences(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let pool = state.db.get_pool();
 
-    // Ensure the row exists first
-    db::preferences::get_or_create(pool, user_id)
-        .await
-        .map_err(|e| {
-            eprintln!("patch_preferences get_or_create error: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
     db::preferences::patch_preferences(pool, user_id, &body)
         .await
         .map(Json)
         .map_err(|e| {
-            eprintln!("patch_preferences update error: {}", e);
+            eprintln!("patch_preferences error: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }

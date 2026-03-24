@@ -506,6 +506,16 @@ pub struct PatchPreferencesRequest {
     pub default_plan_length_days: Option<i16>,
 }
 
+fn deserialize_hhmm<'de, D>(deserializer: D) -> Result<NaiveTime, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    NaiveTime::parse_from_str(&s, "%H:%M")
+        .or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S"))
+        .map_err(serde::de::Error::custom)
+}
+
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct PlanEntryRequest {
     pub date: NaiveDate,
@@ -513,8 +523,18 @@ pub struct PlanEntryRequest {
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
-    pub scheduled_start: String, // "HH:MM" UTC wall-clock time
+    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"
+    #[serde(deserialize_with = "deserialize_hhmm")]
+    pub scheduled_start: NaiveTime,
     pub after_milepost: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum CarryoverDecision {
+    Accept,
+    Defer,
+    Dismiss,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -524,9 +544,9 @@ pub struct PostSchedulePlanRequest {
     pub planning_task_id: Uuid,
     pub entries: Vec<PlanEntryRequest>,
     pub replace: Option<bool>,
-    /// Carryover decisions keyed by entry_id: "defer" | "dismiss" | "accept"
+    /// Carryover decisions keyed by entry_id UUID string
     #[serde(default)]
-    pub carryover_decisions: std::collections::HashMap<String, String>,
+    pub carryover_decisions: std::collections::HashMap<Uuid, CarryoverDecision>,
 }
 
 #[derive(Debug, Clone, Serialize, utoipa::ToSchema)]

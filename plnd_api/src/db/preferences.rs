@@ -4,20 +4,22 @@ use uuid::Uuid;
 use crate::db::error::DatabaseError;
 use crate::db::models::{PatchPreferencesRequest, UserPreferences};
 
-/// Update only the provided planning-horizon preference fields for a user.
+/// Upsert preferences: creates the row with defaults if absent, then applies any provided fields.
+/// Collapses the former get_or_create + UPDATE into a single round-trip.
 pub async fn patch_preferences(
     pool: &PgPool,
     user_id: Uuid,
     req: &PatchPreferencesRequest,
 ) -> Result<UserPreferences, DatabaseError> {
     sqlx::query_as::<_, UserPreferences>(
-        "UPDATE user_preferences
-         SET
-           week_start_day           = COALESCE($2, week_start_day),
-           planning_trigger_offset  = COALESCE($3, planning_trigger_offset),
-           default_plan_length_days = COALESCE($4, default_plan_length_days),
-           updated_at               = NOW()
-         WHERE user_id = $1
+        "INSERT INTO user_preferences
+           (user_id, week_start_day, planning_trigger_offset, default_plan_length_days)
+         VALUES ($1, COALESCE($2, 1), COALESCE($3, 0), COALESCE($4, 7))
+         ON CONFLICT (user_id) DO UPDATE
+           SET week_start_day           = COALESCE($2, user_preferences.week_start_day),
+               planning_trigger_offset  = COALESCE($3, user_preferences.planning_trigger_offset),
+               default_plan_length_days = COALESCE($4, user_preferences.default_plan_length_days),
+               updated_at               = NOW()
          RETURNING user_id, week_start_day, planning_trigger_offset,
                    default_plan_length_days, created_at, updated_at",
     )
