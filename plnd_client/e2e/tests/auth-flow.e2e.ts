@@ -4,6 +4,15 @@ import { DayViewPage } from '../pages/day-view.page';
 // Test 1 requires full Docker stack: docker compose up -d db api mock-oauth-server
 // Test 2 can run with only ng serve (uses addInitScript + route mocks).
 
+const MOCK_PREFS = {
+  user_id: 'e2e-test-uuid',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  week_start_day: 1,
+  planning_trigger_offset: 0,
+  default_plan_length_days: 7
+};
+
 const MOCK_USER_ONBOARDED = {
   user_id: 'e2e-test-uuid',
   email: 'testuser@mock.plnd',
@@ -80,6 +89,20 @@ test.describe('OAuth login flow', () => {
     // Mock the backend logout endpoint (AuthService makes a fire-and-forget call).
     await page.route('http://localhost:3000/auth/logout', route =>
       route.fulfill({ status: 204 })
+    );
+
+    // MainLayoutComponent loads preferences and checks plan status on init.
+    // Without these mocks the synthetic token gets a 401, triggering
+    // authErrorInterceptor → logout('session_expired') before signOut() fires.
+    await page.route('http://localhost:3000/preferences/me', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(MOCK_PREFS)
+      })
+    );
+    await page.route('http://localhost:3000/schedule/plan/status**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
     );
 
     await page.goto('/today');

@@ -7,7 +7,10 @@ import { test, expect } from '@playwright/test';
 const MOCK_PREFS = {
   user_id: 'e2e-test-uuid',
   created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z'
+  updated_at: '2026-01-01T00:00:00Z',
+  week_start_day: 1,
+  planning_trigger_offset: 0,
+  default_plan_length_days: 7
 };
 
 const MOCK_USER_ONBOARDED = {
@@ -32,6 +35,12 @@ test.describe('Settings', () => {
     await page.route('http://localhost:3000/users/me', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
     );
+    await page.route('http://localhost:3000/preferences/me', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route('http://localhost:3000/schedule/plan/status**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
 
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
@@ -49,7 +58,7 @@ test.describe('Settings', () => {
     await expect(panel.getByRole('menuitem', { name: 'Settings' })).toBeVisible();
   });
 
-  test('settings page loads and shows placeholder', async ({ page }) => {
+  test('settings page loads and shows planning form controls', async ({ page }) => {
     // Intercept /users/me so the onboardingCompletedGuard resolves
     await page.route('http://localhost:3000/users/me', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
@@ -59,6 +68,9 @@ test.describe('Settings', () => {
     await page.route('http://localhost:3000/preferences/me', async route => {
       await route.fulfill({ status: 200, json: MOCK_PREFS });
     });
+    await page.route('http://localhost:3000/schedule/plan/status**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
 
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
@@ -66,6 +78,6 @@ test.describe('Settings', () => {
     await page.goto('/settings');
 
     await expect(page.locator('h1')).toHaveText('Settings');
-    await expect(page.locator('.placeholder')).toBeVisible();
+    await expect(page.locator('#weekStartDay')).toBeVisible();
   });
 });

@@ -19,6 +19,15 @@ const MOCK_USER_ONBOARDED = {
   onboarding_completed: true
 };
 
+const MOCK_PREFS = {
+  user_id: 'e2e-test-uuid',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  week_start_day: 1,
+  planning_trigger_offset: 0,
+  default_plan_length_days: 7
+};
+
 test.describe('Onboarding', () => {
   test('unauthenticated /onboarding visit redirects to /login', async ({ page }) => {
     await page.goto('/onboarding');
@@ -44,6 +53,12 @@ test.describe('Onboarding', () => {
   test('authenticated returning user navigating to /onboarding redirects to /today', async ({ page }) => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+    await page.route(`${API_BASE}/preferences/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
     );
 
     await page.addInitScript(() => {
@@ -77,6 +92,14 @@ test.describe('Onboarding', () => {
     );
     await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
       route.fulfill({ status: 200 })
+    );
+    // After onboarding completes, the app navigates to /today → MainLayout loads.
+    // Mock preferences and plan status so the synthetic token doesn't trigger session_expired.
+    await page.route(`${API_BASE}/preferences/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
     );
 
     await page.addInitScript(() => {

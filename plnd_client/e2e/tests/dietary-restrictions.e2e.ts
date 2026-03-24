@@ -6,6 +6,15 @@ import { test, expect } from '@playwright/test';
 const API_BASE = 'http://localhost:3000';
 const DR_URL = `${API_BASE}/dietary-restrictions`;
 
+const MOCK_PREFS = {
+  user_id: 'e2e-test-uuid',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  week_start_day: 1,
+  planning_trigger_offset: 0,
+  default_plan_length_days: 7
+};
+
 const MOCK_USER_ONBOARDED = {
   user_id: 'e2e-test-uuid',
   email: 'test@example.com',
@@ -49,6 +58,12 @@ test.describe('Dietary Restrictions', () => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
     );
+    await page.route(`${API_BASE}/preferences/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
 
     await page.route(`${DR_URL}`, async route => {
       if (route.request().method() === 'GET') {
@@ -84,6 +99,12 @@ test.describe('Dietary Restrictions', () => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
     );
+    await page.route(`${API_BASE}/preferences/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
 
     await page.route(`${DR_URL}`, async route => {
       const method = route.request().method();
@@ -116,6 +137,12 @@ test.describe('Dietary Restrictions', () => {
 
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+    await page.route(`${API_BASE}/preferences/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
     );
 
     await page.route(`${DR_URL}`, async route => {
@@ -156,6 +183,12 @@ test.describe('Dietary Restrictions', () => {
   test('delete restriction removes item from list', async ({ page }) => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+    await page.route(`${API_BASE}/preferences/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
     );
 
     await page.route(`${DR_URL}`, async route => {

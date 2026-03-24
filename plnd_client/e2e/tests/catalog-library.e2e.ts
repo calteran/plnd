@@ -16,6 +16,15 @@ import { test, expect } from '@playwright/test';
 
 const API_BASE = 'http://localhost:3000';
 
+const MOCK_PREFS = {
+  user_id: 'e2e-test-uuid',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  week_start_day: 1,
+  planning_trigger_offset: 0,
+  default_plan_length_days: 7
+};
+
 const MOCK_USER_ONBOARDED = {
   user_id: 'e2e-test-uuid',
   email: 'test@example.com',
@@ -72,7 +81,10 @@ const MOCK_INGREDIENT_PREF: Record<string, unknown> = {
   updated_at: '2026-01-01T00:00:00Z',
 };
 
-// Seed auth and mock /users/me for every test so onboardingCompletedGuard resolves.
+// Seed auth and mock /users/me, /preferences/me, and /schedule/plan/status for
+// every test. The latter two are called by MainLayoutComponent on every page load;
+// without mocks the synthetic JWT returns 401 → authErrorInterceptor fires
+// logout('session_expired') before the test can proceed.
 async function seedAuthAndNavigate(page: Parameters<Parameters<typeof test>[1]>[0]['page']): Promise<void> {
   await page.route(`${API_BASE}/users/me`, route =>
     route.fulfill({
@@ -80,6 +92,12 @@ async function seedAuthAndNavigate(page: Parameters<Parameters<typeof test>[1]>[
       contentType: 'application/json',
       body: JSON.stringify(MOCK_USER_ONBOARDED),
     })
+  );
+  await page.route(`${API_BASE}/preferences/me`, route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+  );
+  await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
   );
 
   await page.addInitScript(() => {

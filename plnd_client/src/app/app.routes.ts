@@ -72,6 +72,19 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/meals/dietary-restrictions/dietary-restrictions').then(m => m.DietaryRestrictionsComponent)
       },
+      {
+        path: 'plan',
+        children: [
+          {
+            path: 'week',
+            loadComponent: () =>
+              import('./features/planning/planning-wizard/planning-wizard').then(
+                m => m.PlanningWizardComponent
+              )
+          },
+          { path: '', redirectTo: 'week', pathMatch: 'full' }
+        ]
+      },
 
       // Not found — shown within the main layout shell
       {

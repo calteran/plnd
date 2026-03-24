@@ -17,8 +17,8 @@ use plnd_api::config;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
-    auth, catalog_details, catalog_ingest, dietary_restrictions, preferences, search, system,
-    user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    auth, catalog_details, catalog_ingest, dietary_restrictions, preferences, schedule, search,
+    system, tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -168,7 +168,10 @@ async fn main() {
             "/users/me/complete-onboarding",
             post(users::post_complete_onboarding),
         )
-        .route("/preferences/me", get(preferences::get_preferences))
+        .route(
+            "/preferences/me",
+            get(preferences::get_preferences).patch(preferences::patch_preferences),
+        )
         .route(
             "/dietary-restrictions",
             get(dietary_restrictions::list_restrictions),
@@ -240,6 +243,10 @@ async fn main() {
             "/my/meals/{pref_id}/dishes/{dish_id}",
             delete(user_meal_prefs::remove_dish),
         )
+        .route("/tasks/weekly-plan", post(tasks::post_weekly_plan_task))
+        .route("/schedule/period", get(schedule::get_period))
+        .route("/schedule/plan/status", get(schedule::get_plan_status))
+        .route("/schedule/plan", post(schedule::post_plan))
         .route("/auth/logout", post(auth::logout))
         .layer(middleware::from_fn_with_state(
             state.clone(),
