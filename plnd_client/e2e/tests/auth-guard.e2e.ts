@@ -12,6 +12,15 @@ const MOCK_USER_ONBOARDED = {
   onboarding_completed: true
 };
 
+const MOCK_PREFS = {
+  user_id: 'e2e-test-uuid',
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  week_start_day: 1,
+  planning_trigger_offset: 0,
+  default_plan_length_days: 7
+};
+
 test.describe('Auth guard', () => {
   test('unauthenticated /today visit redirects to /login', async ({ page }) => {
     // No token → guard sends to /login
@@ -23,6 +32,16 @@ test.describe('Auth guard', () => {
     // Mock /users/me so onboardingCompletedGuard resolves to true
     await page.route('http://localhost:3000/users/me', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    );
+
+    // MainLayoutComponent loads preferences and then checks plan status on init.
+    // Without these mocks, the synthetic token gets a 401 from the real backend,
+    // triggering authErrorInterceptor → logout('session_expired').
+    await page.route('http://localhost:3000/preferences/me', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route('http://localhost:3000/schedule/plan/status**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
     );
 
     // Use addInitScript to seed localStorage BEFORE Angular initializes.

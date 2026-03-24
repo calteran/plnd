@@ -35,6 +35,12 @@ test.describe('Settings', () => {
     await page.route('http://localhost:3000/users/me', route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
     );
+    await page.route('http://localhost:3000/preferences/me', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
+    await page.route('http://localhost:3000/schedule/plan/status**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
 
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
@@ -62,6 +68,9 @@ test.describe('Settings', () => {
     await page.route('http://localhost:3000/preferences/me', async route => {
       await route.fulfill({ status: 200, json: MOCK_PREFS });
     });
+    await page.route('http://localhost:3000/schedule/plan/status**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
 
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
