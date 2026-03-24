@@ -114,9 +114,7 @@ pub async fn post_plan(
         .await
         .map(Json)
         .map_err(|e| match e {
-            db::error::DatabaseError::ValidationError(_) => {
-                StatusCode::BAD_REQUEST
-            }
+            db::error::DatabaseError::ValidationError(_) => StatusCode::BAD_REQUEST,
             _ => {
                 eprintln!("post_plan error: {}", e);
                 StatusCode::INTERNAL_SERVER_ERROR
