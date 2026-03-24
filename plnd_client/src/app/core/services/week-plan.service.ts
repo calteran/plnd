@@ -124,7 +124,7 @@ export class WeekPlanService {
                 task_type: entry.task_type,
                 task_ref_id: entry.task_ref_id,
                 task_ref_type: entry.task_ref_type,
-                scheduled_start: entry.scheduled_start?.slice(11, 16),
+                scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
               });
             }
           }
@@ -265,6 +265,11 @@ export class WeekPlanService {
       carryover_decisions: this.carryoverDecisionsSignal(),
     };
   }
+}
+
+/** Extracts "HH:MM" from an ISO timestamp string using UTC hours/minutes. */
+function utcHHMM(iso: string): string {
+  return new Date(iso).toISOString().slice(11, 16);
 }
 
 function slotDefaultTime(slot: MealSlot): string {

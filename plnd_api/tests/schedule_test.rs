@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{NaiveDate, NaiveTime};
 use plnd_api::db::models::{
     PlanEntryRequest, PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse,
     SchedulePeriodResponse,
@@ -16,7 +16,10 @@ fn test_plan_entry_request_serde() {
     }"#;
     let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
     assert_eq!(req.task_type, "meal");
-    assert_eq!(req.scheduled_start, "08:00");
+    assert_eq!(
+        req.scheduled_start,
+        NaiveTime::from_hms_opt(8, 0, 0).unwrap()
+    );
     assert_eq!(req.after_milepost, Some("breakfast".to_string()));
     assert!(req.title.is_none());
 }

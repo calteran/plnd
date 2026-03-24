@@ -1,11 +1,11 @@
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::db::models::{
-    PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse, ScheduleEntry,
-    SchedulePeriodResponse,
+    CarryoverDecision, PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse,
+    ScheduleEntry, SchedulePeriodResponse,
 };
 
 const ENTRY_COLS: &str =
@@ -117,33 +117,48 @@ pub async fn commit_plan(
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     }
 
-    // Insert new entries
-    let mut committed: i64 = 0;
-    for entry in &req.entries {
-        // Parse "HH:MM" + date into TIMESTAMPTZ (UTC)
-        let naive_time = NaiveTime::parse_from_str(&entry.scheduled_start, "%H:%M")
-            .map_err(|_| DatabaseError::ValidationError("invalid scheduled_start format".into()))?;
-        let scheduled_start = entry.date.and_time(naive_time).and_utc();
+    // Collect and batch-insert all new entries in a single unnest query
+    let mut task_types: Vec<String> = Vec::new();
+    let mut task_ref_ids: Vec<Option<Uuid>> = Vec::new();
+    let mut task_ref_types: Vec<Option<String>> = Vec::new();
+    let mut titles: Vec<Option<String>> = Vec::new();
+    let mut dates: Vec<NaiveDate> = Vec::new();
+    let mut scheduled_starts: Vec<DateTime<Utc>> = Vec::new();
+    let mut after_mileposts: Vec<Option<String>> = Vec::new();
 
+    for entry in &req.entries {
+        let scheduled_start = entry.date.and_time(entry.scheduled_start).and_utc();
+        task_types.push(entry.task_type.clone());
+        task_ref_ids.push(entry.task_ref_id);
+        task_ref_types.push(entry.task_ref_type.clone());
+        titles.push(entry.title.clone());
+        dates.push(entry.date);
+        scheduled_starts.push(scheduled_start);
+        after_mileposts.push(entry.after_milepost.clone());
+    }
+
+    let committed = task_types.len() as i64;
+
+    if !task_types.is_empty() {
         sqlx::query(
             "INSERT INTO schedule_entries
                (user_id, task_type, task_ref_id, task_ref_type, title,
                 date, scheduled_start, status, after_milepost)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'planned', $8)",
+             SELECT $1, unnest($2::text[]), unnest($3::uuid[]), unnest($4::text[]),
+                    unnest($5::text[]), unnest($6::date[]), unnest($7::timestamptz[]),
+                    'planned', unnest($8::text[])",
         )
         .bind(user_id)
-        .bind(&entry.task_type)
-        .bind(entry.task_ref_id)
-        .bind(&entry.task_ref_type)
-        .bind(&entry.title)
-        .bind(entry.date)
-        .bind(scheduled_start)
-        .bind(&entry.after_milepost)
+        .bind(&task_types)
+        .bind(&task_ref_ids)
+        .bind(&task_ref_types)
+        .bind(&titles)
+        .bind(&dates)
+        .bind(&scheduled_starts)
+        .bind(&after_mileposts)
         .execute(&mut *tx)
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-
-        committed += 1;
     }
 
     // Mark planning task as completed
@@ -158,13 +173,9 @@ pub async fn commit_plan(
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
     // Apply carryover decisions: update carry-over entries
-    for (entry_id_str, decision) in &req.carryover_decisions {
-        let entry_id = match uuid::Uuid::parse_str(entry_id_str) {
-            Ok(id) => id,
-            Err(_) => continue,
-        };
-        match decision.as_str() {
-            "accept" => {
+    for (entry_id, decision) in &req.carryover_decisions {
+        match decision {
+            CarryoverDecision::Accept => {
                 // Reschedule to the new horizon start, keeping status 'planned'.
                 // Update both `date` and `scheduled_start` so the absolute TIMESTAMPTZ
                 // moves to the new date while preserving the wall-clock time (UTC).
@@ -182,7 +193,7 @@ pub async fn commit_plan(
                 .await
                 .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
             }
-            "defer" => {
+            CarryoverDecision::Defer => {
                 sqlx::query(
                     "UPDATE schedule_entries SET status = 'deferred', updated_at = NOW()
                      WHERE entry_id = $1 AND user_id = $2",
@@ -193,7 +204,7 @@ pub async fn commit_plan(
                 .await
                 .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
             }
-            "dismiss" => {
+            CarryoverDecision::Dismiss => {
                 sqlx::query(
                     "UPDATE schedule_entries SET status = 'skipped', updated_at = NOW()
                      WHERE entry_id = $1 AND user_id = $2",
@@ -204,7 +215,6 @@ pub async fn commit_plan(
                 .await
                 .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
             }
-            _ => continue,
         }
     }
 
