@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, TimeZone, Utc};
+use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -18,11 +18,10 @@ pub async fn create_weekly_plan_task(
         + chrono::TimeDelta::try_days(trigger_offset as i64)
             .ok_or_else(|| DatabaseError::QueryError("invalid trigger_offset".into()))?;
     // Midnight UTC on the trigger date
-    let scheduled_start = Utc.from_utc_datetime(
-        &trigger_date
-            .and_hms_opt(0, 0, 0)
-            .ok_or_else(|| DatabaseError::QueryError("invalid trigger time".into()))?,
-    );
+    let scheduled_start = trigger_date
+        .and_hms_opt(0, 0, 0)
+        .ok_or_else(|| DatabaseError::QueryError("invalid trigger time".into()))?
+        .and_utc();
 
     // Idempotency: check for existing weekly_plan task at this horizon.
     // Lower bound uses trigger_date (not plan_start) to handle negative offsets correctly —

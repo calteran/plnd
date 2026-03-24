@@ -122,7 +122,7 @@ pub async fn commit_plan(
     for entry in &req.entries {
         // Parse "HH:MM" + date into TIMESTAMPTZ (UTC)
         let naive_time = NaiveTime::parse_from_str(&entry.scheduled_start, "%H:%M")
-            .map_err(|_| DatabaseError::QueryError("invalid scheduled_start format".into()))?;
+            .map_err(|_| DatabaseError::ValidationError("invalid scheduled_start format".into()))?;
         let scheduled_start = entry.date.and_time(naive_time).and_utc();
 
         sqlx::query(

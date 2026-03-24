@@ -100,12 +100,16 @@ export class SettingsComponent implements OnInit {
   });
 
   pending = false;
+  private prefsInitialized = false;
 
   constructor() {
-    // Sync form when preferences load — they arrive asynchronously after ngOnInit.
+    // Sync form once when preferences first load — they arrive asynchronously after
+    // ngOnInit. The guard prevents subsequent preference signal updates (e.g. after
+    // a PATCH /preferences/me response) from overwriting the user's in-progress edits.
     effect(() => {
       const prefs = this.preferencesService.preferences();
-      if (!prefs) return;
+      if (!prefs || this.prefsInitialized) return;
+      this.prefsInitialized = true;
       this.form.patchValue({
         weekStartDay: prefs.week_start_day,
         planLengthDays: prefs.default_plan_length_days,
