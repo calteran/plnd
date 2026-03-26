@@ -28,7 +28,7 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
 
       <div class="wizard-progress" role="progressbar"
            [attr.aria-valuenow]="weekPlanService.currentStep()"
-           aria-valuemin="1" aria-valuemax="5">
+           aria-valuemin="1" [attr.aria-valuemax]="steps.length">
         @for (s of steps; track s.n) {
           @if (!$first) {
             <span class="progress-sep">›</span>
@@ -75,7 +75,7 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
     .wizard-progress { display: flex; align-items: center; gap: 4px; padding: 0.5rem 1rem; }
     .progress-pill { display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
                      border-radius: 14px; border: 1.5px solid var(--color-border-row);
-                     background: #fff; font-size: 11px; color: var(--color-text-muted); }
+                     background: var(--color-surface-white); font-size: 11px; color: var(--color-text-muted); }
     .progress-pill.done { background: var(--color-accent-light); border-color: var(--color-accent-border);
                           color: var(--color-accent-dark); }
     .progress-pill.done .pill-num { background: var(--color-accent); color: #fff; }
