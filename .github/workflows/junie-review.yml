@@ -14,7 +14,7 @@ jobs:
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
       issues: write
     steps:
@@ -22,7 +22,7 @@ jobs:
         with:
           fetch-depth: 1
 
-      - uses: JetBrains/junie-github-action@v1
+      - uses: JetBrains/junie-github-action@v0
         with:
           junie_api_key: ${{ secrets.JUNIE_API_KEY }}
           use_single_comment: "true"
