@@ -8,8 +8,15 @@ const angularTemplate = require("@angular-eslint/eslint-plugin-template");
 const angularTemplateParser = require("@angular-eslint/template-parser");
 
 module.exports = [
+  // Ignore generated/third-party project directories
+  { ignores: ["projects/**/*"] },
+
   // Base JS recommended rules (eslint:recommended equivalent in flat config)
-  js.configs.recommended,
+  // Scoped to JS/TS files to avoid applying JS rules to HTML templates
+  {
+    files: ["**/*.{js,mjs,cjs,ts}"],
+    ...js.configs.recommended,
+  },
 
   // @typescript-eslint flat/recommended — sets up parser, plugins, and base rules for *.ts
   ...tsEslint.configs["flat/recommended"].map((config) => ({
