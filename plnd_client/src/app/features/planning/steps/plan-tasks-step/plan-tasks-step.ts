@@ -50,9 +50,9 @@ import { EnergyLevel, PlannedTask } from '../../../../core/models/week-plan';
     .day-tasks-row { margin-bottom: 1rem; }
     .task-item { display: flex; align-items: center; gap: 0.5rem; padding: 4px 0; font-size: 13px; }
     .task-energy { font-size: 10px; }
-    .task-energy.energy-low { color: var(--color-accent-dark, #4a6fa5); }
-    .task-energy.energy-medium { color: #e67e22; }
-    .task-energy.energy-high { color: #c0392b; }
+    .task-energy.energy-low { color: var(--color-energy-low); }
+    .task-energy.energy-medium { color: var(--color-energy-medium); }
+    .task-energy.energy-high { color: var(--color-energy-high); }
     .task-item button { background: none; border: none; color: var(--color-text-muted); cursor: pointer;
                         font-size: 12px; padding: 2px 4px; border-radius: 4px; margin-left: auto; }
     .task-item button:hover { background: var(--color-border-row); color: var(--color-text-primary); }

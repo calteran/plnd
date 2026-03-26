@@ -50,7 +50,7 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
     .stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
     .stat-value { font-size: 2rem; font-weight: 700; color: var(--color-accent); line-height: 1; }
     .stat-label { font-size: 12px; color: var(--color-text-muted); }
-    .error-message { color: var(--color-error, #c0392b); font-size: 13px; }
+    .error-message { color: var(--color-destructive); font-size: 13px; }
     .btn-finish { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border);
                   border-radius: 6px; padding: 8px 20px; font-size: 13px; font-weight: 600;
                   color: var(--color-accent-dark); cursor: pointer; align-self: flex-end; }
