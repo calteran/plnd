@@ -76,12 +76,12 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
     .progress-pill { display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
                      border-radius: 14px; border: 1.5px solid var(--color-border-row);
                      background: var(--color-surface-white); font-size: 11px; color: var(--color-text-muted); }
-    .progress-pill.done { background: var(--color-accent-light); border-color: var(--color-accent-border);
-                          color: var(--color-accent-dark); }
-    .progress-pill.done .pill-num { background: var(--color-accent); color: #fff; }
-    .progress-pill.active { background: var(--color-accent-light); border-color: var(--color-accent);
-                            color: var(--color-accent-dark); }
+    .progress-pill.done,
+    .progress-pill.active { background: var(--color-accent-light); color: var(--color-accent-dark); }
+    .progress-pill.done { border-color: var(--color-accent-border); }
+    .progress-pill.active { border-color: var(--color-accent); }
     .progress-pill.active .pill-label { font-weight: 700; }
+    .progress-pill.done .pill-num,
     .progress-pill.active .pill-num { background: var(--color-accent); color: #fff; }
     .pill-num { width: 16px; height: 16px; border-radius: 50%; background: var(--color-border-row);
                 display: flex; align-items: center; justify-content: center;
