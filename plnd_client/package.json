@@ -59,7 +59,6 @@
     "@typescript-eslint/parser": "^8.57.2",
     "dependency-cruiser": "^17.3.8",
     "eslint": "^10.1.0",
-    "eslint-plugin-import": "^2.32.0",
     "jasmine-core": "~6.1.0",
     "karma": "~6.4.4",
     "karma-chrome-launcher": "~3.2.0",
