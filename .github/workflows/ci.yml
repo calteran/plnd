@@ -24,14 +24,8 @@ jobs:
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
 
-      - name: Cache cargo bin (machete)
-        uses: actions/cache@v5
-        with:
-          path: ~/.cargo/bin
-          key: cargo-bin-machete-${{ runner.os }}
-
       - name: Install cargo-machete
-        run: cargo install cargo-machete --locked
+        uses: taiki-e/install-action@cargo-machete
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
