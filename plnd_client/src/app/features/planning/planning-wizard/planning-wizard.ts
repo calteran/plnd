@@ -29,11 +29,15 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
       <div class="wizard-progress" role="progressbar"
            [attr.aria-valuenow]="weekPlanService.currentStep()"
            aria-valuemin="1" aria-valuemax="5">
-        @for (s of steps; track s) {
-          <div class="progress-step"
-               [class.active]="weekPlanService.currentStep() === s"
-               [class.done]="weekPlanService.currentStep() > s">
-            {{ s }}
+        @for (s of steps; track s.n) {
+          @if (!$first) {
+            <span class="progress-sep">›</span>
+          }
+          <div class="progress-pill"
+               [class.active]="weekPlanService.currentStep() === s.n"
+               [class.done]="weekPlanService.currentStep() > s.n">
+            <span class="pill-num">{{ s.n }}</span>
+            <span class="pill-label">{{ s.label }}</span>
           </div>
         }
       </div>
@@ -66,11 +70,22 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
     .planning-wizard { display: flex; flex-direction: column; height: 100%;
                        max-width: 860px; margin-inline: auto; width: 100%; }
     .wizard-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; }
-    .wizard-progress { display: flex; gap: 0.5rem; padding: 0.5rem 1rem; }
-    .progress-step { width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid var(--color-border-row);
-                     display: flex; align-items: center; justify-content: center; }
-    .progress-step.active { border-color: var(--color-accent); font-weight: bold; }
-    .progress-step.done { background: var(--color-accent); color: #fff; border-color: transparent; }
+    .wizard-progress { display: flex; align-items: center; gap: 4px; padding: 0.5rem 1rem; }
+    .progress-pill { display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
+                     border-radius: 14px; border: 1.5px solid var(--color-border-row);
+                     background: #fff; font-size: 11px; color: var(--color-text-muted); }
+    .progress-pill.done { background: var(--color-accent-light); border-color: var(--color-accent-border);
+                          color: var(--color-accent-dark); }
+    .progress-pill.done .pill-num { background: var(--color-accent); color: #fff; }
+    .progress-pill.active { background: var(--color-accent-light); border-color: var(--color-accent);
+                            color: var(--color-accent-dark); }
+    .progress-pill.active .pill-label { font-weight: 700; }
+    .progress-pill.active .pill-num { background: var(--color-accent); color: #fff; }
+    .pill-num { width: 16px; height: 16px; border-radius: 50%; background: var(--color-border-row);
+                display: flex; align-items: center; justify-content: center;
+                font-size: 10px; font-weight: 700; flex-shrink: 0; }
+    .pill-label { white-space: nowrap; }
+    .progress-sep { color: var(--color-text-muted); font-size: 12px; user-select: none; }
     .wizard-content { flex: 1; overflow-y: auto; padding: 1rem; }
     .wizard-footer { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 1rem;
                      border-top: 1.5px solid var(--color-border-meal); }
@@ -88,7 +103,13 @@ export class PlanningWizardComponent implements OnInit {
   private readonly preferencesService = inject(PreferencesService);
   private readonly router = inject(Router);
 
-  readonly steps = [1, 2, 3, 4, 5];
+  readonly steps = [
+    { n: 1, label: 'Carryover' },
+    { n: 2, label: 'Tasks' },
+    { n: 3, label: 'Meals' },
+    { n: 4, label: 'Review' },
+    { n: 5, label: 'Confirm' },
+  ];
 
   private sessionInitialized = false;
 
