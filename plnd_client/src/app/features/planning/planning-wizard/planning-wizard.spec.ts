@@ -42,7 +42,7 @@ describe('PlanningWizardComponent', () => {
 
   it('should render all 5 step labels', () => {
     const labels = fixture.nativeElement.querySelectorAll('.pill-label');
-    const texts = Array.from(labels).map((el: any) => el.textContent.trim());
+    const texts = Array.from(labels as HTMLElement[]).map((el) => el.textContent?.trim());
     expect(texts).toEqual(['Carryover', 'Tasks', 'Meals', 'Review', 'Confirm']);
   });
 

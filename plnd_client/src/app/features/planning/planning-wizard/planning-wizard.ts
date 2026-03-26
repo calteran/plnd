@@ -69,7 +69,9 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
   styles: [`
     .planning-wizard { display: flex; flex-direction: column; height: 100%;
                        max-width: 860px; margin-inline: auto; width: 100%; }
-    .wizard-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; }
+    .wizard-header { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; }
+    .wizard-header h1 { font-size: 1.25rem; font-weight: 800; color: var(--color-text-primary);
+                        letter-spacing: -0.02em; margin: 0; }
     .wizard-progress { display: flex; align-items: center; gap: 4px; padding: 0.5rem 1rem; }
     .progress-pill { display: flex; align-items: center; gap: 5px; height: 28px; padding: 0 10px;
                      border-radius: 14px; border: 1.5px solid var(--color-border-row);
@@ -91,7 +93,7 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
                      border-top: 1.5px solid var(--color-border-meal); }
     .nav-btn { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border);
                border-radius: 8px; padding: 5px 14px; color: var(--color-accent-dark);
-               font-size: 18px; font-weight: 700; line-height: 1; min-width: 44px; min-height: 44px;
+               font-size: 16px; font-weight: 400; line-height: 1; min-width: 44px; min-height: 44px;
                display: flex; align-items: center; justify-content: center; }
     .nav-btn--back { margin-right: auto; }
     .btn-cancel { background: none; border: 1px solid var(--color-text-muted); border-radius: 6px;
