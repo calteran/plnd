@@ -13,8 +13,26 @@ updates:
     schedule:
       interval: weekly
     groups:
+      angular:
+        patterns:
+          - '@angular/*'
+      ngrx:
+        patterns:
+          - '@ngrx/*'
+      angular-eslint:
+        patterns:
+          - '@angular-eslint/*'
+          - '@typescript-eslint/*'
+          - 'eslint'
       npm:
-        patterns: ['*']
+        patterns:
+          - '*'
+        exclude-patterns:
+          - '@angular/*'
+          - '@ngrx/*'
+          - '@angular-eslint/*'
+          - '@typescript-eslint/*'
+          - 'eslint'
 
   - package-ecosystem: github-actions
     directory: /
