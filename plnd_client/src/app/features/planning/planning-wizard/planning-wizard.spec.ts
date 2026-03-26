@@ -39,4 +39,24 @@ describe('PlanningWizardComponent', () => {
     const back = fixture.nativeElement.querySelector('.nav-btn--back');
     expect(back).toBeFalsy();
   });
+
+  it('should render all 5 step labels', () => {
+    const labels = fixture.nativeElement.querySelectorAll('.pill-label');
+    const texts = Array.from(labels).map((el: any) => el.textContent.trim());
+    expect(texts).toEqual(['Carryover', 'Tasks', 'Meals', 'Review', 'Confirm']);
+  });
+
+  it('should mark step 1 as active on init', () => {
+    const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
+    expect(pills[0].classList).toContain('active');
+    expect(pills[1].classList).not.toContain('active');
+  });
+
+  it('should mark step 1 as done and step 2 as active when on step 2', () => {
+    fixture.componentInstance.weekPlanService.goToStep(2);
+    fixture.detectChanges();
+    const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
+    expect(pills[0].classList).toContain('done');
+    expect(pills[1].classList).toContain('active');
+  });
 });
