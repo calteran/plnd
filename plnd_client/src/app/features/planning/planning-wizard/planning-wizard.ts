@@ -54,25 +54,33 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
 
       <footer class="wizard-footer">
         @if (weekPlanService.currentStep() > 1) {
-          <button class="btn-back" (click)="back()" type="button">Back</button>
+          <button class="nav-btn nav-btn--back" (click)="back()" type="button" aria-label="Previous step">‹</button>
         }
         @if (weekPlanService.currentStep() < 5) {
-          <button class="btn-next" (click)="next()" type="button">Next</button>
+          <button class="nav-btn" (click)="next()" type="button" aria-label="Next step">›</button>
         }
       </footer>
     </div>
   `,
   styles: [`
-    .planning-wizard { display: flex; flex-direction: column; height: 100%; }
+    .planning-wizard { display: flex; flex-direction: column; height: 100%;
+                       max-width: 860px; margin-inline: auto; width: 100%; }
     .wizard-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem; }
     .wizard-progress { display: flex; gap: 0.5rem; padding: 0.5rem 1rem; }
-    .progress-step { width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid #ccc;
+    .progress-step { width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid var(--color-border-row);
                      display: flex; align-items: center; justify-content: center; }
-    .progress-step.active { border-color: var(--color-primary, #4a6fa5); font-weight: bold; }
-    .progress-step.done { background: var(--color-primary, #4a6fa5); color: #fff; border-color: transparent; }
+    .progress-step.active { border-color: var(--color-accent); font-weight: bold; }
+    .progress-step.done { background: var(--color-accent); color: #fff; border-color: transparent; }
     .wizard-content { flex: 1; overflow-y: auto; padding: 1rem; }
-    .wizard-footer { display: flex; justify-content: space-between; padding: 1rem;
-                     border-top: 1px solid #eee; }
+    .wizard-footer { display: flex; justify-content: flex-end; gap: 0.5rem; padding: 1rem;
+                     border-top: 1.5px solid var(--color-border-meal); }
+    .nav-btn { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border);
+               border-radius: 8px; padding: 5px 14px; color: var(--color-accent-dark);
+               font-size: 18px; font-weight: 700; line-height: 1; min-width: 44px; min-height: 44px;
+               display: flex; align-items: center; justify-content: center; }
+    .nav-btn--back { margin-right: auto; }
+    .btn-cancel { background: none; border: 1px solid var(--color-text-muted); border-radius: 6px;
+                  padding: 6px 14px; font-size: 12px; color: var(--color-text-body); cursor: pointer; }
   `]
 })
 export class PlanningWizardComponent implements OnInit {

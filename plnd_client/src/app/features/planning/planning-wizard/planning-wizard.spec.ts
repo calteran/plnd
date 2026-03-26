@@ -31,12 +31,12 @@ describe('PlanningWizardComponent', () => {
   it('should show Back button when step > 1', () => {
     fixture.componentInstance.weekPlanService.goToStep(2);
     fixture.detectChanges();
-    const back = fixture.nativeElement.querySelector('.btn-back');
+    const back = fixture.nativeElement.querySelector('.nav-btn--back');
     expect(back).toBeTruthy();
   });
 
   it('should not show Back button on step 1', () => {
-    const back = fixture.nativeElement.querySelector('.btn-back');
+    const back = fixture.nativeElement.querySelector('.nav-btn--back');
     expect(back).toBeFalsy();
   });
 });
