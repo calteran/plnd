@@ -79,6 +79,8 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
                font-size: 18px; font-weight: 700; line-height: 1; min-width: 44px; min-height: 44px;
                display: flex; align-items: center; justify-content: center; }
     .nav-btn--back { margin-right: auto; }
+    .btn-cancel { background: none; border: 1px solid var(--color-border-row); border-radius: 6px;
+                  padding: 6px 14px; font-size: 12px; color: var(--color-text-muted); cursor: pointer; }
   `]
 })
 export class PlanningWizardComponent implements OnInit {

@@ -34,7 +34,23 @@ const STANDARD_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
         </div>
       }
     </div>
-  `
+  `,
+  styles: [`
+    .day-meals { margin-bottom: 1.25rem; }
+    .meal-slot { display: flex; align-items: center; gap: 0.75rem; padding: 6px 0;
+                 border-bottom: 1px solid var(--color-border-row); }
+    .slot-label { width: 6rem; font-size: 12px; font-weight: 600; color: var(--color-text-muted);
+                  text-transform: capitalize; }
+    .meal-suggestion { flex: 1; font-size: 13px; color: var(--color-text-body); }
+    .meal-suggestion.accepted { color: var(--color-accent-dark); font-weight: 500; }
+    .meal-slot button[data-action="accept"] { background: var(--color-accent-light);
+                                              border: 1.5px solid var(--color-accent-border);
+                                              border-radius: 6px; padding: 4px 12px; font-size: 12px;
+                                              font-weight: 600; color: var(--color-accent-dark); cursor: pointer; }
+    .meal-slot button:not([data-action]) { background: none; border: 1px solid var(--color-border-row);
+                                           border-radius: 6px; padding: 4px 10px; font-size: 12px;
+                                           color: var(--color-text-muted); cursor: pointer; }
+  `]
 })
 export class PlanMealsStepComponent {
   private readonly weekPlanService = inject(WeekPlanService);

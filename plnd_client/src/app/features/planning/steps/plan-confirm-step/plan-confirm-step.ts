@@ -43,7 +43,19 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
         }
       </button>
     </div>
-  `
+  `,
+  styles: [`
+    .plan-confirm { display: flex; flex-direction: column; gap: 1.5rem; }
+    .summary-stats { display: flex; gap: 2rem; }
+    .stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .stat-value { font-size: 2rem; font-weight: 700; color: var(--color-accent); line-height: 1; }
+    .stat-label { font-size: 12px; color: var(--color-text-muted); }
+    .error-message { color: var(--color-error, #c0392b); font-size: 13px; }
+    .btn-finish { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border);
+                  border-radius: 6px; padding: 8px 20px; font-size: 13px; font-weight: 600;
+                  color: var(--color-accent-dark); cursor: pointer; align-self: flex-end; }
+    .btn-finish:disabled { opacity: 0.4; cursor: not-allowed; }
+  `]
 })
 export class PlanConfirmStepComponent {
   readonly weekPlanService = inject(WeekPlanService);
