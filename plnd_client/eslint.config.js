@@ -1,12 +1,16 @@
 // @ts-check
 "use strict";
 
+const js = require("@eslint/js");
 const tsEslint = require("@typescript-eslint/eslint-plugin");
 const angularEslint = require("@angular-eslint/eslint-plugin");
 const angularTemplate = require("@angular-eslint/eslint-plugin-template");
 const angularTemplateParser = require("@angular-eslint/template-parser");
 
 module.exports = [
+  // Base JS recommended rules (eslint:recommended equivalent in flat config)
+  js.configs.recommended,
+
   // @typescript-eslint flat/recommended — sets up parser, plugins, and base rules for *.ts
   ...tsEslint.configs["flat/recommended"].map((config) => ({
     ...config,
