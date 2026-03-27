@@ -6,7 +6,7 @@ import {
   CarryoverDecision, MealSlot, PlanDraftShape,
   PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
-  PlanStatusResponse, SchedulePeriodResponse,
+  PlanStatusResponse, SchedulePeriodResponse, getMockSuggestion,
 } from '../models/week-plan';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
@@ -242,18 +242,24 @@ export class WeekPlanService {
     const meals = this.scheduledMealsSignal();
     const tasks = this.scheduledTasksSignal();
     const entries: PlanEntryRequest[] = [];
+    const STANDARD_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
-    for (const [date, slots] of Object.entries(meals)) {
-      for (const [slot, meal] of Object.entries(slots ?? {})) {
-        if (!meal) continue;
+    // Resolve all horizon day × standard slot combinations.
+    // Pending (no entry) → implicit acceptance via getMockSuggestion.
+    // __skipped__ sentinel → omit from request.
+    for (const date of this.horizonDays()) {
+      for (const slot of STANDARD_SLOTS) {
+        const meal = meals[date]?.[slot];
+        if (meal?.title === '__skipped__') continue;
+        const resolved: PlannedMeal = meal ?? { type: 'mock', title: getMockSuggestion(date, slot) };
         entries.push({
           date,
           task_type: 'meal',
-          task_ref_id: meal.type === 'user_meal' ? meal.id : undefined,
-          task_ref_type: meal.type === 'user_meal' ? 'user_meal' : undefined,
-          title: meal.type === 'mock' ? meal.title : undefined,
-          scheduled_start: slotDefaultTime(slot as MealSlot),
-          after_milepost: slot as MealSlot,
+          task_ref_id: resolved.type === 'user_meal' ? resolved.id : undefined,
+          task_ref_type: resolved.type === 'user_meal' ? 'user_meal' : undefined,
+          title: resolved.type === 'mock' ? resolved.title : undefined,
+          scheduled_start: slotDefaultTime(slot),
+          after_milepost: slot,
         });
       }
     }
