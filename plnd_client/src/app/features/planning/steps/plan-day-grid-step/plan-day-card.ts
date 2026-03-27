@@ -54,7 +54,7 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
           </div>
           <div>
             <div class="body-section-label">Tasks</div>
-            @for (task of tasks(); track $index) {
+            @for (task of tasks(); track task.title) {
               <div class="body-row">
                 <span class="val">{{ task.title }}</span>
                 <span class="energy-badge" [ngClass]="energyClass(task.energy)">
