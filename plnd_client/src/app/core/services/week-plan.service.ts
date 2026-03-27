@@ -96,7 +96,6 @@ export class WeekPlanService {
 
   clearDraft(): void {
     localStorage.removeItem(this.DRAFT_KEY);
-    this.floatingTasksSignal.set([]);
   }
 
   loadPeriod(start: string, end: string): Observable<SchedulePeriodResponse> {

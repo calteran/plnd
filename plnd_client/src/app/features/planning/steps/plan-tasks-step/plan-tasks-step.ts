@@ -20,8 +20,8 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
                (click)="toggleDay(day)"
                (keydown.enter)="toggleDay(day)"
                (keydown.space)="$event.preventDefault(); toggleDay(day)">
-            <span class="day-name">{{ formatDayName(day) }}</span>
-            <span class="day-date">{{ formatShortDate(day) }}</span>
+            <span class="day-name">{{ formattedDays()[day].dayName }}</span>
+            <span class="day-date">{{ formattedDays()[day].shortDate }}</span>
             <span class="task-badge"
                   [class.zero]="(tasksByDay()[day]?.length ?? 0) === 0">
               {{ tasksByDay()[day]?.length ?? 0 }}
@@ -32,7 +32,7 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
 
           <div class="day-accordion__body">
             <div class="task-list">
-              @for (task of (tasksByDay()[day] ?? []); track $index) {
+              @for (task of (tasksByDay()[day] ?? []); track task) {
                 <div class="task-row">
                   <span class="task-title">{{ task.title }}</span>
                   <span class="energy-badge energy-{{ task.energy }}">
@@ -57,7 +57,7 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
           <span class="floating-hint">agent will schedule these</span>
         </div>
         <div class="float-task-list">
-          @for (task of floatingTasks(); track $index) {
+          @for (task of floatingTasks(); track task) {
             <div class="floating-task-row">
               <span class="task-title">{{ task.title }}</span>
               <span class="floating-badge">floating</span>
@@ -271,6 +271,18 @@ export class PlanTasksStepComponent {
 
   private readonly expandedOverrides = signal<Record<string, boolean>>({});
 
+  readonly formattedDays = computed(() =>
+    Object.fromEntries(
+      this.horizonDays().map(d => {
+        const dt = new Date(`${d}T12:00:00`);
+        return [d, {
+          dayName: dt.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+          shortDate: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        }];
+      })
+    ) as Record<string, { dayName: string; shortDate: string }>
+  );
+
   // Returns the expanded state for a day. Falls back to true when horizon <= 7 days.
   isExpanded(date: string): boolean {
     const overrides = this.expandedOverrides();
@@ -280,14 +292,6 @@ export class PlanTasksStepComponent {
 
   toggleDay(date: string): void {
     this.expandedOverrides.update(o => ({ ...o, [date]: !this.isExpanded(date) }));
-  }
-
-  formatDayName(date: string): string {
-    return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
-  }
-
-  formatShortDate(date: string): string {
-    return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
   removeTask(date: string, localIndex: number): void {

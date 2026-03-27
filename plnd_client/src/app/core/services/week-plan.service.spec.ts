@@ -125,12 +125,6 @@ describe('WeekPlanService', () => {
       expect(service.floatingTasks()[0].title).toBe('Task B');
     });
 
-    it('should clear floatingTasks when clearDraft is called', () => {
-      service.addFloatingTask({ title: 'Lingering task', energy: 'medium', task_type: 'custom' });
-      service.clearDraft();
-      expect(service.floatingTasks()).toEqual([]);
-    });
-
     it('should include floatingTasks in saveDraft', () => {
       service.initSession('2026-03-24', '2026-03-30');
       service.addFloatingTask({ title: 'Call dentist', energy: 'low', task_type: 'custom' });
