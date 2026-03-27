@@ -5,7 +5,7 @@ import {
 } from '../../../../core/models/week-plan';
 
 const STANDARD_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
-const SLOT_LABELS: Record<string, string> = {
+const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
   breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
 };
 
@@ -48,7 +48,7 @@ const SLOT_LABELS: Record<string, string> = {
                 <input #mealInput
                        class="mock-input"
                        type="text"
-                       [value]="editingValue"
+                       [value]="editingValue()"
                        (keydown.enter)="confirmEdit(day, slot, mealInput.value)"
                        (keydown.escape)="cancelEdit()">
                 <span class="input-hint">Enter · Esc to cancel</span>
@@ -57,7 +57,7 @@ const SLOT_LABELS: Record<string, string> = {
                 <button class="gc-x" type="button"
                         data-tip="Clear meal"
                         (click)="clearCustom(day, slot)">×</button>
-                <span class="gc-text custom-t">{{ getMeal(day, slot)!.title }}</span>
+                <span class="gc-text custom-t">{{ getMeal(day, slot)?.title ?? '' }}</span>
                 <div class="gc-actions">
                   <button class="gc-edit-custom" type="button"
                           (click)="startEdit(day, slot)">✏️ edit</button>
@@ -237,7 +237,7 @@ export class PlanMealsStepComponent {
   /** Tracks which cell (if any) has its inline text input open. */
   readonly editingCell = signal<{ date: string; slot: MealSlot } | null>(null);
   /** Current value in the open text input. */
-  editingValue = '';
+  readonly editingValue = signal('');
   /** Per-cell offset for cycling through mock suggestions without persisting them. */
   private readonly suggestOffsets = signal<Record<string, number>>({});
 
@@ -254,7 +254,7 @@ export class PlanMealsStepComponent {
   }
 
   slotLabel(slot: MealSlot): string {
-    return SLOT_LABELS[slot];
+    return SLOT_LABELS[slot] ?? slot;
   }
 
   // ── Cell state queries ─────────────────────────────────────
@@ -291,7 +291,7 @@ export class PlanMealsStepComponent {
 
   startEdit(date: string, slot: MealSlot): void {
     const existing = this.getMeal(date, slot);
-    this.editingValue = existing?.type === 'user_meal' ? existing.title : '';
+    this.editingValue.set(existing?.type === 'user_meal' ? existing.title : '');
     this.editingCell.set({ date, slot });
     // Defer focus until Angular has rendered the input element.
     setTimeout(() => this.mealInput?.nativeElement.focus());
@@ -303,12 +303,12 @@ export class PlanMealsStepComponent {
       this.weekPlanService.setMeal(date, slot, { type: 'user_meal', title: trimmed });
     }
     this.editingCell.set(null);
-    this.editingValue = '';
+    this.editingValue.set('');
   }
 
   cancelEdit(): void {
     this.editingCell.set(null);
-    this.editingValue = '';
+    this.editingValue.set('');
   }
 
   skipSlot(date: string, slot: MealSlot): void {
