@@ -16,6 +16,9 @@ export interface PlannedMeal {
   title: string;
 }
 
+/** Sentinel value stored as PlannedMeal.title when the user has explicitly skipped a slot. */
+export const SKIP_SENTINEL = '__skipped__';
+
 export interface PlannedTask {
   date: string;
   title: string;

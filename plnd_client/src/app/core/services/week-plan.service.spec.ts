@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
-import { PostSchedulePlanRequest } from '../models/week-plan';
+import { PostSchedulePlanRequest, SKIP_SENTINEL } from '../models/week-plan';
 
 describe('WeekPlanService', () => {
   let service: WeekPlanService;
@@ -187,7 +187,7 @@ describe('WeekPlanService', () => {
 
   it('buildCommitRequest excludes slots with __skipped__ sentinel', () => {
     service.initSession('2026-03-24', '2026-03-24');
-    service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: '__skipped__' });
+    service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: SKIP_SENTINEL });
     service.commitPlan('task-1').subscribe();
     const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
     const body = req.request.body as PostSchedulePlanRequest;

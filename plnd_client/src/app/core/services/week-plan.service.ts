@@ -7,6 +7,7 @@ import {
   PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, SchedulePeriodResponse, getMockSuggestion,
+  SKIP_SENTINEL,
 } from '../models/week-plan';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
@@ -242,6 +243,7 @@ export class WeekPlanService {
     const meals = this.scheduledMealsSignal();
     const tasks = this.scheduledTasksSignal();
     const entries: PlanEntryRequest[] = [];
+    // Snack is optional; it is added explicitly via setMeal and never auto-filled.
     const STANDARD_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
     // Resolve all horizon day × standard slot combinations.
@@ -250,7 +252,7 @@ export class WeekPlanService {
     for (const date of this.horizonDays()) {
       for (const slot of STANDARD_SLOTS) {
         const meal = meals[date]?.[slot];
-        if (meal?.title === '__skipped__') continue;
+        if (meal?.title === SKIP_SENTINEL) continue;
         const resolved: PlannedMeal = meal ?? { type: 'mock', title: getMockSuggestion(date, slot) };
         entries.push({
           date,
