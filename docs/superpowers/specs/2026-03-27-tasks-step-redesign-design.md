@@ -132,14 +132,16 @@ this.floatingTasks.set([]);
 
 ### Color tokens
 
-Four new tokens required in `_tokens.scss` (light theme; dark-mode variants deferred — see Out of Scope):
+Four new tokens required in `_tokens.scss`, with both light and dark variants:
 
-| Token | Light value | Purpose |
-|---|---|---|
-| `--color-purple` | `#7c3aed` | Floating panel hint text, add affordance |
-| `--color-purple-light` | `#f5f3ff` | Floating panel header background |
-| `--color-purple-border` | `#c4b5fd` | Floating panel border, badge border |
-| `--color-purple-dark` | `#4c1d95` | Floating panel header label, badge text |
+| Token | Light value | Dark value | Purpose |
+|---|---|---|---|
+| `--color-purple` | `#7c3aed` | `#a78bfa` | Floating panel hint text, add affordance |
+| `--color-purple-light` | `#f5f3ff` | `rgba(124, 58, 237, 0.15)` | Floating panel header background |
+| `--color-purple-border` | `#c4b5fd` | `#7c3aed` | Floating panel border, badge border |
+| `--color-purple-dark` | `#4c1d95` | `#ddd6fe` | Floating panel header label, badge text |
+
+Dark values follow the same pattern as the existing dark-mode accent tokens: text values lighten for contrast, light surfaces become transparent overlays, borders use the mid-range shade.
 
 ---
 
@@ -147,7 +149,7 @@ Four new tokens required in `_tokens.scss` (light theme; dark-mode variants defe
 
 | File | Change |
 |---|---|
-| `plnd_client/src/styles/_tokens.scss` | Add 4 purple tokens (light + dark variants) |
+| `plnd_client/src/styles/_tokens.scss` | Add 4 purple tokens to `:root` and matching dark values to `[data-theme="dark"]` |
 | `plnd_client/src/app/core/models/week-plan.ts` | Add `FloatingTask` type alias |
 | `plnd_client/src/app/core/services/week-plan.service.ts` | Add `floatingTasks` signal + `addFloatingTask()` + `removeFloatingTask()`; update `clearDraft()` |
 | `plnd_client/src/app/features/planning/steps/plan-tasks-step/plan-tasks-step.ts` | Rewrite template + styles; import `AddEntryComponent`; add adapter methods; `horizonDays` becomes `computed()`; drop `ngOnInit` |
@@ -159,7 +161,6 @@ No new component files. `AddEntryComponent` is untouched.
 
 ## Out of Scope
 
-- Dark-mode variants for purple tokens (follow existing dark-mode pattern, deferred)
-- Drag-to-assign floating tasks to a day (deferred to calteran/plnd#65)
+- Drag-to-assign (or tap-to-assign) floating tasks to a specific day — this interaction is explicitly scoped to calteran/plnd#65 and must be implemented there
 - Agent scheduling logic (backend concern)
 - Duration field for floating tasks beyond what `AddEntryComponent` provides for exercise entries
