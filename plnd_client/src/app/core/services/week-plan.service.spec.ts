@@ -130,5 +130,48 @@ describe('WeekPlanService', () => {
       service.clearDraft();
       expect(service.floatingTasks()).toEqual([]);
     });
+
+    it('should include floatingTasks in saveDraft', () => {
+      service.initSession('2026-03-24', '2026-03-30');
+      service.addFloatingTask({ title: 'Call dentist', energy: 'low', task_type: 'custom' });
+      service.saveDraft();
+      const draft = service.loadDraft();
+      expect(draft?.floatingTasks?.length).toBe(1);
+      expect(draft?.floatingTasks?.[0].title).toBe('Call dentist');
+    });
+
+    it('should restore floatingTasks from draft on initSession', () => {
+      const draft = {
+        schemaVersion: 1 as const,
+        planStart: '2026-03-24',
+        planEnd: '2026-03-30',
+        currentStep: 2,
+        carryoverDecisions: {},
+        scheduledMeals: {},
+        scheduledTasks: [],
+        floatingTasks: [{ title: 'Gym', energy: 'high' as const, task_type: 'exercise' as const }],
+        savedAt: '2026-03-23T12:00:00Z',
+      };
+      localStorage.setItem('plnd:plan-draft', JSON.stringify(draft));
+      service.initSession('2026-03-24', '2026-03-30');
+      expect(service.floatingTasks().length).toBe(1);
+      expect(service.floatingTasks()[0].title).toBe('Gym');
+    });
+
+    it('should default floatingTasks to [] when draft has none', () => {
+      const draft = {
+        schemaVersion: 1,
+        planStart: '2026-03-24',
+        planEnd: '2026-03-30',
+        currentStep: 1,
+        carryoverDecisions: {},
+        scheduledMeals: {},
+        scheduledTasks: [],
+        savedAt: '2026-03-23T12:00:00Z',
+      };
+      localStorage.setItem('plnd:plan-draft', JSON.stringify(draft));
+      service.initSession('2026-03-24', '2026-03-30');
+      expect(service.floatingTasks()).toEqual([]);
+    });
   });
 });

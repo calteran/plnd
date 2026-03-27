@@ -52,11 +52,13 @@ export class WeekPlanService {
       this.carryoverDecisionsSignal.set(draft.carryoverDecisions);
       this.scheduledMealsSignal.set(draft.scheduledMeals);
       this.scheduledTasksSignal.set(draft.scheduledTasks);
+      this.floatingTasksSignal.set(draft.floatingTasks ?? []);
     } else {
       this.currentStepSignal.set(1);
       this.carryoverDecisionsSignal.set({});
       this.scheduledMealsSignal.set({});
       this.scheduledTasksSignal.set([]);
+      this.floatingTasksSignal.set([]);
     }
   }
 
@@ -74,6 +76,7 @@ export class WeekPlanService {
       carryoverDecisions: this.carryoverDecisionsSignal(),
       scheduledMeals: this.scheduledMealsSignal(),
       scheduledTasks: this.scheduledTasksSignal(),
+      floatingTasks: this.floatingTasksSignal(),
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(this.DRAFT_KEY, JSON.stringify(draft));

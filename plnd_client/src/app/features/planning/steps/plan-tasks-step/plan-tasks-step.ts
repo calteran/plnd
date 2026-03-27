@@ -294,8 +294,10 @@ export class PlanTasksStepComponent {
     const tasks = this.weekPlanService.scheduledTasks();
     const dayTasks = tasks.filter(t => t.date === date);
     const target = dayTasks[localIndex];
-    const globalIndex = tasks.indexOf(target);
-    if (globalIndex >= 0) this.weekPlanService.removeTask(globalIndex);
+    if (target) {
+      const globalIndex = tasks.indexOf(target);
+      if (globalIndex >= 0) this.weekPlanService.removeTask(globalIndex);
+    }
   }
 
   removeFloatingTask(index: number): void {

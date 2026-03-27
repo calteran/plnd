@@ -37,6 +37,7 @@ export interface PlanDraftShape {
   carryoverDecisions: Record<string, CarryoverDecision>;
   scheduledMeals: Record<string, Partial<Record<MealSlot, PlannedMeal>>>;
   scheduledTasks: PlannedTask[];
+  floatingTasks?: FloatingTask[];
   savedAt: string;
 }
 
