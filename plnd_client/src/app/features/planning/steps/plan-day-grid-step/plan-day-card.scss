@@ -110,12 +110,12 @@
 
 // ── Expanded body ─────────────────────────────────────────────
 .card-body {
-  border-top: 1.5px solid var(--color-accent-border);
   overflow: hidden;
   max-height: 0;
   transition: max-height 0.25s ease-out;
 
   .expanded & {
+    border-top: 1.5px solid var(--color-accent-border);
     max-height: 400px;
     transition: max-height 0.3s ease-in;
   }

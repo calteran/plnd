@@ -14,6 +14,8 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
   template: `
     <div
       class="day-card"
+      role="button"
+      [attr.aria-expanded]="expanded"
       [class.expanded]="expanded"
       (click)="toggle()"
       tabindex="0"
