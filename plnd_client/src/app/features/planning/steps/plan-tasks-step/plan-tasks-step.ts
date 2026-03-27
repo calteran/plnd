@@ -57,7 +57,7 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
           <span class="floating-hint">agent will schedule these</span>
         </div>
         <div class="float-task-list">
-          @for (task of weekPlanService.floatingTasks(); track $index) {
+          @for (task of floatingTasks(); track $index) {
             <div class="floating-task-row">
               <span class="task-title">{{ task.title }}</span>
               <span class="floating-badge">floating</span>
@@ -255,7 +255,7 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
   `],
 })
 export class PlanTasksStepComponent {
-  readonly weekPlanService = inject(WeekPlanService);
+  private readonly weekPlanService = inject(WeekPlanService);
 
   readonly horizonDays = computed(() => this.weekPlanService.horizonDays());
 
@@ -266,6 +266,8 @@ export class PlanTasksStepComponent {
     }
     return byDay;
   });
+
+  protected readonly floatingTasks = computed(() => this.weekPlanService.floatingTasks());
 
   private readonly expandedOverrides = signal<Record<string, boolean>>({});
 
