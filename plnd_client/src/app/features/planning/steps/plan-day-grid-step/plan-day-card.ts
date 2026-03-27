@@ -1,41 +1,70 @@
 import { Component, computed, inject, input } from '@angular/core';
-import { TitleCasePipe } from '@angular/common';
+import { DatePipe, TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealSlot } from '../../../../core/models/week-plan';
+import { EnergyLevel, MealSlot } from '../../../../core/models/week-plan';
 
+// 'snack' is part of the MealSlot type but is excluded from card display — snack scheduling is deferred to a future phase
 const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
 @Component({
   selector: 'app-plan-day-card',
   standalone: true,
-  imports: [TitleCasePipe],
+  imports: [DatePipe, TitleCasePipe],
+  styleUrl: 'plan-day-card.scss',
   template: `
-    <div class="day-card" [class.expanded]="expanded" (click)="toggle()">
+    <div
+      class="day-card"
+      role="button"
+      [attr.aria-expanded]="expanded"
+      [class.expanded]="expanded"
+      (click)="toggle()"
+      tabindex="0"
+      (keydown.enter)="toggle()"
+      (keydown.space)="$event.preventDefault(); toggle()"
+    >
       <div class="card-header">
-        <strong>{{ date() }}</strong>
-        <span class="task-count">{{ taskCount() }} task(s)</span>
-        <span class="meal-count">{{ mealCount() }} meal(s)</span>
+        <span class="day-name">{{ date() | date:'EEE' }}</span>
+        <span class="day-date">{{ date() | date:'MMM d' }}</span>
       </div>
-      @if (expanded) {
-        <div class="card-body">
-          <h4>Meals</h4>
-          <ul>
-            @for (slot of slots; track slot) {
-              @if (getMeal(slot); as meal) {
-                <li>{{ slot | titlecase }}: {{ meal.title }}</li>
-              } @else {
-                <li class="empty-slot">{{ slot | titlecase }}: —</li>
-              }
-            }
-          </ul>
-          <h4>Tasks</h4>
-          <ul>
-            @for (task of tasks(); track $index) {
-              <li>{{ task.title }} ({{ task.energy }})</li>
-            }
-          </ul>
+      <div class="card-stats">
+        <div class="stat-row">
+          <span class="stat-label">tasks</span>
+          <span class="stat-val" [class.zero]="taskCount() === 0">{{ taskCount() }}</span>
         </div>
-      }
+        <div class="stat-row">
+          <span class="stat-label">meals</span>
+          <span class="stat-val" [class.zero]="mealCount() === 0">{{ mealCount() }}</span>
+        </div>
+      </div>
+      <span class="card-chevron">▾</span>
+      <div class="card-body">
+        <div class="card-body-inner">
+          <div>
+            <div class="body-section-label">Meals</div>
+            @for (slot of slots; track slot) {
+              <div class="body-row">
+                <span class="slot">{{ slot | titlecase }}</span>
+                @if (getMeal(slot); as meal) {
+                  <span class="val">{{ meal.title }}</span>
+                } @else {
+                  <span class="empty-val">—</span>
+                }
+              </div>
+            }
+          </div>
+          <div>
+            <div class="body-section-label">Tasks</div>
+            @for (task of tasks(); track task) {
+              <div class="body-row">
+                <span class="val">{{ task.title }}</span>
+                <span class="energy-badge" [class]="energyClass(task.energy)">
+                  {{ energyLabel(task.energy) }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
     </div>
   `
 })
@@ -43,15 +72,29 @@ export class PlanDayCardComponent {
   readonly date = input.required<string>();
 
   private readonly weekPlanService = inject(WeekPlanService);
-  expanded = false;
-  readonly slots = MEAL_SLOTS;
+  protected expanded = false;
+  protected readonly slots = MEAL_SLOTS;
 
-  toggle(): void { this.expanded = !this.expanded; }
+  protected toggle(): void { this.expanded = !this.expanded; }
 
-  readonly tasks = computed(() =>
+  protected readonly tasks = computed(() =>
     this.weekPlanService.scheduledTasks().filter(t => t.date === this.date())
   );
-  readonly taskCount = computed(() => this.tasks().length);
-  getMeal(slot: MealSlot) { return this.weekPlanService.scheduledMeals()[this.date()]?.[slot]; }
-  readonly mealCount = computed(() => this.slots.filter(s => this.getMeal(s)).length);
+  protected readonly taskCount = computed(() => this.tasks().length);
+
+  protected getMeal(slot: MealSlot) {
+    return this.weekPlanService.scheduledMeals()[this.date()]?.[slot];
+  }
+
+  protected readonly mealCount = computed(() => this.slots.filter(s => this.getMeal(s)).length);
+
+  // Public — called directly in spec tests via componentInstance
+  energyClass(energy: EnergyLevel): string {
+    return energy === 'medium' ? 'energy-med' : `energy-${energy}`;
+  }
+
+  // Public — called directly in spec tests via componentInstance
+  energyLabel(energy: EnergyLevel): string {
+    return energy === 'medium' ? 'med' : energy;
+  }
 }

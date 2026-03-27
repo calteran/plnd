@@ -18,7 +18,7 @@ import { PlanDayCardComponent } from './plan-day-card';
     </div>
   `,
   styles: [`
-    .day-grid { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .day-grid { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
     @media (max-width: 600px) {
       .day-grid { flex-direction: column; overflow-x: auto; flex-wrap: nowrap; }
     }
