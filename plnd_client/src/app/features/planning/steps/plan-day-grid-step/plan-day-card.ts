@@ -75,21 +75,23 @@ export class PlanDayCardComponent {
 
   protected toggle(): void { this.expanded = !this.expanded; }
 
-  readonly tasks = computed(() =>
+  protected readonly tasks = computed(() =>
     this.weekPlanService.scheduledTasks().filter(t => t.date === this.date())
   );
-  readonly taskCount = computed(() => this.tasks().length);
+  protected readonly taskCount = computed(() => this.tasks().length);
 
-  getMeal(slot: MealSlot) {
+  protected getMeal(slot: MealSlot) {
     return this.weekPlanService.scheduledMeals()[this.date()]?.[slot];
   }
 
-  readonly mealCount = computed(() => this.slots.filter(s => this.getMeal(s)).length);
+  protected readonly mealCount = computed(() => this.slots.filter(s => this.getMeal(s)).length);
 
+  // Public — called directly in spec tests via componentInstance
   energyClass(energy: EnergyLevel): string {
     return energy === 'medium' ? 'energy-med' : `energy-${energy}`;
   }
 
+  // Public — called directly in spec tests via componentInstance
   energyLabel(energy: EnergyLevel): string {
     return energy === 'medium' ? 'med' : energy;
   }
