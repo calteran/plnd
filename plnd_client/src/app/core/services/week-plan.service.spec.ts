@@ -1,7 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
-import { FloatingTask } from '../models/week-plan';
 
 describe('WeekPlanService', () => {
   let service: WeekPlanService;
