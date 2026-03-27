@@ -1,5 +1,5 @@
 import { Component, computed, inject, input } from '@angular/core';
-import { DatePipe, NgClass, TitleCasePipe } from '@angular/common';
+import { DatePipe, TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { EnergyLevel, MealSlot } from '../../../../core/models/week-plan';
 
@@ -9,7 +9,7 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 @Component({
   selector: 'app-plan-day-card',
   standalone: true,
-  imports: [DatePipe, NgClass, TitleCasePipe],
+  imports: [DatePipe, TitleCasePipe],
   styleUrl: 'plan-day-card.scss',
   template: `
     <div
@@ -54,10 +54,10 @@ const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
           </div>
           <div>
             <div class="body-section-label">Tasks</div>
-            @for (task of tasks(); track task.title) {
+            @for (task of tasks(); track task) {
               <div class="body-row">
                 <span class="val">{{ task.title }}</span>
-                <span class="energy-badge" [ngClass]="energyClass(task.energy)">
+                <span class="energy-badge" [class]="energyClass(task.energy)">
                   {{ energyLabel(task.energy) }}
                 </span>
               </div>
