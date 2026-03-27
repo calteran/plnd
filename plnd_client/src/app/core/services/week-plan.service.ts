@@ -4,7 +4,7 @@ import { Observable, catchError, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
 import {
   CarryoverDecision, MealSlot, PlanDraftShape,
-  PlanEntryRequest, PlannedMeal, PlannedTask,
+  PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, SchedulePeriodResponse,
 } from '../models/week-plan';
@@ -29,6 +29,7 @@ export class WeekPlanService {
   private readonly hasUnplannedHorizonSignal = signal<boolean>(false);
   private readonly isSubmittingSignal = signal<boolean>(false);
   private readonly planningTaskIdSignal = signal<string>('');
+  private readonly floatingTasksSignal = signal<FloatingTask[]>([]);
 
   readonly planStart = this.planStartSignal.asReadonly();
   readonly planEnd = this.planEndSignal.asReadonly();
@@ -40,6 +41,7 @@ export class WeekPlanService {
   readonly hasUnplannedHorizon = this.hasUnplannedHorizonSignal.asReadonly();
   readonly isSubmitting = this.isSubmittingSignal.asReadonly();
   readonly planningTaskId = this.planningTaskIdSignal.asReadonly();
+  readonly floatingTasks = this.floatingTasksSignal.asReadonly();
 
   initSession(start: string, end: string): void {
     this.planStartSignal.set(start);
@@ -91,6 +93,7 @@ export class WeekPlanService {
 
   clearDraft(): void {
     localStorage.removeItem(this.DRAFT_KEY);
+    this.floatingTasksSignal.set([]);
   }
 
   loadPeriod(start: string, end: string): Observable<SchedulePeriodResponse> {
@@ -191,6 +194,14 @@ export class WeekPlanService {
 
   removeTask(index: number): void {
     this.scheduledTasksSignal.update(t => t.filter((_, i) => i !== index));
+  }
+
+  addFloatingTask(task: FloatingTask): void {
+    this.floatingTasksSignal.update(tasks => [...tasks, task]);
+  }
+
+  removeFloatingTask(index: number): void {
+    this.floatingTasksSignal.update(tasks => tasks.filter((_, i) => i !== index));
   }
 
   /** Days in the horizon as ISO date strings (inclusive). */

@@ -27,6 +27,8 @@ export interface PlannedTask {
   scheduled_start?: string; // "HH:MM"
 }
 
+export type FloatingTask = Omit<PlannedTask, 'date'>;
+
 export interface PlanDraftShape {
   schemaVersion: 1;
   planStart: string;

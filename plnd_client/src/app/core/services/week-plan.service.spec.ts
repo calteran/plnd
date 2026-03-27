@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
+import { FloatingTask } from '../models/week-plan';
 
 describe('WeekPlanService', () => {
   let service: WeekPlanService;
@@ -104,5 +105,31 @@ describe('WeekPlanService', () => {
     service.clear();
     expect(service.planStart()).toBe('');
     expect(service.scheduledTasks().length).toBe(0);
+  });
+
+  describe('floating task management', () => {
+    it('should start with an empty floatingTasks list', () => {
+      expect(service.floatingTasks()).toEqual([]);
+    });
+
+    it('should append a task via addFloatingTask', () => {
+      service.addFloatingTask({ title: 'Call dentist', energy: 'low', task_type: 'custom' });
+      expect(service.floatingTasks().length).toBe(1);
+      expect(service.floatingTasks()[0].title).toBe('Call dentist');
+    });
+
+    it('should remove a task by index via removeFloatingTask', () => {
+      service.addFloatingTask({ title: 'Task A', energy: 'low', task_type: 'custom' });
+      service.addFloatingTask({ title: 'Task B', energy: 'medium', task_type: 'custom' });
+      service.removeFloatingTask(0);
+      expect(service.floatingTasks().length).toBe(1);
+      expect(service.floatingTasks()[0].title).toBe('Task B');
+    });
+
+    it('should clear floatingTasks when clearDraft is called', () => {
+      service.addFloatingTask({ title: 'Lingering task', energy: 'medium', task_type: 'custom' });
+      service.clearDraft();
+      expect(service.floatingTasks()).toEqual([]);
+    });
   });
 });
