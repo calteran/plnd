@@ -3,6 +3,7 @@ import { DatePipe, NgClass, TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { EnergyLevel, MealSlot } from '../../../../core/models/week-plan';
 
+// 'snack' is part of the MealSlot type but is excluded from card display — snack scheduling is deferred to a future phase
 const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
 @Component({
@@ -69,10 +70,10 @@ export class PlanDayCardComponent {
   readonly date = input.required<string>();
 
   private readonly weekPlanService = inject(WeekPlanService);
-  expanded = false;
-  readonly slots = MEAL_SLOTS;
+  protected expanded = false;
+  protected readonly slots = MEAL_SLOTS;
 
-  toggle(): void { this.expanded = !this.expanded; }
+  protected toggle(): void { this.expanded = !this.expanded; }
 
   readonly tasks = computed(() =>
     this.weekPlanService.scheduledTasks().filter(t => t.date === this.date())
