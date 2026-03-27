@@ -27,6 +27,8 @@ export interface PlannedTask {
   scheduled_start?: string; // "HH:MM"
 }
 
+export type FloatingTask = Omit<PlannedTask, 'date'>;
+
 export interface PlanDraftShape {
   schemaVersion: 1;
   planStart: string;
@@ -35,6 +37,7 @@ export interface PlanDraftShape {
   carryoverDecisions: Record<string, CarryoverDecision>;
   scheduledMeals: Record<string, Partial<Record<MealSlot, PlannedMeal>>>;
   scheduledTasks: PlannedTask[];
+  floatingTasks?: FloatingTask[];
   savedAt: string;
 }
 
