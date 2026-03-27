@@ -103,7 +103,9 @@ describe('AuthService', () => {
     service.handleCallback('test-jwt-token');
     service.logout();
     // State is cleared synchronously; the HTTP call is fire-and-forget.
-    httpMock.expectOne(`${API_BASE}/auth/logout`).flush(null, { status: 204, statusText: 'No Content' });
+    const req = httpMock.expectOne(`${API_BASE}/auth/logout`);
+    expect(req.request.method).toBe('POST');
+    req.flush(null, { status: 204, statusText: 'No Content' });
   });
 
   it('logout() calls oauthService.logOut()', () => {
