@@ -14,11 +14,16 @@ describe('PlanDayCardComponent', () => {
   }
 
   beforeEach(async () => {
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [PlanDayCardComponent, HttpClientTestingModule]
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
     service.initSession('2026-03-31', '2026-04-06');
+  });
+
+  afterEach(() => {
+    localStorage.clear();
   });
 
   it('should create', () => {
@@ -117,6 +122,15 @@ describe('PlanDayCardComponent', () => {
       card.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
       fixture.detectChanges();
       expect(card.classList.contains('expanded')).toBeTrue();
+    });
+
+    it('should collapse on second Enter key press', () => {
+      const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
+      card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      expect(card.classList.contains('expanded')).toBeFalse();
     });
   });
 
