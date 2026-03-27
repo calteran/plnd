@@ -63,7 +63,11 @@ describe('PlanDayCardComponent', () => {
   });
 
   describe('zero-value badge styling', () => {
-    beforeEach(() => createComponent('2026-04-06')); // day with no tasks or meals added
+    beforeEach(() => {
+      // '2026-04-06' is the last day of the horizon; no tasks or meals are scheduled for it
+      // initSession initialises an empty draft, so this date will always have zero counts
+      createComponent('2026-04-06');
+    });
 
     it('should apply .zero class to tasks badge when task count is 0', () => {
       const statVals = fixture.nativeElement.querySelectorAll('.stat-val');
@@ -95,6 +99,24 @@ describe('PlanDayCardComponent', () => {
       card.click();
       fixture.detectChanges();
       expect(card.classList.contains('expanded')).toBeFalse();
+    });
+  });
+
+  describe('keyboard activation', () => {
+    beforeEach(() => createComponent('2026-03-31'));
+
+    it('should toggle expanded on Enter key', () => {
+      const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
+      card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      expect(card.classList.contains('expanded')).toBeTrue();
+    });
+
+    it('should toggle expanded on Space key', () => {
+      const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
+      card.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      fixture.detectChanges();
+      expect(card.classList.contains('expanded')).toBeTrue();
     });
   });
 
