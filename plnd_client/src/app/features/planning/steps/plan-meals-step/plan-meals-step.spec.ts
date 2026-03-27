@@ -134,6 +134,17 @@ describe('PlanMealsStepComponent', () => {
     expect(after).not.toBe(before);
   });
 
+  it('should persist the cycled suggestion to the service when 🔀 Suggest is clicked', () => {
+    const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+    (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const stored = service.scheduledMeals()['2026-03-23']?.['breakfast'];
+    expect(stored).toBeTruthy();
+    expect(stored!.type).toBe('mock');
+    const displayed = firstCell.querySelector('.gc-text')!.textContent!.trim();
+    expect(stored!.title).toBe(displayed);
+  });
+
   it('should pre-fill edit input with existing custom meal title', () => {
     service.setMeal('2026-03-23', 'breakfast', { type: 'user_meal', title: 'Overnight oats' });
     fixture.detectChanges();

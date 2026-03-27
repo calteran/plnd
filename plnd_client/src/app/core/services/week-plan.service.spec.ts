@@ -209,7 +209,7 @@ describe('WeekPlanService', () => {
     );
     expect(lunch).toBeTruthy();
     expect(lunch!.task_ref_type).toBe('user_meal');
-    expect(lunch!.title).toBeUndefined(); // title omitted for user_meal
+    expect(lunch!.title).toBe('Greek yogurt'); // title included when no id (phase 2 typed meals)
     req.flush({ committed: 3, planning_task_status: 'completed' });
   });
 });

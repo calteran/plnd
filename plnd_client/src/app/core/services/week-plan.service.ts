@@ -259,7 +259,7 @@ export class WeekPlanService {
           task_type: 'meal',
           task_ref_id: resolved.type === 'user_meal' ? resolved.id : undefined,
           task_ref_type: resolved.type === 'user_meal' ? 'user_meal' : undefined,
-          title: resolved.type === 'mock' ? resolved.title : undefined,
+          title: resolved.type === 'mock' || !resolved.id ? resolved.title : undefined,
           scheduled_start: slotDefaultTime(slot),
           after_milepost: slot,
         });
