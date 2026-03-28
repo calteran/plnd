@@ -32,7 +32,7 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
 
           <div class="day-accordion__body">
             <div class="task-list">
-              @for (task of (tasksByDay()[day] ?? []); track task) {
+              @for (task of (tasksByDay()[day] ?? []); track task.title + task.date) {
                 <div class="task-row">
                   <span class="task-title">{{ task.title }}</span>
                   <span class="energy-badge energy-{{ task.energy }}">
@@ -57,7 +57,7 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
           <span class="floating-hint">agent will schedule these</span>
         </div>
         <div class="float-task-list">
-          @for (task of floatingTasks(); track task) {
+          @for (task of floatingTasks(); track task.title) {
             <div class="floating-task-row">
               <span class="task-title">{{ task.title }}</span>
               <span class="floating-badge">floating</span>
