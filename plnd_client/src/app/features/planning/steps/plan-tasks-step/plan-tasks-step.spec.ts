@@ -114,4 +114,24 @@ describe('PlanTasksStepComponent', () => {
     expect(panel.textContent).toContain('FLOATING TASKS');
     expect(panel.textContent).toContain('agent will schedule these');
   });
+
+  it('removeTask should remove the correct task by day-local index', () => {
+    spyOn(service, 'removeTask');
+    service.addTask({ date: '2026-03-24', title: 'First', energy: 'low', task_type: 'custom' });
+    service.addTask({ date: '2026-03-24', title: 'Second', energy: 'high', task_type: 'custom' });
+    fixture.detectChanges();
+    // Remove the second task (day-local index 1); its global index is also 1.
+    fixture.componentInstance.removeTask('2026-03-24', 1);
+    expect(service.removeTask).toHaveBeenCalledWith(1);
+  });
+
+  it('removeTask should resolve global index when tasks from other days precede', () => {
+    spyOn(service, 'removeTask');
+    service.addTask({ date: '2026-03-24', title: 'Day1 Task', energy: 'low', task_type: 'custom' });
+    service.addTask({ date: '2026-03-25', title: 'Day2 Task', energy: 'medium', task_type: 'custom' });
+    fixture.detectChanges();
+    // Remove the first (and only) task on day 2; its global index is 1.
+    fixture.componentInstance.removeTask('2026-03-25', 0);
+    expect(service.removeTask).toHaveBeenCalledWith(1);
+  });
 });
