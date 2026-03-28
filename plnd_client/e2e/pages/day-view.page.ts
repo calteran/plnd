@@ -22,7 +22,7 @@ export class DayViewPage {
 
   // Schedule row items
   getMealRows() { return this.page.locator('app-meal-row'); }
-  getTaskRows() { return this.page.locator('app-task-row'); }
+  getTaskRows() { return this.page.locator('.schedule-list > app-task-row'); }
 
   /** Open the avatar dropdown then click Sign out. */
   async signOut() {
