@@ -74,6 +74,14 @@ just logs             # View service logs
 
 **Escalate to human**: major architecture decisions, core data model changes, security decisions, significant scope changes.
 
+## GitHub Actions (Issue Fixes)
+
+When invoked via GitHub Actions to fix an issue:
+1. Fix the issue on a new branch
+2. Run `just verify` to confirm quality passes
+3. **Always open a PR** using `gh pr create` — do not just push and stop
+4. Reference the issue with "Closes #N" in the PR description
+
 ## Environment Variables
 
 See `.env.example` for local development defaults. Secrets are managed via Doppler (`plnd/dev`) — do not hardcode credentials in TOML or compose files.
