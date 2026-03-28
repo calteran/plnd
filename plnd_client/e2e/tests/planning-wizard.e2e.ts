@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { seedAuth, API_BASE, MOCK_USER_NEW, MOCK_PREFS } from '../helpers/auth';
+import { seedAuth, API_BASE, MOCK_USER_NEW } from '../helpers/auth';
 
 // Fixed date: 2026-03-28 (Saturday)
 // MOCK_PREFS: week_start_day=1 (Monday), default_plan_length_days=7
@@ -75,8 +75,8 @@ test.describe('Planning Wizard', () => {
 
     test('active pill advances and done pills accumulate as user steps forward', async ({ page }) => {
       // Advance to step 3 via two Next clicks
-      await page.locator('[aria-label="Next step"]').click();
-      await page.locator('[aria-label="Next step"]').click();
+      await page.getByLabel('Next step').click();
+      await page.getByLabel('Next step').click();
 
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
       await expect(page.locator('.progress-pill.done')).toHaveCount(2);
@@ -94,29 +94,29 @@ test.describe('Planning Wizard', () => {
     });
 
     test('Step 1 has no Previous button', async ({ page }) => {
-      await expect(page.locator('[aria-label="Previous step"]')).not.toBeVisible();
+      await expect(page.getByLabel('Previous step')).not.toBeVisible();
     });
 
     test('Next button advances to the next step', async ({ page }) => {
-      await page.locator('[aria-label="Next step"]').click();
+      await page.getByLabel('Next step').click();
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
     });
 
     test('Previous button returns to the prior step', async ({ page }) => {
-      await page.locator('[aria-label="Next step"]').click();
+      await page.getByLabel('Next step').click();
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
 
-      await page.locator('[aria-label="Previous step"]').click();
+      await page.getByLabel('Previous step').click();
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('1');
     });
 
     test('Step 5 has no Next button', async ({ page }) => {
       // Navigate to step 5 by clicking Next four times
       for (let i = 0; i < 4; i++) {
-        await page.locator('[aria-label="Next step"]').click();
+        await page.getByLabel('Next step').click();
       }
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('5');
-      await expect(page.locator('[aria-label="Next step"]')).not.toBeVisible();
+      await expect(page.getByLabel('Next step')).not.toBeVisible();
     });
   });
 
@@ -144,7 +144,7 @@ test.describe('Planning Wizard', () => {
       await page.goto('/plan/week');
       await expect(page.locator('.planning-wizard')).toBeVisible();
 
-      await page.locator('.btn-cancel').click();
+      await page.getByRole('button', { name: 'Cancel' }).click();
 
       // /today guard immediately redirects to /day/:date
       await expect(page).toHaveURL(/\/day\//);

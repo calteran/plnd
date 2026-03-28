@@ -69,7 +69,7 @@ machete:
 
 # TypeScript quality commands
 ts-lint:
-    cd plnd_client && npx eslint "src/**/*.ts"
+    cd plnd_client && npx eslint "src/**/*.ts" "e2e/**/*.ts"
 
 ts-deps:
     cd plnd_client && npm run check-dependencies
