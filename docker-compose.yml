@@ -19,7 +19,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: plnd_api/Dockerfile
     ports:
       - "3000:3000"
     environment:
@@ -65,7 +65,7 @@ services:
   client:
     build:
       context: .
-      dockerfile: Dockerfile.client
+      dockerfile: plnd_client/Dockerfile
     ports:
       - "4200:4200"
     environment:

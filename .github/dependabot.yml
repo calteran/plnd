@@ -35,6 +35,22 @@ updates:
           - 'eslint'
 
   - package-ecosystem: docker
+    directory: /plnd_api
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ['*']
+
+  - package-ecosystem: docker
+    directory: /plnd_client
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ['*']
+
+  - package-ecosystem: docker
     directory: /
     schedule:
       interval: weekly
