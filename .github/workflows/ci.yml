@@ -107,7 +107,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: plnd_client/package-lock.json
 
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: plnd_client/node_modules
+          key: node-modules-${{ hashFiles('plnd_client/package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: cd plnd_client && npm ci
 
       - name: Run Angular unit tests (headless)
@@ -148,11 +156,31 @@ jobs:
           cache: 'npm'
           cache-dependency-path: plnd_client/package-lock.json
 
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: plnd_client/node_modules
+          key: node-modules-${{ hashFiles('plnd_client/package-lock.json') }}
+
       - name: Install Angular dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: cd plnd_client && npm ci
 
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('plnd_client/package-lock.json') }}
+
       - name: Install Playwright browsers
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: cd plnd_client && npx playwright install chromium --with-deps
+
+      - name: Install Playwright system dependencies
+        if: steps.cache-playwright.outputs.cache-hit == 'true'
+        run: cd plnd_client && npx playwright install-deps chromium
 
       - name: Build API binary
         run: cargo build -p plnd_api
