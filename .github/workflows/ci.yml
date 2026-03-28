@@ -112,7 +112,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: plnd_client/node_modules
-          key: node-modules-${{ hashFiles('plnd_client/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
 
       - name: Install dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
@@ -161,7 +161,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: plnd_client/node_modules
-          key: node-modules-${{ hashFiles('plnd_client/package-lock.json') }}
+          key: node-modules-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
 
       - name: Install Angular dependencies
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
@@ -172,7 +172,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ hashFiles('plnd_client/package-lock.json') }}
+          key: playwright-chromium-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
