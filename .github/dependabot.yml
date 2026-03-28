@@ -34,6 +34,14 @@ updates:
           - '@typescript-eslint/*'
           - 'eslint'
 
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ['*']
+
   - package-ecosystem: github-actions
     directory: /
     schedule:
