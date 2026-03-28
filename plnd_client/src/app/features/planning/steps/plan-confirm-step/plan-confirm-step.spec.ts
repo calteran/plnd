@@ -47,7 +47,6 @@ describe('PlanConfirmStepComponent', () => {
   });
 
   it('should count pending slots (no entry) as fully covered', () => {
-    // No meals explicitly set — all pending slots are implicitly accepted
     fixture.detectChanges();
     expect(fixture.componentInstance.mealCoverage()).toBe(100);
   });
@@ -58,5 +57,42 @@ describe('PlanConfirmStepComponent', () => {
     // 7 days × 3 slots = 21 total; 1 skipped → 20 covered
     const expected = Math.round((20 / 21) * 100);
     expect(fixture.componentInstance.mealCoverage()).toBe(expected);
+  });
+
+  // ── New structure tests ───────────────────────────────────────────────────
+
+  it('should render a completion banner container', () => {
+    const banner = fixture.nativeElement.querySelector('.completion-banner');
+    expect(banner).toBeTruthy();
+  });
+
+  it('should show "Ready to go!" heading inside the banner', () => {
+    const heading = fixture.nativeElement.querySelector('.banner-heading');
+    expect(heading?.textContent?.trim()).toBe('Ready to go!');
+  });
+
+  it('should render the step title', () => {
+    const title = fixture.nativeElement.querySelector('.step-title');
+    expect(title?.textContent?.trim()).toBe('Confirm Your Plan');
+  });
+
+  it('should render the week range in the subtitle', () => {
+    const sub = fixture.nativeElement.querySelector('.step-sub');
+    // initSession sets 2026-03-24 → 2026-03-30
+    expect(sub?.textContent).toContain('Mar 24');
+    expect(sub?.textContent).toContain('Mar 30');
+  });
+
+  it('should not show error banner when there is no error', () => {
+    const el = fixture.nativeElement.querySelector('.error-banner');
+    expect(el).toBeNull();
+  });
+
+  it('should show styled error banner when errorMessage is set', () => {
+    fixture.componentInstance.errorMessage = 'Failed to save plan — please try again.';
+    fixture.detectChanges();
+    const el = fixture.nativeElement.querySelector('.error-banner');
+    expect(el).toBeTruthy();
+    expect(el.textContent).toContain('Failed to save plan');
   });
 });
