@@ -120,6 +120,147 @@ test.describe('Planning Wizard', () => {
     });
   });
 
+  // ── Step 1 — Carryover Review ─────────────────────────────────────────────
+
+  test.describe('Step 1 — Carryover Review', () => {
+    // Mock carryover entries from the previous week (2026-03-21 → 2026-03-23)
+    const MOCK_CARRYOVER = [
+      {
+        entry_id: 'co-1',
+        task_type: 'custom',
+        title: 'Morning run',
+        date: '2026-03-21',
+        scheduled_start: '07:00:00',
+        status: 'incomplete',
+      },
+      {
+        // No title — component should fall back to task_type
+        entry_id: 'co-2',
+        task_type: 'habit',
+        date: '2026-03-22',
+        scheduled_start: '09:00:00',
+        status: 'incomplete',
+      },
+      {
+        entry_id: 'co-3',
+        task_type: 'custom',
+        title: 'Read book',
+        date: '2026-03-23',
+        scheduled_start: '20:00:00',
+        status: 'incomplete',
+      },
+    ];
+
+    async function seedWizardWithCarryover(page: Page): Promise<void> {
+      await seedWizard(page);
+      // Override period route (LIFO — this handler runs before seedWizard's empty mock)
+      await page.route(`${API_BASE}/schedule/period**`, route =>
+        route.fulfill({
+          status: 200,
+          json: { entries: [], carryover: MOCK_CARRYOVER },
+        })
+      );
+    }
+
+    test('empty state shows celebration emoji and message when no carryover', async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      await seedWizard(page); // returns carryover: []
+      await page.goto('/plan/week');
+      await expect(page.locator('.planning-wizard')).toBeVisible();
+      await expect(page.locator('.empty-state')).toBeVisible();
+      await expect(page.locator('.empty-emoji')).toContainText('🎉');
+      await expect(page.locator('.carryover-list')).not.toBeVisible();
+    });
+
+    test('carryover items render with title, task-type fallback, and original date', async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      await seedWizardWithCarryover(page);
+      await page.goto('/plan/week');
+      await expect(page.locator('.carryover-list')).toBeVisible();
+
+      const items = page.locator('.carryover-item');
+      await expect(items).toHaveCount(3);
+
+      // Item with explicit title
+      await expect(items.nth(0).locator('.item-title')).toHaveText('Morning run');
+      await expect(items.nth(0).locator('.item-date')).toContainText('Mar 21');
+
+      // Item without title falls back to task_type (no titlecase transform on this element)
+      await expect(items.nth(1).locator('.item-title')).toHaveText('habit');
+
+      // Third item
+      await expect(items.nth(2).locator('.item-title')).toHaveText('Read book');
+      await expect(items.nth(2).locator('.item-date')).toContainText('Mar 23');
+    });
+
+    test('decision badges default to Accept for all items', async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      await seedWizardWithCarryover(page);
+      await page.goto('/plan/week');
+      await expect(page.locator('.carryover-list')).toBeVisible();
+
+      const badges = page.locator('.decision-badge');
+      await expect(badges).toHaveCount(3);
+      for (let i = 0; i < 3; i++) {
+        await expect(badges.nth(i)).toHaveAttribute('data-decision', 'accept');
+        await expect(badges.nth(i)).toContainText('Accept');
+      }
+    });
+
+    test('clicking badge cycles Accept → Defer → Dismiss → Accept', async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      await seedWizardWithCarryover(page);
+      await page.goto('/plan/week');
+      await expect(page.locator('.carryover-list')).toBeVisible();
+
+      const badge = page.locator('.decision-badge').first();
+
+      // Initial state: Accept
+      await expect(badge).toHaveAttribute('data-decision', 'accept');
+
+      // Click 1: Accept → Defer
+      await badge.click();
+      await expect(badge).toHaveAttribute('data-decision', 'defer');
+      await expect(badge).toContainText('Defer');
+
+      // Click 2: Defer → Dismiss
+      await badge.click();
+      await expect(badge).toHaveAttribute('data-decision', 'dismiss');
+      await expect(badge).toContainText('Dismiss');
+
+      // Click 3: Dismiss → Accept (wraps around)
+      await badge.click();
+      await expect(badge).toHaveAttribute('data-decision', 'accept');
+      await expect(badge).toContainText('Accept');
+    });
+
+    test('carryover decisions persist when navigating to Step 2 and back', async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      await seedWizardWithCarryover(page);
+      await page.goto('/plan/week');
+      await expect(page.locator('.carryover-list')).toBeVisible();
+
+      // Change first item to Defer, second to Dismiss
+      const badges = page.locator('.decision-badge');
+      await badges.nth(0).click(); // accept → defer
+      await badges.nth(1).click(); // accept → defer
+      await badges.nth(1).click(); // defer  → dismiss
+
+      // Navigate to Step 2
+      await page.getByLabel('Next step').click();
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
+
+      // Navigate back to Step 1
+      await page.getByLabel('Previous step').click();
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('1');
+
+      // Decisions should still be set
+      await expect(page.locator('.decision-badge').nth(0)).toHaveAttribute('data-decision', 'defer');
+      await expect(page.locator('.decision-badge').nth(1)).toHaveAttribute('data-decision', 'dismiss');
+      await expect(page.locator('.decision-badge').nth(2)).toHaveAttribute('data-decision', 'accept');
+    });
+  });
+
   // ── Cancel flow ────────────────────────────────────────────────────────────
 
   test.describe('Cancel flow', () => {
