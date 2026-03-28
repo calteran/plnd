@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealSlot, SKIP_SENTINEL, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
+import { SKIP_SENTINEL, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
 
 @Component({
   selector: 'app-plan-confirm-step',

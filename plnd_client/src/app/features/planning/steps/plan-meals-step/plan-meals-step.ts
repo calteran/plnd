@@ -238,8 +238,6 @@ export class PlanMealsStepComponent {
   readonly editingCell = signal<{ date: string; slot: MealSlot } | null>(null);
   /** Current value in the open text input. */
   readonly editingValue = signal('');
-  /** Per-cell offset for cycling through mock suggestions without persisting them. */
-  private readonly suggestOffsets = signal<Record<string, number>>({});
 
   // ── Formatters ────────────────────────────────────────────
 
@@ -276,18 +274,11 @@ export class PlanMealsStepComponent {
     return e?.date === date && e?.slot === slot;
   }
 
-  /**
-   * Returns the current suggestion for a pending cell. Prefers the persisted mock
-   * title (set when the user cycles with 🔀); falls back to the deterministic
-   * suggestion rotated by the local offset signal.
-   */
+  /** Returns the displayed suggestion for a pending cell — persisted mock title or deterministic default. */
   getSuggestion(date: string, slot: MealSlot): string {
     const stored = this.getMeal(date, slot);
     if (stored?.type === 'mock') return stored.title;
-    const key = `${date}:${slot}`;
-    const offset = this.suggestOffsets()[key] ?? 0;
-    const baseIdx = MOCK_MEAL_SUGGESTIONS.indexOf(getMockSuggestion(date, slot));
-    return MOCK_MEAL_SUGGESTIONS[(baseIdx + offset) % MOCK_MEAL_SUGGESTIONS.length];
+    return getMockSuggestion(date, slot);
   }
 
   // ── Actions ───────────────────────────────────────────────
@@ -328,11 +319,9 @@ export class PlanMealsStepComponent {
 
   /** Cycles to the next mock suggestion and persists it so implicit acceptance uses the chosen one. */
   reSuggest(date: string, slot: MealSlot): void {
-    const key = `${date}:${slot}`;
-    const newOffset = ((this.suggestOffsets()[key] ?? 0) + 1) % MOCK_MEAL_SUGGESTIONS.length;
-    this.suggestOffsets.update(o => ({ ...o, [key]: newOffset }));
-    const baseIdx = MOCK_MEAL_SUGGESTIONS.indexOf(getMockSuggestion(date, slot));
-    const title = MOCK_MEAL_SUGGESTIONS[(baseIdx + newOffset) % MOCK_MEAL_SUGGESTIONS.length];
+    const currentTitle = this.getMeal(date, slot)?.title ?? getMockSuggestion(date, slot);
+    const currentIndex = MOCK_MEAL_SUGGESTIONS.indexOf(currentTitle);
+    const title = MOCK_MEAL_SUGGESTIONS[(currentIndex + 1) % MOCK_MEAL_SUGGESTIONS.length];
     this.weekPlanService.setMeal(date, slot, { type: 'mock', title });
   }
 }
