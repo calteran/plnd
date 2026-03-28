@@ -74,7 +74,8 @@ test.describe('Day View', () => {
   test.describe('URL routing', () => {
     test('/today redirects to canonical /day/YYYY-MM-DD URL', async ({ page }) => {
       await seedAuth(page);
-      await page.goto('/today');
+      const dayView = new DayViewPage(page);
+      await dayView.goto();
       await expect(page).toHaveURL(/\/day\/\d{4}-\d{2}-\d{2}/);
     });
   });
@@ -90,8 +91,9 @@ test.describe('Day View', () => {
 
     test('shows "Today" badge when viewing today\'s date', async ({ page }) => {
       await seedAuth(page);
-      await page.goto('/today');
-      await expect(page.locator('.today-badge')).toBeVisible();
+      const dayView = new DayViewPage(page);
+      await dayView.goto();
+      await expect(dayView.getTodayBadge()).toBeVisible();
     });
 
     test('next button advances the date in URL and header', async ({ page }) => {
