@@ -6,7 +6,7 @@
 
 **Architecture:** All changes are confined to two files: `_tokens.scss` (new color tokens) and `plan-review-step.ts` (template + styles + a small cycling method). No new components, no service changes, no backend work.
 
-**Tech Stack:** Angular 19 (standalone components, signals), SCSS tokens via CSS custom properties, Karma/Jasmine for unit tests.
+**Tech Stack:** Angular 21 (standalone components, signals), SCSS tokens via CSS custom properties, Karma/Jasmine for unit tests.
 
 ---
 
