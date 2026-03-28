@@ -33,7 +33,7 @@ import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
 
           <div class="day-accordion__body">
             <div class="task-list">
-              @for (task of (tasksByDay()[day] ?? []); track task) {
+              @for (task of tasksByDay()[day]; track task) {
                 <div class="task-row">
                   <span class="task-title">{{ task.title }}</span>
                   <span class="energy-badge energy-{{ task.energy }}">
@@ -237,7 +237,9 @@ export class PlanTasksStepComponent {
   readonly horizonDays = computed(() => this.weekPlanService.horizonDays());
 
   readonly tasksByDay = computed(() => {
-    const byDay: Record<string, PlannedTask[]> = {};
+    const byDay: Record<string, PlannedTask[]> = Object.fromEntries(
+      this.horizonDays().map(d => [d, [] as PlannedTask[]])
+    );
     for (const task of this.weekPlanService.scheduledTasks()) {
       (byDay[task.date] ??= []).push(task);
     }
