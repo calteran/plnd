@@ -1,32 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const API_BASE = 'http://localhost:3000';
-
-const MOCK_USER_NEW = {
-  user_id: 'e2e-test-uuid',
-  email: 'test@example.com',
-  display_name: null,
-  avatar_url: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  is_active: true,
-  last_login: null,
-  onboarding_completed: false
-};
-
-const MOCK_USER_ONBOARDED = {
-  ...MOCK_USER_NEW,
-  onboarding_completed: true
-};
-
-const MOCK_PREFS = {
-  user_id: 'e2e-test-uuid',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  week_start_day: 1,
-  planning_trigger_offset: 0,
-  default_plan_length_days: 7
-};
+import { API_BASE, MOCK_USER_NEW, MOCK_USER_ONBOARDED, MOCK_PREFS } from '../helpers/auth';
 
 test.describe('Onboarding', () => {
   test('unauthenticated /onboarding visit redirects to /login', async ({ page }) => {

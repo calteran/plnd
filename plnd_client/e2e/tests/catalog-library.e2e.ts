@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+import { API_BASE, seedAuth } from '../helpers/auth';
 
 // Tests verify the API contract for catalog library endpoints:
 // GET/POST /my/dishes, PATCH /my/dishes/{id}, GET/POST /my/meals,
@@ -13,29 +14,6 @@ import { test, expect } from '@playwright/test';
 //
 // All backend responses are mocked via page.route() so these tests are
 // independent of the Docker image version.
-
-const API_BASE = 'http://localhost:3000';
-
-const MOCK_PREFS = {
-  user_id: 'e2e-test-uuid',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  week_start_day: 1,
-  planning_trigger_offset: 0,
-  default_plan_length_days: 7
-};
-
-const MOCK_USER_ONBOARDED = {
-  user_id: 'e2e-test-uuid',
-  email: 'test@example.com',
-  display_name: 'Test User',
-  avatar_url: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  is_active: true,
-  last_login: null,
-  onboarding_completed: true,
-};
 
 const MOCK_DISH: Record<string, unknown> = {
   user_dish_pref_id: 'dish-pref-uuid-1',
@@ -81,29 +59,11 @@ const MOCK_INGREDIENT_PREF: Record<string, unknown> = {
   updated_at: '2026-01-01T00:00:00Z',
 };
 
-// Seed auth and mock /users/me, /preferences/me, and /schedule/plan/status for
-// every test. The latter two are called by MainLayoutComponent on every page load;
-// without mocks the synthetic JWT returns 401 → authErrorInterceptor fires
-// logout('session_expired') before the test can proceed.
-async function seedAuthAndNavigate(page: Parameters<Parameters<typeof test>[1]>[0]['page']): Promise<void> {
-  await page.route(`${API_BASE}/users/me`, route =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify(MOCK_USER_ONBOARDED),
-    })
-  );
-  await page.route(`${API_BASE}/preferences/me`, route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
-  );
-  await page.route(`${API_BASE}/schedule/plan/status**`, route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
-  );
-
-  await page.addInitScript(() => {
-    localStorage.setItem('auth_token', 'synthetic.test.token');
-  });
-
+// Seed auth and navigate to /today. seedAuth mocks /users/me, /preferences/me,
+// and /schedule/plan/status — without these mocks the synthetic JWT returns 401
+// → authErrorInterceptor fires logout('session_expired') before the test can proceed.
+async function seedAuthAndNavigate(page: Page): Promise<void> {
+  await seedAuth(page);
   await page.goto('/today');
   await expect(page).toHaveURL(/\/day\//);
 }
