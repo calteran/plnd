@@ -16,8 +16,8 @@ export function formatDate(isoDate: string): string {
   });
 }
 
-/** "Jan 6" — month short + day, used for week range labels */
-export function formatWeekDate(isoDate: string): string {
+/** "Jan 6" — month short + day, used for week range and day column sub-labels */
+export function formatDayDate(isoDate: string): string {
   return noonDate(isoDate).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric',
   });
@@ -28,9 +28,4 @@ export function formatDayName(isoDate: string): string {
   return noonDate(isoDate).toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-/** "Jan 6" — month short + day, used for day column sub-labels */
-export function formatDayDate(isoDate: string): string {
-  return noonDate(isoDate).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric',
-  });
-}
+export const formatWeekDate = formatDayDate;
