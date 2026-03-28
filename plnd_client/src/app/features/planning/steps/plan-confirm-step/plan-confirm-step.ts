@@ -113,7 +113,7 @@ export class PlanConfirmStepComponent {
   readonly weekPlanService = inject(WeekPlanService);
   private readonly router = inject(Router);
 
-  errorMessage: string = '';
+  errorMessage = '';
 
   readonly totalDays = computed(() => this.weekPlanService.horizonDays().length);
   readonly taskCount = computed(() => this.weekPlanService.scheduledTasks().length);
