@@ -36,7 +36,7 @@ jobs:
 
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: plnd_client/node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
@@ -117,7 +117,7 @@ jobs:
 
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: plnd_client/node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
@@ -166,7 +166,7 @@ jobs:
 
       - name: Cache node_modules
         id: cache-node-modules
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: plnd_client/node_modules
           key: node-modules-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
@@ -177,7 +177,7 @@ jobs:
 
       - name: Cache Playwright browsers
         id: cache-playwright
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/ms-playwright
           key: playwright-chromium-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
