@@ -237,6 +237,8 @@ export class WeekPlanService {
     this.hasUnplannedHorizonSignal.set(false);
     this.isSubmittingSignal.set(false);
     this.planningTaskIdSignal.set('');
+    this.floatingTasksSignal.set([]);
+    this.clearDraft();
   }
 
   private buildCommitRequest(taskId: string, replace: boolean): PostSchedulePlanRequest {
