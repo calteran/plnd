@@ -185,6 +185,21 @@ describe('WeekPlanService', () => {
     req.flush({ committed: 3, planning_task_status: 'completed' });
   });
 
+  it('buildCommitRequest includes an explicit snack entry', () => {
+    service.initSession('2026-03-24', '2026-03-24');
+    service.setMeal('2026-03-24', 'snack', { type: 'user_meal', title: 'Apple' });
+    service.commitPlan('task-1').subscribe();
+    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+    const body = req.request.body as PostSchedulePlanRequest;
+    const snack = body.entries.find(
+      e => e.date === '2026-03-24' && e.after_milepost === 'snack',
+    );
+    expect(snack).toBeTruthy();
+    expect(snack!.title).toBe('Apple');
+    expect(snack!.task_ref_type).toBe('user_meal');
+    req.flush({ committed: 4, planning_task_status: 'completed' });
+  });
+
   it('buildCommitRequest excludes slots with __skipped__ sentinel', () => {
     service.initSession('2026-03-24', '2026-03-24');
     service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: SKIP_SENTINEL });

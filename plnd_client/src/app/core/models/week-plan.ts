@@ -19,6 +19,9 @@ export interface PlannedMeal {
 /** Sentinel value stored as PlannedMeal.title when the user has explicitly skipped a slot. */
 export const SKIP_SENTINEL = '__skipped__';
 
+/** The three standard meal slots that are auto-filled with suggestions. Snack is excluded — it is only included when explicitly set via setMeal. */
+export const STANDARD_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
+
 export interface PlannedTask {
   date: string;
   title: string;

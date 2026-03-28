@@ -2,9 +2,8 @@ import { Component, computed, inject, signal, ViewChild, ElementRef } from '@ang
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import {
   MealSlot, PlannedMeal, getMockSuggestion, MOCK_MEAL_SUGGESTIONS, SKIP_SENTINEL,
+  STANDARD_MEAL_SLOTS,
 } from '../../../../core/models/week-plan';
-
-const STANDARD_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
   breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
 };
@@ -229,7 +228,7 @@ export class PlanMealsStepComponent {
 
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
 
-  readonly slots = STANDARD_SLOTS;
+  readonly slots = STANDARD_MEAL_SLOTS;
   readonly horizonDays = computed(() => this.weekPlanService.horizonDays());
   readonly gridColumns = computed(
     () => `68px repeat(${this.horizonDays().length}, 1fr)`,

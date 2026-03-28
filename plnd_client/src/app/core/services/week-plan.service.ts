@@ -7,7 +7,7 @@ import {
   PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, SchedulePeriodResponse, getMockSuggestion,
-  SKIP_SENTINEL,
+  SKIP_SENTINEL, STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
@@ -243,14 +243,13 @@ export class WeekPlanService {
     const meals = this.scheduledMealsSignal();
     const tasks = this.scheduledTasksSignal();
     const entries: PlanEntryRequest[] = [];
-    // Snack is optional; it is added explicitly via setMeal and never auto-filled.
-    const STANDARD_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
     // Resolve all horizon day × standard slot combinations.
     // Pending (no entry) → implicit acceptance via getMockSuggestion.
     // __skipped__ sentinel → omit from request.
+    // Non-standard slots (e.g. snack) are never auto-filled; include them only if explicitly set.
     for (const date of this.horizonDays()) {
-      for (const slot of STANDARD_SLOTS) {
+      for (const slot of STANDARD_MEAL_SLOTS) {
         const meal = meals[date]?.[slot];
         if (meal?.title === SKIP_SENTINEL) continue;
         const resolved: PlannedMeal = meal ?? { type: 'mock', title: getMockSuggestion(date, slot) };
@@ -260,6 +259,20 @@ export class WeekPlanService {
           task_ref_id: resolved.type === 'user_meal' ? resolved.id : undefined,
           task_ref_type: resolved.type === 'user_meal' ? 'user_meal' : undefined,
           title: resolved.type === 'mock' || !resolved.id ? resolved.title : undefined,
+          scheduled_start: slotDefaultTime(slot),
+          after_milepost: slot,
+        });
+      }
+      // Explicit non-standard slots (snack, etc.) — include only what was explicitly set.
+      for (const [slotKey, meal] of Object.entries(meals[date] ?? {})) {
+        const slot = slotKey as MealSlot;
+        if (STANDARD_MEAL_SLOTS.includes(slot) || !meal || meal.title === SKIP_SENTINEL) continue;
+        entries.push({
+          date,
+          task_type: 'meal',
+          task_ref_id: meal.type === 'user_meal' ? meal.id : undefined,
+          task_ref_type: meal.type === 'user_meal' ? 'user_meal' : undefined,
+          title: meal.type === 'mock' || !meal.id ? meal.title : undefined,
           scheduled_start: slotDefaultTime(slot),
           after_milepost: slot,
         });

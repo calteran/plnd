@@ -1,10 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { EnergyLevel, MealSlot } from '../../../../core/models/week-plan';
-
-// 'snack' is part of the MealSlot type but is excluded from card display — snack scheduling is deferred to a future phase
-const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
+import { EnergyLevel, MealSlot, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
 
 @Component({
   selector: 'app-plan-day-card',
@@ -73,7 +70,7 @@ export class PlanDayCardComponent {
 
   private readonly weekPlanService = inject(WeekPlanService);
   protected expanded = false;
-  protected readonly slots = MEAL_SLOTS;
+  protected readonly slots = STANDARD_MEAL_SLOTS;
 
   protected toggle(): void { this.expanded = !this.expanded; }
 
