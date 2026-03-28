@@ -32,7 +32,7 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
 
           <div class="day-accordion__body">
             <div class="task-list">
-              @for (task of (tasksByDay()[day] ?? []); track task.title + task.date) {
+              @for (task of (tasksByDay()[day] ?? []); track task) {
                 <div class="task-row">
                   <span class="task-title">{{ task.title }}</span>
                   <span class="energy-badge energy-{{ task.energy }}">
