@@ -1,0 +1,30 @@
+// plnd_client/src/styles/_energy-badges.scss
+// Shared energy level badge styles — used by plan-tasks-step and plan-day-grid-step.
+// Tints and borders are derived from the --color-energy-* tokens via color-mix() so
+// they automatically adapt when dark-mode token values change.
+
+.energy-badge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.energy-low {
+  background: color-mix(in srgb, var(--color-energy-low) 12%, transparent);
+  color: var(--color-energy-low);
+  border: 1px solid color-mix(in srgb, var(--color-energy-low) 25%, transparent);
+}
+
+.energy-medium {
+  background: color-mix(in srgb, var(--color-energy-medium) 12%, transparent);
+  color: var(--color-energy-medium);
+  border: 1px solid color-mix(in srgb, var(--color-energy-medium) 25%, transparent);
+}
+
+.energy-high {
+  background: color-mix(in srgb, var(--color-energy-high) 12%, transparent);
+  color: var(--color-energy-high);
+  border: 1px solid color-mix(in srgb, var(--color-energy-high) 25%, transparent);
+}

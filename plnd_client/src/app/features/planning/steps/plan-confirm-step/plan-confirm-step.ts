@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { SKIP_SENTINEL, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
+import { formatWeekDate } from '../../utils/date-format.utils';
 
 @Component({
   selector: 'app-plan-confirm-step',
@@ -60,15 +61,6 @@ import { SKIP_SENTINEL, STANDARD_MEAL_SLOTS } from '../../../../core/models/week
   `,
   styles: [`
     .plan-confirm { display: flex; flex-direction: column; gap: 1rem; }
-
-    /* ── Header ────────────────────────────────── */
-    .step-title { font-size: 13px; font-weight: 800; color: var(--color-text-primary);
-                  margin: 0 0 2px; }
-    .step-sub { font-size: 11px; color: var(--color-text-muted); margin: 0;
-                display: flex; align-items: center; gap: 5px; }
-    .week-range { font-size: 10px; font-weight: 700;
-                  background: var(--color-accent-light); border: 1px solid var(--color-accent-border);
-                  border-radius: 4px; padding: 1px 6px; color: var(--color-accent-dark); }
 
     /* ── Completion banner ─────────────────────── */
     .completion-banner {
@@ -132,10 +124,7 @@ export class PlanConfirmStepComponent {
     return Math.round((covered / (days.length * STANDARD_MEAL_SLOTS.length)) * 100);
   });
 
-  formatWeekDate(isoDate: string): string {
-    const dt = new Date(`${isoDate}T12:00:00`);
-    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
+  readonly formatWeekDate = formatWeekDate;
 
   finish(): void {
     this.errorMessage = '';

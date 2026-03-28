@@ -141,8 +141,8 @@ describe('PlanDayCardComponent', () => {
       expect(fixture.componentInstance.energyClass('low')).toBe('energy-low');
     });
 
-    it('returns "energy-med" for medium', () => {
-      expect(fixture.componentInstance.energyClass('medium')).toBe('energy-med');
+    it('returns "energy-medium" for medium', () => {
+      expect(fixture.componentInstance.energyClass('medium')).toBe('energy-medium');
     });
 
     it('returns "energy-high" for high', () => {

@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { PlannedTask } from '../../../../core/models/week-plan';
 import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-entry/add-entry';
+import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
 
 @Component({
   selector: 'app-plan-tasks-step',
@@ -159,30 +160,6 @@ import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-
     .task-list .task-row:last-child { border-bottom: none; }
     .task-title { flex: 1; color: var(--color-text-body); }
 
-    /* ── Energy badges ───────────────────────────── */
-    .energy-badge {
-      font-size: 8px;
-      font-weight: 700;
-      padding: 1px 5px;
-      border-radius: 3px;
-      flex-shrink: 0;
-    }
-    .energy-low {
-      background: rgba(74, 111, 165, 0.12);
-      color: var(--color-energy-low);
-      border: 1px solid rgba(74, 111, 165, 0.25);
-    }
-    .energy-medium {
-      background: rgba(230, 126, 34, 0.12);
-      color: var(--color-energy-medium);
-      border: 1px solid rgba(230, 126, 34, 0.25);
-    }
-    .energy-high {
-      background: rgba(192, 57, 43, 0.12);
-      color: var(--color-energy-high);
-      border: 1px solid rgba(192, 57, 43, 0.25);
-    }
-
     /* ── Remove buttons ──────────────────────────── */
     .task-remove, .floating-remove {
       background: none;
@@ -273,13 +250,10 @@ export class PlanTasksStepComponent {
 
   readonly formattedDays = computed(() =>
     Object.fromEntries(
-      this.horizonDays().map(d => {
-        const dt = new Date(`${d}T12:00:00`);
-        return [d, {
-          dayName: dt.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-          shortDate: dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        }];
-      })
+      this.horizonDays().map(d => [d, {
+        dayName: formatDayName(d).toUpperCase(),
+        shortDate: formatDayDate(d),
+      }])
     ) as Record<string, { dayName: string; shortDate: string }>
   );
 
