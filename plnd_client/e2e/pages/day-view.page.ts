@@ -15,10 +15,10 @@ export class DayViewPage {
 
   // Schedule states
   getScheduleList() { return this.page.locator('.schedule-list'); }
-  getSkeletonList() { return this.page.locator('.skeleton-list'); }
+  getSkeletonList() { return this.page.getByLabel('Loading schedule'); }
   getEmptyState() { return this.page.locator('.empty-state'); }
-  getErrorState() { return this.page.locator('[role="alert"]'); }
-  getRetryButton() { return this.page.locator('.retry-link'); }
+  getErrorState() { return this.page.getByRole('alert'); }
+  getRetryButton() { return this.page.getByRole('button', { name: /retry/i }); }
 
   // Schedule row items
   getMealRows() { return this.page.locator('app-meal-row'); }
