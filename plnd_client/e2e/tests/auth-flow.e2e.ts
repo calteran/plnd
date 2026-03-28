@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { DayViewPage } from '../pages/day-view.page';
-import { API_BASE, MOCK_USER_ONBOARDED, MOCK_PREFS, seedAuth } from '../helpers/auth';
+import { API_BASE, MOCK_USER_ONBOARDED, seedAuth } from '../helpers/auth';
 
 // Test 1 requires full Docker stack: docker compose up -d db api mock-oauth-server
 // Test 2 can run with only ng serve (uses addInitScript + route mocks).
