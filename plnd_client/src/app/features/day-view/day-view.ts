@@ -74,8 +74,6 @@ export class DayViewComponent implements OnInit {
 
   onDateChange(date: string): void { this.router.navigate(['/day', date]); }
   retry(): void { this.scheduleService.loadDay(this.scheduleService.date()); }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onPlanMeal(mealId: string): void { /* TODO: open meal planning panel */ }
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onItemAdded(entry: AddedEntry): void { /* TODO: add item to service */ }
+  onPlanMeal(_mealId: string): void { /* TODO: open meal planning panel */ }
+  onItemAdded(_entry: AddedEntry): void { /* TODO: add item to service */ }
 }

@@ -24,6 +24,23 @@ module.exports = [
     files: ["**/*.ts"],
   })),
 
+  // @typescript-eslint flat/stylistic — consistency rules (array types, type annotations, etc.)
+  ...tsEslint.configs["flat/stylistic"].map((config) => ({
+    ...config,
+    files: ["**/*.ts"],
+  })),
+
+  // Override: configure no-unused-vars to respect the _ prefix convention for intentionally unused params
+  {
+    files: ["**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+    },
+  },
+
   // Angular rules for TypeScript files, with inline template extraction
   {
     files: ["**/*.ts"],

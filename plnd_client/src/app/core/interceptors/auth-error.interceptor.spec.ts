@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { noop } from 'rxjs';
 import { provideHttpClient, withInterceptors, HttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { authErrorInterceptor } from './auth-error.interceptor';
@@ -36,26 +37,26 @@ describe('authErrorInterceptor', () => {
   });
 
   it('does not call logout on a 404 error', () => {
-    http.get('/api/test').subscribe({ error: () => {} });
+    http.get('/api/test').subscribe({ error: noop });
     httpMock.expectOne('/api/test').flush({}, { status: 404, statusText: 'Not Found' });
     expect(authService.logout).not.toHaveBeenCalled();
   });
 
   it('does not call logout on a 500 error', () => {
-    http.get('/api/test').subscribe({ error: () => {} });
+    http.get('/api/test').subscribe({ error: noop });
     httpMock.expectOne('/api/test').flush({}, { status: 500, statusText: 'Internal Server Error' });
     expect(authService.logout).not.toHaveBeenCalled();
   });
 
   it('calls logout with session_expired on a 401 from a backend URL', () => {
-    http.get('/api/test').subscribe({ error: () => {} });
+    http.get('/api/test').subscribe({ error: noop });
     httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(authService.logout).toHaveBeenCalledWith('session_expired');
   });
 
   it('does not call logout on a 401 from the OIDC issuer URL', () => {
     const oidcUrl = 'http://localhost:8080/plnd-dev/token';
-    http.get(oidcUrl).subscribe({ error: () => {} });
+    http.get(oidcUrl).subscribe({ error: noop });
     httpMock.expectOne(oidcUrl).flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(authService.logout).not.toHaveBeenCalled();
   });
@@ -67,7 +68,7 @@ describe('authErrorInterceptor', () => {
     const original = environment.oidc.issuerUrl;
     environment.oidc.issuerUrl = '';
     try {
-      http.get('/api/test').subscribe({ error: () => {} });
+      http.get('/api/test').subscribe({ error: noop });
       httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
       expect(authService.logout).toHaveBeenCalledWith('session_expired');
     } finally {
@@ -77,7 +78,7 @@ describe('authErrorInterceptor', () => {
 
   it('does not call logout when already unauthenticated (prevents loop on /auth/logout 401)', () => {
     authService.isAuthenticated.and.returnValue(false);
-    http.get('/api/test').subscribe({ error: () => {} });
+    http.get('/api/test').subscribe({ error: noop });
     httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(authService.logout).not.toHaveBeenCalled();
   });
