@@ -48,6 +48,7 @@ async function seedAuth(page: Page) {
 test.describe('Day View — Task Completion Toggle', () => {
 
   test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime('2026-03-28T00:00:00');
     await seedAuth(page);
   });
 
