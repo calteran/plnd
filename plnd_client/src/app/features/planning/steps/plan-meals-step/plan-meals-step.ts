@@ -1,5 +1,6 @@
 import { Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
 import {
   MealSlot, PlannedMeal, getMockSuggestion, MOCK_MEAL_SUGGESTIONS, SKIP_SENTINEL,
   STANDARD_MEAL_SLOTS,
@@ -241,15 +242,8 @@ export class PlanMealsStepComponent {
 
   // ── Formatters ────────────────────────────────────────────
 
-  formatDayName(date: string): string {
-    return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short' });
-  }
-
-  formatDayDate(date: string): string {
-    return new Date(`${date}T12:00:00`).toLocaleDateString('en-US', {
-      month: 'short', day: 'numeric',
-    });
-  }
+  readonly formatDayName = formatDayName;
+  readonly formatDayDate = formatDayDate;
 
   slotLabel(slot: MealSlot): string {
     return SLOT_LABELS[slot] ?? slot;

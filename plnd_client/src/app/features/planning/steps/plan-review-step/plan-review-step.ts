@@ -2,6 +2,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { CarryoverDecision } from '../../../../core/models/week-plan';
+import { formatDate, formatWeekDate } from '../../utils/date-format.utils';
 
 const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
 
@@ -48,15 +49,6 @@ const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
   `,
   styles: [`
     .plan-review { display: flex; flex-direction: column; gap: 1rem; }
-
-    /* ── Header ──────────────────────────────────── */
-    .step-title { font-size: 13px; font-weight: 800; color: var(--color-text-primary);
-                  margin: 0 0 2px; }
-    .step-sub { font-size: 11px; color: var(--color-text-muted); margin: 0;
-                display: flex; align-items: center; gap: 5px; }
-    .week-range { font-size: 10px; font-weight: 700;
-                  background: var(--color-accent-light); border: 1px solid var(--color-accent-border);
-                  border-radius: 4px; padding: 1px 6px; color: var(--color-accent-dark); }
 
     /* ── List ────────────────────────────────────── */
     .carryover-list { list-style: none; margin: 0; padding: 0;
@@ -137,13 +129,6 @@ export class PlanReviewStepComponent implements OnInit {
     this.weekPlanService.setCarryoverDecision(entryId, next);
   }
 
-  formatDate(isoDate: string): string {
-    const dt = new Date(`${isoDate}T12:00:00`);
-    return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  }
-
-  formatWeekDate(isoDate: string): string {
-    const dt = new Date(`${isoDate}T12:00:00`);
-    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
+  readonly formatDate = formatDate;
+  readonly formatWeekDate = formatWeekDate;
 }
