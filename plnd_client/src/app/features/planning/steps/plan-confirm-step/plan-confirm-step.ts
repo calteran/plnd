@@ -1,9 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealSlot } from '../../../../core/models/week-plan';
-
-const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
+import { SKIP_SENTINEL, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
 
 @Component({
   selector: 'app-plan-confirm-step',
@@ -71,11 +69,16 @@ export class PlanConfirmStepComponent {
     const days = this.weekPlanService.horizonDays();
     if (days.length === 0) return 0;
     const meals = this.weekPlanService.scheduledMeals();
-    const filled = days.reduce((acc, d) => {
+    // Pending slots (no entry) = implicitly accepted = covered.
+    // Only the SKIP_SENTINEL reduces coverage.
+    const covered = days.reduce((acc, d) => {
       const daySlots = meals[d] ?? {};
-      return acc + MEAL_SLOTS.filter(s => daySlots[s]).length;
+      return acc + STANDARD_MEAL_SLOTS.filter(s => {
+        const entry = daySlots[s];
+        return !entry || entry.title !== SKIP_SENTINEL;
+      }).length;
     }, 0);
-    return Math.round((filled / (days.length * MEAL_SLOTS.length)) * 100);
+    return Math.round((covered / (days.length * STANDARD_MEAL_SLOTS.length)) * 100);
   });
 
   finish(): void {

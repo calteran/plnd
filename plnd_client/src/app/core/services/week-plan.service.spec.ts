@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
+import { PostSchedulePlanRequest, SKIP_SENTINEL } from '../models/week-plan';
 
 describe('WeekPlanService', () => {
   let service: WeekPlanService;
@@ -167,5 +168,63 @@ describe('WeekPlanService', () => {
       service.initSession('2026-03-24', '2026-03-30');
       expect(service.floatingTasks()).toEqual([]);
     });
+  });
+
+  it('buildCommitRequest includes mock suggestion for a pending (no-entry) slot', () => {
+    service.initSession('2026-03-24', '2026-03-24'); // single day
+    // No explicit meal set — all slots are pending
+    service.commitPlan('task-1').subscribe();
+    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+    const body = req.request.body as PostSchedulePlanRequest;
+    const breakfast = body.entries.find(
+      e => e.date === '2026-03-24' && e.after_milepost === 'breakfast',
+    );
+    expect(breakfast).toBeTruthy();
+    expect(breakfast!.title).toBeTruthy(); // mock suggestion title present
+    expect(breakfast!.task_type).toBe('meal');
+    req.flush({ committed: 3, planning_task_status: 'completed' });
+  });
+
+  it('buildCommitRequest includes an explicit snack entry', () => {
+    service.initSession('2026-03-24', '2026-03-24');
+    service.setMeal('2026-03-24', 'snack', { type: 'user_meal', title: 'Apple' });
+    service.commitPlan('task-1').subscribe();
+    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+    const body = req.request.body as PostSchedulePlanRequest;
+    const snack = body.entries.find(
+      e => e.date === '2026-03-24' && e.after_milepost === 'snack',
+    );
+    expect(snack).toBeTruthy();
+    expect(snack!.title).toBe('Apple');
+    expect(snack!.task_ref_type).toBe('user_meal');
+    req.flush({ committed: 4, planning_task_status: 'completed' });
+  });
+
+  it('buildCommitRequest excludes slots with __skipped__ sentinel', () => {
+    service.initSession('2026-03-24', '2026-03-24');
+    service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: SKIP_SENTINEL });
+    service.commitPlan('task-1').subscribe();
+    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+    const body = req.request.body as PostSchedulePlanRequest;
+    const breakfast = body.entries.find(
+      e => e.date === '2026-03-24' && e.after_milepost === 'breakfast',
+    );
+    expect(breakfast).toBeUndefined();
+    req.flush({ committed: 2, planning_task_status: 'completed' });
+  });
+
+  it('buildCommitRequest includes user_meal entries as-is', () => {
+    service.initSession('2026-03-24', '2026-03-24');
+    service.setMeal('2026-03-24', 'lunch', { type: 'user_meal', title: 'Greek yogurt' });
+    service.commitPlan('task-1').subscribe();
+    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+    const body = req.request.body as PostSchedulePlanRequest;
+    const lunch = body.entries.find(
+      e => e.date === '2026-03-24' && e.after_milepost === 'lunch',
+    );
+    expect(lunch).toBeTruthy();
+    expect(lunch!.task_ref_type).toBe('user_meal');
+    expect(lunch!.title).toBe('Greek yogurt'); // title included when no id (phase 2 typed meals)
+    req.flush({ committed: 3, planning_task_status: 'completed' });
   });
 });

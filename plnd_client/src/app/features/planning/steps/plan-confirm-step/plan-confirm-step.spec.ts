@@ -4,6 +4,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { of } from 'rxjs';
 import { PlanConfirmStepComponent } from './plan-confirm-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { SKIP_SENTINEL } from '../../../../core/models/week-plan';
 
 describe('PlanConfirmStepComponent', () => {
   let fixture: ComponentFixture<PlanConfirmStepComponent>;
@@ -43,5 +44,19 @@ describe('PlanConfirmStepComponent', () => {
     const btn = fixture.nativeElement.querySelector('.btn-finish');
     btn.click();
     expect(service.commitPlan).toHaveBeenCalled();
+  });
+
+  it('should count pending slots (no entry) as fully covered', () => {
+    // No meals explicitly set — all pending slots are implicitly accepted
+    fixture.detectChanges();
+    expect(fixture.componentInstance.mealCoverage()).toBe(100);
+  });
+
+  it('should exclude __skipped__ slots from mealCoverage', () => {
+    service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: SKIP_SENTINEL });
+    fixture.detectChanges();
+    // 7 days × 3 slots = 21 total; 1 skipped → 20 covered
+    const expected = Math.round((20 / 21) * 100);
+    expect(fixture.componentInstance.mealCoverage()).toBe(expected);
   });
 });
