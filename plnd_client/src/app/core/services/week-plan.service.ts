@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, tap, throwError } from 'rxjs';
+import { Observable, catchError, noop, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
 import {
   CarryoverDecision, MealSlot, PlanDraftShape,
@@ -145,7 +145,7 @@ export class WeekPlanService {
       .get<PlanStatusResponse>(`${this.apiBase}/schedule/plan/status?start=${start}&end=${end}`)
       .subscribe({
         next: resp => this.hasUnplannedHorizonSignal.set(!resp.planned),
-        error: () => {},
+        error: noop,
       });
   }
 

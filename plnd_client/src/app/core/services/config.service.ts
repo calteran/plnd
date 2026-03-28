@@ -29,7 +29,7 @@ export class ConfigService {
       throw new Error('API timeout must be a positive number');
     }
     
-    const validLogLevels: Array<'debug' | 'info' | 'warn' | 'error'> = ['debug', 'info', 'warn', 'error'];
+    const validLogLevels: ('debug' | 'info' | 'warn' | 'error')[] = ['debug', 'info', 'warn', 'error'];
     if (!validLogLevels.includes(config.logging.level)) {
       throw new Error(`Invalid log level: ${config.logging.level}`);
     }
@@ -47,12 +47,12 @@ export class ConfigService {
     if (!config.api.baseUrl) {
       throw new Error('API base URL is not configured');
     }
-    
+
     if (typeof config.api.timeout !== 'number' || config.api.timeout <= 0) {
       throw new Error('API timeout must be a positive number');
     }
-    
-    const validLogLevels: Array<'debug' | 'info' | 'warn' | 'error'> = ['debug', 'info', 'warn', 'error'];
+
+    const validLogLevels: ('debug' | 'info' | 'warn' | 'error')[] = ['debug', 'info', 'warn', 'error'];
     if (!validLogLevels.includes(config.logging.level)) {
       throw new Error(`Invalid log level: ${config.logging.level}`);
     }

@@ -7,7 +7,7 @@ import { onboardingNotCompletedGuard, onboardingCompletedGuard } from './onboard
 import { UserService } from '../services/user.service';
 import { User } from '../models/user';
 
-type UserServicePrivate = { userSignal: { set: (v: User) => void } };
+interface UserServicePrivate { userSignal: { set: (v: User) => void } }
 
 const BASE_USER: User = {
   user_id: 'test-uuid',
