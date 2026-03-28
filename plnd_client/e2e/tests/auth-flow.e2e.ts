@@ -1,36 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { DayViewPage } from '../pages/day-view.page';
+import { API_BASE, MOCK_USER_ONBOARDED, MOCK_PREFS, seedAuth } from '../helpers/auth';
 
 // Test 1 requires full Docker stack: docker compose up -d db api mock-oauth-server
 // Test 2 can run with only ng serve (uses addInitScript + route mocks).
-
-const MOCK_PREFS = {
-  user_id: 'e2e-test-uuid',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  week_start_day: 1,
-  planning_trigger_offset: 0,
-  default_plan_length_days: 7
-};
-
-const MOCK_USER_ONBOARDED = {
-  user_id: 'e2e-test-uuid',
-  email: 'testuser@mock.plnd',
-  display_name: 'Test User',
-  avatar_url: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  is_active: true,
-  last_login: null,
-  onboarding_completed: true
-};
 
 test.describe('OAuth login flow', () => {
   test('completes full OIDC login and lands on dashboard', async ({ page }) => {
     // Mock the backend token exchange so the test does not require a running PLND API.
     // The Angular OIDC library still talks to the real mock OAuth server (port 8080)
     // to exchange the authorization code for an ID token — that is a real network call.
-    await page.route('http://localhost:3000/auth/token', route =>
+    await page.route(`${API_BASE}/auth/token`, route =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -43,7 +23,7 @@ test.describe('OAuth login flow', () => {
     );
 
     // Mock /users/me so onboardingCompletedGuard resolves to true.
-    await page.route('http://localhost:3000/users/me', route =>
+    await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -71,38 +51,12 @@ test.describe('OAuth login flow', () => {
   });
 
   test('logout clears token and returns to /login', async ({ page }) => {
-    // Seed the backend JWT into localStorage before Angular initialises,
-    // mimicking a previously authenticated session.
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
-
-    // Mock /users/me for the onboardingCompletedGuard on /today.
-    await page.route('http://localhost:3000/users/me', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_USER_ONBOARDED)
-      })
-    );
+    // seedAuth seeds localStorage + mocks /users/me, /preferences/me, /schedule/plan/status.
+    await seedAuth(page);
 
     // Mock the backend logout endpoint (AuthService makes a fire-and-forget call).
-    await page.route('http://localhost:3000/auth/logout', route =>
+    await page.route(`${API_BASE}/auth/logout`, route =>
       route.fulfill({ status: 204 })
-    );
-
-    // MainLayoutComponent loads preferences and checks plan status on init.
-    // Without these mocks the synthetic token gets a 401, triggering
-    // authErrorInterceptor → logout('session_expired') before signOut() fires.
-    await page.route('http://localhost:3000/preferences/me', route =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(MOCK_PREFS)
-      })
-    );
-    await page.route('http://localhost:3000/schedule/plan/status**', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
     );
 
     await page.goto('/today');

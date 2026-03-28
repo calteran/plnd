@@ -1,29 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { seedAuth } from '../helpers/auth';
 
 // All tests seed auth via addInitScript (sets localStorage before Angular bootstraps)
 // and use Playwright route interception to mock the preferences API, so these tests
 // are independent of the Docker API image version.
-
-const MOCK_PREFS = {
-  user_id: 'e2e-test-uuid',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  week_start_day: 1,
-  planning_trigger_offset: 0,
-  default_plan_length_days: 7
-};
-
-const MOCK_USER_ONBOARDED = {
-  user_id: 'e2e-test-uuid',
-  email: 'test@example.com',
-  display_name: 'Test User',
-  avatar_url: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  is_active: true,
-  last_login: null,
-  onboarding_completed: true
-};
 
 test.describe('Settings', () => {
   test('unauthenticated /settings visit redirects to /login', async ({ page }) => {
@@ -32,19 +12,7 @@ test.describe('Settings', () => {
   });
 
   test('avatar dropdown includes a Settings button', async ({ page }) => {
-    await page.route('http://localhost:3000/users/me', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
-    );
-    await page.route('http://localhost:3000/preferences/me', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
-    );
-    await page.route('http://localhost:3000/schedule/plan/status**', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
-    );
-
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
+    await seedAuth(page);
     await page.goto('/today');
     await expect(page).toHaveURL(/\/day\//);
 
@@ -59,22 +27,7 @@ test.describe('Settings', () => {
   });
 
   test('settings page loads and shows planning form controls', async ({ page }) => {
-    // Intercept /users/me so the onboardingCompletedGuard resolves
-    await page.route('http://localhost:3000/users/me', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
-    );
-
-    // Intercept preferences API
-    await page.route('http://localhost:3000/preferences/me', async route => {
-      await route.fulfill({ status: 200, json: MOCK_PREFS });
-    });
-    await page.route('http://localhost:3000/schedule/plan/status**', route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
-    );
-
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
+    await seedAuth(page);
     await page.goto('/settings');
 
     await expect(page.locator('h1')).toHaveText('Settings');
