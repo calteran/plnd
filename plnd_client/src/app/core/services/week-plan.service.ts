@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
@@ -207,8 +207,8 @@ export class WeekPlanService {
     this.floatingTasksSignal.update(tasks => tasks.filter((_, i) => i !== index));
   }
 
-  /** Days in the horizon as ISO date strings (inclusive). */
-  horizonDays(): string[] {
+  /** Days in the horizon as ISO date strings (inclusive). Reactive: re-evaluates when planStart/planEnd change. */
+  readonly horizonDays = computed(() => {
     const start = this.planStartSignal();
     const end = this.planEndSignal();
     if (!start || !end) return [];
@@ -224,7 +224,7 @@ export class WeekPlanService {
       cur.setDate(cur.getDate() + 1);
     }
     return days;
-  }
+  });
 
   clear(): void {
     this.planStartSignal.set('');
