@@ -24,6 +24,20 @@ export class DayViewPage {
   getMealRows() { return this.page.locator('app-meal-row'); }
   getTaskRows() { return this.page.locator('.schedule-list > app-task-row'); }
 
+  // Add-entry form
+  getAddRow() { return this.page.locator('.add-row'); }
+  getEntryInput() { return this.page.locator('.entry-input'); }
+  getMorphExercise() { return this.page.locator('.morph-form--exercise'); }
+  getMorphAppointment() { return this.page.locator('.morph-form--appointment'); }
+  getAddButton() { return this.page.locator('button.btn-add'); }
+  getCancelButton() { return this.page.locator('button.btn-cancel'); }
+
+  /** Click "Add something…" and wait for the text input to appear. */
+  async openAddEntry() {
+    await this.getAddRow().click();
+    await this.getEntryInput().waitFor({ state: 'visible' });
+  }
+
   /** Open the avatar dropdown then click Sign out. */
   async signOut() {
     await this.page.locator('.avatar-btn').click();
