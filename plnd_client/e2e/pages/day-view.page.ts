@@ -23,6 +23,9 @@ export class DayViewPage {
   // Schedule row items
   getMealRows() { return this.page.locator('app-meal-row'); }
   getTaskRows() { return this.page.locator('.schedule-list > app-task-row'); }
+  getTaskRowInner(row: import('@playwright/test').Locator) { return row.locator('.task-row'); }
+  getTaskRowCheckbox(row: import('@playwright/test').Locator) { return row.getByRole('checkbox'); }
+  getTaskRowLabel(row: import('@playwright/test').Locator) { return row.locator('.label'); }
 
   // Add-entry form
   getAddRow() { return this.page.getByRole('button', { name: 'Open entry form' }); }
