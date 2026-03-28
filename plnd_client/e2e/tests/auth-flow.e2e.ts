@@ -15,10 +15,14 @@ test.describe('OAuth login flow', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
+    await page.route(`${API_BASE}/auth/token`, route =>
+      route.fulfill({
+        status: 200,
+        json: {
           access_token: 'synthetic.backend.jwt',
           token_type: 'Bearer',
           expires_in: 86400
-        })
+        }
       })
     );
 

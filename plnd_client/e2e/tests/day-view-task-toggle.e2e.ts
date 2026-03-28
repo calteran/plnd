@@ -108,7 +108,7 @@ test.describe('Day View — Task Completion Toggle', () => {
       await page.route(`${API_BASE}/schedule/items/**`, async route => {
         if (route.request().method() === 'PATCH') {
           capturedBody = route.request().postDataJSON() as Record<string, unknown>;
-          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({}) });
+          await route.fulfill({ status: 200, json: {} });
         } else {
           await route.continue();
         }

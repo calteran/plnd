@@ -40,12 +40,12 @@ export async function seedAuth(page: Page) {
     localStorage.setItem('auth_token', 'synthetic.test.token');
   });
   await page.route(`${API_BASE}/users/me`, route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
+    route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
   );
   await page.route(`${API_BASE}/preferences/me`, route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    route.fulfill({ status: 200, json: MOCK_PREFS })
   );
   await page.route(`${API_BASE}/schedule/plan/status**`, route =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    route.fulfill({ status: 200, json: { planned: false } })
   );
 }
