@@ -24,6 +24,21 @@ export class DayViewPage {
   getMealRows() { return this.page.locator('app-meal-row'); }
   getTaskRows() { return this.page.locator('.schedule-list > app-task-row'); }
 
+  // Add-entry form
+  getAddRow() { return this.page.getByRole('button', { name: 'Open entry form' }); }
+  getEntryInput() { return this.page.getByLabel('Add something to your day'); }
+  getMorphExercise() { return this.page.locator('.morph-form--exercise'); }
+  getMorphAppointment() { return this.page.locator('.morph-form--appointment'); }
+  getAddButton() { return this.page.getByRole('button', { name: 'Add', exact: true }); }
+  getCancelButton() { return this.page.getByRole('button', { name: 'Cancel', exact: true }); }
+  getParseHint() { return this.page.locator('.parse-hint'); }
+
+  /** Click "Add something…" and wait for the text input to appear. */
+  async openAddEntry() {
+    await this.getAddRow().click();
+    await this.getEntryInput().waitFor({ state: 'visible' });
+  }
+
   /** Open the avatar dropdown then click Sign out. */
   async signOut() {
     await this.page.locator('.avatar-btn').click();
