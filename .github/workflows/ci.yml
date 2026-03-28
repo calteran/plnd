@@ -34,7 +34,15 @@ jobs:
           cache: 'npm'
           cache-dependency-path: plnd_client/package-lock.json
 
+      - name: Cache node_modules
+        id: cache-node-modules
+        uses: actions/cache@v4
+        with:
+          path: plnd_client/node_modules
+          key: node-modules-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
+
       - name: Install Angular dependencies
+        if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: cd plnd_client && npm ci
 
       - name: Rust – check formatting
