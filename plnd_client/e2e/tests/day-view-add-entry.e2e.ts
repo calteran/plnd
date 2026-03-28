@@ -100,7 +100,7 @@ test.describe('Day View — Add Entry', () => {
   });
 
   test.describe('smart type detection', () => {
-    async function openAndType(page: import('@playwright/test').Page, text: string) {
+    async function openAndType(page: Page, text: string) {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
       await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
@@ -113,15 +113,15 @@ test.describe('Day View — Add Entry', () => {
       const dayView = await openAndType(page, 'yoga for a bit');
       await expect(dayView.getMorphExercise()).toBeVisible();
       await expect(dayView.getMorphAppointment()).not.toBeVisible();
-      await expect(dayView.getMorphExercise().locator('[aria-label="Duration in minutes"]')).toBeVisible();
+      await expect(dayView.getMorphExercise().getByLabel('Duration in minutes')).toBeVisible();
     });
 
     test('time pattern shows appointment fields (time picker + location)', async ({ page }) => {
       const dayView = await openAndType(page, 'dentist 2pm');
       await expect(dayView.getMorphAppointment()).toBeVisible();
       await expect(dayView.getMorphExercise()).not.toBeVisible();
-      await expect(dayView.getMorphAppointment().locator('[aria-label="Appointment time"]')).toBeVisible();
-      await expect(dayView.getMorphAppointment().locator('[aria-label="Location"]')).toBeVisible();
+      await expect(dayView.getMorphAppointment().getByLabel('Appointment time')).toBeVisible();
+      await expect(dayView.getMorphAppointment().getByLabel('Location')).toBeVisible();
     });
 
     test('generic text shows no morph fields (task default)', async ({ page }) => {
@@ -140,8 +140,8 @@ test.describe('Day View — Add Entry', () => {
       await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
       await dayView.openAddEntry();
       await dayView.getEntryInput().fill('yoga');
-      await expect(page.locator('.parse-hint')).toBeVisible();
-      await expect(page.locator('.parse-hint')).toContainText(/exercise/i);
+      await expect(dayView.getParseHint()).toBeVisible();
+      await expect(dayView.getParseHint()).toContainText(/exercise/i);
     });
 
     test('submitting the form adds the entry to the schedule list', async ({ page }) => {
