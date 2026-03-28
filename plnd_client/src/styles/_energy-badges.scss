@@ -17,8 +17,6 @@
   border: 1px solid color-mix(in srgb, var(--color-energy-low) 25%, transparent);
 }
 
-// .energy-med is used by plan-day-card; .energy-medium is used by plan-tasks-step.
-.energy-med,
 .energy-medium {
   background: color-mix(in srgb, var(--color-energy-medium) 12%, transparent);
   color: var(--color-energy-medium);

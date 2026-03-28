@@ -87,7 +87,7 @@ export class PlanDayCardComponent {
 
   // Public — called directly in spec tests via componentInstance
   energyClass(energy: EnergyLevel): string {
-    return energy === 'medium' ? 'energy-med' : `energy-${energy}`;
+    return `energy-${energy}`;
   }
 
   // Public — called directly in spec tests via componentInstance
