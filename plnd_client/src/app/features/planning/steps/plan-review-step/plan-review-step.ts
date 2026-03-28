@@ -15,7 +15,7 @@ const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
       <p class="step-sub">
         Planning
         <span class="week-range">
-          {{ weekPlanService.planStart() }} → {{ weekPlanService.planEnd() }}
+          {{ formatWeekDate(weekPlanService.planStart()) }} → {{ formatWeekDate(weekPlanService.planEnd()) }}
         </span>
       </p>
 
@@ -140,5 +140,10 @@ export class PlanReviewStepComponent implements OnInit {
   formatDate(isoDate: string): string {
     const dt = new Date(`${isoDate}T12:00:00`);
     return dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  }
+
+  formatWeekDate(isoDate: string): string {
+    const dt = new Date(`${isoDate}T12:00:00`);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 }
