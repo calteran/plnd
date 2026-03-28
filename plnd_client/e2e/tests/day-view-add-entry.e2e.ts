@@ -131,6 +131,46 @@ test.describe('Day View — Add Entry', () => {
     });
   });
 
-  // Task 5 tests go here
+  test.describe('deferred features', () => {
+    test('parse hint updates based on detected type', async ({ page }) => {
+      // TODO: remove test.fail() when parseHint() is implemented (LLM integration, Phase 3)
+      test.fail();
+      const dayView = new DayViewPage(page);
+      await dayView.gotoDate('2026-03-28');
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await dayView.openAddEntry();
+      await dayView.getEntryInput().fill('yoga');
+      await expect(page.locator('.parse-hint')).toBeVisible();
+      await expect(page.locator('.parse-hint')).toContainText(/exercise/i);
+    });
+
+    test('submitting the form adds the entry to the schedule list', async ({ page }) => {
+      // TODO: remove test.fail() when DayViewComponent.onItemAdded() is implemented
+      test.fail();
+      const MOCK_CREATED_ENTRY = {
+        id: 'new-entry-1',
+        type: 'task',
+        label: 'call mum',
+        status: 'pending',
+      };
+      await page.route(`${API_BASE}/schedule**`, route => {
+        if (route.request().method() === 'POST') {
+          return route.fulfill({
+            status: 201,
+            contentType: 'application/json',
+            body: JSON.stringify(MOCK_CREATED_ENTRY),
+          });
+        }
+        return route.continue();
+      });
+      const dayView = new DayViewPage(page);
+      await dayView.gotoDate('2026-03-28');
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await dayView.openAddEntry();
+      await dayView.getEntryInput().fill('call mum');
+      await dayView.getAddButton().click();
+      await expect(dayView.getScheduleList()).toContainText('call mum');
+    });
+  });
 
 });
