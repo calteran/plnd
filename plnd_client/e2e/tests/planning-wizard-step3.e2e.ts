@@ -73,4 +73,40 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
       await expect(headers.nth(2).locator('.day-date')).toContainText('Apr 1');
     });
   });
+
+  // ── Pending cell interaction ──────────────────────────────────────────────────
+
+  test.describe('Pending cell interaction', () => {
+    test('a pending cell shows gc-pick and gc-suggest buttons', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      await expect(cell.locator('.gc-pick')).toBeVisible();
+      await expect(cell.locator('.gc-suggest')).toBeVisible();
+    });
+
+    test('clicking gc-pick opens the inline editor', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      await cell.locator('.gc-pick').click();
+      await expect(cell).toHaveClass(/gc-editing/);
+      await expect(cell.locator('.mock-input')).toBeVisible();
+    });
+
+    test('typing a name and pressing Enter fills the cell with custom-g state', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      await cell.locator('.gc-pick').click();
+      await cell.locator('.mock-input').fill('Greek yogurt');
+      await cell.locator('.mock-input').press('Enter');
+      await expect(cell).toHaveClass(/custom-g/);
+      await expect(cell.locator('.gc-text.custom-t')).toHaveText('Greek yogurt');
+    });
+
+    test('pressing Escape cancels edit without saving', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      await cell.locator('.gc-pick').click();
+      await cell.locator('.mock-input').fill('Should not save');
+      await cell.locator('.mock-input').press('Escape');
+      await expect(cell).not.toHaveClass(/gc-editing/);
+      await expect(cell.locator('.gc-pick')).toBeVisible();
+      await expect(cell.locator('.gc-text.custom-t')).not.toBeVisible();
+    });
+  });
 });
