@@ -59,11 +59,11 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
   // ── Day headers ──────────────────────────────────────────────────────────────
 
   test.describe('Day headers', () => {
-    test('headers show correct day names: MON, TUE, WED', async ({ page }) => {
+    test('headers show correct day names: Mon, Tue, Wed', async ({ page }) => {
       const headers = page.locator('.cell-day-header');
-      await expect(headers.nth(0).locator('.day-name')).toHaveText('MON');
-      await expect(headers.nth(1).locator('.day-name')).toHaveText('TUE');
-      await expect(headers.nth(2).locator('.day-name')).toHaveText('WED');
+      await expect(headers.nth(0).locator('.day-name')).toHaveText('Mon');
+      await expect(headers.nth(1).locator('.day-name')).toHaveText('Tue');
+      await expect(headers.nth(2).locator('.day-name')).toHaveText('Wed');
     });
 
     test('headers show correct dates: Mar 30, Mar 31, Apr 1', async ({ page }) => {
