@@ -155,4 +155,47 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
       await expect(cell.locator('.gc-pick')).toBeVisible();
     });
   });
+
+  // ── Persistence ───────────────────────────────────────────────────────────────
+
+  test('meals state survives navigating to Step 4 and back to Step 3', async ({ page }) => {
+    const cell = page.locator('.gc').first();
+    // Fill Mon/Breakfast
+    await cell.locator('.gc-pick').click();
+    await cell.locator('.mock-input').fill('Overnight oats');
+    await cell.locator('.mock-input').press('Enter');
+    await expect(cell).toHaveClass(/custom-g/);
+
+    // Navigate to Step 4
+    await page.getByLabel('Next step').click();
+    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('4');
+
+    // Navigate back to Step 3
+    await page.getByLabel('Previous step').click();
+    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
+
+    // Meal should still be set
+    await expect(page.locator('.gc').first()).toHaveClass(/custom-g/);
+    await expect(page.locator('.gc').first().locator('.gc-text.custom-t')).toHaveText('Overnight oats');
+  });
+
+  // ── Autocomplete — test.fail() (phase-3) ─────────────────────────────────────
+  // These tests are expected to FAIL until autocomplete is implemented.
+  // When they start passing, remove test.fail() and the comment.
+
+  test.fail('typing in mock-input shows a suggestion dropdown', async ({ page }) => {
+    const cell = page.locator('.gc').first();
+    await cell.locator('.gc-pick').click();
+    await cell.locator('.mock-input').fill('chi');
+    await expect(page.locator('.autocomplete-dropdown')).toBeVisible();
+  });
+
+  test.fail('clicking a suggestion fills the cell and closes the editor', async ({ page }) => {
+    const cell = page.locator('.gc').first();
+    await cell.locator('.gc-pick').click();
+    await cell.locator('.mock-input').fill('chi');
+    await page.locator('.autocomplete-dropdown .suggestion-item').first().click();
+    await expect(cell).toHaveClass(/custom-g/);
+    await expect(cell.locator('.mock-input')).not.toBeVisible();
+  });
 });
