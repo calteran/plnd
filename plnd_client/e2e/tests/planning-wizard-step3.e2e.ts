@@ -109,4 +109,50 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
       await expect(cell.locator('.gc-text.custom-t')).not.toBeVisible();
     });
   });
+
+  // ── Custom meal cell ─────────────────────────────────────────────────────────
+
+  test.describe('Custom meal cell', () => {
+    test('a filled cell shows the meal title in gc-text.custom-t', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      // Fill via the editor
+      await cell.locator('.gc-pick').click();
+      await cell.locator('.mock-input').fill('Avocado toast');
+      await cell.locator('.mock-input').press('Enter');
+      await expect(cell.locator('.gc-text.custom-t')).toHaveText('Avocado toast');
+    });
+
+    test('clicking gc-x on a custom cell clears it back to pending', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      // First fill the cell
+      await cell.locator('.gc-pick').click();
+      await cell.locator('.mock-input').fill('Avocado toast');
+      await cell.locator('.mock-input').press('Enter');
+      await expect(cell).toHaveClass(/custom-g/);
+      // Then clear it
+      await cell.locator('.gc-x').click();
+      await expect(cell).not.toHaveClass(/custom-g/);
+      await expect(cell.locator('.gc-pick')).toBeVisible();
+    });
+  });
+
+  // ── Skip / undo ───────────────────────────────────────────────────────────────
+
+  test.describe('Skip / undo', () => {
+    test('clicking gc-x on a pending cell applies skipped-g and shows "— skipped"', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      await cell.locator('.gc-x').click();
+      await expect(cell).toHaveClass(/skipped-g/);
+      await expect(cell.locator('.gc-text.skip-t')).toContainText('— skipped');
+    });
+
+    test('clicking gc-undo on a skipped cell restores pending state', async ({ page }) => {
+      const cell = page.locator('.gc').first();
+      await cell.locator('.gc-x').click();
+      await expect(cell).toHaveClass(/skipped-g/);
+      await cell.locator('.gc-undo').click();
+      await expect(cell).not.toHaveClass(/skipped-g/);
+      await expect(cell.locator('.gc-pick')).toBeVisible();
+    });
+  });
 });
