@@ -285,4 +285,121 @@ test.describe('Planning Wizard', () => {
     });
   });
 
+  // ── Step 2 — Tasks Planning ───────────────────────────────────────────────
+
+  test.describe('Step 2 — Tasks Planning', () => {
+    const MOCK_TASKS = [
+      { title: 'Morning run', energy: 'high', date: '2026-03-30', task_type: 'custom' },
+      { title: 'Read book',   energy: 'low',  date: '2026-03-30', task_type: 'custom' },
+    ];
+
+    test.beforeEach(async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      await page.addInitScript((tasks) => {
+        localStorage.setItem('plnd:plan-draft', JSON.stringify({
+          schemaVersion: 1,
+          planStart: '2026-03-30',
+          planEnd: '2026-04-05',
+          currentStep: 2,
+          carryoverDecisions: {},
+          scheduledMeals: {},
+          scheduledTasks: tasks,
+          floatingTasks: [],
+          savedAt: '2026-03-29T00:00:00.000Z',
+        }));
+      }, MOCK_TASKS);
+      await seedWizard(page);
+      await page.goto('/plan/week');
+      await expect(page.locator('.planning-wizard')).toBeVisible();
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
+    });
+
+    test('daily accordions render one entry per horizon day', async ({ page }) => {
+      await expect(page.locator('.day-accordion')).toHaveCount(7);
+    });
+
+    test('accordion header shows day name, date, and task count badge', async ({ page }) => {
+      const first = page.locator('.day-accordion').nth(0);
+      await expect(first.locator('.day-name')).toHaveText('MON');
+      await expect(first.locator('.day-date')).toContainText('Mar 30');
+      await expect(first.locator('.task-badge')).toHaveText('2 tasks');
+
+      const second = page.locator('.day-accordion').nth(1);
+      await expect(second.locator('.task-badge')).toHaveText('0 tasks');
+    });
+
+    test('clicking accordion header collapses and re-expands it', async ({ page }) => {
+      const first = page.locator('.day-accordion').nth(0);
+      // Horizon ≤ 7 → auto-expanded on load
+      await expect(first).toHaveClass(/open/);
+
+      // Click to collapse
+      await first.locator('.day-accordion__header').click();
+      await expect(first).not.toHaveClass(/open/);
+
+      // Click to re-expand
+      await first.locator('.day-accordion__header').click();
+      await expect(first).toHaveClass(/open/);
+    });
+
+    test('task row shows title and energy level badge', async ({ page }) => {
+      const first = page.locator('.day-accordion').nth(0);
+      const rows = first.locator('.task-row');
+      await expect(rows).toHaveCount(2);
+
+      await expect(rows.nth(0).locator('.task-title')).toHaveText('Morning run');
+      await expect(rows.nth(0).locator('.energy-badge.energy-high')).toBeVisible();
+
+      await expect(rows.nth(1).locator('.task-title')).toHaveText('Read book');
+      await expect(rows.nth(1).locator('.energy-badge.energy-low')).toBeVisible();
+    });
+
+    test('adding a task to a day appends it to that day list', async ({ page }) => {
+      // Target the second accordion (2026-03-31) — starts empty
+      const second = page.locator('.day-accordion').nth(1);
+      const addAffordance = second.locator('.add-affordance');
+
+      await addAffordance.locator('.add-row').click();
+      await addAffordance.locator('.entry-input').fill('Walk the dog');
+      await addAffordance.locator('.btn-add').click();
+
+      const rows = second.locator('.task-row');
+      await expect(rows).toHaveCount(1);
+      await expect(rows.nth(0).locator('.task-title')).toHaveText('Walk the dog');
+      await expect(rows.nth(0).locator('.energy-badge')).toBeVisible();
+    });
+
+    test('remove button removes a task from the day list', async ({ page }) => {
+      const first = page.locator('.day-accordion').nth(0);
+      const rows = first.locator('.task-row');
+      await expect(rows).toHaveCount(2);
+
+      // Remove the first task ("Morning run")
+      await rows.nth(0).locator('.task-remove').click();
+
+      await expect(rows).toHaveCount(1);
+      await expect(rows.nth(0).locator('.task-title')).toHaveText('Read book');
+    });
+
+    test('floating tasks panel renders with floating title and hint', async ({ page }) => {
+      await expect(page.locator('.floating-panel')).toBeVisible();
+      await expect(page.locator('.floating-title')).toContainText('FLOATING TASKS');
+      await expect(page.locator('.floating-hint')).toBeVisible();
+    });
+
+    test('adding a floating task appends it to the floating list', async ({ page }) => {
+      const floatAdd = page.locator('.float-add-affordance');
+
+      await floatAdd.locator('.add-row').click();
+      await floatAdd.locator('.entry-input').fill('Buy groceries');
+      await floatAdd.locator('.btn-add').click();
+
+      const rows = page.locator('.floating-task-row');
+      await expect(rows).toHaveCount(1);
+      await expect(rows.nth(0).locator('.task-title')).toHaveText('Buy groceries');
+      await expect(rows.nth(0).locator('.floating-badge')).toBeVisible();
+    });
+
+  });
+
 });
