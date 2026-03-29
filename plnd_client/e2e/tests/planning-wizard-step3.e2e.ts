@@ -1,11 +1,17 @@
 import { test, expect, Page } from '@playwright/test';
-import { seedAuth, API_BASE } from '../helpers/auth';
+import { seedAuth, API_BASE, MOCK_PREFS } from '../helpers/auth';
 
 // Fixed seed: 3-day horizon Mon 2026-03-30 → Wed 2026-04-01
+// Override default_plan_length_days → 3 so the wizard computes the same horizon
 // currentStep: 3 → wizard opens directly on the Meals step
+
+const MOCK_PREFS_3DAY = { ...MOCK_PREFS, default_plan_length_days: 3 };
 
 async function seedWizard(page: Page): Promise<void> {
   await seedAuth(page);
+  await page.route(`${API_BASE}/preferences/me`, route =>
+    route.fulfill({ status: 200, json: MOCK_PREFS_3DAY })
+  );
   await page.route(`${API_BASE}/tasks/weekly-plan**`, route =>
     route.fulfill({ status: 200, json: { task_id: 'test-planning-task' } })
   );
@@ -194,6 +200,8 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     const cell = page.locator('.gc').first();
     await cell.locator('.gc-pick').click();
     await cell.locator('.mock-input').fill('chi');
+    // Autocomplete dropdown does not yet exist — fail fast so test.fail() registers correctly
+    await expect(page.locator('.autocomplete-dropdown')).toBeVisible({ timeout: 3000 });
     await page.locator('.autocomplete-dropdown .suggestion-item').first().click();
     await expect(cell).toHaveClass(/custom-g/);
     await expect(cell.locator('.mock-input')).not.toBeVisible();

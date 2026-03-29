@@ -168,6 +168,7 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
     .gc-text {
       font-size: 11px; color: var(--color-text-body); font-style: italic; opacity: 0.75;
       line-height: 1.3; flex: 1; padding-right: 14px; margin-bottom: 5px;
+      pointer-events: none;
     }
     .gc-text.custom-t {
       color: var(--color-accent-dark); font-weight: 600; font-style: normal; opacity: 1;
