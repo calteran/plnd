@@ -42,7 +42,7 @@ Add Playwright e2e coverage for Step 3 of the Planning Wizard: the meals grid. C
 - Grid contains 9 `.gc` cells total (3 days × 3 slots)
 
 ### Day headers
-- Headers show correct day names: `MON`, `TUE`, `WED`
+- Headers show correct day names: `Mon`, `Tue`, `Wed` (DOM text from `formatDayName`; CSS `text-transform: uppercase` renders uppercase visually but is invisible to Playwright's `toHaveText`)
 - Headers show correct dates: `Mar 30`, `Mar 31`, `Apr 1`
 
 ### Pending cell interaction
