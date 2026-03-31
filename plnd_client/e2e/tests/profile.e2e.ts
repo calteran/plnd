@@ -92,10 +92,10 @@ test.describe('Profile', () => {
       }
     });
 
-    // 'not-a-url' lacks a scheme — Angular's pattern validator marks the form invalid
+    // 'not-a-url' lacks a scheme — Angular's pattern validator marks the form invalid,
+    // disabling the Save button (clicking a disabled button would time out)
     await profile.getAvatarUrlInput().fill('not-a-url');
-    await profile.getSaveButton().click();
-    // Save button is disabled when form is invalid, so no PATCH is sent
+    await expect(profile.getSaveButton()).toBeDisabled();
     await expect(profile.getSuccessMessage()).not.toBeVisible();
     expect(patchCalled).toBe(false);
   });

@@ -62,7 +62,7 @@ import { UserService } from '../../../core/services/user.service';
                 maxlength="500"
               />
               @if (form.controls.avatar_url.invalid && form.controls.avatar_url.touched) {
-                <span class="field-error">Must be a valid URL (https://…) and 500 characters or fewer</span>
+                <span class="field-error">Must be a valid URL (http:// or https://) and 500 characters or fewer</span>
               }
             </div>
 
