@@ -5,6 +5,7 @@ import { CarryoverDecision } from '../../../../core/models/week-plan';
 import { formatDate, formatWeekDate } from '../../utils/date-format.utils';
 
 const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
+const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
 
 @Component({
   selector: 'app-plan-review-step',
@@ -24,7 +25,7 @@ const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
         <p class="loading-text">Loading…</p>
       } @else if (weekPlanService.carryoverItems().length === 0) {
         <div class="empty-state">
-          <span class="empty-emoji">🎉</span>
+          <span class="empty-emoji">{{ emptyStateEmoji }}</span>
           <p class="empty-heading">All caught up!</p>
           <p class="empty-sub">No unfinished items from last week to review.</p>
         </div>
@@ -107,6 +108,7 @@ const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
 export class PlanReviewStepComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   loading = true;
+  readonly emptyStateEmoji = EMPTY_STATE_EMOJIS[Math.floor(Math.random() * EMPTY_STATE_EMOJIS.length)];
 
   ngOnInit(): void {
     if (!this.weekPlanService.planStart() || !this.weekPlanService.planEnd()) {
