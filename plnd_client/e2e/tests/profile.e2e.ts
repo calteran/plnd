@@ -94,6 +94,23 @@ test.describe('Profile', () => {
     expect(patchCalled).toBe(false);
   });
 
+  test('save failure shows an error message', async ({ page }) => {
+    await seedAuth(page);
+    const profile = await goToProfile(page);
+
+    await page.route(`${API_BASE}/users/me`, async (route) => {
+      if (route.request().method() === 'PATCH') {
+        await route.fulfill({ status: 500 });
+      } else {
+        await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
+      }
+    });
+
+    await profile.getDisplayNameInput().fill('Updated Name');
+    await profile.getSaveButton().click();
+    await expect(profile.getErrorMessage()).toHaveText('Failed to save. Please try again.', { timeout: 5_000 });
+  });
+
   test('Cancel button discards unsaved changes and restores original values', async ({ page }) => {
     await seedAuth(page);
     const profile = await goToProfile(page);
