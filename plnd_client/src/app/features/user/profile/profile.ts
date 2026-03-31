@@ -62,7 +62,7 @@ import { UserService } from '../../../core/services/user.service';
                 maxlength="500"
               />
               @if (form.controls.avatar_url.invalid && form.controls.avatar_url.touched) {
-                <span class="field-error">Avatar URL must be 500 characters or fewer</span>
+                <span class="field-error">Must be a valid URL (http:// or https://) and 500 characters or fewer</span>
               }
             </div>
 
@@ -192,7 +192,7 @@ export class ProfileComponent implements OnInit {
 
   readonly form = new FormGroup({
     display_name: new FormControl('', [Validators.maxLength(100)]),
-    avatar_url: new FormControl('', [Validators.maxLength(500)])
+    avatar_url: new FormControl('', [Validators.maxLength(500), Validators.pattern(/^https?:\/\/.+/)])
   });
 
   ngOnInit(): void {
