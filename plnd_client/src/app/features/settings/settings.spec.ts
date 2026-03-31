@@ -73,8 +73,7 @@ describe('SettingsComponent', () => {
     httpMock.expectOne(r => r.method === 'GET').flush(MOCK_PREFS);
     fixture.detectChanges();
 
-    const buttons: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll('button[type="button"]');
-    const btn = buttons[buttons.length - 1]; // last button is Save
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('button[type="submit"]');
     btn.click();
     const req = httpMock.expectOne(r => r.url.includes('/preferences/me') && r.method === 'PATCH');
     expect(req.request.body).toBeTruthy();
