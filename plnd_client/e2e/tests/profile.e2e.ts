@@ -56,7 +56,7 @@ test.describe('Profile', () => {
     let patchBody: Record<string, string> | undefined;
     await page.route(`${API_BASE}/users/me`, async (route) => {
       if (route.request().method() === 'PATCH') {
-        patchBody = JSON.parse(route.request().postData() ?? '{}');
+        patchBody = route.request().postDataJSON();
       }
       await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
     });
