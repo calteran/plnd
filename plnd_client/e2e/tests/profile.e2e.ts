@@ -57,8 +57,10 @@ test.describe('Profile', () => {
     await page.route(`${API_BASE}/users/me`, async (route) => {
       if (route.request().method() === 'PATCH') {
         patchBody = route.request().postDataJSON();
+        await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
+      } else {
+        await route.fallback();
       }
-      await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
     });
 
     await profile.getDisplayNameInput().fill('Updated Name');
@@ -82,8 +84,12 @@ test.describe('Profile', () => {
 
     let patchCalled = false;
     await page.route(`${API_BASE}/users/me`, async (route) => {
-      if (route.request().method() === 'PATCH') patchCalled = true;
-      await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
+      if (route.request().method() === 'PATCH') {
+        patchCalled = true;
+        await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
+      } else {
+        await route.fallback();
+      }
     });
 
     // 'not-a-url' lacks a scheme — browser's native type="url" validation blocks submit
@@ -102,7 +108,7 @@ test.describe('Profile', () => {
       if (route.request().method() === 'PATCH') {
         await route.fulfill({ status: 500 });
       } else {
-        await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
+        await route.fallback();
       }
     });
 
