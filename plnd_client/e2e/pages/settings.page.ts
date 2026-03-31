@@ -9,6 +9,7 @@ export class SettingsPage {
   getWeekStartSelect() { return this.page.locator('select#weekStartDay'); }
   getPlanLengthInput() { return this.page.locator('input#planLengthDays'); }
   getPlanningTriggerInput() { return this.page.locator('input#planningTriggerOffset'); }
+  getBackButton() { return this.page.getByRole('button', { name: /back/i }); }
   getSaveButton() { return this.page.getByRole('button', { name: 'Save' }); }
   getSuccessMessage() { return this.page.locator('.status-success'); }
   getErrorMessage() { return this.page.locator('.status-error'); }

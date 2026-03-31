@@ -149,7 +149,7 @@ test.describe('Settings', () => {
     await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
 
     // Navigate away via the Back button — Angular router navigation keeps service state alive
-    await page.getByRole('button', { name: /back/i }).click();
+    await settings.getBackButton().click();
     await expect(page).toHaveURL(/\/day\//);
 
     // Navigate back to settings via the avatar dropdown (router-link navigation, not a page reload)
