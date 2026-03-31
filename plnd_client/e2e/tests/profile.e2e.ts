@@ -95,6 +95,6 @@ test.describe('Profile', () => {
     const profile = await goToProfile(page);
 
     await profile.getBackButton().click();
-    await expect(page).not.toHaveURL(/\/profile/);
+    await expect(page).toHaveURL(/\/day\//);
   });
 });

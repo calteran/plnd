@@ -13,7 +13,7 @@ export class ProfilePage {
   getAvatarUrlInput() { return this.page.locator('#avatar-url'); }
   getSaveButton() { return this.page.getByRole('button', { name: 'Save' }); }
   getCancelButton() { return this.page.getByRole('button', { name: 'Cancel' }); }
-  getBackButton() { return this.page.locator('.back-btn'); }
+  getBackButton() { return this.page.getByRole('button', { name: /back/i }); }
   getSuccessMessage() { return this.page.locator('.status-success'); }
   getErrorMessage() { return this.page.locator('.status-error'); }
 }
