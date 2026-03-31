@@ -151,7 +151,7 @@ export class SettingsComponent implements OnInit {
       default_plan_length_days: v.planLengthDays,
       planning_trigger_offset: v.planningTriggerOffset,
     }).subscribe({
-      next: () => { this.pending = false; this.successMessage = 'Settings saved.'; },
+      next: () => { this.pending = false; this.successMessage = 'Settings saved.'; this.form.markAsPristine(); },
       error: () => { this.pending = false; this.errorMessage = 'Failed to save settings.'; }
     });
   }
