@@ -15,7 +15,7 @@ import { PreferencesService } from '../../core/services/preferences.service';
       </div>
 
       @if (preferencesService.preferences()) {
-        <form [formGroup]="form">
+        <form [formGroup]="form" (ngSubmit)="save()">
           <div class="settings-section">
             <h2>Planning</h2>
 
@@ -39,7 +39,7 @@ import { PreferencesService } from '../../core/services/preferences.service';
                    formControlName="planningTriggerOffset" class="settings-input" />
           </div>
 
-          <button type="button" (click)="save()" [disabled]="pending">Save</button>
+          <button type="submit" [disabled]="pending">Save</button>
           @if (successMessage) {
             <p class="status-success">{{ successMessage }}</p>
           }
