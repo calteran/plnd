@@ -92,10 +92,10 @@ test.describe('Profile', () => {
       }
     });
 
-    // 'not-a-url' lacks a scheme — browser's native type="url" validation blocks submit
+    // 'not-a-url' lacks a scheme — Angular's pattern validator marks the form invalid
     await profile.getAvatarUrlInput().fill('not-a-url');
     await profile.getSaveButton().click();
-    // If native validation fires, ngSubmit never runs and no PATCH is sent
+    // Save button is disabled when form is invalid, so no PATCH is sent
     await expect(profile.getSuccessMessage()).not.toBeVisible();
     expect(patchCalled).toBe(false);
   });
