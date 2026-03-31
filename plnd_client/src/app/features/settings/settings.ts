@@ -40,6 +40,12 @@ import { PreferencesService } from '../../core/services/preferences.service';
           </div>
 
           <button type="button" (click)="save()" [disabled]="pending">Save</button>
+          @if (successMessage) {
+            <p class="status-success">{{ successMessage }}</p>
+          }
+          @if (errorMessage) {
+            <p class="status-error">{{ errorMessage }}</p>
+          }
         </form>
       }
     </div>
@@ -87,6 +93,9 @@ import { PreferencesService } from '../../core/services/preferences.service';
       border: 1px solid var(--color-border, #ccc);
       border-radius: 4px;
     }
+
+    .status-success { color: #16a34a; font-size: 0.875rem; margin: 0.75rem 0 0; }
+    .status-error   { color: #dc2626; font-size: 0.875rem; margin: 0.75rem 0 0; }
   `]
 })
 export class SettingsComponent implements OnInit {
@@ -100,6 +109,8 @@ export class SettingsComponent implements OnInit {
   });
 
   pending = false;
+  successMessage = '';
+  errorMessage = '';
   private prefsInitialized = false;
 
   constructor() {
@@ -127,6 +138,12 @@ export class SettingsComponent implements OnInit {
   }
 
   save(): void {
+    this.successMessage = '';
+    this.errorMessage = '';
+    if (!this.form.valid) {
+      this.errorMessage = 'Please correct the invalid values before saving.';
+      return;
+    }
     const v = this.form.getRawValue();
     this.pending = true;
     this.preferencesService.patchPreferences({
@@ -134,8 +151,8 @@ export class SettingsComponent implements OnInit {
       default_plan_length_days: v.planLengthDays,
       planning_trigger_offset: v.planningTriggerOffset,
     }).subscribe({
-      next: () => { this.pending = false; },
-      error: () => { this.pending = false; }
+      next: () => { this.pending = false; this.successMessage = 'Settings saved.'; },
+      error: () => { this.pending = false; this.errorMessage = 'Failed to save settings.'; }
     });
   }
 }
