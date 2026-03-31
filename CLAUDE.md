@@ -10,6 +10,8 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - **Phase 1**: Foundation — COMPLETED (auth, database, basic API, Angular shell)
 - **Phase 2**: Core Features — COMPLETED (domain model, catalog/library API, external providers)
 
+- **Repository**: https://github.com/calteran/plnd
+
 > See [DOMAIN_MODEL.md](DOMAIN_MODEL.md) for domain architecture.
 
 ## Critical Rules
