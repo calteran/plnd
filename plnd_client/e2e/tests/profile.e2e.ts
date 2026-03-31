@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { MOCK_USER_ONBOARDED, seedAuth } from '../helpers/auth';
 import { ProfilePage } from '../pages/profile.page';
 
@@ -9,11 +9,11 @@ import { ProfilePage } from '../pages/profile.page';
 // Tests that verify form pre-population navigate through /today first so that the
 // UserService signal is populated before ProfileComponent initialises.
 
-async function goToProfile(page: InstanceType<typeof import('@playwright/test').Page>): Promise<ProfilePage> {
+async function goToProfile(page: Page): Promise<ProfilePage> {
   await page.goto('/today');
   await page.waitForURL(/\/day\//);
-  await page.goto('/profile');
   const profile = new ProfilePage(page);
+  await profile.goto();
   await expect(profile.getHeading()).toHaveText('My Profile');
   return profile;
 }
@@ -26,8 +26,9 @@ test.describe('Profile', () => {
 
   test('profile page loads and shows "My Profile" heading', async ({ page }) => {
     await seedAuth(page);
-    await page.goto('/profile');
-    await expect(page.locator('h1')).toHaveText('My Profile');
+    const profile = new ProfilePage(page);
+    await profile.goto();
+    await expect(profile.getHeading()).toHaveText('My Profile');
   });
 
   test('read-only section displays email address, member since, and last login', async ({ page }) => {
