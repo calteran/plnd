@@ -1,5 +1,4 @@
 import { Component, OnInit, effect, inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
 import { toIsoDate } from '../../../core/services/schedule.service';
@@ -23,7 +22,6 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
     <div class="planning-wizard">
       <header class="wizard-header">
         <h1>Plan Your Week</h1>
-        <button class="btn-cancel" (click)="cancel()" type="button">Cancel</button>
       </header>
 
       <div class="wizard-progress" role="progressbar"
@@ -94,14 +92,11 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
                font-size: 16px; font-weight: 400; line-height: 1; min-width: 44px; min-height: 44px;
                display: flex; align-items: center; justify-content: center; }
     .nav-btn--back { margin-right: auto; }
-    .btn-cancel { background: none; border: 1px solid var(--color-text-muted); border-radius: 6px;
-                  padding: 6px 14px; font-size: 12px; color: var(--color-text-body); cursor: pointer; }
   `]
 })
 export class PlanningWizardComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   private readonly preferencesService = inject(PreferencesService);
-  private readonly router = inject(Router);
 
   readonly steps = [
     { n: 1, label: 'Carryover' },
@@ -156,8 +151,4 @@ export class PlanningWizardComponent implements OnInit {
     if (step > 1) this.weekPlanService.goToStep(step - 1);
   }
 
-  cancel(): void {
-    this.weekPlanService.clearDraft();
-    this.router.navigate(['/today']);
-  }
 }

@@ -250,41 +250,6 @@ test.describe('Planning Wizard', () => {
     });
   });
 
-  // ── Cancel flow ────────────────────────────────────────────────────────────
-
-  test.describe('Cancel flow', () => {
-    test('Cancel button clears the draft and redirects to /today', async ({ page }) => {
-      await page.clock.setFixedTime('2026-03-28T00:00:00');
-      await page.addInitScript(() => {
-        // Pre-seed a draft so we can verify it gets wiped on cancel
-        localStorage.setItem('plnd:plan-draft', JSON.stringify({
-          schemaVersion: 1,
-          planStart: '2026-03-30',
-          planEnd: '2026-04-05',
-          currentStep: 2,
-          carryoverDecisions: {},
-          scheduledMeals: {},
-          scheduledTasks: [],
-          floatingTasks: [],
-          savedAt: '2026-03-28T00:00:00.000Z',
-        }));
-      });
-      await seedWizard(page);
-
-      await page.goto('/plan/week');
-      await expect(page.locator('.planning-wizard')).toBeVisible();
-
-      await page.getByRole('button', { name: 'Cancel' }).click();
-
-      // /today guard immediately redirects to /day/:date
-      await expect(page).toHaveURL(/\/day\//);
-
-      // Draft must be wiped from localStorage
-      const draft = await page.evaluate(() => localStorage.getItem('plnd:plan-draft'));
-      expect(draft).toBeNull();
-    });
-  });
-
   // ── Step 2 — Tasks Planning ───────────────────────────────────────────────
 
   test.describe('Step 2 — Tasks Planning', () => {
