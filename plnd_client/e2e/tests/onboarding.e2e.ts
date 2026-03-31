@@ -127,22 +127,17 @@ test.describe('Step 2 — profile', () => {
   test('entering a name and clicking Next Step calls PATCH /users/me with the name and advances to restrictions', async ({ page }) => {
     let capturedBody: Record<string, unknown> | null = null;
 
+    await startOnboarding(page);
+
+    // Layer PATCH handler on top; falls back to startOnboarding's GET handler for non-PATCH requests
     await page.route(`${API_BASE}/users/me`, async route => {
       if (route.request().method() === 'PATCH') {
         capturedBody = route.request().postDataJSON() as Record<string, unknown>;
         await route.fulfill({ status: 200, json: { ...MOCK_USER_NEW, display_name: 'Alex' } });
       } else {
-        await route.fulfill({ status: 200, json: MOCK_USER_NEW });
+        await route.fallback();
       }
     });
-    await page.route(`${API_BASE}/dietary-restrictions`, route =>
-      route.fulfill({ status: 200, json: [] })
-    );
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
-    await page.goto('/onboarding');
-    await page.getByRole('button', { name: 'Get Started' }).click();
 
     await page.locator('#display-name').fill('Alex');
     await page.getByRole('button', { name: /Next Step/ }).click();
@@ -154,22 +149,16 @@ test.describe('Step 2 — profile', () => {
   test('leaving name blank and clicking Next Step advances to restrictions without calling PATCH /users/me', async ({ page }) => {
     let patchCalled = false;
 
+    await startOnboarding(page);
+
     await page.route(`${API_BASE}/users/me`, async route => {
       if (route.request().method() === 'PATCH') {
         patchCalled = true;
         await route.fulfill({ status: 200, json: MOCK_USER_NEW });
       } else {
-        await route.fulfill({ status: 200, json: MOCK_USER_NEW });
+        await route.fallback();
       }
     });
-    await page.route(`${API_BASE}/dietary-restrictions`, route =>
-      route.fulfill({ status: 200, json: [] })
-    );
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
-    await page.goto('/onboarding');
-    await page.getByRole('button', { name: 'Get Started' }).click();
 
     await page.getByRole('button', { name: /Next Step/ }).click();
 
@@ -179,19 +168,19 @@ test.describe('Step 2 — profile', () => {
 });
 
 test.describe('Step 3 — dietary restrictions', () => {
-  test('restriction add form is visible', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await startOnboarding(page);
     await page.getByRole('button', { name: 'Skip' }).click();
-
     await expect(page.locator('h1')).toHaveText('Dietary Restrictions');
+  });
+
+  test('restriction add form is visible', async ({ page }) => {
     await expect(page.locator('#r-type')).toBeVisible();
     await expect(page.locator('#r-name')).toBeVisible();
     await expect(page.locator('#r-notes')).toBeVisible();
   });
 
   test('adding a restriction shows it as a chip', async ({ page }) => {
-    await startOnboarding(page);
-
     await page.route(`${API_BASE}/dietary-restrictions`, async route => {
       if (route.request().method() === 'POST') {
         await route.fulfill({
@@ -211,8 +200,6 @@ test.describe('Step 3 — dietary restrictions', () => {
       }
     });
 
-    await page.getByRole('button', { name: 'Skip' }).click();
-
     await page.locator('#r-name').fill('peanuts');
     await page.getByRole('button', { name: 'Add' }).click();
 
@@ -224,13 +211,8 @@ test.describe('Step 3 — dietary restrictions', () => {
   test('multiple restrictions can be added before completing', async ({ page }) => {
     let postCount = 0;
 
-    await page.route(`${API_BASE}/users/me`, route =>
-      route.fulfill({ status: 200, json: MOCK_USER_NEW })
-    );
     await page.route(`${API_BASE}/dietary-restrictions`, async route => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 200, json: [] });
-      } else if (route.request().method() === 'POST') {
+      if (route.request().method() === 'POST') {
         postCount += 1;
         const body = route.request().postDataJSON() as { restriction_type: string; name: string };
         await route.fulfill({
@@ -246,15 +228,9 @@ test.describe('Step 3 — dietary restrictions', () => {
           }
         });
       } else {
-        await route.continue();
+        await route.fallback();
       }
     });
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
-    await page.goto('/onboarding');
-    await page.getByRole('button', { name: 'Get Started' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
 
     // Add first restriction
     await page.locator('#r-name').fill('peanuts');
@@ -271,12 +247,6 @@ test.describe('Step 3 — dietary restrictions', () => {
   test('clicking Done calls POST /users/me/complete-onboarding and redirects to /day/:date', async ({ page }) => {
     let onboardingCompleteCalled = false;
 
-    await page.route(`${API_BASE}/users/me`, route =>
-      route.fulfill({ status: 200, json: MOCK_USER_NEW })
-    );
-    await page.route(`${API_BASE}/dietary-restrictions`, route =>
-      route.fulfill({ status: 200, json: [] })
-    );
     await page.route(`${API_BASE}/users/me/complete-onboarding`, async route => {
       onboardingCompleteCalled = true;
       await route.fulfill({ status: 200 });
@@ -287,12 +257,6 @@ test.describe('Step 3 — dietary restrictions', () => {
     await page.route(`${API_BASE}/schedule/plan/status**`, route =>
       route.fulfill({ status: 200, json: { planned: false } })
     );
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
-    await page.goto('/onboarding');
-    await page.getByRole('button', { name: 'Get Started' }).click();
-    await page.getByRole('button', { name: 'Skip' }).click();
 
     await page.getByRole('button', { name: 'Done' }).click();
 
