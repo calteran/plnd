@@ -94,8 +94,8 @@ import { PreferencesService } from '../../core/services/preferences.service';
       border-radius: 4px;
     }
 
-    .status-success { color: #16a34a; font-size: 0.875rem; margin: 0.75rem 0 0; }
-    .status-error   { color: #dc2626; font-size: 0.875rem; margin: 0.75rem 0 0; }
+    .status-success { color: var(--color-success); font-size: 0.875rem; margin: 0.75rem 0 0; }
+    .status-error   { color: var(--color-destructive); font-size: 0.875rem; margin: 0.75rem 0 0; }
   `]
 })
 export class SettingsComponent implements OnInit {
