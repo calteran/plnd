@@ -9,8 +9,8 @@ export class ProfilePage {
   getEmailRow() { return this.page.locator('.info-row').filter({ hasText: 'Email' }).locator('.info-value'); }
   getMemberSinceRow() { return this.page.locator('.info-row').filter({ hasText: 'Member since' }).locator('.info-value'); }
   getLastLoginRow() { return this.page.locator('.info-row').filter({ hasText: 'Last login' }).locator('.info-value'); }
-  getDisplayNameInput() { return this.page.locator('#display-name'); }
-  getAvatarUrlInput() { return this.page.locator('#avatar-url'); }
+  getDisplayNameInput() { return this.page.getByLabel('Display name'); }
+  getAvatarUrlInput() { return this.page.getByLabel('Avatar URL'); }
   getSaveButton() { return this.page.getByRole('button', { name: 'Save' }); }
   getCancelButton() { return this.page.getByRole('button', { name: 'Cancel' }); }
   getBackButton() { return this.page.getByRole('button', { name: /back/i }); }

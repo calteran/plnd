@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { MOCK_USER_ONBOARDED, seedAuth } from '../helpers/auth';
+import { API_BASE, MOCK_USER_ONBOARDED, seedAuth } from '../helpers/auth';
 import { ProfilePage } from '../pages/profile.page';
 
 // All tests seed auth via addInitScript (sets localStorage before Angular bootstraps)
@@ -53,9 +53,18 @@ test.describe('Profile', () => {
     await seedAuth(page);
     const profile = await goToProfile(page);
 
+    let patchBody: Record<string, string> | undefined;
+    await page.route(`${API_BASE}/users/me`, async (route) => {
+      if (route.request().method() === 'PATCH') {
+        patchBody = JSON.parse(route.request().postData() ?? '{}');
+      }
+      await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
+    });
+
     await profile.getDisplayNameInput().fill('Updated Name');
     await profile.getSaveButton().click();
     await expect(profile.getSuccessMessage()).toHaveText('Profile updated.', { timeout: 5_000 });
+    expect(patchBody).toMatchObject({ display_name: 'Updated Name' });
   });
 
   test('avatar URL field accepts a valid URL and save succeeds', async ({ page }) => {
@@ -71,11 +80,18 @@ test.describe('Profile', () => {
     await seedAuth(page);
     const profile = await goToProfile(page);
 
+    let patchCalled = false;
+    await page.route(`${API_BASE}/users/me`, async (route) => {
+      if (route.request().method() === 'PATCH') patchCalled = true;
+      await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
+    });
+
     // 'not-a-url' lacks a scheme — browser's native type="url" validation blocks submit
     await profile.getAvatarUrlInput().fill('not-a-url');
     await profile.getSaveButton().click();
-    // If native validation fires, ngSubmit never runs and no success message appears
+    // If native validation fires, ngSubmit never runs and no PATCH is sent
     await expect(profile.getSuccessMessage()).not.toBeVisible();
+    expect(patchCalled).toBe(false);
   });
 
   test('Cancel button discards unsaved changes and restores original values', async ({ page }) => {
