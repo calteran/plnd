@@ -189,14 +189,16 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
   // These tests are expected to FAIL until autocomplete is implemented.
   // When they start passing, remove test.fail() and the comment.
 
-  test.fail('typing in mock-input shows a suggestion dropdown', async ({ page }) => {
+  test('typing in mock-input shows a suggestion dropdown', async ({ page }) => {
+    test.fail();
     const cell = page.locator('.gc').first();
     await cell.locator('.gc-pick').click();
     await cell.locator('.mock-input').fill('chi');
     await expect(page.locator('.autocomplete-dropdown')).toBeVisible();
   });
 
-  test.fail('clicking a suggestion fills the cell and closes the editor', async ({ page }) => {
+  test('clicking a suggestion fills the cell and closes the editor', async ({ page }) => {
+    test.fail();
     const cell = page.locator('.gc').first();
     await cell.locator('.gc-pick').click();
     await cell.locator('.mock-input').fill('chi');
