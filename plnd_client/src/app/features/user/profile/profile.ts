@@ -192,7 +192,7 @@ export class ProfileComponent implements OnInit {
 
   readonly form = new FormGroup({
     display_name: new FormControl('', [Validators.maxLength(100)]),
-    avatar_url: new FormControl('', [Validators.maxLength(500), Validators.pattern(/^(https?:\/\/)?\S*\.\S+/)])
+    avatar_url: new FormControl('', [Validators.maxLength(500), Validators.pattern(/^(https?:\/\/)?\S+\.\S+$/)])
   });
 
   ngOnInit(): void {
