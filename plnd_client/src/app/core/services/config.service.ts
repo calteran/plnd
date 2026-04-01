@@ -8,18 +8,13 @@ import { EnvironmentConfig } from '../models/config';
 })
 export class ConfigService {
   private configSubject = new BehaviorSubject<EnvironmentConfig>(environment);
-  config$ = this.configSubject.asObservable();
 
   constructor() {
-    this.validateConfig();
+    this.validateConfigObject(this.getConfig());
   }
 
   getConfig(): EnvironmentConfig {
     return this.configSubject.value;
-  }
-
-  private validateConfig(): void {
-    this.validateConfigObject(this.getConfig());
   }
 
   // Method to update configuration at runtime (for advanced use cases)
@@ -41,7 +36,7 @@ export class ConfigService {
 
     const validLogLevels: ('debug' | 'info' | 'warn' | 'error')[] = ['debug', 'info', 'warn', 'error'];
     if (!validLogLevels.includes(config.logging.level)) {
-      throw new Error(`Invalid log level: ${config.logging.level}`);
+      throw new Error(`Invalid logLevel: ${config.logging.level}`);
     }
   }
 }
