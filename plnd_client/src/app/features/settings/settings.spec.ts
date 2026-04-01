@@ -9,6 +9,7 @@ const MOCK_PREFS = {
   week_start_day: 1,
   planning_trigger_offset: 0,
   default_plan_length_days: 7,
+  wake_time: '07:00:00',
   created_at: '',
   updated_at: '',
 };
@@ -22,6 +23,7 @@ describe('SettingsComponent', () => {
     }).compileComponents();
 
     httpMock = TestBed.inject(HttpTestingController);
+    spyOn(console, 'error');
   });
 
   afterEach(() => {

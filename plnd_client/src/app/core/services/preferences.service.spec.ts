@@ -23,6 +23,7 @@ describe('PreferencesService', () => {
     });
     service = TestBed.inject(PreferencesService);
     httpMock = TestBed.inject(HttpTestingController);
+    spyOn(console, 'error');
   });
 
   afterEach(() => {
