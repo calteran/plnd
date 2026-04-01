@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { API_BASE, MOCK_USER_NEW, MOCK_USER_ONBOARDED, MOCK_PREFS } from '../helpers/auth';
+import { API_BASE, MOCK_USER_NEW, MOCK_USER_ONBOARDED, MOCK_PREFS, MOCK_BRIEFING_WEATHER, MOCK_BRIEFING_NEWS, MOCK_BRIEFING_YESTERDAY } from '../helpers/auth';
 
 test.describe('Onboarding', () => {
   test('unauthenticated /onboarding visit redirects to /login', async ({ page }) => {
@@ -32,6 +32,15 @@ test.describe('Onboarding', () => {
     );
     await page.route(`${API_BASE}/schedule/plan/status**`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
+    await page.route(`${API_BASE}/briefing/weather`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_WEATHER) })
+    );
+    await page.route(`${API_BASE}/briefing/news`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_NEWS) })
+    );
+    await page.route(`${API_BASE}/briefing/yesterday`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_YESTERDAY) })
     );
 
     await page.addInitScript(() => {
@@ -73,6 +82,15 @@ test.describe('Onboarding', () => {
     );
     await page.route(`${API_BASE}/schedule/plan/status**`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
+    );
+    await page.route(`${API_BASE}/briefing/weather`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_WEATHER) })
+    );
+    await page.route(`${API_BASE}/briefing/news`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_NEWS) })
+    );
+    await page.route(`${API_BASE}/briefing/yesterday`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_YESTERDAY) })
     );
 
     await page.addInitScript(() => {
@@ -256,6 +274,15 @@ test.describe('Step 3 — dietary restrictions', () => {
     );
     await page.route(`${API_BASE}/schedule/plan/status**`, route =>
       route.fulfill({ status: 200, json: { planned: false } })
+    );
+    await page.route(`${API_BASE}/briefing/weather`, route =>
+      route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
+    );
+    await page.route(`${API_BASE}/briefing/news`, route =>
+      route.fulfill({ status: 200, json: MOCK_BRIEFING_NEWS })
+    );
+    await page.route(`${API_BASE}/briefing/yesterday`, route =>
+      route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
     );
 
     await page.getByRole('button', { name: 'Done' }).click();

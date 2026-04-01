@@ -25,14 +25,14 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
   template: `
     <div class="schedule-view">
 
-      @if (isToday()) {
-        <app-briefing-header />
-      }
-
       <app-day-header
         [date]="scheduleService.date()"
         (dateChange)="onDateChange($event)"
       />
+
+      @if (isToday()) {
+        <app-briefing-header />
+      }
 
       @if (scheduleService.isLoading()) {
         <div class="skeleton-list" aria-label="Loading schedule" aria-busy="true">
