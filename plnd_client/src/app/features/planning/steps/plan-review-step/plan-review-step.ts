@@ -25,7 +25,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
         <p class="loading-text">Loading…</p>
       } @else if (weekPlanService.carryoverItems().length === 0) {
         <div class="empty-state">
-          <span class="empty-emoji">{{ emptyStateEmoji }}</span>
+          <span class="empty-emoji" aria-hidden="true">{{ emptyStateEmoji }}</span>
           <p class="empty-heading">All caught up!</p>
           <p class="empty-sub">No unfinished items from last week to review.</p>
         </div>
