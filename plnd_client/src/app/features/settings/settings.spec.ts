@@ -82,4 +82,36 @@ describe('SettingsComponent', () => {
       default_plan_length_days: 7, created_at: '', updated_at: ''
     });
   });
+
+  it('shows error message when preferences fail to load', () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.url.includes('/preferences/me') && r.method === 'GET')
+      .flush('error', { status: 500, statusText: 'Internal Server Error' });
+    fixture.detectChanges();
+
+    const errorEl = fixture.nativeElement.querySelector('.load-error');
+    expect(errorEl).toBeTruthy();
+    expect(errorEl.textContent).toContain("Settings couldn't be loaded");
+  });
+
+  it('retry button clears error and re-fetches preferences', () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.url.includes('/preferences/me') && r.method === 'GET')
+      .flush('error', { status: 500, statusText: 'Internal Server Error' });
+    fixture.detectChanges();
+
+    const retryBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.load-error button');
+    expect(retryBtn).toBeTruthy();
+    retryBtn.click();
+
+    // A new GET should be issued after retry
+    const retryReq = httpMock.expectOne(r => r.url.includes('/preferences/me') && r.method === 'GET');
+    retryReq.flush(MOCK_PREFS);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.load-error')).toBeNull();
+    expect(fixture.nativeElement.querySelector('form')).toBeTruthy();
+  });
 });

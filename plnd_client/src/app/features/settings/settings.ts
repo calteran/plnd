@@ -14,7 +14,12 @@ import { PreferencesService } from '../../core/services/preferences.service';
         <h1>Settings</h1>
       </div>
 
-      @if (preferencesService.preferences()) {
+      @if (preferencesService.loadError()) {
+        <div class="load-error" role="alert">
+          <p>Settings couldn't be loaded. Please try again.</p>
+          <button type="button" (click)="retryLoad()">Retry</button>
+        </div>
+      } @else if (preferencesService.preferences()) {
         <form [formGroup]="form" (ngSubmit)="save()">
           <div class="settings-section">
             <h2>Planning</h2>
@@ -96,6 +101,18 @@ import { PreferencesService } from '../../core/services/preferences.service';
 
     .status-success { color: var(--color-success); font-size: 0.875rem; margin: 0.75rem 0 0; }
     .status-error   { color: var(--color-destructive); font-size: 0.875rem; margin: 0.75rem 0 0; }
+
+    .load-error {
+      padding: 1rem;
+      border: 1px solid var(--color-destructive, #c00);
+      border-radius: 4px;
+      color: var(--color-destructive, #c00);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .load-error p { margin: 0; }
   `]
 })
 export class SettingsComponent implements OnInit {
@@ -130,6 +147,11 @@ export class SettingsComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.preferencesService.loadPreferences();
+  }
+
+  retryLoad(): void {
+    this.preferencesService.clearPreferences();
     this.preferencesService.loadPreferences();
   }
 

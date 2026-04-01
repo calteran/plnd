@@ -10,18 +10,26 @@ export class PreferencesService {
   private readonly config = inject(ConfigService);
 
   private readonly preferencesSignal = signal<UserPreferences | null>(null);
+  private readonly loadErrorSignal = signal(false);
 
   /** The current user preferences — null until loadPreferences() succeeds */
   readonly preferences = this.preferencesSignal.asReadonly();
+
+  /** True when the most recent loadPreferences() call failed */
+  readonly loadError = this.loadErrorSignal.asReadonly();
 
   /** Fetch preferences from the API and cache in the signal. No-ops if already loaded. */
   loadPreferences(): void {
     if (this.preferencesSignal()) return;
 
+    this.loadErrorSignal.set(false);
     const apiBase = this.config.getConfig().api.baseUrl;
     this.http.get<UserPreferences>(`${apiBase}/preferences/me`).subscribe({
       next: prefs => this.preferencesSignal.set(prefs),
-      error: err => console.error('Failed to load preferences', err)
+      error: err => {
+        console.error('Failed to load preferences', err);
+        this.loadErrorSignal.set(true);
+      }
     });
   }
 
@@ -36,5 +44,6 @@ export class PreferencesService {
   /** Reset the preferences signal (called on logout) */
   clearPreferences(): void {
     this.preferencesSignal.set(null);
+    this.loadErrorSignal.set(false);
   }
 }
