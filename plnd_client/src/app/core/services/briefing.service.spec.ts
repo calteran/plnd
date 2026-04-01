@@ -95,6 +95,14 @@ describe('BriefingService', () => {
     expect(service.weather()?.temp_c).toBe(14);
   });
 
+  it('does not fire duplicate requests when load() is called twice', () => {
+    service.load();
+    service.load(); // should be a no-op
+    flushAll(W, N, Y);
+    // httpMock.verify() in afterEach confirms no unexpected requests were made
+    expect(service.weather()?.temp_c).toBe(14);
+  });
+
   it('sets yesterdayError when yesterday fails', () => {
     service.load();
     httpMock

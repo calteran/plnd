@@ -14,7 +14,7 @@ pub struct BriefingState {
 }
 
 /// Cached weather data.
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, utoipa::ToSchema)]
 pub struct WeatherCacheEntry {
     pub temp_c: f64,
     pub condition: String,

@@ -22,8 +22,13 @@ export class BriefingService {
   readonly newsError      = this._newsError.asReadonly();
   readonly yesterdayError = this._yesterdayError.asReadonly();
 
-  /** Fire all three briefing requests in parallel. Each section fails independently. */
+  private _loaded = false;
+
+  /** Fire all three briefing requests in parallel. Each section fails independently.
+   *  No-ops if already called — prevents duplicate in-flight requests on rapid re-renders. */
   load(): void {
+    if (this._loaded) return;
+    this._loaded = true;
     const base = this.config.getConfig().api.baseUrl;
 
     this.http.get<WeatherSummary>(`${base}/briefing/weather`).subscribe({

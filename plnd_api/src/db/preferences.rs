@@ -13,12 +13,13 @@ pub async fn patch_preferences(
 ) -> Result<UserPreferences, DatabaseError> {
     sqlx::query_as::<_, UserPreferences>(
         "INSERT INTO user_preferences
-           (user_id, week_start_day, planning_trigger_offset, default_plan_length_days)
-         VALUES ($1, COALESCE($2, 1), COALESCE($3, 0), COALESCE($4, 7))
+           (user_id, week_start_day, planning_trigger_offset, default_plan_length_days, wake_time)
+         VALUES ($1, COALESCE($2, 1), COALESCE($3, 0), COALESCE($4, 7), COALESCE($5, '07:00'))
          ON CONFLICT (user_id) DO UPDATE
            SET week_start_day           = COALESCE($2, user_preferences.week_start_day),
                planning_trigger_offset  = COALESCE($3, user_preferences.planning_trigger_offset),
                default_plan_length_days = COALESCE($4, user_preferences.default_plan_length_days),
+               wake_time                = COALESCE($5, user_preferences.wake_time),
                updated_at               = NOW()
          RETURNING user_id, week_start_day, planning_trigger_offset,
                    default_plan_length_days, wake_time, created_at, updated_at",
@@ -27,6 +28,7 @@ pub async fn patch_preferences(
     .bind(req.week_start_day)
     .bind(req.planning_trigger_offset)
     .bind(req.default_plan_length_days)
+    .bind(req.wake_time)
     .fetch_one(pool)
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))

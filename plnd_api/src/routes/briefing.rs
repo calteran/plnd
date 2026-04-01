@@ -7,7 +7,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use chrono::{Local, NaiveDate};
+use chrono::{NaiveDate, Utc};
 use serde::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -53,6 +53,17 @@ struct OpenMeteoDailyData {
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
+#[utoipa::path(
+    get,
+    path = "/briefing/weather",
+    tag = "Briefing",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Current weather summary", body = WeatherCacheEntry),
+        (status = 401, description = "Unauthorized"),
+        (status = 503, description = "Weather service unavailable"),
+    )
+)]
 pub async fn get_weather(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -119,6 +130,17 @@ pub async fn get_weather(
     Ok(Json(summary))
 }
 
+#[utoipa::path(
+    get,
+    path = "/briefing/news",
+    tag = "Briefing",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Latest news headlines", body = NewsResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 503, description = "News feed unavailable"),
+    )
+)]
 pub async fn get_news(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -166,6 +188,17 @@ pub async fn get_news(
     Ok(Json(NewsResponse { headlines }))
 }
 
+#[utoipa::path(
+    get,
+    path = "/briefing/yesterday",
+    tag = "Briefing",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Yesterday's task and meal recap", body = YesterdayResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn get_yesterday(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -173,8 +206,7 @@ pub async fn get_yesterday(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let pool = state.db.get_pool();
 
-    // yesterday = today - 1 day, in local wall-clock time
-    let yesterday: NaiveDate = Local::now().date_naive() - chrono::Duration::days(1);
+    let yesterday: NaiveDate = Utc::now().date_naive() - chrono::Duration::days(1);
 
     let snapshot = db::briefing::yesterday_snapshot(pool, user_id, yesterday)
         .await
