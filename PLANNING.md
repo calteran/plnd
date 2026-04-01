@@ -247,45 +247,63 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [ ] *(deferred)* Exercise planning UI
 - [ ] *(deferred)* Family profile management
 
-### Phase 3: AI Enhancements (Intelligent Features)
-**Goal**: Implement advanced LLM-powered planning capabilities
+### Phase 3: Agentic AI
+**Goal**: Platform-independent agentic AI layer with local LLM support; intent-driven task entry and AI-powered weekly meal planning
+
+> See [`docs/superpowers/specs/2026-04-01-phase3-ai-design.md`](./docs/superpowers/specs/2026-04-01-phase3-ai-design.md) for full design.
 
 **Tasks:**
-- [ ] **Basic LLM Integration**
-  - [ ] Set up Mistral API client
-  - [ ] Implement basic prompt templates
-  - [ ] Create simple meal suggestion tool
-  - [ ] Add basic conversation context
 
-- [ ] **Advanced LLM Tools**
-  - [ ] Build LLM nutrition analysis tool
-  - [ ] Build LLM schedule optimization tool
-  - [ ] Build LLM preference-update tool
-  - [ ] Implement context-aware suggestion engine
+- [ ] **Prerequisite: DB Layer Migration** *(Issue [#158](https://github.com/calteran/plnd/issues/158))*
+  - [ ] Move DB layer from `plnd_api/src/db/` into `plnd_data`
+  - [ ] Establish clean dependency graph: `plnd_api` → `plnd_agent` → `plnd_data`
 
-- [ ] **Prompt Engineering**
-  - [ ] Write domain-specific prompt templates
-  - [ ] Add few-shot examples to prompt templates
-  - [ ] Enforce structured output in LLM responses
-  - [ ] Add LLM error handling and retry logic
+- [ ] **Phase 3.0 — `plnd_agent` Foundation**
+  - [ ] New `plnd_agent` workspace crate (no Axum dependency)
+  - [ ] `LlmProvider` trait with OpenAI-compatible and Anthropic implementations
+  - [ ] Mock provider for CI testing
+  - [ ] Tiered provider registry (Fast / Capable)
+  - [ ] `Tool` trait, `ToolRegistry`, and `AgentLoop` with parallel tool execution
+  - [ ] `UseCase` enum with prompt library and provider tier mapping
+  - [ ] LLM config section
 
-- [ ] **Conversational Interface**
-  - [ ] Process natural language user input
-  - [ ] Classify user request intent
-  - [ ] Persist conversation context across sessions
-  - [ ] Support multi-turn conversation flows
+- [ ] **Phase 3.1 — Memory System**
+  - [ ] `user_memories` DB migration
+  - [ ] Memory CRUD in `plnd_data`
+  - [ ] Memory injection into agent context filtered by use case
+  - [ ] Memory tools: get, save, update, forget
 
-- [ ] **Proactive Suggestions**
-  - [ ] Detect patterns from user behavior history
-  - [ ] Generate personalized meal/exercise recommendations
-  - [ ] Auto-adjust plans based on user feedback
-  - [ ] Feed user ratings back into the suggestion model
+- [ ] **Phase 3.2 — Task Entry**
+  - [ ] Schedule tools: find slot, create task
+  - [ ] `task_entry.md` prompt
+  - [ ] `/agent/task` route
+  - [ ] Angular: task entry with dynamic UI signals rendering
+
+- [ ] **Phase 3.3 — Meal Planning Wizard**
+  - [ ] Meal planning tools: preferences, catalog search, nutrition, schedule, propose plan
+  - [ ] `meal_planning.md` and `meal_rebalance.md` prompts
+  - [ ] `/agent/meal-plan` route
+  - [ ] Angular: planning wizard with locked-slot model for user-pinned meals
 
 **Deliverables:**
-- [ ] Intelligent planning assistant
-- [ ] Context-aware suggestions
-- [ ] Natural language interface
-- [ ] Personalized recommendations
+- [ ] Platform-independent LLM abstraction (`plnd_agent` crate)
+- [ ] Intent-driven task entry with autonomous scheduling and UI signals
+- [ ] AI-powered weekly meal planning with iterative rebalancing
+- [ ] User memory system
+
+### Phase 3.5: Background Agent Jobs *(deferred)*
+**Goal**: Autonomous background agents for memory improvement and proactive insights; deployable as independent binaries separate from `plnd_api`
+
+**Tasks:**
+- [ ] Memory coalescing (merge duplicates, retire stale entries)
+- [ ] Pattern detection from task and schedule history
+- [ ] Nutritional drift detection
+- [ ] `plnd_worker` standalone binary
+
+**Deliverables:**
+- [ ] Autonomous memory improvement
+- [ ] Proactive pattern and habit detection
+- [ ] Independent worker binary
 
 ### Phase 4: Integration Features
 **Goal**: Connect with external services and enhance functionality
