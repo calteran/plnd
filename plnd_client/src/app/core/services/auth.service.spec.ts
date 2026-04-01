@@ -4,9 +4,7 @@ import { Router } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { AuthService } from './auth.service';
-import { UserService } from './user.service';
-import { PreferencesService } from './preferences.service';
-import { DietaryRestrictionsService } from './dietary-restrictions.service';
+import { SessionStateService } from './session-state.service';
 
 const API_BASE = 'http://localhost:3000';
 
@@ -113,25 +111,11 @@ describe('AuthService', () => {
     expect(mockOauthService.logOut).toHaveBeenCalled();
   });
 
-  it('logout() calls clearUser() on UserService', () => {
-    const userService = TestBed.inject(UserService);
-    spyOn(userService, 'clearUser');
+  it('logout() calls clearAll() on SessionStateService', () => {
+    const sessionState = TestBed.inject(SessionStateService);
+    spyOn(sessionState, 'clearAll');
     service.logout();
-    expect(userService.clearUser).toHaveBeenCalled();
-  });
-
-  it('logout() calls clearPreferences() on PreferencesService', () => {
-    const prefsService = TestBed.inject(PreferencesService);
-    spyOn(prefsService, 'clearPreferences');
-    service.logout();
-    expect(prefsService.clearPreferences).toHaveBeenCalled();
-  });
-
-  it('logout() calls clear() on DietaryRestrictionsService', () => {
-    const dietaryService = TestBed.inject(DietaryRestrictionsService);
-    spyOn(dietaryService, 'clear');
-    service.logout();
-    expect(dietaryService.clear).toHaveBeenCalled();
+    expect(sessionState.clearAll).toHaveBeenCalled();
   });
 
   it('logout() with a reason navigates to /login with that reason as a query param', () => {
