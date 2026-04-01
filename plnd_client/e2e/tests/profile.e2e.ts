@@ -92,8 +92,8 @@ test.describe('Profile', () => {
       }
     });
 
-    // 'not-a-url' lacks a scheme — Angular's pattern validator marks the form invalid,
-    // disabling the Save button (clicking a disabled button would time out)
+    // 'not-a-url' has no dot, so it fails the bare-domain heuristic — Angular's pattern
+    // validator marks the form invalid, disabling the Save button.
     await profile.getAvatarUrlInput().fill('not-a-url');
     await expect(profile.getSaveButton()).toBeDisabled();
     await expect(profile.getSuccessMessage()).not.toBeVisible();

@@ -133,4 +133,32 @@ describe('ProfileComponent', () => {
     const texts = Array.from(errors).map(e => e.textContent ?? '');
     expect(texts.some(t => t.includes('500 characters'))).toBeTrue();
   });
+
+  describe('avatar_url pattern validator', () => {
+    const validUrls = [
+      'https://example.com/avatar.jpg',
+      'http://example.com/avatar.jpg',
+      'example.com/avatar.jpg',
+      'cdn.example.com/img.png',
+    ];
+    const invalidUrls = [
+      'not-a-url',
+      'notaurl',
+      'justword',
+    ];
+
+    for (const url of validUrls) {
+      it(`accepts valid URL: "${url}"`, () => {
+        component.form.controls.avatar_url.setValue(url);
+        expect(component.form.controls.avatar_url.errors?.['pattern']).toBeUndefined();
+      });
+    }
+
+    for (const url of invalidUrls) {
+      it(`rejects invalid URL: "${url}"`, () => {
+        component.form.controls.avatar_url.setValue(url);
+        expect(component.form.controls.avatar_url.errors?.['pattern']).toBeTruthy();
+      });
+    }
+  });
 });
