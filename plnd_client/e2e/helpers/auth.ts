@@ -33,6 +33,26 @@ export const MOCK_PREFS = {
   week_start_day: 1,
   planning_trigger_offset: 0,
   default_plan_length_days: 7,
+  wake_time: '07:00:00',
+};
+
+export const MOCK_BRIEFING_WEATHER = {
+  temp_c: 18,
+  condition: 'Clear',
+  high_c: 22,
+  low_c: 14,
+  precipitation_flag: false,
+};
+
+export const MOCK_BRIEFING_NEWS = {
+  headlines: ['Test headline one', 'Test headline two', 'Test headline three'],
+};
+
+export const MOCK_BRIEFING_YESTERDAY = {
+  tasks_done: 3,
+  tasks_total: 5,
+  meals_logged: 2,
+  meals_planned: 3,
 };
 
 export async function seedAuth(page: Page) {
@@ -47,5 +67,14 @@ export async function seedAuth(page: Page) {
   );
   await page.route(`${API_BASE}/schedule/plan/status**`, route =>
     route.fulfill({ status: 200, json: { planned: false } })
+  );
+  await page.route(`${API_BASE}/briefing/weather`, route =>
+    route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
+  );
+  await page.route(`${API_BASE}/briefing/news`, route =>
+    route.fulfill({ status: 200, json: MOCK_BRIEFING_NEWS })
+  );
+  await page.route(`${API_BASE}/briefing/yesterday`, route =>
+    route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
   );
 }
