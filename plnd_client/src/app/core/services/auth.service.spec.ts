@@ -56,6 +56,13 @@ describe('AuthService', () => {
     }));
   });
 
+  it('passes strictDiscoveryDocumentValidation from config to oauthService.configure()', () => {
+    // The dev environment sets strictDiscoveryDocumentValidation: false for the mock IdP.
+    expect(mockOauthService.configure).toHaveBeenCalledWith(jasmine.objectContaining({
+      strictDiscoveryDocumentValidation: false,
+    }));
+  });
+
   it('should not be authenticated initially', () => {
     expect(service.isAuthenticated()).toBeFalse();
   });
