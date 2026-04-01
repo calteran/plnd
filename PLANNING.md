@@ -247,45 +247,73 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [ ] *(deferred)* Exercise planning UI
 - [ ] *(deferred)* Family profile management
 
-### Phase 3: AI Enhancements (Intelligent Features)
-**Goal**: Implement advanced LLM-powered planning capabilities
+### Phase 3: Agentic AI
+**Goal**: Implement an agentic AI layer that parses user intent, acts autonomously on high-confidence decisions, and surfaces only uncertain fields as UI prompts. Platform/model independent, locally runnable (Ollama/LMStudio), CI-safe with mock provider.
+
+> **Design Reference**: See [`docs/superpowers/specs/2026-04-01-phase3-ai-design.md`](./docs/superpowers/specs/2026-04-01-phase3-ai-design.md) for full architecture, tool system, memory design, prompt library, structured output contracts, and security mitigations.
 
 **Tasks:**
-- [ ] **Basic LLM Integration**
-  - [ ] Set up Mistral API client
-  - [ ] Implement basic prompt templates
-  - [ ] Create simple meal suggestion tool
-  - [ ] Add basic conversation context
 
-- [ ] **Advanced LLM Tools**
-  - [ ] Build LLM nutrition analysis tool
-  - [ ] Build LLM schedule optimization tool
-  - [ ] Build LLM preference-update tool
-  - [ ] Implement context-aware suggestion engine
+- [ ] **Prerequisite: DB Layer Migration** *(Issue [#158](https://github.com/calteran/plnd/issues/158))*
+  - [ ] Add SQLx to `plnd_data/Cargo.toml`
+  - [ ] Move `plnd_api/src/db/` (18 files) → `plnd_data/src/db/`
+  - [ ] Update `plnd_api` imports; remove direct SQLx dependency
+  - [ ] `just verify` must pass cleanly — no behavior changes
 
-- [ ] **Prompt Engineering**
-  - [ ] Write domain-specific prompt templates
-  - [ ] Add few-shot examples to prompt templates
-  - [ ] Enforce structured output in LLM responses
-  - [ ] Add LLM error handling and retry logic
+- [ ] **Phase 3.0 — `plnd_agent` Foundation**
+  - [ ] New workspace crate `plnd_agent` (no Axum dependency)
+  - [ ] `LlmProvider` trait + `CompletionRequest`/`CompletionResponse` types
+  - [ ] `OpenAiCompatibleProvider` (`async-openai`, configurable `base_url` — targets Ollama, LMStudio, OpenAI, Mistral)
+  - [ ] `AnthropicProvider` (raw `reqwest` — targets Claude, AWS Bedrock)
+  - [ ] `MockLlmProvider` for CI (canned deterministic responses)
+  - [ ] Tiered provider registry (`ProviderTier::Fast` / `ProviderTier::Capable`)
+  - [ ] `Tool` trait + `ToolRegistry`
+  - [ ] `AgentLoop` — LLM call → parallel tool execution → repeat; `max_iterations` safety ceiling
+  - [ ] `UseCase` enum — maps to system prompt + provider tier
+  - [ ] Prompt stubs: `task_entry.md`, `meal_planning.md`, `meal_rebalance.md`
+  - [ ] `[llm]` config section (provider, base_url, model, api_key, max_tokens)
 
-- [ ] **Conversational Interface**
-  - [ ] Process natural language user input
-  - [ ] Classify user request intent
-  - [ ] Persist conversation context across sessions
-  - [ ] Support multi-turn conversation flows
+- [ ] **Phase 3.1 — Memory System**
+  - [ ] DB migration: `user_memories` table (user_id, category, content, tags)
+  - [ ] `plnd_data`: CRUD for user memories (get by category, save, update, delete)
+  - [ ] `AgentService::run()` — load & inject memories into system context by use case
+  - [ ] Memory tools: `get_user_memories`, `save_memory`, `update_memory`, `forget_memory`
 
-- [ ] **Proactive Suggestions**
-  - [ ] Detect patterns from user behavior history
-  - [ ] Generate personalized meal/exercise recommendations
-  - [ ] Auto-adjust plans based on user feedback
-  - [ ] Feed user ratings back into the suggestion model
+- [ ] **Phase 3.2 — Task Entry**
+  - [ ] Schedule tools: `find_schedule_slot`, `create_task` (terminal — DB-generated UUID)
+  - [ ] `task_entry.md` prompt (full implementation with `<user_input>` security delimiters)
+  - [ ] `/agent/task` route in `plnd_api`
+  - [ ] Angular: wire task entry form to agent endpoint; render `ui_signals` as dynamic form controls
+
+- [ ] **Phase 3.3 — Meal Planning Wizard**
+  - [ ] Meal planning tools: `get_user_preferences`, `search_meal_catalog`, `get_meal_nutrition`, `get_week_schedule`, `propose_meal_plan` (terminal)
+  - [ ] `meal_planning.md` and `meal_rebalance.md` prompts
+  - [ ] `/agent/meal-plan` route in `plnd_api`
+  - [ ] Angular: connect planning wizard to agent endpoint; implement `locked` slot model for user-pinned meals
 
 **Deliverables:**
-- [ ] Intelligent planning assistant
-- [ ] Context-aware suggestions
-- [ ] Natural language interface
-- [ ] Personalized recommendations
+- [ ] `plnd_agent` workspace crate with provider-independent LLM abstraction
+- [ ] Intent-driven task entry (free text → task created + UI signals for uncertain fields)
+- [ ] AI-powered weekly meal planning wizard with iterative rebalancing
+- [ ] User memory system (categorised free-text observations, per-user, DB-backed)
+- [ ] Prompt library (compile-time embedded `.md` files)
+- [ ] Three-layer test strategy (unit/integration with mock provider; E2E local-only)
+
+### Phase 3.5: Background Agent Jobs *(deferred)*
+**Goal**: Autonomous background agents that improve memory quality and surface proactive insights over time.
+
+> These jobs use the same `AgentLoop` as Phase 3, but run as independent binaries (`plnd_worker`) — deployable on separate infrastructure. No Axum dependency; `plnd_agent` is a pure library.
+
+**Tasks:**
+- [ ] **Memory Coalescing** — periodic LLM pass to merge near-duplicate memories, compress verbose entries, retire stale ones
+- [ ] **Pattern Detection** — analyse task/schedule history to generate new memories from observed habits the user never stated explicitly
+- [ ] **Nutritional Drift Detection** — notice if recent meals consistently miss certain nutrients; surface in next planning session
+- [ ] **`plnd_worker` binary** — standalone binary importing `plnd_agent` + `plnd_data`; cron-scheduled or event-triggered
+
+**Deliverables:**
+- [ ] Autonomous memory improvement over time
+- [ ] Proactive habit/pattern detection
+- [ ] Independent worker binary deployable separately from the API server
 
 ### Phase 4: Integration Features
 **Goal**: Connect with external services and enhance functionality
