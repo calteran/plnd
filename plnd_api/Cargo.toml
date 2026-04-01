@@ -33,7 +33,7 @@ utoipa-scalar = { version = "0.3", features = ["axum"] }
 tokio = { version = "1", features = ["full", "test-util"] }
 
 [package.metadata.cargo-machete]
-ignored = ["futures", "utoipa", "moka", "feed-rs"]
+ignored = ["futures", "utoipa"]
 
 [package.metadata.nextest]
 # Configure nextest for better test execution
