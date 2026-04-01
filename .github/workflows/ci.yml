@@ -62,6 +62,13 @@ jobs:
       - name: Run tests
         run: cargo nextest run --workspace
 
+      - name: Upload API binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: plnd-api-binary
+          path: target/debug/plnd_api
+          retention-days: 1
+
   # ── Job 2: Angular lint + unit tests ───────────────────────────────────────
   client:
     name: Client
@@ -118,12 +125,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -157,8 +158,14 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit == 'true'
         run: cd plnd_client && npx playwright install-deps chromium
 
-      - name: Build API binary
-        run: cargo build -p plnd_api
+      - name: Download API binary
+        uses: actions/download-artifact@v4
+        with:
+          name: plnd-api-binary
+          path: target/debug/
+
+      - name: Make API binary executable
+        run: chmod +x target/debug/plnd_api
 
       - name: Start mock OAuth server
         run: |
@@ -174,10 +181,9 @@ jobs:
 
       - name: Start API server (background)
         run: |
-          cd plnd_api
           APP_DATABASE__URL=postgres://plnd:plnd_dev@localhost/plnd_dev \
           APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev \
-          cargo run &
+          ./target/debug/plnd_api &
           timeout 30s bash -c 'until curl -sf http://localhost:3000/health; do sleep 1; done'
 
       - name: Run Playwright e2e tests
@@ -185,7 +191,7 @@ jobs:
 
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: plnd_client/playwright-report/
