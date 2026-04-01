@@ -2,6 +2,7 @@
 // This allows the config module to be used in tests
 
 pub mod auth;
+pub mod briefing;
 pub mod config;
 pub mod db;
 pub mod openapi;

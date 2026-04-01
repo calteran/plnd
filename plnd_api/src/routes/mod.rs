@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod briefing;
 pub mod catalog_details;
 pub mod catalog_ingest;
 pub mod dietary_restrictions;

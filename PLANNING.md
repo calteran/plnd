@@ -128,7 +128,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 IN PROGRESS
+### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 COMPLETED
 
 ### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
@@ -204,7 +204,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] External provider clients (USDA FDC, Open Food Facts, TheMealDB) with search infrastructure and `plnd_data`/`plnd_seed` workspace crates
 - [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
 
-### Phase 2.5: UI/UX Design & Remaining Planning UI — IN PROGRESS
+### Phase 2.5: UI/UX Design & Remaining Planning UI — COMPLETED
 **Goal**: Complete the meal planning UI and morning briefing using the design language established during day-view development. Exercise planning and family support are indefinitely deferred.
 
 **Tasks:**
@@ -232,18 +232,18 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [ ] Enable shared meal planning for family members
   - [ ] Implement caregiver access roles and permissions
 
-- [ ] **Morning Briefing** — *See `docs/superpowers/specs/2026-03-23-morning-briefing-design.md`*
-  - [ ] Briefing data model (`wake_time` on user_preferences)
-  - [ ] Briefing backend routes (`/briefing/weather`, `/briefing/news`, `/briefing/yesterday`)
-  - [ ] BriefingService (Angular)
-  - [ ] BriefingHeaderComponent (weather + news cards)
-  - [ ] YesterdaySnapshotComponent (light recap strip)
-  - [ ] DayViewComponent `isToday` wiring
+- [x] **Morning Briefing** — *See `docs/superpowers/specs/2026-03-23-morning-briefing-design.md`*
+  - [x] Briefing data model (`wake_time` on user_preferences)
+  - [x] Briefing backend routes (`/briefing/weather`, `/briefing/news`, `/briefing/yesterday`)
+  - [x] BriefingService (Angular)
+  - [x] BriefingHeaderComponent (weather + news cards)
+  - [x] YesterdaySnapshotComponent (light recap strip)
+  - [x] DayViewComponent `isToday` wiring
 
 **Deliverables:**
 - [x] Day view with daily schedule (meals, tasks, exercises) and `/today`/`/yesterday`/`/tomorrow` route aliases
 - [x] Meal planning UI
-- [ ] Morning briefing
+- [x] Morning briefing
 - [ ] *(deferred)* Exercise planning UI
 - [ ] *(deferred)* Family profile management
 

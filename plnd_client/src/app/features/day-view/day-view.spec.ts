@@ -5,6 +5,7 @@ import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
 import { DayViewComponent } from './day-view';
 import { ScheduleService } from '../../core/services/schedule.service';
+import { BriefingService } from '../../core/services/briefing.service';
 import { ScheduleItem } from '../../core/models/schedule';
 import { signal } from '@angular/core';
 
@@ -28,6 +29,18 @@ function makeScheduleServiceMock(overrides: Partial<{
   };
 }
 
+function makeBriefingServiceMock() {
+  return {
+    weather:        signal(null).asReadonly(),
+    news:           signal(null).asReadonly(),
+    yesterday:      signal(null).asReadonly(),
+    weatherError:   signal(null).asReadonly(),
+    newsError:      signal(null).asReadonly(),
+    yesterdayError: signal(null).asReadonly(),
+    load: jasmine.createSpy('load'),
+  };
+}
+
 const TEST_DATE = '2026-03-20';
 const mockActivatedRoute = { params: of({ date: TEST_DATE }) };
 
@@ -38,6 +51,7 @@ describe('DayViewComponent (schedule view)', () => {
       imports: [DayViewComponent, RouterTestingModule],
       providers: [
         { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -52,6 +66,7 @@ describe('DayViewComponent (schedule view)', () => {
       imports: [DayViewComponent, RouterTestingModule],
       providers: [
         { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -66,6 +81,7 @@ describe('DayViewComponent (schedule view)', () => {
       imports: [DayViewComponent, RouterTestingModule],
       providers: [
         { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -84,6 +100,7 @@ describe('DayViewComponent (schedule view)', () => {
       imports: [DayViewComponent, RouterTestingModule],
       providers: [
         { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -99,11 +116,54 @@ describe('DayViewComponent (schedule view)', () => {
       imports: [DayViewComponent, RouterTestingModule],
       providers: [
         { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
     const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
     expect(svc.loadDay).toHaveBeenCalledWith(TEST_DATE);
+  });
+});
+
+const now = new Date();
+const TODAY_DATE = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+describe('DayViewComponent (isToday wiring)', () => {
+  async function setupWithDate(date: string) {
+    const svc = makeScheduleServiceMock({ date });
+    const briefing = makeBriefingServiceMock();
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService,  useValue: svc },
+        { provide: BriefingService,  useValue: briefing },
+        { provide: ActivatedRoute,   useValue: { params: of({ date }) } },
+      ],
+    }).compileComponents();
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+    return { f, briefing };
+  }
+
+  it('renders briefing-header and calls briefing.load() for today', async () => {
+    const { f, briefing } = await setupWithDate(TODAY_DATE);
+    expect(f.debugElement.query(By.css('app-briefing-header'))).toBeTruthy();
+    expect(briefing.load).toHaveBeenCalled();
+  });
+
+  it('does not render briefing-header for a past date', async () => {
+    const { f } = await setupWithDate('2026-01-01');
+    expect(f.debugElement.query(By.css('app-briefing-header'))).toBeFalsy();
+  });
+
+  it('renders yesterday-snapshot for today', async () => {
+    const { f } = await setupWithDate(TODAY_DATE);
+    expect(f.debugElement.query(By.css('app-yesterday-snapshot'))).toBeTruthy();
+  });
+
+  it('does not render yesterday-snapshot for a future date', async () => {
+    const { f } = await setupWithDate('2030-12-31');
+    expect(f.debugElement.query(By.css('app-yesterday-snapshot'))).toBeFalsy();
   });
 });

@@ -13,12 +13,13 @@ use std::sync::Arc;
 
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::{JwksCache, JwtService, SessionService};
+use plnd_api::briefing::BriefingState;
 use plnd_api::config;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
-    auth, catalog_details, catalog_ingest, dietary_restrictions, preferences, schedule, search,
-    system, tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, preferences, schedule,
+    search, system, tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -137,6 +138,24 @@ async fn main() {
         search_cache,
     );
 
+    let briefing = BriefingState::new(
+        config.external_providers.weather_latitude,
+        config.external_providers.weather_longitude,
+        config.external_providers.news_feed_url.clone(),
+    );
+    println!(
+        "  Briefing weather location: {}, {}",
+        config.external_providers.weather_latitude, config.external_providers.weather_longitude,
+    );
+    if config.external_providers.news_feed_url.is_empty() {
+        println!("  Briefing news feed: disabled (news_feed_url not set)");
+    } else {
+        println!(
+            "  Briefing news feed: {}",
+            config.external_providers.news_feed_url
+        );
+    }
+
     let state = Arc::new(AppState {
         db: db_conn,
         jwt,
@@ -144,6 +163,7 @@ async fn main() {
         jwks,
         oidc_client_id: config.auth.oidc.client_id.clone(),
         provider_search,
+        briefing,
     });
 
     let cors = CorsLayer::new()
@@ -247,6 +267,9 @@ async fn main() {
         .route("/schedule/period", get(schedule::get_period))
         .route("/schedule/plan/status", get(schedule::get_plan_status))
         .route("/schedule/plan", post(schedule::post_plan))
+        .route("/briefing/weather", get(briefing::get_weather))
+        .route("/briefing/news", get(briefing::get_news))
+        .route("/briefing/yesterday", get(briefing::get_yesterday))
         .route("/auth/logout", post(auth::logout))
         .layer(middleware::from_fn_with_state(
             state.clone(),

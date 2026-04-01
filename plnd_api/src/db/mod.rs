@@ -1,4 +1,5 @@
 // Database module
+pub mod briefing;
 pub mod catalog_details;
 pub mod catalog_ingest;
 pub mod connection;

@@ -17,6 +17,7 @@ pub struct UserPreferences {
     pub week_start_day: i16,
     pub planning_trigger_offset: i16,
     pub default_plan_length_days: i16,
+    pub wake_time: NaiveTime,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -504,6 +505,7 @@ pub struct PatchPreferencesRequest {
     pub week_start_day: Option<i16>,
     pub planning_trigger_offset: Option<i16>,
     pub default_plan_length_days: Option<i16>,
+    pub wake_time: Option<NaiveTime>,
 }
 
 fn deserialize_hhmm<'de, D>(deserializer: D) -> Result<NaiveTime, D::Error>

@@ -1,8 +1,10 @@
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
+use crate::briefing::WeatherCacheEntry;
 use crate::db::models::{DietaryRestriction, ReadyStatus, User, UserPreferences};
 use crate::routes::{
+    briefing::{NewsResponse, YesterdayResponse},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
     users::UpdateProfileRequest,
 };
@@ -41,6 +43,9 @@ impl Modify for BearerSecurityAddon {
         crate::routes::users::delete_me,
         crate::routes::users::post_complete_onboarding,
         crate::routes::preferences::get_preferences,
+        crate::routes::briefing::get_weather,
+        crate::routes::briefing::get_news,
+        crate::routes::briefing::get_yesterday,
         crate::routes::dietary_restrictions::list_restrictions,
         crate::routes::dietary_restrictions::create_restriction,
         crate::routes::dietary_restrictions::update_restriction,
@@ -54,6 +59,9 @@ impl Modify for BearerSecurityAddon {
         UpdateProfileRequest,
         CreateRestrictionRequest,
         UpdateRestrictionRequest,
+        WeatherCacheEntry,
+        NewsResponse,
+        YesterdayResponse,
     )),
     modifiers(&BearerSecurityAddon),
     tags(
@@ -62,6 +70,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Users", description = "User profile management"),
         (name = "Preferences", description = "User preference settings"),
         (name = "Dietary Restrictions", description = "Dietary restriction management"),
+        (name = "Briefing", description = "Morning briefing — weather, news, and yesterday recap"),
     )
 )]
 pub struct ApiDoc;
