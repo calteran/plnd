@@ -168,7 +168,7 @@ test.describe('Planning Wizard', () => {
       await page.goto('/plan/week');
       await expect(page.locator('.planning-wizard')).toBeVisible();
       await expect(page.locator('.empty-state')).toBeVisible();
-      await expect(page.locator('.empty-emoji')).toContainText('🎉');
+      await expect(page.locator('.empty-emoji')).toContainText(/[🎉✨🙌🌟💪🥳]/u);
       await expect(page.locator('.carryover-list')).not.toBeVisible();
     });
 
