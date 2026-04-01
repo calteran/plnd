@@ -99,14 +99,25 @@ In v1, both tiers point to the same local provider. A second provider is wired i
 
 ### Config
 
+Each tier has independent settings, allowing Fast and Capable to point at different providers, models, or API keys:
+
 ```toml
-[llm]
-provider = "ollama"
-base_url  = "http://localhost:11434"
-model     = "llama3.2"
-api_key   = ""        # empty for local; populated via Doppler for cloud
+[llm.fast]
+provider   = "ollama"
+base_url   = "http://localhost:11434"
+model      = "phi3"
+api_key    = ""
+max_tokens = 1024
+
+[llm.capable]
+provider   = "ollama"
+base_url   = "http://localhost:11434"
+model      = "llama3.2"
+api_key    = ""        # populated via Doppler for cloud providers
 max_tokens = 4096
 ```
+
+In v1 both tiers point to the same local provider; switching `capable` to a cloud provider requires only a config change.
 
 ---
 
@@ -122,6 +133,8 @@ pub struct AgentLoop {
 
 **Execution**: LLM call → parallel tool execution (`tokio::join_all`) → append results to message history → repeat until `tool_calls` is empty or `max_iterations` reached.
 
+If the LLM returns a terminal tool call (`create_task` or `propose_meal_plan`) in a batch with other tool calls, the loop executes all tools in that batch in parallel, then stops — subsequent results are discarded. Only one terminal tool is expected per turn; if multiple appear, the first one encountered (by insertion order) wins and the loop halts after that batch completes.
+
 `AgentService::run(user_id, use_case, input)` orchestrates the full pipeline:
 1. Load relevant user memories from `plnd_data` (filtered by `UseCase`)
 2. Resolve system prompt via `use_case.system_prompt()`
@@ -136,16 +149,20 @@ pub struct AgentLoop {
 ## Tool System
 
 ```rust
+pub struct ToolContext {
+    pub user_id: Uuid,   // sourced from auth session — never from LLM output
+}
+
 #[async_trait]
 pub trait Tool: Send + Sync {
     fn name(&self) -> &str;
     fn description(&self) -> &str;      // shown to the LLM
     fn schema(&self) -> serde_json::Value;
-    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value, ToolError>;
+    async fn execute(&self, ctx: &ToolContext, input: serde_json::Value) -> Result<serde_json::Value, ToolError>;
 }
 ```
 
-Tool implementations live in `plnd_agent/src/tools/` and hold references to `plnd_data` repositories directly — no injection through `plnd_api`.
+`ToolContext` is constructed by `AgentService` from the authenticated session and passed through to every tool call — tools never accept `user_id` from LLM-supplied `input`. Tool implementations live in `plnd_agent/src/tools/` and hold references to `plnd_data` repositories directly — no injection through `plnd_api`.
 
 Each `UseCase` registers only its own tool subset. `TaskEntry` never has access to meal planning tools.
 
