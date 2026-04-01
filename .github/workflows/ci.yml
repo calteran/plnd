@@ -181,9 +181,10 @@ jobs:
 
       - name: Start API server (background)
         run: |
+          cd plnd_api
           APP_DATABASE__URL=postgres://plnd:plnd_dev@localhost/plnd_dev \
           APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev \
-          ./target/debug/plnd_api &
+          ../target/debug/plnd_api &
           timeout 30s bash -c 'until curl -sf http://localhost:3000/health; do sleep 1; done'
 
       - name: Run Playwright e2e tests
