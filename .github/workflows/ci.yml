@@ -11,63 +11,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ── Job 1: Static analysis ──────────────────────────────────────────────────
-  lint:
-    name: Lint
+  # ── Job 1: Rust lint + build + unit tests ───────────────────────────────────
+  backend:
+    name: Backend
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust build artifacts
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install cargo-machete
-        uses: taiki-e/install-action@cargo-machete
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
-          cache-dependency-path: plnd_client/package-lock.json
-
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v5
-        with:
-          path: plnd_client/node_modules
-          key: node-modules-${{ runner.os }}-${{ hashFiles('plnd_client/package-lock.json') }}
-
-      - name: Install Angular dependencies
-        if: steps.cache-node-modules.outputs.cache-hit != 'true'
-        run: cd plnd_client && npm ci
-
-      - name: Rust – check formatting
-        run: cargo fmt --check
-
-      - name: Rust – Clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-
-      - name: Rust – cargo-deny (licenses + advisories)
-        uses: EmbarkStudios/cargo-deny-action@v2
-
-      - name: Rust – cargo-machete (unused deps)
-        run: cargo machete
-
-      - name: Angular – ESLint
-        run: cd plnd_client && npx eslint "src/**/*.ts"
-
-      - name: Angular – dependency health
-        run: cd plnd_client && npm run check-dependencies && npm run check-licenses && npm run check-circular
-
-  # ── Job 2: Rust build + unit tests ─────────────────────────────────────────
-  test-rust:
-    name: Test (Rust)
-    runs-on: ubuntu-latest
-    needs: lint
     services:
       postgres:
         image: postgres:15
@@ -91,6 +38,21 @@ jobs:
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
 
+      - name: Install cargo-machete
+        uses: taiki-e/install-action@cargo-machete
+
+      - name: Rust – check formatting
+        run: cargo fmt --check
+
+      - name: Rust – Clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Rust – cargo-deny (licenses + advisories)
+        uses: EmbarkStudios/cargo-deny-action@v2
+
+      - name: Rust – cargo-machete (unused deps)
+        run: cargo machete
+
       - name: Install cargo-nextest
         uses: taiki-e/install-action@cargo-nextest
 
@@ -100,11 +62,10 @@ jobs:
       - name: Run tests
         run: cargo nextest run --workspace
 
-  # ── Job 3: Angular unit tests ───────────────────────────────────────────────
-  test-angular:
-    name: Test (Angular)
+  # ── Job 2: Angular lint + unit tests ───────────────────────────────────────
+  client:
+    name: Client
     runs-on: ubuntu-latest
-    needs: lint
     steps:
       - uses: actions/checkout@v6
 
@@ -126,14 +87,20 @@ jobs:
         if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: cd plnd_client && npm ci
 
+      - name: Angular – ESLint
+        run: cd plnd_client && npx eslint "src/**/*.ts"
+
+      - name: Angular – dependency health
+        run: cd plnd_client && npm run check-dependencies && npm run check-licenses && npm run check-circular
+
       - name: Run Angular unit tests (headless)
         run: cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
 
-  # ── Job 4: End-to-end tests ─────────────────────────────────────────────────
+  # ── Job 3: End-to-end tests ─────────────────────────────────────────────────
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
-    needs: [test-rust, test-angular]
+    needs: [backend, client]
     services:
       postgres:
         image: postgres:15
