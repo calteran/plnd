@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::{JwksCache, JwtService, SessionService};
+use plnd_api::briefing::BriefingState;
 use plnd_api::config;
 use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
@@ -137,6 +138,22 @@ async fn main() {
         search_cache,
     );
 
+    let briefing = BriefingState::new(
+        config.external_providers.weather_latitude,
+        config.external_providers.weather_longitude,
+        config.external_providers.news_feed_url.clone(),
+    );
+    println!(
+        "  Briefing weather location: {}, {}",
+        config.external_providers.weather_latitude,
+        config.external_providers.weather_longitude,
+    );
+    if config.external_providers.news_feed_url.is_empty() {
+        println!("  Briefing news feed: disabled (news_feed_url not set)");
+    } else {
+        println!("  Briefing news feed: {}", config.external_providers.news_feed_url);
+    }
+
     let state = Arc::new(AppState {
         db: db_conn,
         jwt,
@@ -144,6 +161,7 @@ async fn main() {
         jwks,
         oidc_client_id: config.auth.oidc.client_id.clone(),
         provider_search,
+        briefing,
     });
 
     let cors = CorsLayer::new()

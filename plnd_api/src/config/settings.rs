@@ -113,6 +113,15 @@ pub struct ExternalProvidersConfig {
     /// Basic-auth password for the OFf staging server (`off`). Leave empty for production.
     #[serde(default)]
     pub off_basic_auth_password: String,
+    /// RSS/Atom feed URL for briefing headlines. Leave empty to disable news.
+    #[serde(default)]
+    pub news_feed_url: String,
+    /// WGS-84 latitude for Open-Meteo weather proxy (e.g. 51.5074 for London).
+    #[serde(default = "default_weather_latitude")]
+    pub weather_latitude: f64,
+    /// WGS-84 longitude for Open-Meteo weather proxy (e.g. -0.1278 for London).
+    #[serde(default = "default_weather_longitude")]
+    pub weather_longitude: f64,
 }
 
 fn default_themealdb_key() -> String {
@@ -126,6 +135,9 @@ fn default_off_base_url() -> String {
 fn default_cache_ttl_hours() -> u64 {
     36
 }
+
+fn default_weather_latitude() -> f64 { 51.5074 }
+fn default_weather_longitude() -> f64 { -0.1278 }
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {

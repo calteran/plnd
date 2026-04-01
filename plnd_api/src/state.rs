@@ -1,4 +1,5 @@
 use crate::auth::{JwksCache, JwtService, SessionService};
+use crate::briefing::BriefingState;
 use crate::db::Database;
 use plnd_data::search::ProviderSearchService;
 use std::sync::Arc;
@@ -14,4 +15,5 @@ pub struct AppState {
     /// OIDC client_id used as the expected `aud` claim in ID tokens.
     pub oidc_client_id: String,
     pub provider_search: ProviderSearchService,
+    pub briefing: BriefingState,
 }
