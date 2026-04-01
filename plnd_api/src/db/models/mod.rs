@@ -17,6 +17,7 @@ pub struct UserPreferences {
     pub week_start_day: i16,
     pub planning_trigger_offset: i16,
     pub default_plan_length_days: i16,
+    pub wake_time: NaiveTime,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

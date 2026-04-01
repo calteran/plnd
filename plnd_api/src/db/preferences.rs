@@ -21,7 +21,7 @@ pub async fn patch_preferences(
                default_plan_length_days = COALESCE($4, user_preferences.default_plan_length_days),
                updated_at               = NOW()
          RETURNING user_id, week_start_day, planning_trigger_offset,
-                   default_plan_length_days, created_at, updated_at",
+                   default_plan_length_days, wake_time, created_at, updated_at",
     )
     .bind(user_id)
     .bind(req.week_start_day)
@@ -40,7 +40,7 @@ pub async fn get_or_create(pool: &PgPool, user_id: Uuid) -> Result<UserPreferenc
          ON CONFLICT (user_id) DO UPDATE
            SET updated_at = user_preferences.updated_at
          RETURNING user_id, week_start_day, planning_trigger_offset,
-                   default_plan_length_days, created_at, updated_at",
+                   default_plan_length_days, wake_time, created_at, updated_at",
     )
     .bind(user_id)
     .fetch_one(pool)
