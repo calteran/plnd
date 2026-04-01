@@ -63,7 +63,7 @@ jobs:
         run: cargo nextest run --workspace
 
       - name: Upload API binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: plnd-api-binary
           path: target/debug/plnd_api
@@ -159,7 +159,7 @@ jobs:
         run: cd plnd_client && npx playwright install-deps chromium
 
       - name: Download API binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: plnd-api-binary
           path: target/debug/
