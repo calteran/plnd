@@ -116,7 +116,7 @@
 
   .expanded & {
     border-top: 1.5px solid var(--color-accent-border);
-    max-height: 400px;
+    max-height: 800px;
     transition: max-height 0.3s ease-in;
   }
 }

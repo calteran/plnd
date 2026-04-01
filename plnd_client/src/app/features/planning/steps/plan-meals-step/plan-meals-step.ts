@@ -51,7 +51,8 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
                        [value]="editingValue()"
                        (keydown.enter)="confirmEdit(day, slot, mealInput.value)"
                        (keydown.escape)="cancelEdit()"
-                       (blur)="cancelEdit()">
+                       (blur)="cancelEdit()"><!-- blur commits the current value by cancelling the edit, ensuring
+                            the input is dismissed before a click on another cell is processed -->
                 <span class="input-hint">Enter · Esc to cancel</span>
 
               } @else if (isCustom(day, slot)) {
@@ -127,13 +128,13 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
     [data-tip]:hover::after {
       content: attr(data-tip);
       position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
-      background: #1a1a18; color: #fff; font-size: 10px; white-space: nowrap;
+      background: var(--color-tooltip-bg); color: #fff; font-size: 10px; white-space: nowrap;
       padding: 3px 7px; border-radius: 4px; pointer-events: none; z-index: 10;
     }
     [data-tip]:hover::before {
       content: ''; position: absolute; bottom: calc(100% + 1px);
       left: 50%; transform: translateX(-50%);
-      border: 4px solid transparent; border-top-color: #1a1a18;
+      border: 4px solid transparent; border-top-color: var(--color-tooltip-bg);
       pointer-events: none; z-index: 10;
     }
 
@@ -228,6 +229,8 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
 export class PlanMealsStepComponent {
   private readonly weekPlanService = inject(WeekPlanService);
 
+  // Only one meal cell can be in edit mode at a time, so there is at most
+  // one #mealInput in the DOM. ViewChild safely resolves to that single instance.
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
 
   readonly slots = STANDARD_MEAL_SLOTS;
