@@ -104,9 +104,9 @@ import { PreferencesService } from '../../core/services/preferences.service';
 
     .load-error {
       padding: 1rem;
-      border: 1px solid var(--color-destructive, #c00);
+      border: 1px solid var(--color-destructive);
       border-radius: 4px;
-      color: var(--color-destructive, #c00);
+      color: var(--color-destructive);
       display: flex;
       align-items: center;
       gap: 1rem;
@@ -151,7 +151,6 @@ export class SettingsComponent implements OnInit {
   }
 
   retryLoad(): void {
-    this.preferencesService.clearPreferences();
     this.preferencesService.loadPreferences();
   }
 

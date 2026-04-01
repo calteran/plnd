@@ -71,12 +71,17 @@ describe('PreferencesService', () => {
     );
     expect(service.loadError()).toBeTrue();
 
-    // clearPreferences resets error and allows a new attempt
-    service.clearPreferences();
-    expect(service.loadError()).toBeFalse();
+    // After a failure, loadPreferences() can be called again directly — no clearPreferences needed
     service.loadPreferences();
     httpMock.expectOne(r => r.url.endsWith('/preferences/me')).flush(mockPrefs);
     expect(service.loadError()).toBeFalse();
+    expect(service.preferences()).toEqual(mockPrefs);
+  });
+
+  it('loadPreferences no-ops when a request is already in flight', () => {
+    service.loadPreferences();
+    service.loadPreferences();
+    httpMock.expectOne(r => r.url.endsWith('/preferences/me') && r.method === 'GET').flush(mockPrefs);
     expect(service.preferences()).toEqual(mockPrefs);
   });
 
