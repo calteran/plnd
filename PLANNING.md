@@ -205,7 +205,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [x] Catalog & library API with transparent copy-on-write fork and Angular service layer
 
 ### Phase 2.5: UI/UX Design & Remaining Planning UI — IN PROGRESS
-**Goal**: Build the remaining planning UI features (meal planning, exercise planning, family support) using the design language established during day-view development.
+**Goal**: Complete the meal planning UI and morning briefing using the design language established during day-view development. Exercise planning and family support are indefinitely deferred.
 
 **Tasks:**
 
@@ -215,18 +215,18 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] Route aliases `/today`, `/yesterday`, `/tomorrow` → `/day/:date` with date-validation guard
   - [x] `ScheduleService` — signals-based daily schedule state (meals, tasks, exercises)
 
-- [ ] **Meal Planning UI**
-  - [ ] Build meal planning UI (list, add/edit/delete dishes and meals)
-  - [ ] Schedule meals onto the weekly plan view
-  - [ ] Support recurring meal templates
+- [x] **Meal Planning UI**
+  - [x] Build meal planning UI (list, add/edit/delete dishes and meals)
+  - [x] Schedule meals onto the weekly plan view
+  - [x] Support recurring meal templates
 
-- [ ] **Exercise Planning Core**
+- [ ] **Exercise Planning Core** *(indefinitely deferred)*
   - [ ] Implement exercise CRUD API endpoints
   - [ ] Build workout planning UI (list, add/edit/delete)
   - [ ] Schedule workouts onto the weekly plan view
   - [ ] Support recurring exercise templates
 
-- [ ] **Family Support Foundation**
+- [ ] **Family Support Foundation** *(indefinitely deferred)*
   - [ ] Create family account schema and API
   - [ ] Build family profile management UI
   - [ ] Enable shared meal planning for family members
@@ -242,10 +242,10 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 **Deliverables:**
 - [x] Day view with daily schedule (meals, tasks, exercises) and `/today`/`/yesterday`/`/tomorrow` route aliases
-- [ ] Meal and exercise planning UI
-- [ ] Family profile management
-- [ ] Core planning interfaces (weekly schedule view)
+- [x] Meal planning UI
 - [ ] Morning briefing
+- [ ] *(deferred)* Exercise planning UI
+- [ ] *(deferred)* Family profile management
 
 ### Phase 3: AI Enhancements (Intelligent Features)
 **Goal**: Implement advanced LLM-powered planning capabilities
