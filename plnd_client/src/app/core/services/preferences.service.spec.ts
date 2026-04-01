@@ -54,4 +54,44 @@ describe('PreferencesService', () => {
     service.clearPreferences();
     expect(service.preferences()).toBeNull();
   });
+
+  it('loadPreferences sets loadError to true on HTTP error', () => {
+    expect(service.loadError()).toBeFalse();
+    service.loadPreferences();
+    const req = httpMock.expectOne(r => r.url.endsWith('/preferences/me') && r.method === 'GET');
+    req.flush('Server error', { status: 500, statusText: 'Internal Server Error' });
+    expect(service.loadError()).toBeTrue();
+    expect(service.preferences()).toBeNull();
+  });
+
+  it('loadPreferences clears loadError on retry after failure', () => {
+    service.loadPreferences();
+    httpMock.expectOne(r => r.url.endsWith('/preferences/me')).flush(
+      'error', { status: 500, statusText: 'Internal Server Error' }
+    );
+    expect(service.loadError()).toBeTrue();
+
+    // After a failure, loadPreferences() can be called again directly — no clearPreferences needed
+    service.loadPreferences();
+    httpMock.expectOne(r => r.url.endsWith('/preferences/me')).flush(mockPrefs);
+    expect(service.loadError()).toBeFalse();
+    expect(service.preferences()).toEqual(mockPrefs);
+  });
+
+  it('loadPreferences no-ops when a request is already in flight', () => {
+    service.loadPreferences();
+    service.loadPreferences();
+    httpMock.expectOne(r => r.url.endsWith('/preferences/me') && r.method === 'GET').flush(mockPrefs);
+    expect(service.preferences()).toEqual(mockPrefs);
+  });
+
+  it('clearPreferences resets loadError', () => {
+    service.loadPreferences();
+    httpMock.expectOne(r => r.url.endsWith('/preferences/me')).flush(
+      'error', { status: 503, statusText: 'Service Unavailable' }
+    );
+    expect(service.loadError()).toBeTrue();
+    service.clearPreferences();
+    expect(service.loadError()).toBeFalse();
+  });
 });
