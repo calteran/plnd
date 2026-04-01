@@ -12,7 +12,7 @@ import { BriefingService } from '../../../../core/services/briefing.service';
       </div>
     } @else if (briefing.yesterdayError()) {
       <div class="yesterday-snapshot yesterday-snapshot--unavailable">
-        Yesterday's data unavailable
+        {{ briefing.yesterdayError() }}
       </div>
     }
   `,

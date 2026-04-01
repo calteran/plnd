@@ -96,8 +96,18 @@ pub async fn get_weather(
     let summary = WeatherCacheEntry {
         temp_c: resp.current.temperature_2m,
         condition: weather_code_to_condition(resp.current.weather_code).to_string(),
-        high_c: resp.daily.temperature_2m_max.first().copied().unwrap_or(0.0),
-        low_c: resp.daily.temperature_2m_min.first().copied().unwrap_or(0.0),
+        high_c: resp
+            .daily
+            .temperature_2m_max
+            .first()
+            .copied()
+            .unwrap_or(0.0),
+        low_c: resp
+            .daily
+            .temperature_2m_min
+            .first()
+            .copied()
+            .unwrap_or(0.0),
         precipitation_flag: resp.current.precipitation > 0.0,
     };
 

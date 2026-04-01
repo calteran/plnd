@@ -1,19 +1,33 @@
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ScheduleService } from '../../core/services/schedule.service';
+import { ScheduleService, todayIso } from '../../core/services/schedule.service';
+import { BriefingService } from '../../core/services/briefing.service';
 import { isMealAnchor } from '../../core/models/schedule';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
 import { MealRowComponent } from '../schedule/components/meal-row/meal-row';
 import { TaskRowComponent } from '../schedule/components/task-row/task-row';
 import { AddEntryComponent, AddedEntry } from '../schedule/components/add-entry/add-entry';
+import { BriefingHeaderComponent } from './components/briefing-header/briefing-header';
+import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yesterday-snapshot';
 
 @Component({
   selector: 'app-day-view',
   standalone: true,
-  imports: [DayHeaderComponent, MealRowComponent, TaskRowComponent, AddEntryComponent],
+  imports: [
+    DayHeaderComponent,
+    MealRowComponent,
+    TaskRowComponent,
+    AddEntryComponent,
+    BriefingHeaderComponent,
+    YesterdaySnapshotComponent,
+  ],
   template: `
     <div class="schedule-view">
+
+      @if (isToday()) {
+        <app-briefing-header />
+      }
 
       <app-day-header
         [date]="scheduleService.date()"
@@ -55,21 +69,34 @@ import { AddEntryComponent, AddedEntry } from '../schedule/components/add-entry/
           <app-add-entry (added)="onItemAdded($event)" />
         </div>
       }
+
+      @if (isToday()) {
+        <app-yesterday-snapshot />
+      }
+
     </div>
   `,
-  styleUrl: './day-view.scss'
+  styleUrl: './day-view.scss',
 })
 export class DayViewComponent implements OnInit {
   protected readonly scheduleService = inject(ScheduleService);
+  protected readonly briefingService = inject(BriefingService);
   protected readonly isMealAnchor    = isMealAnchor;
   private  readonly route            = inject(ActivatedRoute);
   private  readonly router           = inject(Router);
   private  readonly destroyRef       = inject(DestroyRef);
 
+  readonly isToday = computed(() => this.scheduleService.date() === todayIso());
+
   ngOnInit(): void {
     this.route.params
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(params => this.scheduleService.loadDay(params['date']));
+      .subscribe(params => {
+        this.scheduleService.loadDay(params['date']);
+        if (this.isToday()) {
+          this.briefingService.load();
+        }
+      });
   }
 
   onDateChange(date: string): void { this.router.navigate(['/day', date]); }

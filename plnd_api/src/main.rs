@@ -145,13 +145,15 @@ async fn main() {
     );
     println!(
         "  Briefing weather location: {}, {}",
-        config.external_providers.weather_latitude,
-        config.external_providers.weather_longitude,
+        config.external_providers.weather_latitude, config.external_providers.weather_longitude,
     );
     if config.external_providers.news_feed_url.is_empty() {
         println!("  Briefing news feed: disabled (news_feed_url not set)");
     } else {
-        println!("  Briefing news feed: {}", config.external_providers.news_feed_url);
+        println!(
+            "  Briefing news feed: {}",
+            config.external_providers.news_feed_url
+        );
     }
 
     let state = Arc::new(AppState {
@@ -265,8 +267,8 @@ async fn main() {
         .route("/schedule/period", get(schedule::get_period))
         .route("/schedule/plan/status", get(schedule::get_plan_status))
         .route("/schedule/plan", post(schedule::post_plan))
-        .route("/briefing/weather",   get(briefing::get_weather))
-        .route("/briefing/news",      get(briefing::get_news))
+        .route("/briefing/weather", get(briefing::get_weather))
+        .route("/briefing/news", get(briefing::get_news))
         .route("/briefing/yesterday", get(briefing::get_yesterday))
         .route("/auth/logout", post(auth::logout))
         .layer(middleware::from_fn_with_state(

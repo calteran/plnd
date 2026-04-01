@@ -136,8 +136,12 @@ fn default_cache_ttl_hours() -> u64 {
     36
 }
 
-fn default_weather_latitude() -> f64 { 51.5074 }
-fn default_weather_longitude() -> f64 { -0.1278 }
+fn default_weather_latitude() -> f64 {
+    51.5074
+}
+fn default_weather_longitude() -> f64 {
+    -0.1278
+}
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
