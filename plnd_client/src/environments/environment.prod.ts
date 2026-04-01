@@ -24,6 +24,8 @@ export const environment = {
     issuerUrl: '',
     clientId: '',
     redirectUri: 'https://app.plnd.example.com/auth/callback',
-    scope: 'openid email profile'
+    scope: 'openid email profile',
+    // Real IdPs are fully spec-compliant; enforce strict discovery document validation.
+    strictDiscoveryDocumentValidation: true,
   }
 };

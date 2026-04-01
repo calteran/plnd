@@ -28,6 +28,9 @@ export const environment = {
     issuerUrl: 'http://localhost:8080/plnd-dev',
     clientId: 'mock-client',
     redirectUri: 'http://localhost:4200/auth/callback',
-    scope: 'openid email profile'
+    scope: 'openid email profile',
+    // The mock OIDC server omits some optional discovery fields; disable strict
+    // validation to avoid false rejections during local development.
+    strictDiscoveryDocumentValidation: false,
   }
 };

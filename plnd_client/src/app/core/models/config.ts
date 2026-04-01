@@ -24,6 +24,12 @@ export interface OidcConfig {
   redirectUri: string;
   /** Requested OIDC scopes. */
   scope: string;
+  /**
+   * When true, the library enforces that all fields required by the OIDC spec
+   * are present in the IdP's discovery document. Set to false only for mock/dev
+   * servers that omit optional discovery fields; real IdPs should use true.
+   */
+  strictDiscoveryDocumentValidation: boolean;
 }
 
 export interface EnvironmentConfig {

@@ -34,9 +34,7 @@ export class AuthService {
       clientId: cfg.clientId,
       scope: cfg.scope,
       responseType: 'code',
-      // The mock OAuth server omits some optional OIDC discovery fields;
-      // disable strict validation to avoid false rejections.
-      strictDiscoveryDocumentValidation: false,
+      strictDiscoveryDocumentValidation: cfg.strictDiscoveryDocumentValidation,
     });
   }
 
