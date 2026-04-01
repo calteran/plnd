@@ -12,12 +12,12 @@ import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
     <div class="tasks-step">
 
       @for (day of horizonDays(); track day) {
-        <div class="day-accordion" [class.open]="isExpanded(day)">
+        <div class="day-accordion" [class.open]="expandedState()[day]">
 
           <div class="day-accordion__header"
                role="button"
                tabindex="0"
-               [attr.aria-expanded]="isExpanded(day)"
+               [attr.aria-expanded]="expandedState()[day]"
                (click)="toggleDay(day)"
                (keydown.enter)="toggleDay(day)"
                (keydown.space)="$event.preventDefault(); toggleDay(day)">
@@ -259,15 +259,19 @@ export class PlanTasksStepComponent {
     ) as Record<string, { dayName: string; shortDate: string }>
   );
 
-  // Returns the expanded state for a day. Falls back to true when horizon <= 7 days.
-  isExpanded(date: string): boolean {
+  readonly expandedState = computed<Record<string, boolean>>(() => {
+    const days = this.horizonDays();
     const overrides = this.expandedOverrides();
-    if (date in overrides) return overrides[date];
-    return this.horizonDays().length <= 7;
-  }
+    const defaultVal = days.length <= 7;
+    const state: Record<string, boolean> = {};
+    for (const day of days) {
+      state[day] = day in overrides ? overrides[day] : defaultVal;
+    }
+    return state;
+  });
 
   toggleDay(date: string): void {
-    this.expandedOverrides.update(o => ({ ...o, [date]: !this.isExpanded(date) }));
+    this.expandedOverrides.update(o => ({ ...o, [date]: !(this.expandedState()[date] ?? false) }));
   }
 
   removeTask(date: string, localIndex: number): void {
