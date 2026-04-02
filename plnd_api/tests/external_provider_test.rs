@@ -6,8 +6,8 @@ use plnd_data::providers::dtos::{
     SearchQuery, SearchResult,
 };
 use plnd_data::providers::{
-    ExerciseProvider, ExternalClientError, NutritionProvider, OpenFoodFactsClient, RecipeProvider,
-    TheMealDbClient, UsdaFdcClient,
+    ExerciseProvider, ExternalProviderError, NutritionProvider, OpenFoodFactsProvider, RecipeProvider,
+    TheMealDbProvider, UsdaFdcProvider,
 };
 use rust_decimal::Decimal;
 
@@ -30,12 +30,12 @@ fn test_search_query_new_with_string_literal() {
 }
 
 // ---------------------------------------------------------------------------
-// ExternalClientError display messages
+// ExternalProviderError display messages
 // ---------------------------------------------------------------------------
 
 #[test]
 fn test_rate_limited_error_with_retry_after() {
-    let err = ExternalClientError::RateLimited {
+    let err = ExternalProviderError::RateLimited {
         retry_after_secs: Some(30),
     };
     let msg = err.to_string();
@@ -51,7 +51,7 @@ fn test_rate_limited_error_with_retry_after() {
 
 #[test]
 fn test_rate_limited_error_without_retry_after() {
-    let err = ExternalClientError::RateLimited {
+    let err = ExternalProviderError::RateLimited {
         retry_after_secs: None,
     };
     let msg = err.to_string();
@@ -60,7 +60,7 @@ fn test_rate_limited_error_without_retry_after() {
 
 #[test]
 fn test_configuration_error_message() {
-    let err = ExternalClientError::ConfigurationError("missing API key".to_string());
+    let err = ExternalProviderError::ConfigurationError("missing API key".to_string());
     assert_eq!(
         err.to_string(),
         "Client configuration error: missing API key"
@@ -69,19 +69,19 @@ fn test_configuration_error_message() {
 
 #[test]
 fn test_http_error_message() {
-    let err = ExternalClientError::HttpError("connection refused".to_string());
+    let err = ExternalProviderError::HttpError("connection refused".to_string());
     assert_eq!(err.to_string(), "HTTP request failed: connection refused");
 }
 
 #[test]
 fn test_unauthorized_message() {
-    let err = ExternalClientError::Unauthorized;
+    let err = ExternalProviderError::Unauthorized;
     assert!(err.to_string().contains("Unauthorized"));
 }
 
 #[test]
 fn test_not_found_message() {
-    let err = ExternalClientError::NotFound;
+    let err = ExternalProviderError::NotFound;
     assert!(err.to_string().contains("not found"));
 }
 
@@ -217,13 +217,13 @@ impl NutritionProvider for MockNutritionProvider {
     async fn search_ingredients(
         &self,
         _query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError> {
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
         Ok(vec![])
     }
     async fn get_ingredient_by_id(
         &self,
         _external_id: &str,
-    ) -> Result<Option<ExternalIngredient>, ExternalClientError> {
+    ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
         Ok(None)
     }
 }
@@ -238,13 +238,13 @@ impl RecipeProvider for MockRecipeProvider {
     async fn search_dishes(
         &self,
         _query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError> {
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
         Ok(vec![])
     }
     async fn get_dish_by_id(
         &self,
         _external_id: &str,
-    ) -> Result<Option<ExternalDish>, ExternalClientError> {
+    ) -> Result<Option<ExternalDish>, ExternalProviderError> {
         Ok(None)
     }
 }
@@ -259,13 +259,13 @@ impl ExerciseProvider for MockExerciseProvider {
     async fn search_exercises(
         &self,
         _query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError> {
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
         Ok(vec![])
     }
     async fn get_exercise_by_id(
         &self,
         _external_id: &str,
-    ) -> Result<Option<ExternalExercise>, ExternalClientError> {
+    ) -> Result<Option<ExternalExercise>, ExternalProviderError> {
         Ok(None)
     }
 }
@@ -294,36 +294,36 @@ fn test_exercise_provider_object_safety() {
 
 #[test]
 fn test_usda_fdc_source_name() {
-    let client = UsdaFdcClient::new("test-key");
+    let client = UsdaFdcProvider::new("test-key");
     assert_eq!(client.source_name(), "usda_fdc");
 }
 
 #[test]
 fn test_open_food_facts_source_name() {
-    let client = OpenFoodFactsClient::default();
+    let client = OpenFoodFactsProvider::default();
     assert_eq!(client.source_name(), "openfoodfacts");
 }
 
 #[test]
 fn test_themealdb_source_name() {
-    let client = TheMealDbClient::new("1");
+    let client = TheMealDbProvider::new("1");
     assert_eq!(client.source_name(), "themealdb");
 }
 
 #[test]
 fn test_usda_fdc_nutrition_provider_object_safety() {
-    let client: Box<dyn NutritionProvider> = Box::new(UsdaFdcClient::new("test-key"));
+    let client: Box<dyn NutritionProvider> = Box::new(UsdaFdcProvider::new("test-key"));
     assert_eq!(client.source_name(), "usda_fdc");
 }
 
 #[test]
 fn test_open_food_facts_nutrition_provider_object_safety() {
-    let client: Box<dyn NutritionProvider> = Box::new(OpenFoodFactsClient::default());
+    let client: Box<dyn NutritionProvider> = Box::new(OpenFoodFactsProvider::default());
     assert_eq!(client.source_name(), "openfoodfacts");
 }
 
 #[test]
 fn test_themealdb_recipe_provider_object_safety() {
-    let client: Box<dyn RecipeProvider> = Box::new(TheMealDbClient::new("1"));
+    let client: Box<dyn RecipeProvider> = Box::new(TheMealDbProvider::new("1"));
     assert_eq!(client.source_name(), "themealdb");
 }

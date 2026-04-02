@@ -1,5 +1,5 @@
 use crate::providers::dtos::ExternalIngredient;
-use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
+use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalProviderError};
 use async_trait::async_trait;
 
 /// Abstraction over any nutrition / ingredient data provider (e.g. USDA FDC, OpenFoodFacts).
@@ -15,14 +15,14 @@ pub trait NutritionProvider: Send + Sync {
     async fn search_ingredients(
         &self,
         query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError>;
+    ) -> Result<Vec<SearchResult>, ExternalProviderError>;
 
     /// Fetch a single ingredient by the provider's own ID.
     ///
     /// Returns `Ok(None)` when the provider confirms the ID no longer exists,
-    /// as distinct from an `Err(ExternalClientError::NotFound)` for unexpected absences.
+    /// as distinct from an `Err(ExternalProviderError::NotFound)` for unexpected absences.
     async fn get_ingredient_by_id(
         &self,
         external_id: &str,
-    ) -> Result<Option<ExternalIngredient>, ExternalClientError>;
+    ) -> Result<Option<ExternalIngredient>, ExternalProviderError>;
 }

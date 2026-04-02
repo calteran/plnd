@@ -47,7 +47,7 @@ mod tests {
         async fn current(
             &self,
             _location: Location,
-        ) -> Result<WeatherData, plnd_data::providers::ExternalClientError> {
+        ) -> Result<WeatherData, plnd_data::providers::ExternalProviderError> {
             Ok(WeatherData {
                 temperature_c: 22.0,
                 condition: "Clear sky".to_string(),
@@ -65,7 +65,7 @@ mod tests {
         async fn headlines(
             &self,
             _query: NewsQuery,
-        ) -> Result<Vec<NewsHeadline>, plnd_data::providers::ExternalClientError> {
+        ) -> Result<Vec<NewsHeadline>, plnd_data::providers::ExternalProviderError> {
             Ok(vec![])
         }
     }

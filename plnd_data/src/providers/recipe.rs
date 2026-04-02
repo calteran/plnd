@@ -1,5 +1,5 @@
 use crate::providers::dtos::ExternalDish;
-use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
+use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalProviderError};
 use async_trait::async_trait;
 
 /// Abstraction over any recipe / dish data provider (e.g. Spoonacular, Edamam).
@@ -15,7 +15,7 @@ pub trait RecipeProvider: Send + Sync {
     async fn search_dishes(
         &self,
         query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError>;
+    ) -> Result<Vec<SearchResult>, ExternalProviderError>;
 
     /// Fetch a single dish by the provider's own ID.
     ///
@@ -23,5 +23,5 @@ pub trait RecipeProvider: Send + Sync {
     async fn get_dish_by_id(
         &self,
         external_id: &str,
-    ) -> Result<Option<ExternalDish>, ExternalClientError>;
+    ) -> Result<Option<ExternalDish>, ExternalProviderError>;
 }

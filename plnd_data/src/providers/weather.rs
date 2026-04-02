@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 use crate::providers::dtos::Location;
-use crate::providers::error::ExternalClientError;
+use crate::providers::error::ExternalProviderError;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -21,7 +21,7 @@ pub struct WeatherData {
 /// any location. Implementations must be `Send + Sync` for use behind `Arc`.
 #[async_trait]
 pub trait WeatherProvider: Send + Sync {
-    async fn current(&self, location: Location) -> Result<WeatherData, ExternalClientError>;
+    async fn current(&self, location: Location) -> Result<WeatherData, ExternalProviderError>;
 }
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────
@@ -94,14 +94,14 @@ pub(crate) fn build_open_meteo_url(lat: f64, lon: f64) -> String {
 
 #[async_trait]
 impl WeatherProvider for OpenMeteoProvider {
-    async fn current(&self, location: Location) -> Result<WeatherData, ExternalClientError> {
+    async fn current(&self, location: Location) -> Result<WeatherData, ExternalProviderError> {
         let url = build_open_meteo_url(location.latitude, location.longitude);
 
         let resp = self.http.get(&url).send().await?;
 
         let status = resp.status();
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -110,7 +110,7 @@ impl WeatherProvider for OpenMeteoProvider {
         let resp: OpenMeteoResponse = resp
             .json()
             .await
-            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
         Ok(WeatherData {
             temperature_c: resp.current.temperature_2m,
