@@ -40,7 +40,7 @@ if ! command -v timeout &>/dev/null; then
     exit 1
 fi
 if ! command -v flock &>/dev/null; then
-    echo "✗ 'flock' not found — install util-linux: brew install util-linux" >&2
+    echo "✗ 'flock' not found — install flock: brew install flock" >&2
     exit 1
 fi
 
