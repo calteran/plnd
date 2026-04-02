@@ -24,10 +24,14 @@ interface ClientErrorPayload {
  * avoid re-entering the interceptor chain and causing recursion.
  * Uses keepalive: true so the request survives page navigation/unload.
  */
-function reportError(payload: ClientErrorPayload): void {
+function reportError(payload: ClientErrorPayload, authHeader?: string): void {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (authHeader) {
+    headers['Authorization'] = authHeader;
+  }
   fetch('/api/client_error', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(payload),
     keepalive: true,
   }).catch(() => {
@@ -54,13 +58,14 @@ export const observabilityInterceptor: HttpInterceptorFn = (
   return next(reqWithId).pipe(
     catchError((error: unknown) => {
       if (error instanceof HttpErrorResponse) {
+        const authHeader = reqWithId.headers.get('Authorization') ?? undefined;
         reportError({
           message: `HTTP ${error.status} ${error.statusText} — ${req.method} ${req.url}`,
           url: req.url,
           request_id: requestId,
           timestamp: new Date().toISOString(),
           user_agent: navigator.userAgent,
-        });
+        }, authHeader);
       }
       return throwError(() => error);
     })

@@ -1,10 +1,11 @@
 use crate::models::ReadyStatus;
 use crate::state::AppState;
 use axum::{
-    extract::State,
+    extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
+use std::net::SocketAddr;
 use chrono::Utc;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -17,6 +18,7 @@ use std::sync::Arc;
         (status = 200, description = "API is alive", body = String)
     )
 )]
+#[tracing::instrument(skip_all)]
 pub async fn health_check() -> &'static str {
     "OK"
 }
@@ -30,6 +32,7 @@ pub async fn health_check() -> &'static str {
         (status = 503, description = "A dependency is unavailable"),
     )
 )]
+#[tracing::instrument(skip(state))]
 pub async fn readiness_check(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ReadyStatus>, StatusCode> {
@@ -76,8 +79,10 @@ pub struct ClientErrorPayload {
         (status = 429, description = "Rate limit exceeded"),
     )
 )]
+#[tracing::instrument(skip_all)]
 pub async fn report_client_error(
     State(state): State<Arc<AppState>>,
+    ConnectInfo(peer_addr): ConnectInfo<SocketAddr>,
     headers: HeaderMap,
     Json(payload): Json<ClientErrorPayload>,
 ) -> StatusCode {
@@ -95,7 +100,7 @@ pub async fn report_client_error(
             .or_else(|| headers.get("X-Real-IP"))
             .and_then(|v| v.to_str().ok())
             .map(|s| s.split(',').next().unwrap_or(s).trim().to_string())
-            .unwrap_or_else(|| "unknown".to_string());
+            .unwrap_or_else(|| peer_addr.ip().to_string());
 
         if state.client_error_limiter.check_key(&ip).is_err() {
             return StatusCode::TOO_MANY_REQUESTS;

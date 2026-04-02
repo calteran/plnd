@@ -12,7 +12,7 @@ use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use plnd_data::db::user_ingredient_prefs;
 
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpsertIngredientPrefBody {
     pub is_blocked: bool,
     pub notes: Option<String>,
@@ -29,6 +29,7 @@ pub struct UpsertIngredientPrefBody {
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -61,6 +62,7 @@ pub async fn list(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn upsert(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -96,6 +98,7 @@ pub async fn upsert(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

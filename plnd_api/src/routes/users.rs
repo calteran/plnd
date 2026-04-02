@@ -27,6 +27,7 @@ pub struct UpdateProfileRequest {
         (status = 404, description = "User not found"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -56,6 +57,7 @@ pub async fn get_me(
         (status = 422, description = "Validation error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn patch_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -103,6 +105,7 @@ pub async fn patch_me(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn post_complete_onboarding(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -129,6 +132,7 @@ pub async fn post_complete_onboarding(
         (status = 404, description = "User not found"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn delete_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

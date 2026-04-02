@@ -37,6 +37,7 @@ pub const MAX_NOTES_LEN: usize = 500;
     )
 )]
 /// GET /dietary-restrictions — list all restrictions for the current user
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn list_restrictions(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -73,6 +74,7 @@ pub async fn list_restrictions(
     )
 )]
 /// POST /dietary-restrictions — create a new restriction
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn create_restriction(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -136,6 +138,7 @@ pub async fn create_restriction(
     )
 )]
 /// PATCH /dietary-restrictions/:id — update notes on an existing restriction
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn update_restriction(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -175,6 +178,7 @@ pub async fn update_restriction(
     )
 )]
 /// DELETE /dietary-restrictions/:id — remove a restriction
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn delete_restriction(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

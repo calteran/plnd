@@ -39,6 +39,7 @@ pub struct TokenExchangeResponse {
 /// Angular obtains the ID token from the OIDC library after completing the
 /// authorization code + PKCE flow. The backend validates the token via JWKS,
 /// finds or creates the user, and issues a backend JWT bound to a session record.
+#[tracing::instrument(skip_all)]
 pub async fn token_exchange(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -170,6 +171,7 @@ pub async fn token_exchange(
 /// The middleware has already validated the token and inserted Claims into
 /// request extensions. We use the JTI from Claims to mark the session revoked,
 /// so subsequent requests with the same JWT are rejected by the middleware.
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn logout(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

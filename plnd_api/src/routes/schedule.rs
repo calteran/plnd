@@ -39,6 +39,7 @@ pub struct PeriodQuery {
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_period(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -76,6 +77,7 @@ pub async fn get_period(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_plan_status(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -110,6 +112,7 @@ pub async fn get_plan_status(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn post_plan(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

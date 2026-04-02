@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 // ── Query params ──────────────────────────────────────────────────────────────
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct LocQuery {
     pub loc: Option<String>,
 }
@@ -107,6 +107,7 @@ pub struct YesterdayResponse {
         (status = 503, description = "Weather service unavailable"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_weather(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -155,6 +156,7 @@ pub async fn get_weather(
         (status = 503, description = "News feed unavailable"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_news(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -208,6 +210,7 @@ pub async fn get_news(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_yesterday(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

@@ -24,6 +24,7 @@ use uuid::Uuid;
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn patch_preferences(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -75,6 +76,7 @@ pub async fn patch_preferences(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_preferences(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

@@ -31,6 +31,7 @@ pub struct WeeklyPlanQuery {
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn post_weekly_plan_task(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
