@@ -40,7 +40,79 @@ pub fn weather_code_to_condition(code: u32) -> &'static str {
     }
 }
 
-// ── Placeholder impl (OpenMeteoProvider added in Task 3) ──────────────────────
+// ── Internal serde types ──────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct OpenMeteoResponse {
+    current: OpenMeteoCurrentData,
+    daily: OpenMeteoDailyData,
+}
+
+#[derive(Deserialize)]
+struct OpenMeteoCurrentData {
+    temperature_2m: f64,
+    precipitation: f64,
+    weather_code: u32,
+}
+
+#[derive(Deserialize)]
+struct OpenMeteoDailyData {
+    temperature_2m_max: Vec<f64>,
+    temperature_2m_min: Vec<f64>,
+}
+
+// ── OpenMeteoProvider ─────────────────────────────────────────────────────────
+
+/// Fetches weather from the free Open-Meteo API (no API key required).
+pub struct OpenMeteoProvider {
+    http: reqwest::Client,
+}
+
+impl OpenMeteoProvider {
+    pub fn new() -> Self {
+        Self { http: super::build_http_client() }
+    }
+}
+
+impl Default for OpenMeteoProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub(crate) fn build_open_meteo_url(lat: f64, lon: f64) -> String {
+    format!(
+        "https://api.open-meteo.com/v1/forecast\
+         ?latitude={lat}&longitude={lon}\
+         &current=temperature_2m,precipitation,weather_code\
+         &daily=temperature_2m_max,temperature_2m_min\
+         &forecast_days=1"
+    )
+}
+
+#[async_trait]
+impl WeatherProvider for OpenMeteoProvider {
+    async fn current(&self, location: Location) -> Result<WeatherData, ExternalClientError> {
+        let url = build_open_meteo_url(location.latitude, location.longitude);
+
+        let resp: OpenMeteoResponse = self
+            .http
+            .get(&url)
+            .send()
+            .await?
+            .json()
+            .await
+            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+
+        Ok(WeatherData {
+            temperature_c: resp.current.temperature_2m,
+            condition: weather_code_to_condition(resp.current.weather_code).to_string(),
+            high_c: resp.daily.temperature_2m_max.first().copied().unwrap_or(0.0),
+            low_c: resp.daily.temperature_2m_min.first().copied().unwrap_or(0.0),
+            precipitation_mm: resp.current.precipitation,
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -74,5 +146,13 @@ mod tests {
     #[test]
     fn weather_code_unknown_is_cloudy() {
         assert_eq!(weather_code_to_condition(200), "Cloudy");
+    }
+
+    #[test]
+    fn open_meteo_url_contains_coordinates() {
+        let url = build_open_meteo_url(51.5, -0.1);
+        assert!(url.contains("latitude=51.5"), "url: {url}");
+        assert!(url.contains("longitude=-0.1"), "url: {url}");
+        assert!(url.contains("forecast_days=1"), "url: {url}");
     }
 }
