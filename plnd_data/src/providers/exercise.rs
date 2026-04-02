@@ -1,5 +1,5 @@
-use crate::clients::dtos::ExternalExercise;
-use crate::clients::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
+use crate::providers::dtos::ExternalExercise;
+use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalProviderError};
 use async_trait::async_trait;
 
 /// Abstraction over any exercise data provider (e.g. WGER, MuscleWiki).
@@ -18,7 +18,7 @@ pub trait ExerciseProvider: Send + Sync {
     async fn search_exercises(
         &self,
         query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError>;
+    ) -> Result<Vec<SearchResult>, ExternalProviderError>;
 
     /// Fetch a single exercise by the provider's own ID.
     ///
@@ -26,5 +26,5 @@ pub trait ExerciseProvider: Send + Sync {
     async fn get_exercise_by_id(
         &self,
         external_id: &str,
-    ) -> Result<Option<ExternalExercise>, ExternalClientError>;
+    ) -> Result<Option<ExternalExercise>, ExternalProviderError>;
 }

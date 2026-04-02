@@ -1,4 +1,4 @@
-use plnd_data::clients::dtos::SearchQuery;
+use plnd_data::providers::dtos::SearchQuery;
 use plnd_seed::dishes::{AUTO_SEEDED_TAG, DISH_TERMS};
 use plnd_seed::error::SeedError;
 use plnd_seed::ingredients::INGREDIENT_TERMS;

@@ -3,16 +3,16 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::clients::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
-use crate::clients::error::ExternalClientError;
-use crate::clients::nutrition::NutritionProvider;
+use crate::providers::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
+use crate::providers::error::ExternalProviderError;
+use crate::providers::nutrition::NutritionProvider;
 
-pub struct UsdaFdcClient {
+pub struct UsdaFdcProvider {
     http: Client,
     api_key: String,
 }
 
-impl UsdaFdcClient {
+impl UsdaFdcProvider {
     pub fn new(api_key: &str) -> Self {
         Self {
             http: super::build_http_client(),
@@ -113,7 +113,7 @@ fn build_nutrition_from_detail(nutrients: &[FdcDetailNutrient]) -> NutritionFact
 // ---------------------------------------------------------------------------
 
 #[async_trait]
-impl NutritionProvider for UsdaFdcClient {
+impl NutritionProvider for UsdaFdcProvider {
     fn source_name(&self) -> &str {
         "usda_fdc"
     }
@@ -121,9 +121,9 @@ impl NutritionProvider for UsdaFdcClient {
     async fn search_ingredients(
         &self,
         query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError> {
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
         if self.api_key.is_empty() {
-            return Err(ExternalClientError::ConfigurationError(
+            return Err(ExternalProviderError::ConfigurationError(
                 "USDA FDC API key is not configured".to_string(),
             ));
         }
@@ -141,7 +141,7 @@ impl NutritionProvider for UsdaFdcClient {
 
         let status = resp.status();
         if status.as_u16() == 401 || status.as_u16() == 403 {
-            return Err(ExternalClientError::Unauthorized);
+            return Err(ExternalProviderError::Unauthorized);
         }
         if status.as_u16() == 429 {
             let retry_after_secs = resp
@@ -149,10 +149,10 @@ impl NutritionProvider for UsdaFdcClient {
                 .get("retry-after")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok());
-            return Err(ExternalClientError::RateLimited { retry_after_secs });
+            return Err(ExternalProviderError::RateLimited { retry_after_secs });
         }
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -161,7 +161,7 @@ impl NutritionProvider for UsdaFdcClient {
         let body: FdcSearchResponse = resp
             .json()
             .await
-            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
         let results = body
             .foods
@@ -180,9 +180,9 @@ impl NutritionProvider for UsdaFdcClient {
     async fn get_ingredient_by_id(
         &self,
         external_id: &str,
-    ) -> Result<Option<ExternalIngredient>, ExternalClientError> {
+    ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
         if self.api_key.is_empty() {
-            return Err(ExternalClientError::ConfigurationError(
+            return Err(ExternalProviderError::ConfigurationError(
                 "USDA FDC API key is not configured".to_string(),
             ));
         }
@@ -200,7 +200,7 @@ impl NutritionProvider for UsdaFdcClient {
             return Ok(None);
         }
         if status.as_u16() == 401 || status.as_u16() == 403 {
-            return Err(ExternalClientError::Unauthorized);
+            return Err(ExternalProviderError::Unauthorized);
         }
         if status.as_u16() == 429 {
             let retry_after_secs = resp
@@ -208,10 +208,10 @@ impl NutritionProvider for UsdaFdcClient {
                 .get("retry-after")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok());
-            return Err(ExternalClientError::RateLimited { retry_after_secs });
+            return Err(ExternalProviderError::RateLimited { retry_after_secs });
         }
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -220,7 +220,7 @@ impl NutritionProvider for UsdaFdcClient {
         let food: FdcDetailFood = resp
             .json()
             .await
-            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
         let serving_size_g = food
             .food_portions
@@ -250,8 +250,8 @@ impl NutritionProvider for UsdaFdcClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clients::dtos::SearchQuery;
-    use crate::clients::error::ExternalClientError;
+    use crate::providers::dtos::SearchQuery;
+    use crate::providers::error::ExternalProviderError;
 
     #[test]
     fn test_apply_nutrient_maps_all_known_ids() {
@@ -387,11 +387,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_api_key_returns_configuration_error() {
-        let client = UsdaFdcClient::new("");
+        let client = UsdaFdcProvider::new("");
         let query = SearchQuery::new("apple");
         let result = client.search_ingredients(&query).await;
         assert!(
-            matches!(result, Err(ExternalClientError::ConfigurationError(_))),
+            matches!(result, Err(ExternalProviderError::ConfigurationError(_))),
             "expected ConfigurationError, got: {:?}",
             result
         );

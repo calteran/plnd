@@ -6,10 +6,10 @@ use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::cache::{make_cache_key, SearchCache};
-use crate::clients::dtos::{SearchQuery, SearchResult};
-use crate::clients::exercise::ExerciseProvider;
-use crate::clients::nutrition::NutritionProvider;
-use crate::clients::recipe::RecipeProvider;
+use crate::providers::dtos::{SearchQuery, SearchResult};
+use crate::providers::exercise::ExerciseProvider;
+use crate::providers::nutrition::NutritionProvider;
+use crate::providers::recipe::RecipeProvider;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "type", rename_all = "snake_case")]

@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use futures::StreamExt;
 use plnd_data::cache::{make_cache_key, SearchCache};
-use plnd_data::clients::dtos::{ExternalIngredient, SearchQuery, SearchResult};
-use plnd_data::clients::error::ExternalClientError;
-use plnd_data::clients::nutrition::NutritionProvider;
+use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery, SearchResult};
+use plnd_data::providers::error::ExternalProviderError;
+use plnd_data::providers::nutrition::NutritionProvider;
 use plnd_data::search::{ProviderSearchEvent, ProviderSearchService};
 use std::sync::Arc;
 
@@ -95,9 +95,9 @@ impl NutritionProvider for FixedNutritionProvider {
     async fn search_ingredients(
         &self,
         _query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError> {
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
         if self.should_error {
-            Err(ExternalClientError::HttpError("test error".to_string()))
+            Err(ExternalProviderError::HttpError("test error".to_string()))
         } else {
             Ok(self.results.clone())
         }
@@ -106,7 +106,7 @@ impl NutritionProvider for FixedNutritionProvider {
     async fn get_ingredient_by_id(
         &self,
         _id: &str,
-    ) -> Result<Option<ExternalIngredient>, ExternalClientError> {
+    ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
         Ok(None)
     }
 }

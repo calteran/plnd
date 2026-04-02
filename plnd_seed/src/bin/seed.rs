@@ -1,5 +1,5 @@
-use plnd_data::clients::{
-    NutritionProvider, OpenFoodFactsClient, RecipeProvider, TheMealDbClient, UsdaFdcClient,
+use plnd_data::providers::{
+    NutritionProvider, OpenFoodFactsProvider, RecipeProvider, TheMealDbProvider, UsdaFdcProvider,
 };
 use std::sync::Arc;
 
@@ -33,11 +33,11 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let nutrition_providers: Vec<Arc<dyn NutritionProvider>> = vec![
-        Arc::new(UsdaFdcClient::new(&usda_key)),
-        Arc::new(OpenFoodFactsClient::new(&off_base_url, off_basic_auth)),
+        Arc::new(UsdaFdcProvider::new(&usda_key)),
+        Arc::new(OpenFoodFactsProvider::new(&off_base_url, off_basic_auth)),
     ];
     let recipe_providers: Vec<Arc<dyn RecipeProvider>> =
-        vec![Arc::new(TheMealDbClient::new(&mdb_key))];
+        vec![Arc::new(TheMealDbProvider::new(&mdb_key))];
 
     println!("Running catalog seed from external providers...");
     plnd_seed::seed(&pool, &nutrition_providers, &recipe_providers).await?;

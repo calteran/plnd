@@ -5,16 +5,16 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::clients::dtos::{ExternalDish, ExternalDishIngredient, SearchQuery, SearchResult};
-use crate::clients::error::ExternalClientError;
-use crate::clients::recipe::RecipeProvider;
+use crate::providers::dtos::{ExternalDish, ExternalDishIngredient, SearchQuery, SearchResult};
+use crate::providers::error::ExternalProviderError;
+use crate::providers::recipe::RecipeProvider;
 
-pub struct TheMealDbClient {
+pub struct TheMealDbProvider {
     http: Client,
     base_url: String,
 }
 
-impl TheMealDbClient {
+impl TheMealDbProvider {
     pub fn new(api_key: &str) -> Self {
         Self {
             http: super::build_http_client(),
@@ -202,7 +202,7 @@ fn meal_to_dish(meal: MdbMeal) -> ExternalDish {
 // ---------------------------------------------------------------------------
 
 #[async_trait]
-impl RecipeProvider for TheMealDbClient {
+impl RecipeProvider for TheMealDbProvider {
     fn source_name(&self) -> &str {
         "themealdb"
     }
@@ -210,7 +210,7 @@ impl RecipeProvider for TheMealDbClient {
     async fn search_dishes(
         &self,
         query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError> {
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
         // exclude_allergens cannot be applied: TheMealDB provides no allergen data
         let url = format!("{}/search.php", self.base_url);
         let resp = self
@@ -222,7 +222,7 @@ impl RecipeProvider for TheMealDbClient {
 
         let status = resp.status();
         if status.as_u16() == 401 || status.as_u16() == 403 {
-            return Err(ExternalClientError::Unauthorized);
+            return Err(ExternalProviderError::Unauthorized);
         }
         if status.as_u16() == 429 {
             let retry_after_secs = resp
@@ -230,10 +230,10 @@ impl RecipeProvider for TheMealDbClient {
                 .get("retry-after")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok());
-            return Err(ExternalClientError::RateLimited { retry_after_secs });
+            return Err(ExternalProviderError::RateLimited { retry_after_secs });
         }
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -242,7 +242,7 @@ impl RecipeProvider for TheMealDbClient {
         let body: MdbSearchResponse = resp
             .json()
             .await
-            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
         let results = body
             .meals
@@ -262,7 +262,7 @@ impl RecipeProvider for TheMealDbClient {
     async fn get_dish_by_id(
         &self,
         external_id: &str,
-    ) -> Result<Option<ExternalDish>, ExternalClientError> {
+    ) -> Result<Option<ExternalDish>, ExternalProviderError> {
         let url = format!("{}/lookup.php", self.base_url);
         let resp = self
             .http
@@ -273,7 +273,7 @@ impl RecipeProvider for TheMealDbClient {
 
         let status = resp.status();
         if status.as_u16() == 401 || status.as_u16() == 403 {
-            return Err(ExternalClientError::Unauthorized);
+            return Err(ExternalProviderError::Unauthorized);
         }
         if status.as_u16() == 429 {
             let retry_after_secs = resp
@@ -281,10 +281,10 @@ impl RecipeProvider for TheMealDbClient {
                 .get("retry-after")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok());
-            return Err(ExternalClientError::RateLimited { retry_after_secs });
+            return Err(ExternalProviderError::RateLimited { retry_after_secs });
         }
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -293,7 +293,7 @@ impl RecipeProvider for TheMealDbClient {
         let body: MdbSearchResponse = resp
             .json()
             .await
-            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
         Ok(body.meals.and_then(|mut m| m.pop()).map(meal_to_dish))
     }

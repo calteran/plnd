@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::clients::dtos::Location;
-use crate::clients::error::ExternalClientError;
+use crate::providers::dtos::Location;
+use crate::providers::error::ExternalProviderError;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -28,7 +28,8 @@ pub struct NewsQuery {
 /// Trait for fetching news headlines.
 #[async_trait]
 pub trait NewsProvider: Send + Sync {
-    async fn headlines(&self, query: NewsQuery) -> Result<Vec<NewsHeadline>, ExternalClientError>;
+    async fn headlines(&self, query: NewsQuery)
+        -> Result<Vec<NewsHeadline>, ExternalProviderError>;
 }
 
 // ── Pure helper ───────────────────────────────────────────────────────────────
@@ -71,7 +72,10 @@ impl RssFeedProvider {
 
 #[async_trait]
 impl NewsProvider for RssFeedProvider {
-    async fn headlines(&self, query: NewsQuery) -> Result<Vec<NewsHeadline>, ExternalClientError> {
+    async fn headlines(
+        &self,
+        query: NewsQuery,
+    ) -> Result<Vec<NewsHeadline>, ExternalProviderError> {
         let feed_url = query.feed_url.as_deref().unwrap_or(&self.default_feed_url);
 
         if feed_url.is_empty() {
@@ -82,7 +86,7 @@ impl NewsProvider for RssFeedProvider {
 
         let status = resp.status();
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -90,7 +94,7 @@ impl NewsProvider for RssFeedProvider {
 
         let bytes = resp.bytes().await?;
 
-        parse_feed_headlines(&bytes, query.limit).map_err(ExternalClientError::ResponseParseError)
+        parse_feed_headlines(&bytes, query.limit).map_err(ExternalProviderError::ResponseParseError)
     }
 }
 

@@ -1,3 +1,3 @@
 pub mod cache;
-pub mod clients;
+pub mod providers;
 pub mod search;

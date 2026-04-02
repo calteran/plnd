@@ -23,8 +23,8 @@ use plnd_api::routes::{
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
-use plnd_data::clients::{
-    OpenFoodFactsClient, OpenMeteoProvider, RssFeedProvider, TheMealDbClient, UsdaFdcClient,
+use plnd_data::providers::{
+    OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider, UsdaFdcProvider,
 };
 use plnd_data::search::ProviderSearchService;
 
@@ -84,8 +84,8 @@ async fn main() {
         .parse()
         .expect("invalid CORS origin in auth.frontend_origin");
 
-    // Construct external provider clients
-    let nutrition_usda = Arc::new(UsdaFdcClient::new(
+    // Construct external providers
+    let nutrition_usda = Arc::new(UsdaFdcProvider::new(
         &config.external_providers.usda_fdc_api_key,
     ));
     let off_basic_auth = if config.external_providers.off_basic_auth_user.is_empty() {
@@ -96,11 +96,11 @@ async fn main() {
             config.external_providers.off_basic_auth_password.clone(),
         ))
     };
-    let nutrition_off = Arc::new(OpenFoodFactsClient::new(
+    let nutrition_off = Arc::new(OpenFoodFactsProvider::new(
         &config.external_providers.off_base_url,
         off_basic_auth,
     ));
-    let recipe_mdb = Arc::new(TheMealDbClient::new(
+    let recipe_mdb = Arc::new(TheMealDbProvider::new(
         &config.external_providers.themealdb_api_key,
     ));
     if config.external_providers.usda_fdc_api_key.is_empty() {
@@ -121,9 +121,9 @@ async fn main() {
     // The seed is idempotent — safe to run on every startup.
     {
         let seed_pool = db_conn.get_pool().clone();
-        let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::clients::NutritionProvider>> =
+        let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::providers::NutritionProvider>> =
             vec![nutrition_usda.clone(), nutrition_off.clone()];
-        let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::clients::RecipeProvider>> =
+        let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::providers::RecipeProvider>> =
             vec![recipe_mdb.clone()];
         tokio::spawn(async move {
             if let Err(e) = plnd_seed::seed(&seed_pool, &seed_nutrition, &seed_recipe).await {

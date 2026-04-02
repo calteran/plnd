@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 #[derive(Error, Debug)]
-pub enum ExternalClientError {
+pub enum ExternalProviderError {
     #[error("HTTP request failed: {0}")]
     HttpError(String),
     #[error("Rate limited by provider; retry after {retry_after_secs:?} seconds")]
@@ -16,8 +16,8 @@ pub enum ExternalClientError {
     ConfigurationError(String),
 }
 
-impl From<reqwest::Error> for ExternalClientError {
+impl From<reqwest::Error> for ExternalProviderError {
     fn from(e: reqwest::Error) -> Self {
-        ExternalClientError::HttpError(e.to_string())
+        ExternalProviderError::HttpError(e.to_string())
     }
 }

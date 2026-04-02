@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use moka::future::Cache;
 
-use crate::clients::dtos::{SearchQuery, SearchResult};
+use crate::providers::dtos::{SearchQuery, SearchResult};
 
 #[derive(Clone)]
 pub struct SearchCache {

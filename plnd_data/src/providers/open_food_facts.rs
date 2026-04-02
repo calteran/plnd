@@ -3,17 +3,17 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::clients::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
-use crate::clients::error::ExternalClientError;
-use crate::clients::nutrition::NutritionProvider;
+use crate::providers::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
+use crate::providers::error::ExternalProviderError;
+use crate::providers::nutrition::NutritionProvider;
 
-pub struct OpenFoodFactsClient {
+pub struct OpenFoodFactsProvider {
     http: Client,
     base_url: String,
     basic_auth: Option<(String, String)>,
 }
 
-impl OpenFoodFactsClient {
+impl OpenFoodFactsProvider {
     pub fn new(base_url: &str, basic_auth: Option<(String, String)>) -> Self {
         Self {
             http: super::build_http_client(),
@@ -23,7 +23,7 @@ impl OpenFoodFactsClient {
     }
 }
 
-impl Default for OpenFoodFactsClient {
+impl Default for OpenFoodFactsProvider {
     fn default() -> Self {
         // Staging server with public credentials — switch to production URL with no
         // basic auth before launch.
@@ -133,7 +133,7 @@ fn product_to_ingredient(p: OffProduct) -> ExternalIngredient {
 // ---------------------------------------------------------------------------
 
 #[async_trait]
-impl NutritionProvider for OpenFoodFactsClient {
+impl NutritionProvider for OpenFoodFactsProvider {
     fn source_name(&self) -> &str {
         "openfoodfacts"
     }
@@ -141,7 +141,7 @@ impl NutritionProvider for OpenFoodFactsClient {
     async fn search_ingredients(
         &self,
         query: &SearchQuery,
-    ) -> Result<Vec<SearchResult>, ExternalClientError> {
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
         let url = format!("{}/cgi/search.pl", self.base_url);
         let req = self.http.get(&url).query(&[
             ("search_terms", query.query.as_str()),
@@ -159,7 +159,7 @@ impl NutritionProvider for OpenFoodFactsClient {
 
         let status = resp.status();
         if status.as_u16() == 401 || status.as_u16() == 403 {
-            return Err(ExternalClientError::Unauthorized);
+            return Err(ExternalProviderError::Unauthorized);
         }
         if status.as_u16() == 429 {
             let retry_after_secs = resp
@@ -167,10 +167,10 @@ impl NutritionProvider for OpenFoodFactsClient {
                 .get("retry-after")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok());
-            return Err(ExternalClientError::RateLimited { retry_after_secs });
+            return Err(ExternalProviderError::RateLimited { retry_after_secs });
         }
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -179,7 +179,7 @@ impl NutritionProvider for OpenFoodFactsClient {
         let body: OffSearchResponse = resp
             .json()
             .await
-            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
         let results = body
             .products
@@ -215,7 +215,7 @@ impl NutritionProvider for OpenFoodFactsClient {
     async fn get_ingredient_by_id(
         &self,
         external_id: &str,
-    ) -> Result<Option<ExternalIngredient>, ExternalClientError> {
+    ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
         let url = format!("{}/api/v2/product/{}.json", self.base_url, external_id);
         let req = self.http.get(&url).query(&[("lc", "en"), ("cc", "us")]);
         let req = match &self.basic_auth {
@@ -229,7 +229,7 @@ impl NutritionProvider for OpenFoodFactsClient {
             return Ok(None);
         }
         if status.as_u16() == 401 || status.as_u16() == 403 {
-            return Err(ExternalClientError::Unauthorized);
+            return Err(ExternalProviderError::Unauthorized);
         }
         if status.as_u16() == 429 {
             let retry_after_secs = resp
@@ -237,10 +237,10 @@ impl NutritionProvider for OpenFoodFactsClient {
                 .get("retry-after")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|s| s.parse::<u64>().ok());
-            return Err(ExternalClientError::RateLimited { retry_after_secs });
+            return Err(ExternalProviderError::RateLimited { retry_after_secs });
         }
         if !status.is_success() {
-            return Err(ExternalClientError::HttpError(format!(
+            return Err(ExternalProviderError::HttpError(format!(
                 "HTTP {}",
                 status.as_u16()
             )));
@@ -249,7 +249,7 @@ impl NutritionProvider for OpenFoodFactsClient {
         let detail: OffDetailResponse = resp
             .json()
             .await
-            .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
         if detail.status == 0 {
             return Ok(None);
