@@ -91,7 +91,7 @@ impl NewsProvider for RssFeedProvider {
             .map_err(|e| ExternalClientError::HttpError(e.to_string()))?;
 
         parse_feed_headlines(&bytes, query.limit)
-            .map_err(|e| ExternalClientError::ResponseParseError(e))
+            .map_err(ExternalClientError::ResponseParseError)
     }
 }
 
