@@ -28,11 +28,26 @@ where
         .map_err(serde::de::Error::custom)
 }
 
+fn deserialize_opt_hhmm<'de, D>(deserializer: D) -> Result<Option<NaiveTime>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: Option<String> = Option::deserialize(deserializer)?;
+    match s {
+        None => Ok(None),
+        Some(s) => NaiveTime::parse_from_str(&s, "%H:%M")
+            .or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S"))
+            .map(Some)
+            .map_err(serde::de::Error::custom),
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct PatchPreferencesRequest {
     pub week_start_day: Option<i16>,
     pub planning_trigger_offset: Option<i16>,
     pub default_plan_length_days: Option<i16>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub wake_time: Option<NaiveTime>,
 }
 
