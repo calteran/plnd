@@ -6,6 +6,7 @@ pub mod open_food_facts;
 pub mod recipe;
 pub mod themealdb;
 pub mod usda_fdc;
+pub mod weather;
 
 pub use error::ExternalClientError;
 pub use exercise::ExerciseProvider;
