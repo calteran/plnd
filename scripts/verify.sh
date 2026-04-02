@@ -81,6 +81,9 @@ wait_all() {
 
 echo "◆ Starting verification..."
 
+# ── Kill any leftover containers from a previous run ──────────────────────────
+docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
+
 # ── Fire everything immediately ───────────────────────────────────────────────
 echo "→ Launching checks, services, and build in parallel..."
 
