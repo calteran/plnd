@@ -24,7 +24,6 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "que
 serde_json = "1.0"
 futures      = "0.3"
 moka         = { version = "0.12", features = ["future"] }
-feed-rs      = "2"
 utoipa = { version = "5.4", features = ["uuid", "chrono", "decimal"] }
 utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-scalar = { version = "0.3", features = ["axum"] }
