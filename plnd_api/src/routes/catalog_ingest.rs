@@ -35,7 +35,7 @@ pub struct IngestIngredientResponse {
     request_body = IngestIngredientBody,
     security(("bearer_auth" = [])),
     responses(
-        (status = 200, description = "Ingredient ingested into catalog", body = IngestIngredientResponse),
+        (status = 201, description = "Ingredient ingested into catalog", body = IngestIngredientResponse),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error"),
     )
@@ -44,7 +44,7 @@ pub async fn ingest_ingredient(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
     Json(body): Json<IngestIngredientBody>,
-) -> Result<Json<IngestIngredientResponse>, StatusCode> {
+) -> Result<(StatusCode, Json<IngestIngredientResponse>), StatusCode> {
     let allergens = body.allergens.unwrap_or_default();
     let occasion_tags = body.occasion_tags.unwrap_or_default();
     let id = catalog_ingest::ingest_ingredient(
@@ -62,7 +62,10 @@ pub async fn ingest_ingredient(
     )
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    Ok(Json(IngestIngredientResponse {
-        catalog_ingredient_id: id,
-    }))
+    Ok((
+        StatusCode::CREATED,
+        Json(IngestIngredientResponse {
+            catalog_ingredient_id: id,
+        }),
+    ))
 }
