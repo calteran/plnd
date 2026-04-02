@@ -88,10 +88,7 @@ impl NewsProvider for RssFeedProvider {
             )));
         }
 
-        let bytes = resp
-            .bytes()
-            .await
-            .map_err(|e| ExternalClientError::HttpError(e.to_string()))?;
+        let bytes = resp.bytes().await?;
 
         parse_feed_headlines(&bytes, query.limit).map_err(ExternalClientError::ResponseParseError)
     }
