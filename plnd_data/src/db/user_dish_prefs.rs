@@ -1,6 +1,7 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
+use super::error::DatabaseError;
 use super::models::UserDishPrefDetail;
 
 /// Single SQL fragment for selecting a UserDishPrefDetail row.
@@ -26,7 +27,7 @@ const PREF_DETAIL_SELECT: &str = r#"
     LEFT JOIN user_dishes    ud ON ud.user_dish_id = p.user_dish_id
 "#;
 
-pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserDishPrefDetail>, sqlx::Error> {
+pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserDishPrefDetail>, DatabaseError> {
     let sql = format!(
         "{} WHERE p.user_id = $1 ORDER BY p.created_at",
         PREF_DETAIL_SELECT
@@ -35,13 +36,14 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserDishPrefDetail
         .bind(user_id)
         .fetch_all(pool)
         .await
+        .map_err(Into::into)
 }
 
 pub async fn get(
     pool: &PgPool,
     user_id: Uuid,
     pref_id: Uuid,
-) -> Result<Option<UserDishPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
     let sql = format!(
         "{} WHERE p.user_id = $1 AND p.user_dish_pref_id = $2",
         PREF_DETAIL_SELECT
@@ -51,13 +53,14 @@ pub async fn get(
         .bind(pref_id)
         .fetch_optional(pool)
         .await
+        .map_err(Into::into)
 }
 
 pub async fn create_from_catalog(
     pool: &PgPool,
     user_id: Uuid,
     catalog_dish_id: Uuid,
-) -> Result<UserDishPrefDetail, sqlx::Error> {
+) -> Result<UserDishPrefDetail, DatabaseError> {
     // Insert the pref record. If duplicate, the UNIQUE(user_id, catalog_dish_id) constraint
     // will return a unique violation error — the caller maps this to 409.
     let (pref_id,) = sqlx::query_as::<_, (Uuid,)>(
@@ -80,7 +83,7 @@ pub async fn create_from_scratch(
     instructions: Option<&str>,
     prep_time_minutes: Option<i32>,
     cook_time_minutes: Option<i32>,
-) -> Result<UserDishPrefDetail, sqlx::Error> {
+) -> Result<UserDishPrefDetail, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     // Create personal dish first
@@ -120,7 +123,7 @@ pub async fn update_metadata(
     is_safe_food: Option<bool>,
     is_blocked: Option<bool>,
     notes: Option<Option<String>>,
-) -> Result<Option<UserDishPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
     let rows = sqlx::query(
         r#"
         UPDATE user_dish_prefs SET
@@ -158,7 +161,7 @@ pub async fn fork_and_update_recipe(
     instructions: Option<&str>,
     prep_time_minutes: Option<i32>,
     cook_time_minutes: Option<i32>,
-) -> Result<Option<UserDishPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     // Get current pref (lock row)
@@ -239,7 +242,7 @@ pub async fn fork_and_update_recipe(
     get(pool, user_id, pref_id).await
 }
 
-pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool, sqlx::Error> {
+pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool, DatabaseError> {
     // Also delete the personal user_dish if it exists (cascade not set — manual delete)
     let mut tx = pool.begin().await?;
 
@@ -282,7 +285,7 @@ pub async fn add_ingredient(
     user_id: Uuid,
     pref_id: Uuid,
     params: AddIngredientParams,
-) -> Result<Option<UserDishPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     // Ensure fork if catalog-backed
@@ -324,7 +327,7 @@ pub async fn remove_ingredient(
     user_id: Uuid,
     pref_id: Uuid,
     ingredient_id: Uuid,
-) -> Result<Option<bool>, sqlx::Error> {
+) -> Result<Option<bool>, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     let user_dish_id = ensure_forked(&mut tx, user_id, pref_id).await?;
@@ -350,7 +353,7 @@ async fn ensure_forked(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
     pref_id: Uuid,
-) -> Result<Option<Uuid>, sqlx::Error> {
+) -> Result<Option<Uuid>, DatabaseError> {
     let row = sqlx::query_as::<_, (Option<Uuid>, Option<Uuid>)>(
         "SELECT user_dish_id, catalog_dish_id FROM user_dish_prefs \
          WHERE user_id = $1 AND user_dish_pref_id = $2 FOR UPDATE",
