@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use super::models::UserIngredientPref;
 
+#[tracing::instrument(skip(pool), fields(table = "user_ingredient_prefs", op = "list"))]
 pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserIngredientPref>, sqlx::Error> {
     sqlx::query_as::<_, UserIngredientPref>(
         "SELECT user_ingredient_pref_id, user_id, catalog_ingredient_id, \
@@ -14,6 +15,7 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserIngredientPref
     .await
 }
 
+#[tracing::instrument(skip(pool), fields(table = "user_ingredient_prefs", op = "upsert"))]
 pub async fn upsert(
     pool: &PgPool,
     user_id: Uuid,
@@ -41,6 +43,7 @@ pub async fn upsert(
     .await
 }
 
+#[tracing::instrument(skip(pool), fields(table = "user_ingredient_prefs", op = "delete"))]
 pub async fn delete(
     pool: &PgPool,
     user_id: Uuid,

@@ -28,6 +28,7 @@ use plnd_data::db::catalog_details;
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip_all)]
 pub async fn get_ingredient(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
@@ -56,6 +57,7 @@ pub async fn get_ingredient(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip_all)]
 pub async fn get_dish(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
@@ -85,6 +87,7 @@ pub async fn get_dish(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip_all)]
 pub async fn get_meal(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,

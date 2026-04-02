@@ -6,6 +6,7 @@ use crate::db::error::DatabaseError;
 use crate::db::models::UserPreferences;
 
 /// Upsert preferences: creates the row with defaults if absent, then applies any provided fields.
+#[tracing::instrument(skip(pool), fields(table = "preferences", op = "patch_preferences"))]
 pub async fn patch_preferences(
     pool: &PgPool,
     user_id: Uuid,
@@ -38,6 +39,7 @@ pub async fn patch_preferences(
 }
 
 /// Get preferences for a user, creating a default row if none exists.
+#[tracing::instrument(skip(pool), fields(table = "preferences", op = "get_or_create"))]
 pub async fn get_or_create(pool: &PgPool, user_id: Uuid) -> Result<UserPreferences, DatabaseError> {
     sqlx::query_as::<_, UserPreferences>(
         "INSERT INTO user_preferences (user_id)

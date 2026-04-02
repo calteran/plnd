@@ -13,6 +13,10 @@ pub struct YesterdaySnapshot {
     pub meals_logged: i64,
 }
 
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "schedule_entries", op = "yesterday_snapshot")
+)]
 pub async fn yesterday_snapshot(
     pool: &PgPool,
     user_id: Uuid,

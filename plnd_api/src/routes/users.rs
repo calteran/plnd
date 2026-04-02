@@ -27,6 +27,7 @@ pub struct UpdateProfileRequest {
         (status = 404, description = "User not found"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -35,7 +36,7 @@ pub async fn get_me(
     let pool = state.db.get_pool();
 
     match db::users::find_by_id(pool, user_id).await.map_err(|e| {
-        eprintln!("get_me DB error: {}", e);
+        tracing::error!(error = %e, "get_me DB error");
         StatusCode::INTERNAL_SERVER_ERROR
     })? {
         Some(user) => Ok(Json(UserResponse::from(user))),
@@ -56,6 +57,7 @@ pub async fn get_me(
         (status = 422, description = "Validation error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn patch_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -84,7 +86,7 @@ pub async fn patch_me(
     )
     .await
     .map_err(|e| {
-        eprintln!("patch_me DB error: {}", e);
+        tracing::error!(error = %e, "patch_me DB error");
         StatusCode::INTERNAL_SERVER_ERROR
     })? {
         Some(user) => Ok(Json(UserResponse::from(user))),
@@ -103,6 +105,7 @@ pub async fn patch_me(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn post_complete_onboarding(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -112,7 +115,7 @@ pub async fn post_complete_onboarding(
     db::users::complete_onboarding(pool, user_id)
         .await
         .map_err(|e| {
-            eprintln!("complete_onboarding error: {e}");
+            tracing::error!(error = %e, "complete_onboarding error");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
     Ok(StatusCode::OK)
@@ -129,6 +132,7 @@ pub async fn post_complete_onboarding(
         (status = 404, description = "User not found"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn delete_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -139,7 +143,7 @@ pub async fn delete_me(
     let found = db::users::deactivate_user(pool, user_id)
         .await
         .map_err(|e| {
-            eprintln!("delete_me DB error: {}", e);
+            tracing::error!(error = %e, "delete_me DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 

@@ -5,6 +5,10 @@ use super::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
 };
 
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "catalog_ingredients", op = "get_ingredient")
+)]
 pub async fn get_ingredient(
     pool: &PgPool,
     ingredient_id: Uuid,
@@ -19,6 +23,7 @@ pub async fn get_ingredient(
     .await
 }
 
+#[tracing::instrument(skip(pool), fields(table = "catalog_dishes", op = "get_dish"))]
 pub async fn get_dish(
     pool: &PgPool,
     dish_id: Uuid,
@@ -48,6 +53,7 @@ pub async fn get_dish(
     Ok(Some((dish, ingredients)))
 }
 
+#[tracing::instrument(skip(pool), fields(table = "catalog_meals", op = "get_meal"))]
 pub async fn get_meal(
     pool: &PgPool,
     meal_id: Uuid,

@@ -27,6 +27,7 @@ const PREF_DETAIL_SELECT: &str = r#"
     LEFT JOIN user_dishes    ud ON ud.user_dish_id = p.user_dish_id
 "#;
 
+#[tracing::instrument(skip(pool), fields(table = "user_dish_prefs", op = "list"))]
 pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserDishPrefDetail>, DatabaseError> {
     let sql = format!(
         "{} WHERE p.user_id = $1 ORDER BY p.created_at",
@@ -39,6 +40,7 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserDishPrefDetail
         .map_err(Into::into)
 }
 
+#[tracing::instrument(skip(pool), fields(table = "user_dish_prefs", op = "get"))]
 pub async fn get(
     pool: &PgPool,
     user_id: Uuid,
@@ -56,6 +58,10 @@ pub async fn get(
         .map_err(Into::into)
 }
 
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_dish_prefs", op = "create_from_catalog")
+)]
 pub async fn create_from_catalog(
     pool: &PgPool,
     user_id: Uuid,
@@ -76,6 +82,10 @@ pub async fn create_from_catalog(
         .map(|opt| opt.expect("just inserted"))
 }
 
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_dish_prefs", op = "create_from_scratch")
+)]
 pub async fn create_from_scratch(
     pool: &PgPool,
     user_id: Uuid,
@@ -115,6 +125,7 @@ pub async fn create_from_scratch(
         .map(|opt| opt.expect("just inserted"))
 }
 
+#[tracing::instrument(skip(pool), fields(table = "user_dish_prefs", op = "update_metadata"))]
 pub async fn update_metadata(
     pool: &PgPool,
     user_id: Uuid,
@@ -153,6 +164,10 @@ pub async fn update_metadata(
 
 /// Fork a catalog dish into user_dishes (if not already forked), then apply recipe update.
 /// Runs in a transaction. If pref already has a user_dish_id, skips the fork step.
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_dish_prefs", op = "fork_and_update_recipe")
+)]
 pub async fn fork_and_update_recipe(
     pool: &PgPool,
     user_id: Uuid,
@@ -242,6 +257,7 @@ pub async fn fork_and_update_recipe(
     get(pool, user_id, pref_id).await
 }
 
+#[tracing::instrument(skip(pool), fields(table = "user_dish_prefs", op = "delete"))]
 pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool, DatabaseError> {
     // Also delete the personal user_dish if it exists (cascade not set — manual delete)
     let mut tx = pool.begin().await?;
@@ -280,6 +296,10 @@ pub struct AddIngredientParams {
     pub sort_order: i16,
 }
 
+#[tracing::instrument(
+    skip(pool, params),
+    fields(table = "user_dish_prefs", op = "add_ingredient")
+)]
 pub async fn add_ingredient(
     pool: &PgPool,
     user_id: Uuid,
@@ -322,6 +342,10 @@ pub async fn add_ingredient(
     get(pool, user_id, pref_id).await
 }
 
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_dish_prefs", op = "remove_ingredient")
+)]
 pub async fn remove_ingredient(
     pool: &PgPool,
     user_id: Uuid,

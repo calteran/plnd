@@ -6,6 +6,7 @@ use crate::db::error::DatabaseError;
 use crate::db::models::User;
 
 /// Find a user by their email address
+#[tracing::instrument(skip(pool), fields(table = "users", op = "find_by_email"))]
 pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, DatabaseError> {
     sqlx::query_as::<_, User>(
         "SELECT user_id, email, display_name, created_at, updated_at,
@@ -19,6 +20,7 @@ pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, D
 }
 
 /// Find a user by their UUID
+#[tracing::instrument(skip(pool), fields(table = "users", op = "find_by_id"))]
 pub async fn find_by_id(pool: &PgPool, user_id: Uuid) -> Result<Option<User>, DatabaseError> {
     sqlx::query_as::<_, User>(
         "SELECT user_id, email, display_name, created_at, updated_at,
@@ -32,6 +34,7 @@ pub async fn find_by_id(pool: &PgPool, user_id: Uuid) -> Result<Option<User>, Da
 }
 
 /// Create a new user, returning the created record
+#[tracing::instrument(skip(pool), fields(table = "users", op = "create"))]
 pub async fn create(
     pool: &PgPool,
     email: &str,
@@ -60,6 +63,7 @@ pub async fn create(
 }
 
 /// Find a user by their OAuth provider type and provider-issued user ID (sub)
+#[tracing::instrument(skip(pool), fields(table = "users", op = "find_by_provider"))]
 pub async fn find_by_provider(
     pool: &PgPool,
     provider_type: &str,
@@ -80,6 +84,10 @@ pub async fn find_by_provider(
 }
 
 /// Record an OAuth provider link for an existing user
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "oauth_providers", op = "link_oauth_provider")
+)]
 pub async fn link_oauth_provider(
     pool: &PgPool,
     user_id: Uuid,
@@ -104,6 +112,7 @@ pub async fn link_oauth_provider(
 
 /// Update a user's display_name and/or avatar_url.
 /// Fields set to None are left unchanged (COALESCE semantics).
+#[tracing::instrument(skip(pool), fields(table = "users", op = "update_profile"))]
 pub async fn update_profile(
     pool: &PgPool,
     user_id: Uuid,
@@ -128,6 +137,7 @@ pub async fn update_profile(
 }
 
 /// Soft-deactivate a user (is_active = FALSE). Returns true if a row was updated.
+#[tracing::instrument(skip(pool), fields(table = "users", op = "deactivate_user"))]
 pub async fn deactivate_user(pool: &PgPool, user_id: Uuid) -> Result<bool, DatabaseError> {
     sqlx::query("UPDATE users SET is_active = FALSE, updated_at = NOW() WHERE user_id = $1")
         .bind(user_id)
@@ -138,6 +148,7 @@ pub async fn deactivate_user(pool: &PgPool, user_id: Uuid) -> Result<bool, Datab
 }
 
 /// Update a user's last_login timestamp
+#[tracing::instrument(skip(pool), fields(table = "users", op = "touch_last_login"))]
 pub async fn touch_last_login(pool: &PgPool, user_id: Uuid) -> Result<(), DatabaseError> {
     sqlx::query("UPDATE users SET last_login = NOW(), updated_at = NOW() WHERE user_id = $1")
         .bind(user_id)
@@ -149,6 +160,7 @@ pub async fn touch_last_login(pool: &PgPool, user_id: Uuid) -> Result<(), Databa
 
 /// Mark onboarding as completed for the given user.
 /// The AND clause makes this idempotent — already-completed users return false but no error.
+#[tracing::instrument(skip(pool), fields(table = "users", op = "complete_onboarding"))]
 pub async fn complete_onboarding(pool: &PgPool, user_id: Uuid) -> Result<bool, DatabaseError> {
     sqlx::query(
         "UPDATE users SET onboarding_completed = TRUE, updated_at = NOW()

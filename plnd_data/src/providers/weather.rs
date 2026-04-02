@@ -94,6 +94,11 @@ pub(crate) fn build_open_meteo_url(lat: f64, lon: f64) -> String {
 
 #[async_trait]
 impl WeatherProvider for OpenMeteoProvider {
+    #[tracing::instrument(
+        name = "provider::openmeteo::current",
+        skip(self),
+        fields(provider = "openmeteo")
+    )]
     async fn current(&self, location: Location) -> Result<WeatherData, ExternalProviderError> {
         let url = build_open_meteo_url(location.latitude, location.longitude);
 

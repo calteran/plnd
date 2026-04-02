@@ -39,6 +39,7 @@ pub struct TokenExchangeResponse {
 /// Angular obtains the ID token from the OIDC library after completing the
 /// authorization code + PKCE flow. The backend validates the token via JWKS,
 /// finds or creates the user, and issues a backend JWT bound to a session record.
+#[tracing::instrument(skip_all)]
 pub async fn token_exchange(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
@@ -50,7 +51,7 @@ pub async fn token_exchange(
         .validate_id_token(&req.id_token, &state.oidc_client_id)
         .await
         .map_err(|e| {
-            eprintln!("ID token validation failed: {}", e);
+            tracing::error!(error = %e, "ID token validation failed");
             StatusCode::UNAUTHORIZED
         })?;
 
@@ -68,7 +69,7 @@ pub async fn token_exchange(
     let user = match db::users::find_by_provider(pool, &req.provider, sub)
         .await
         .map_err(|e| {
-            eprintln!("Provider lookup failed: {}", e);
+            tracing::error!(error = %e, "provider lookup failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })? {
         Some(existing) => {
@@ -77,7 +78,7 @@ pub async fn token_exchange(
         }
         None => {
             let user = match db::users::find_by_email(pool, &email).await.map_err(|e| {
-                eprintln!("Email lookup failed: {}", e);
+                tracing::error!(error = %e, "email lookup failed");
                 StatusCode::INTERNAL_SERVER_ERROR
             })? {
                 Some(existing) => {
@@ -87,7 +88,7 @@ pub async fn token_exchange(
                 None => db::users::create(pool, &email, name, picture)
                     .await
                     .map_err(|e| {
-                        eprintln!("User creation failed: {}", e);
+                        tracing::error!(error = %e, "user creation failed");
                         StatusCode::INTERNAL_SERVER_ERROR
                     })?,
             };
@@ -95,7 +96,7 @@ pub async fn token_exchange(
             if let Err(e) =
                 db::users::link_oauth_provider(pool, user.user_id, &req.provider, sub).await
             {
-                eprintln!("Failed to link OAuth provider (non-fatal): {}", e);
+                tracing::warn!(error = %e, "failed to link OAuth provider (non-fatal)");
             }
 
             user
@@ -112,13 +113,13 @@ pub async fn token_exchange(
             user.avatar_url.as_deref(),
         )
         .map_err(|e| {
-            eprintln!("JWT generation failed: {}", e);
+            tracing::error!(error = %e, "JWT generation failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
     // 5. Decode the backend JWT to extract the JTI for session binding.
     let backend_claims = state.jwt.validate_token(&jwt).map_err(|e| {
-        eprintln!("JWT self-validation failed: {}", e);
+        tracing::error!(error = %e, "JWT self-validation failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -144,7 +145,7 @@ pub async fn token_exchange(
         )
         .await
         .map_err(|e| {
-            eprintln!("Session creation failed: {}", e);
+            tracing::error!(error = %e, "session creation failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -170,6 +171,7 @@ pub async fn token_exchange(
 /// The middleware has already validated the token and inserted Claims into
 /// request extensions. We use the JTI from Claims to mark the session revoked,
 /// so subsequent requests with the same JWT are rejected by the middleware.
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn logout(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

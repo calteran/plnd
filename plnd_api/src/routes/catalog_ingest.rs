@@ -40,6 +40,7 @@ pub struct IngestIngredientResponse {
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip_all)]
 pub async fn ingest_ingredient(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,

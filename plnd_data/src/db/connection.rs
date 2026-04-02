@@ -29,6 +29,7 @@ impl Database {
     }
 
     /// Health check - verify database connectivity
+    #[tracing::instrument(skip_all)]
     pub async fn health_check(&self) -> Result<(), DatabaseError> {
         sqlx::query("SELECT 1")
             .execute(&self.pool)

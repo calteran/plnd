@@ -24,6 +24,7 @@ use plnd_data::db::{error::DatabaseError, user_dish_prefs};
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -56,6 +57,7 @@ pub async fn list(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn get_detail(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -72,7 +74,7 @@ pub async fn get_detail(
 
 /// Link an existing catalog dish or create a personal dish from scratch.
 /// Provide either `catalog_dish_id` OR `name` (not both).
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateDishBody {
     /// Link an existing catalog dish
     pub catalog_dish_id: Option<Uuid>,
@@ -97,6 +99,7 @@ pub struct CreateDishBody {
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn create(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -140,7 +143,7 @@ pub async fn create(
 /// Metadata fields (rating, is_safe_food, is_blocked, notes) update the pref row.
 /// Recipe fields (name, instructions, prep_time_minutes, cook_time_minutes) trigger a fork-and-update.
 /// To explicitly clear rating or notes to NULL, send `"rating": null` / `"notes": null` in the JSON.
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct PatchDishBody {
     // Metadata fields
     #[schema(value_type = Option<Object>)]
@@ -173,6 +176,7 @@ pub struct PatchDishBody {
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn patch(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -259,6 +263,7 @@ pub async fn patch(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -275,7 +280,7 @@ pub async fn delete(
     }
 }
 
-#[derive(Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct AddIngredientBody {
     pub catalog_ingredient_id: Uuid,
     #[schema(value_type = f64)]
@@ -302,6 +307,7 @@ pub struct AddIngredientBody {
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn add_ingredient(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -345,6 +351,7 @@ pub async fn add_ingredient(
         (status = 500, description = "Internal server error"),
     )
 )]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn remove_ingredient(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

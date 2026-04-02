@@ -17,6 +17,7 @@ const ENTRY_COLS: &str =
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
      family_meal_id, after_milepost, after_entry_id, deviation_note, created_at, updated_at";
 
+#[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_period"))]
 pub async fn get_period(
     pool: &PgPool,
     user_id: Uuid,
@@ -52,6 +53,7 @@ pub async fn get_period(
     Ok(SchedulePeriodResponse { entries, carryover })
 }
 
+#[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_plan_status"))]
 pub async fn get_plan_status(
     pool: &PgPool,
     user_id: Uuid,
@@ -76,6 +78,10 @@ pub async fn get_plan_status(
     })
 }
 
+#[tracing::instrument(
+    skip(pool, req),
+    fields(table = "schedule_entries", op = "commit_plan")
+)]
 pub async fn commit_plan(
     pool: &PgPool,
     user_id: Uuid,
