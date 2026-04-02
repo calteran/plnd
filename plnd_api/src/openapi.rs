@@ -8,7 +8,7 @@ use crate::api_response::{
     SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
     UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
-use crate::models::{PostSchedulePlanRequest, ReadyStatus};
+use crate::models::{CarryoverDecision, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus};
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
     catalog_ingest::{IngestIngredientBody, IngestIngredientResponse},
@@ -133,6 +133,8 @@ impl Modify for BearerSecurityAddon {
         PlanStatusApiResponse,
         PostSchedulePlanApiResponse,
         PostSchedulePlanRequest,
+        PlanEntryRequest,
+        CarryoverDecision,
         // User library preferences
         UserDishPrefDetailResponse,
         UserIngredientPrefResponse,
