@@ -71,6 +71,7 @@ pub async fn get_period(
     security(("bearer_auth" = [])),
     responses(
         (status = 200, description = "Planning status for the period", body = PlanStatusApiResponse),
+        (status = 400, description = "end must be >= start"),
         (status = 401, description = "Unauthorized"),
         (status = 500, description = "Internal server error"),
     )
@@ -80,6 +81,9 @@ pub async fn get_plan_status(
     Extension(claims): Extension<Claims>,
     Query(params): Query<PeriodQuery>,
 ) -> Result<Json<PlanStatusApiResponse>, StatusCode> {
+    if params.end < params.start {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let pool = state.db.get_pool();
 

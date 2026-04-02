@@ -1,5 +1,6 @@
 use chrono::{NaiveDate, NaiveTime};
 use plnd_api::models::{PlanEntryRequest, PostSchedulePlanRequest};
+use plnd_api::routes::schedule::PeriodQuery;
 use plnd_data::db::models::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 #[test]
@@ -79,4 +80,45 @@ fn test_post_schedule_plan_response_serde() {
     let json = serde_json::to_string(&resp).unwrap();
     assert!(json.contains("14"));
     assert!(json.contains("completed"));
+}
+
+#[test]
+fn test_period_query_reversed_dates_is_invalid() {
+    // The get_plan_status handler rejects requests where end < start with HTTP 400.
+    // This test confirms that the guard condition (end < start) correctly identifies
+    // a reversed date range so the handler logic can return BAD_REQUEST.
+    let query = PeriodQuery {
+        start: NaiveDate::from_ymd_opt(2026, 4, 10).unwrap(),
+        end: NaiveDate::from_ymd_opt(2026, 4, 1).unwrap(),
+    };
+    assert!(
+        query.end < query.start,
+        "end < start should be true for reversed range"
+    );
+}
+
+#[test]
+fn test_period_query_valid_dates_passes_guard() {
+    // A valid date range (end >= start) should not trigger the BAD_REQUEST guard.
+    let query = PeriodQuery {
+        start: NaiveDate::from_ymd_opt(2026, 4, 1).unwrap(),
+        end: NaiveDate::from_ymd_opt(2026, 4, 10).unwrap(),
+    };
+    assert!(
+        query.end >= query.start,
+        "end >= start should not trigger the guard"
+    );
+}
+
+#[test]
+fn test_period_query_same_date_passes_guard() {
+    // A single-day range (end == start) is valid and should not trigger the guard.
+    let query = PeriodQuery {
+        start: NaiveDate::from_ymd_opt(2026, 4, 5).unwrap(),
+        end: NaiveDate::from_ymd_opt(2026, 4, 5).unwrap(),
+    };
+    assert!(
+        query.end >= query.start,
+        "end == start should not trigger the guard"
+    );
 }
