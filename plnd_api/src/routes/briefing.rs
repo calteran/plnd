@@ -24,7 +24,10 @@ fn parse_loc(s: &str) -> Option<Location> {
     let (lat_str, lon_str) = s.split_once(',')?;
     let latitude = lat_str.trim().parse::<f64>().ok()?;
     let longitude = lon_str.trim().parse::<f64>().ok()?;
-    Some(Location { latitude, longitude })
+    Some(Location {
+        latitude,
+        longitude,
+    })
 }
 
 /// Round location to 1 decimal place for cache key stability (~11 km grid).
@@ -66,7 +69,10 @@ pub struct NewsHeadlineResponse {
 
 impl From<plnd_data::clients::NewsHeadline> for NewsHeadlineResponse {
     fn from(h: plnd_data::clients::NewsHeadline) -> Self {
-        Self { title: h.title, url: h.url }
+        Self {
+            title: h.title,
+            url: h.url,
+        }
     }
 }
 
@@ -125,7 +131,11 @@ pub async fn get_weather(
             StatusCode::SERVICE_UNAVAILABLE
         })?;
 
-    state.briefing.weather_cache.insert(cache_key, data.clone()).await;
+    state
+        .briefing
+        .weather_cache
+        .insert(cache_key, data.clone())
+        .await;
     Ok(Json(WeatherResponse::from(data)))
 }
 
@@ -166,17 +176,16 @@ pub async fn get_news(
         limit: 3,
     };
 
-    let data = state
-        .briefing
-        .news
-        .headlines(query)
-        .await
-        .map_err(|e| {
-            eprintln!("news fetch error: {e}");
-            StatusCode::SERVICE_UNAVAILABLE
-        })?;
+    let data = state.briefing.news.headlines(query).await.map_err(|e| {
+        eprintln!("news fetch error: {e}");
+        StatusCode::SERVICE_UNAVAILABLE
+    })?;
 
-    state.briefing.news_cache.insert(cache_key, data.clone()).await;
+    state
+        .briefing
+        .news_cache
+        .insert(cache_key, data.clone())
+        .await;
     let headlines = data.into_iter().map(NewsHeadlineResponse::from).collect();
     Ok(Json(NewsResponse { headlines }))
 }
@@ -247,14 +256,20 @@ mod tests {
 
     #[test]
     fn round_location_1dp() {
-        let loc = round_location(Location { latitude: 51.5074, longitude: -0.1278 });
+        let loc = round_location(Location {
+            latitude: 51.5074,
+            longitude: -0.1278,
+        });
         assert!((loc.latitude - 51.5).abs() < 1e-9);
         assert!((loc.longitude - (-0.1)).abs() < 1e-9);
     }
 
     #[test]
     fn round_location_rounds_up() {
-        let loc = round_location(Location { latitude: 51.55, longitude: 0.0 });
+        let loc = round_location(Location {
+            latitude: 51.55,
+            longitude: 0.0,
+        });
         assert!((loc.latitude - 51.6).abs() < 1e-9);
     }
 }

@@ -72,10 +72,7 @@ impl RssFeedProvider {
 #[async_trait]
 impl NewsProvider for RssFeedProvider {
     async fn headlines(&self, query: NewsQuery) -> Result<Vec<NewsHeadline>, ExternalClientError> {
-        let feed_url = query
-            .feed_url
-            .as_deref()
-            .unwrap_or(&self.default_feed_url);
+        let feed_url = query.feed_url.as_deref().unwrap_or(&self.default_feed_url);
 
         if feed_url.is_empty() {
             return Ok(vec![]);
@@ -90,8 +87,7 @@ impl NewsProvider for RssFeedProvider {
             .await
             .map_err(|e| ExternalClientError::HttpError(e.to_string()))?;
 
-        parse_feed_headlines(&bytes, query.limit)
-            .map_err(ExternalClientError::ResponseParseError)
+        parse_feed_headlines(&bytes, query.limit).map_err(ExternalClientError::ResponseParseError)
     }
 }
 

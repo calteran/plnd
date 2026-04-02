@@ -70,7 +70,9 @@ pub struct OpenMeteoProvider {
 
 impl OpenMeteoProvider {
     pub fn new() -> Self {
-        Self { http: super::build_http_client() }
+        Self {
+            http: super::build_http_client(),
+        }
     }
 }
 
@@ -107,8 +109,18 @@ impl WeatherProvider for OpenMeteoProvider {
         Ok(WeatherData {
             temperature_c: resp.current.temperature_2m,
             condition: weather_code_to_condition(resp.current.weather_code).to_string(),
-            high_c: resp.daily.temperature_2m_max.first().copied().unwrap_or(0.0),
-            low_c: resp.daily.temperature_2m_min.first().copied().unwrap_or(0.0),
+            high_c: resp
+                .daily
+                .temperature_2m_max
+                .first()
+                .copied()
+                .unwrap_or(0.0),
+            low_c: resp
+                .daily
+                .temperature_2m_min
+                .first()
+                .copied()
+                .unwrap_or(0.0),
             precipitation_mm: resp.current.precipitation,
         })
     }

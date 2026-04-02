@@ -23,7 +23,9 @@ use plnd_api::routes::{
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
-use plnd_data::clients::{OpenFoodFactsClient, OpenMeteoProvider, RssFeedProvider, TheMealDbClient, UsdaFdcClient};
+use plnd_data::clients::{
+    OpenFoodFactsClient, OpenMeteoProvider, RssFeedProvider, TheMealDbClient, UsdaFdcClient,
+};
 use plnd_data::search::ProviderSearchService;
 
 #[tokio::main]
