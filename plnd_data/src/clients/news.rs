@@ -78,11 +78,17 @@ impl NewsProvider for RssFeedProvider {
             return Ok(vec![]);
         }
 
-        let bytes = self
-            .http
-            .get(feed_url)
-            .send()
-            .await?
+        let resp = self.http.get(feed_url).send().await?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(ExternalClientError::HttpError(format!(
+                "HTTP {}",
+                status.as_u16()
+            )));
+        }
+
+        let bytes = resp
             .bytes()
             .await
             .map_err(|e| ExternalClientError::HttpError(e.to_string()))?;

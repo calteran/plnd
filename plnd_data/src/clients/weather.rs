@@ -97,11 +97,17 @@ impl WeatherProvider for OpenMeteoProvider {
     async fn current(&self, location: Location) -> Result<WeatherData, ExternalClientError> {
         let url = build_open_meteo_url(location.latitude, location.longitude);
 
-        let resp: OpenMeteoResponse = self
-            .http
-            .get(&url)
-            .send()
-            .await?
+        let resp = self.http.get(&url).send().await?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            return Err(ExternalClientError::HttpError(format!(
+                "HTTP {}",
+                status.as_u16()
+            )));
+        }
+
+        let resp: OpenMeteoResponse = resp
             .json()
             .await
             .map_err(|e| ExternalClientError::ResponseParseError(e.to_string()))?;

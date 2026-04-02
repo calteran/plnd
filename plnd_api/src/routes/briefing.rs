@@ -24,6 +24,9 @@ fn parse_loc(s: &str) -> Option<Location> {
     let (lat_str, lon_str) = s.split_once(',')?;
     let latitude = lat_str.trim().parse::<f64>().ok()?;
     let longitude = lon_str.trim().parse::<f64>().ok()?;
+    if !latitude.is_finite() || !longitude.is_finite() {
+        return None;
+    }
     Some(Location {
         latitude,
         longitude,
@@ -252,6 +255,11 @@ mod tests {
     #[test]
     fn parse_loc_non_numeric_returns_none() {
         assert!(parse_loc("abc,def").is_none());
+    }
+
+    #[test]
+    fn parse_loc_nan_returns_none() {
+        assert!(parse_loc("nan,0.0").is_none());
     }
 
     #[test]
