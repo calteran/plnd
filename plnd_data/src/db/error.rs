@@ -18,7 +18,6 @@ pub enum DatabaseError {
     #[error("Migration failed: {0}")]
     MigrationError(String),
 
-    #[allow(dead_code)]
     #[error("Database configuration error: {0}")]
     ConfigurationError(String),
 
@@ -35,6 +34,7 @@ impl From<sqlx::Error> for DatabaseError {
             sqlx::Error::RowNotFound => DatabaseError::NotFound,
             sqlx::Error::PoolClosed | sqlx::Error::PoolTimedOut => DatabaseError::ConnectionLost,
             sqlx::Error::Io(_) => DatabaseError::ConnectionLost,
+            sqlx::Error::Configuration(_) => DatabaseError::ConfigurationError(error.to_string()),
             sqlx::Error::Database(ref db_err) if db_err.code().as_deref() == Some("23505") => {
                 DatabaseError::UniqueViolation
             }
