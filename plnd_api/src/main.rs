@@ -23,8 +23,9 @@ use plnd_api::briefing::BriefingState;
 use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
-    auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, preferences, schedule,
-    search, system, tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, meal_suggestions,
+    preferences, schedule, search, system, tasks, user_dish_prefs, user_ingredient_prefs,
+    user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -291,6 +292,10 @@ async fn main() {
         .route(
             "/my/meals/{pref_id}/dishes/{dish_id}",
             delete(user_meal_prefs::remove_dish),
+        )
+        .route(
+            "/my/meal-suggestions",
+            get(meal_suggestions::get_suggestions),
         )
         .route("/tasks/weekly-plan", post(tasks::post_weekly_plan_task))
         .route("/schedule/period", get(schedule::get_period))
