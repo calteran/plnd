@@ -4,7 +4,7 @@ use chrono::Utc;
 use serde_json::{from_value, to_value};
 use uuid::Uuid;
 
-use plnd_api::db::models::{
+use plnd_data::db::models::{
     UserDishPref, UserDishPrefDetail, UserIngredientPref, UserMealPref, UserMealPrefDetail,
 };
 

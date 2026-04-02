@@ -1,7 +1,8 @@
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
-use crate::db::models::{DietaryRestriction, ReadyStatus, User, UserPreferences};
+use crate::api_response::{DietaryRestrictionResponse, UserPreferencesResponse, UserResponse};
+use crate::models::ReadyStatus;
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
@@ -41,6 +42,7 @@ impl Modify for BearerSecurityAddon {
         crate::routes::users::patch_me,
         crate::routes::users::delete_me,
         crate::routes::users::post_complete_onboarding,
+        crate::routes::preferences::patch_preferences,
         crate::routes::preferences::get_preferences,
         crate::routes::briefing::get_weather,
         crate::routes::briefing::get_news,
@@ -51,9 +53,9 @@ impl Modify for BearerSecurityAddon {
         crate::routes::dietary_restrictions::delete_restriction,
     ),
     components(schemas(
-        User,
-        UserPreferences,
-        DietaryRestriction,
+        UserResponse,
+        UserPreferencesResponse,
+        DietaryRestrictionResponse,
         ReadyStatus,
         UpdateProfileRequest,
         CreateRestrictionRequest,

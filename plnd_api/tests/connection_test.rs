@@ -1,5 +1,5 @@
-use plnd_api::db::connection::Database;
-use plnd_api::db::error::DatabaseError;
+use plnd_data::db::connection::Database;
+use plnd_data::db::error::DatabaseError;
 
 #[tokio::test]
 async fn test_database_connection_creation() {

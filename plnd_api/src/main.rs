@@ -15,7 +15,6 @@ use plnd_api::auth::auth_middleware;
 use plnd_api::auth::{JwksCache, JwtService, SessionService};
 use plnd_api::briefing::BriefingState;
 use plnd_api::config;
-use plnd_api::db::Database;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
     auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, preferences, schedule,
@@ -23,6 +22,7 @@ use plnd_api::routes::{
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
+use plnd_data::db::Database;
 use plnd_data::providers::{
     OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider, UsdaFdcProvider,
 };

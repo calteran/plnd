@@ -1,15 +1,15 @@
 // Offline tests for domain model structs and constants.
 // No live database required — follows the dietary_restrictions_test.rs pattern.
-use plnd_api::db::models::{
-    CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
-    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, MealTask,
-    ScheduleEntry, ScheduleTemplate, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,
-    UserMealDish, WorkTask,
-};
 use plnd_api::routes::domain_constants::{
     SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_AFTER_MILEPOSTS, VALID_ENERGY_LEVELS,
     VALID_FAMILY_ROLES, VALID_FOCUS_LEVELS, VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS,
     VALID_RECURRENCE_TYPES, VALID_TASK_STATUSES, VALID_TASK_TYPES,
+};
+use plnd_data::db::models::{
+    CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
+    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, MealTask,
+    ScheduleEntry, ScheduleTemplate, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,
+    UserMealDish, WorkTask,
 };
 
 // ---------------------------------------------------------------------------

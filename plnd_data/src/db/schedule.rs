@@ -82,6 +82,9 @@ pub async fn commit_plan(
         .await
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
+    // If replace=true, delete planned entries for unstarted days only (spec §303).
+    // An unstarted day has no in_progress or completed entries; started days are
+    // left completely untouched even if replace=true.
     if req.replace {
         let started_days: Vec<NaiveDate> = sqlx::query_scalar(
             "SELECT DISTINCT date FROM schedule_entries
@@ -113,6 +116,7 @@ pub async fn commit_plan(
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     }
 
+    // Collect and batch-insert all new entries in a single unnest query
     let mut task_types: Vec<String> = Vec::new();
     let mut task_ref_ids: Vec<Option<Uuid>> = Vec::new();
     let mut task_ref_types: Vec<Option<String>> = Vec::new();
@@ -156,6 +160,7 @@ pub async fn commit_plan(
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     }
 
+    // Mark planning task as completed
     sqlx::query(
         "UPDATE tasks SET status = 'completed', updated_at = NOW()
          WHERE task_id = $1 AND user_id = $2",
@@ -166,9 +171,13 @@ pub async fn commit_plan(
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
+    // Apply carryover decisions: update carry-over entries
     for (entry_id, decision) in &req.carryover_decisions {
         match decision {
             CarryoverDecision::Accept => {
+                // Reschedule to the new horizon start, keeping status 'planned'.
+                // Update both `date` and `scheduled_start` so the absolute TIMESTAMPTZ
+                // moves to the new date while preserving the wall-clock time (UTC).
                 sqlx::query(
                     "UPDATE schedule_entries
                      SET date = $1,

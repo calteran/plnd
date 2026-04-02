@@ -1,12 +1,12 @@
+use crate::api_response::UserResponse;
 use crate::auth::jwt::Claims;
-use crate::db;
-use crate::db::models::User;
 use crate::state::AppState;
 use axum::{
     extract::{Extension, State},
     http::StatusCode,
     Json,
 };
+use plnd_data::db;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -22,16 +22,15 @@ pub struct UpdateProfileRequest {
     tag = "Users",
     security(("bearer_auth" = [])),
     responses(
-        (status = 200, description = "Current user profile", body = User),
+        (status = 200, description = "Current user profile", body = UserResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "User not found"),
     )
 )]
-/// GET /users/me — return the current user's profile
 pub async fn get_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-) -> Result<Json<User>, StatusCode> {
+) -> Result<Json<UserResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let pool = state.db.get_pool();
 
@@ -39,7 +38,7 @@ pub async fn get_me(
         eprintln!("get_me DB error: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })? {
-        Some(user) => Ok(Json(user)),
+        Some(user) => Ok(Json(UserResponse::from(user))),
         None => Err(StatusCode::NOT_FOUND),
     }
 }
@@ -51,21 +50,19 @@ pub async fn get_me(
     security(("bearer_auth" = [])),
     request_body = UpdateProfileRequest,
     responses(
-        (status = 200, description = "Updated user profile", body = User),
+        (status = 200, description = "Updated user profile", body = UserResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "User not found"),
         (status = 422, description = "Validation error"),
     )
 )]
-/// PATCH /users/me — update display_name and/or avatar_url
 pub async fn patch_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Json(body): Json<UpdateProfileRequest>,
-) -> Result<Json<User>, StatusCode> {
+) -> Result<Json<UserResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    // Validate field lengths
     if let Some(ref name) = body.display_name {
         if name.len() > 100 {
             return Err(StatusCode::UNPROCESSABLE_ENTITY);
@@ -90,7 +87,7 @@ pub async fn patch_me(
         eprintln!("patch_me DB error: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })? {
-        Some(user) => Ok(Json(user)),
+        Some(user) => Ok(Json(UserResponse::from(user))),
         None => Err(StatusCode::NOT_FOUND),
     }
 }
@@ -106,7 +103,6 @@ pub async fn patch_me(
         (status = 500, description = "Internal server error"),
     )
 )]
-/// POST /users/me/complete-onboarding — mark onboarding as done, returns 200 OK
 pub async fn post_complete_onboarding(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -133,7 +129,6 @@ pub async fn post_complete_onboarding(
         (status = 404, description = "User not found"),
     )
 )]
-/// DELETE /users/me — soft-deactivate the account, returns 204 No Content
 pub async fn delete_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

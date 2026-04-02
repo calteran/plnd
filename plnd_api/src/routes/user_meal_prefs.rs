@@ -9,8 +9,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::db::{models::UserMealPrefDetail, user_meal_prefs};
 use crate::state::AppState;
+use plnd_data::db::{models::UserMealPrefDetail, user_meal_prefs};
 
 fn is_unique_violation(e: &sqlx::Error) -> bool {
     let s = e.to_string().to_lowercase();

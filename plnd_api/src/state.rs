@@ -1,6 +1,6 @@
 use crate::auth::{JwksCache, JwtService, SessionService};
 use crate::briefing::BriefingState;
-use crate::db::Database;
+use plnd_data::db::Database;
 use plnd_data::search::ProviderSearchService;
 use std::sync::Arc;
 
