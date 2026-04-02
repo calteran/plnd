@@ -3,6 +3,26 @@ build:
     cargo build --workspace
     cd plnd_client && npx ng build
 
+# Set up local development environment — run once after cloning
+init:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "→ Installing Homebrew packages..."
+    brew install util-linux libpq doppler/cli/doppler
+
+    echo "→ Installing Rust tools..."
+    cargo install cargo-nextest --locked
+    cargo install cargo-deny --locked
+    cargo install cargo-machete
+
+    echo "→ Installing Angular/Node dependencies..."
+    cd plnd_client && npm ci
+
+    echo "→ Installing Playwright browser..."
+    cd plnd_client && npx playwright install chromium
+
+    echo "✅ Dev environment ready. Run 'doppler login' if you haven't already."
+
 # Run development environment (PostgreSQL + Client) in detached mode
 dev:
     doppler run -- docker compose build --no-cache && doppler run -- docker compose up -d --force-recreate
