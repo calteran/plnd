@@ -1,6 +1,7 @@
 pub mod dtos;
 pub mod error;
 pub mod exercise;
+pub mod news;
 pub mod nutrition;
 pub mod open_food_facts;
 pub mod recipe;
