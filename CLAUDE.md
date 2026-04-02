@@ -28,6 +28,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 
 ### Branch Discipline
 - **NEVER commit directly to `main`** — always work on a feature or fix branch and open a PR
+- **ALWAYS branch from `main`** — never base a branch on another feature branch; this avoids merge conflicts and spurious commits when the parent branch merges
 
 ### Before Every Commit
 Run `just verify` — this executes the full quality suite and must pass cleanly.
