@@ -1,3 +1,4 @@
+pub mod dev_user;
 pub mod dishes;
 pub mod error;
 pub mod ingredients;
