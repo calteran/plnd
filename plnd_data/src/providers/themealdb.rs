@@ -207,6 +207,7 @@ impl RecipeProvider for TheMealDbProvider {
         "themealdb"
     }
 
+    #[tracing::instrument(name = "provider::themealdb::search_dishes", skip(self), fields(provider = "themealdb"))]
     async fn search_dishes(
         &self,
         query: &SearchQuery,
@@ -259,6 +260,7 @@ impl RecipeProvider for TheMealDbProvider {
         Ok(results)
     }
 
+    #[tracing::instrument(name = "provider::themealdb::get_dish_by_id", skip(self), fields(provider = "themealdb", external_id = %external_id))]
     async fn get_dish_by_id(
         &self,
         external_id: &str,

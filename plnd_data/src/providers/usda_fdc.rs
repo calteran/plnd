@@ -118,6 +118,7 @@ impl NutritionProvider for UsdaFdcProvider {
         "usda_fdc"
     }
 
+    #[tracing::instrument(name = "provider::usda_fdc::search_ingredients", skip(self), fields(provider = "usda_fdc"))]
     async fn search_ingredients(
         &self,
         query: &SearchQuery,
@@ -177,6 +178,7 @@ impl NutritionProvider for UsdaFdcProvider {
         Ok(results)
     }
 
+    #[tracing::instrument(name = "provider::usda_fdc::get_ingredient_by_id", skip(self), fields(provider = "usda_fdc", external_id = %external_id))]
     async fn get_ingredient_by_id(
         &self,
         external_id: &str,
