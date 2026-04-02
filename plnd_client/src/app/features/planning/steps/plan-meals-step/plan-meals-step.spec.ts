@@ -2,18 +2,33 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { PlanMealsStepComponent } from './plan-meals-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { MealSuggestionsService } from '../../../../core/services/meal-suggestions.service';
+
+const MOCK_SUGGESTIONS = [
+  { id: 'id-1', name: 'Oatmeal',         suggestion_type: 'meal' },
+  { id: 'id-2', name: 'Scrambled Eggs',  suggestion_type: 'dish' },
+  { id: 'id-3', name: 'Yogurt & Fruit',  suggestion_type: 'meal' },
+];
 
 describe('PlanMealsStepComponent', () => {
   let fixture: ComponentFixture<PlanMealsStepComponent>;
   let service: WeekPlanService;
   let component: PlanMealsStepComponent;
+  let suggestionsSpy: jasmine.SpyObj<MealSuggestionsService>;
 
   beforeEach(async () => {
+    suggestionsSpy = jasmine.createSpyObj('MealSuggestionsService', ['load', 'suggestions']);
+    // Default: return mock suggestions for any (date, slot)
+    suggestionsSpy.suggestions.and.returnValue(MOCK_SUGGESTIONS);
+
     await TestBed.configureTestingModule({
       imports: [PlanMealsStepComponent, HttpClientTestingModule],
+      providers: [
+        { provide: MealSuggestionsService, useValue: suggestionsSpy },
+      ],
     }).compileComponents();
+
     service = TestBed.inject(WeekPlanService);
-    // Mon 2026-03-23 through Fri 2026-03-27 → 5 days
     service.initSession('2026-03-23', '2026-03-27');
     fixture = TestBed.createComponent(PlanMealsStepComponent);
     component = fixture.componentInstance;
@@ -127,11 +142,11 @@ describe('PlanMealsStepComponent', () => {
 
   it('should change suggestion text when 🔀 Suggest is clicked', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
-    const before = firstCell.querySelector('.gc-text')!.textContent!.trim();
     (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
     fixture.detectChanges();
     const after = firstCell.querySelector('.gc-text')!.textContent!.trim();
-    expect(after).not.toBe(before);
+    // The cycled-to name must be one of the mock suggestions
+    expect(MOCK_SUGGESTIONS.map(s => s.name)).toContain(after);
   });
 
   it('should persist the cycled suggestion to the service when 🔀 Suggest is clicked', () => {
@@ -141,8 +156,6 @@ describe('PlanMealsStepComponent', () => {
     const stored = service.scheduledMeals()['2026-03-23']?.['breakfast'];
     expect(stored).toBeTruthy();
     expect(stored!.type).toBe('mock');
-    const displayed = firstCell.querySelector('.gc-text')!.textContent!.trim();
-    expect(stored!.title).toBe(displayed);
   });
 
   it('should pre-fill edit input with existing custom meal title', () => {

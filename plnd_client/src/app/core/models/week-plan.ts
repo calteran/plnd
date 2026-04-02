@@ -19,6 +19,14 @@ export interface PlannedMeal {
 /** Sentinel value stored as PlannedMeal.title when the user has explicitly skipped a slot. */
 export const SKIP_SENTINEL = '__skipped__';
 
+/** A meal or dish returned by GET /my/meal-suggestions. */
+export interface MealSuggestion {
+  id:              string;
+  name:            string;
+  /** "meal" or "dish" */
+  suggestion_type: string;
+}
+
 /** The three standard meal slots that are auto-filled with suggestions. Snack is excluded — it is only included when explicitly set via setMeal. */
 export const STANDARD_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
@@ -94,16 +102,3 @@ export interface PostSchedulePlanResponse {
   planning_task_status: string;
 }
 
-export const MOCK_MEAL_SUGGESTIONS: string[] = [
-  'Oatmeal', 'Scrambled Eggs', 'Yogurt & Fruit',
-  'Salad', 'Sandwich', 'Soup',
-  'Pasta', 'Stir Fry', 'Grilled Chicken',
-  'Smoothie', 'Leftovers',
-];
-
-// TODO(phase-3): replace mock array with WeekPlanService.getMealSuggestions()
-export function getMockSuggestion(date: string, slot: MealSlot): string {
-  const hash = date.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  const slotIndex = ['breakfast', 'lunch', 'dinner', 'snack'].indexOf(slot);
-  return MOCK_MEAL_SUGGESTIONS[(hash + slotIndex) % MOCK_MEAL_SUGGESTIONS.length];
-}
