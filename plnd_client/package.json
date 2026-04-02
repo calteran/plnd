@@ -55,7 +55,7 @@
     "@angular/cli": "~21.2.5",
     "@angular/compiler-cli": "~21.2.6",
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.59.1",
     "@types/jasmine": "~6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.57.2",
     "@typescript-eslint/parser": "^8.57.2",
@@ -68,7 +68,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.2.0",
     "license-checker": "^25.0.1",
-    "npm-check-updates": "^19.6.6",
-    "typescript": "^5.9.3"
+    "npm-check-updates": "^20.0.0",
+    "typescript": "^6.0.2"
   }
 }
