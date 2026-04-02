@@ -60,7 +60,7 @@ describe('observabilityInterceptor', () => {
     http.get('/api/fail').subscribe({ error: () => {} });
     httpTesting.expectOne('/api/fail').flush(
       { message: 'Not Found' },
-      { status: 404, statusText: 'Not Found' }
+      { status: 404 }
     );
     expect(fetchSpy).toHaveBeenCalledOnceWith(
       '/api/client_error',
