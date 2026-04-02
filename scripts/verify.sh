@@ -26,6 +26,7 @@ declare -a JOB_LABELS=()
 
 # ── Cleanup ────────────────────────────────────────────────────────────────────
 cleanup() {
+    exec 9>&- 2>/dev/null || true
     for pid in "${JOB_PIDS[@]+"${JOB_PIDS[@]}"}"; do
         kill "$pid" 2>/dev/null || true
     done
@@ -41,6 +42,10 @@ if ! command -v timeout &>/dev/null; then
 fi
 if ! command -v flock &>/dev/null; then
     echo "✗ 'flock' not found — install flock: brew install flock" >&2
+    exit 1
+fi
+if ! docker info &>/dev/null; then
+    echo "✗ Docker is not running — start Docker Desktop and retry" >&2
     exit 1
 fi
 
@@ -98,27 +103,27 @@ docker run --rm -d \
     ghcr.io/navikt/mock-oauth2-server:3.0.1 > /dev/null
 
 # Rust read-only checks — no target/ lock, safe to parallelize with anything
-(cd "$PROJECT_ROOT" && cargo fmt --check) &
+(exec 9>&-; cd "$PROJECT_ROOT" && cargo fmt --check) &
 track $! "cargo fmt"
 
-(cd "$PROJECT_ROOT" && cargo deny check) &
+(exec 9>&-; cd "$PROJECT_ROOT" && cargo deny check) &
 track $! "cargo deny"
 
-(cd "$PROJECT_ROOT" && cargo machete) &
+(exec 9>&-; cd "$PROJECT_ROOT" && cargo machete) &
 track $! "cargo machete"
 
 # TypeScript checks
-(cd "$PROJECT_ROOT/plnd_client" && npx eslint "src/**/*.ts" "e2e/**/*.ts") &
+(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && npx eslint "src/**/*.ts" "e2e/**/*.ts") &
 track $! "eslint"
 
-(cd "$PROJECT_ROOT/plnd_client" && \
+(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && \
     npm run check-dependencies && \
     npm run check-licenses && \
     npm run check-circular) &
 track $! "ts-deps"
 
 # Angular unit tests — fully independent of Rust
-(cd "$PROJECT_ROOT/plnd_client" && \
+(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && \
     npx ng test --browsers=ChromeHeadless --watch=false --code-coverage) &
 track $! "ng test"
 
@@ -132,6 +137,7 @@ cargo build --workspace
 # Both share target/ so they must be sequential with each other,
 # but neither gates the e2e phase below.
 (
+    exec 9>&-
     cd "$PROJECT_ROOT"
     status=0
     cargo nextest run --workspace \
