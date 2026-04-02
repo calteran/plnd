@@ -166,18 +166,22 @@ pub async fn get_news(
     let location = parse_loc(&loc_str).ok_or(StatusCode::BAD_REQUEST)?;
     let location = round_location(location);
 
-    let cache_key = format!("{:.1},{:.1}", location.latitude, location.longitude);
-
-    if let Some(cached) = state.briefing.news_cache.get(&cache_key).await {
-        let headlines = cached.into_iter().map(NewsHeadlineResponse::from).collect();
-        return Ok(Json(NewsResponse { headlines }));
-    }
-
     let query = NewsQuery {
         location,
         feed_url: None,
         limit: 3,
     };
+
+    let feed_url_key = query.feed_url.as_deref().unwrap_or("");
+    let cache_key = format!(
+        "{:.1},{:.1}:{}",
+        location.latitude, location.longitude, feed_url_key
+    );
+
+    if let Some(cached) = state.briefing.news_cache.get(&cache_key).await {
+        let headlines = cached.into_iter().map(NewsHeadlineResponse::from).collect();
+        return Ok(Json(NewsResponse { headlines }));
+    }
 
     let data = state.briefing.news.headlines(query).await.map_err(|e| {
         eprintln!("news fetch error: {e}");
