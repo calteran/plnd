@@ -28,6 +28,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 
 ### Branch Discipline
 - **NEVER commit directly to `main`** — always work on a feature or fix branch and open a PR
+- **ALWAYS branch from `main`** — never base a branch on another feature branch; this avoids merge conflicts and spurious commits when the parent branch merges
 
 ### Before Every Commit
 Run `just verify` — this executes the full quality suite and must pass cleanly.
@@ -69,6 +70,7 @@ just logs             # View service logs
 - Always use latest stable versions of Rust and Node.js dependencies
 - Health data is sensitive — strict access controls required
 - Neurodivergent support principles: gradual exposure, sensory-friendly, customizable
+- **Never leave a known issue in code without a tracking GitHub issue** — if a bug, limitation, or tech debt is identified and not fixed immediately, open an issue before moving on
 
 ## Decision Making
 
