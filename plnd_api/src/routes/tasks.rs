@@ -1,3 +1,4 @@
+use crate::api_response::TaskResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
@@ -7,7 +8,6 @@ use axum::{
 };
 use chrono::NaiveDate;
 use plnd_data::db;
-use plnd_data::db::models::Task;
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -17,11 +17,25 @@ pub struct WeeklyPlanQuery {
     pub plan_start: NaiveDate,
 }
 
+#[utoipa::path(
+    post,
+    path = "/tasks/weekly-plan",
+    tag = "Tasks",
+    params(
+        ("plan_start" = NaiveDate, Query, description = "Start date of the planning week (YYYY-MM-DD)")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Planning task created or returned", body = TaskResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn post_weekly_plan_task(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Query(params): Query<WeeklyPlanQuery>,
-) -> Result<Json<Task>, StatusCode> {
+) -> Result<Json<TaskResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let pool = state.db.get_pool();
 
@@ -40,6 +54,7 @@ pub async fn post_weekly_plan_task(
         prefs.planning_trigger_offset,
     )
     .await
+    .map(TaskResponse::from)
     .map(Json)
     .map_err(|e| {
         eprintln!("post_weekly_plan_task error: {}", e);

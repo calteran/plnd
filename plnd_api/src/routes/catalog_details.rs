@@ -3,67 +3,98 @@ use axum::{
     http::StatusCode,
     Extension, Json,
 };
-use serde::Serialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::api_response::{
+    CatalogIngredientResponse, DishDetailApiResponse, MealDetailApiResponse,
+};
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::{
-    catalog_details,
-    models::{CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish},
-};
+use plnd_data::db::catalog_details;
 
-#[derive(Serialize)]
-pub struct DishDetailResponse {
-    #[serde(flatten)]
-    pub dish: CatalogDish,
-    pub ingredients: Vec<CatalogDishIngredient>,
-}
-
-#[derive(Serialize)]
-pub struct MealDetailResponse {
-    #[serde(flatten)]
-    pub meal: CatalogMeal,
-    pub dishes: Vec<CatalogMealDish>,
-}
-
+#[utoipa::path(
+    get,
+    path = "/catalog/ingredients/{id}",
+    tag = "Catalog",
+    params(
+        ("id" = Uuid, Path, description = "Catalog ingredient ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Ingredient details", body = CatalogIngredientResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn get_ingredient(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
     Path(id): Path<Uuid>,
-) -> Result<Json<CatalogIngredient>, StatusCode> {
+) -> Result<Json<CatalogIngredientResponse>, StatusCode> {
     catalog_details::get_ingredient(state.db.get_pool(), id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map(CatalogIngredientResponse::from)
         .map(Json)
         .ok_or(StatusCode::NOT_FOUND)
 }
 
+#[utoipa::path(
+    get,
+    path = "/catalog/dishes/{id}",
+    tag = "Catalog",
+    params(
+        ("id" = Uuid, Path, description = "Catalog dish ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Dish details with ingredients", body = DishDetailApiResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn get_dish(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
     Path(id): Path<Uuid>,
-) -> Result<Json<DishDetailResponse>, StatusCode> {
+) -> Result<Json<DishDetailApiResponse>, StatusCode> {
     let result = catalog_details::get_dish(state.db.get_pool(), id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     match result {
         None => Err(StatusCode::NOT_FOUND),
-        Some((dish, ingredients)) => Ok(Json(DishDetailResponse { dish, ingredients })),
+        Some(pair) => Ok(Json(DishDetailApiResponse::from(pair))),
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/catalog/meals/{id}",
+    tag = "Catalog",
+    params(
+        ("id" = Uuid, Path, description = "Catalog meal ID")
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Meal details with dishes", body = MealDetailApiResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn get_meal(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
     Path(id): Path<Uuid>,
-) -> Result<Json<MealDetailResponse>, StatusCode> {
+) -> Result<Json<MealDetailApiResponse>, StatusCode> {
     let result = catalog_details::get_meal(state.db.get_pool(), id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     match result {
         None => Err(StatusCode::NOT_FOUND),
-        Some((meal, dishes)) => Ok(Json(MealDetailResponse { meal, dishes })),
+        Some(pair) => Ok(Json(MealDetailApiResponse::from(pair))),
     }
 }
