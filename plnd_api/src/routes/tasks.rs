@@ -43,7 +43,7 @@ pub async fn post_weekly_plan_task(
     let prefs = db::preferences::get_or_create(pool, user_id)
         .await
         .map_err(|e| {
-            eprintln!("post_weekly_plan_task get_prefs error: {}", e);
+            tracing::error!(error = %e, "weekly plan task: get_prefs error");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
@@ -57,7 +57,7 @@ pub async fn post_weekly_plan_task(
     .map(TaskResponse::from)
     .map(Json)
     .map_err(|e| {
-        eprintln!("post_weekly_plan_task error: {}", e);
+        tracing::error!(error = %e, "weekly plan task: post error");
         StatusCode::INTERNAL_SERVER_ERROR
     })
 }

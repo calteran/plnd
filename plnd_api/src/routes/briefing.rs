@@ -130,7 +130,7 @@ pub async fn get_weather(
         .current(location)
         .await
         .map_err(|e| {
-            eprintln!("weather fetch error: {e}");
+            tracing::error!(error = %e, "weather fetch error");
             StatusCode::SERVICE_UNAVAILABLE
         })?;
 
@@ -184,7 +184,7 @@ pub async fn get_news(
     }
 
     let data = state.briefing.news.headlines(query).await.map_err(|e| {
-        eprintln!("news fetch error: {e}");
+        tracing::error!(error = %e, "news fetch error");
         StatusCode::SERVICE_UNAVAILABLE
     })?;
 
@@ -220,7 +220,7 @@ pub async fn get_yesterday(
     let snapshot = db::briefing::yesterday_snapshot(pool, user_id, yesterday)
         .await
         .map_err(|e| {
-            eprintln!("yesterday_snapshot error: {e}");
+            tracing::error!(error = %e, "yesterday snapshot error");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 

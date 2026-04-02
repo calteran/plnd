@@ -54,7 +54,7 @@ pub async fn list_restrictions(
             )
         })
         .map_err(|e| {
-            eprintln!("list_restrictions DB error: {}", e);
+            tracing::error!(error = %e, "list_restrictions DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }
@@ -115,7 +115,7 @@ pub async fn create_restriction(
         db::error::DatabaseError::UniqueViolation => StatusCode::CONFLICT,
         db::error::DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
         e => {
-            eprintln!("create_restriction DB error: {}", e);
+            tracing::error!(error = %e, "create_restriction DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         }
     })
@@ -155,7 +155,7 @@ pub async fn update_restriction(
     db::dietary_restrictions::update(pool, restriction_id, user_id, body.notes.as_deref())
         .await
         .map_err(|e| {
-            eprintln!("update_restriction DB error: {}", e);
+            tracing::error!(error = %e, "update_restriction DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .map(|r| Json(DietaryRestrictionResponse::from(r)))
@@ -186,7 +186,7 @@ pub async fn delete_restriction(
     db::dietary_restrictions::delete(pool, restriction_id, user_id)
         .await
         .map_err(|e| {
-            eprintln!("delete_restriction DB error: {}", e);
+            tracing::error!(error = %e, "delete_restriction DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
         .and_then(|deleted| {

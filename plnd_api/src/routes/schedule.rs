@@ -55,7 +55,7 @@ pub async fn get_period(
         .map(SchedulePeriodApiResponse::from)
         .map(Json)
         .map_err(|e| {
-            eprintln!("get_period error: {}", e);
+            tracing::error!(error = %e, "get_period error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }
@@ -92,7 +92,7 @@ pub async fn get_plan_status(
         .map(PlanStatusApiResponse::from)
         .map(Json)
         .map_err(|e| {
-            eprintln!("get_plan_status error: {}", e);
+            tracing::error!(error = %e, "get_plan_status error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }
@@ -166,7 +166,7 @@ pub async fn post_plan(
             plnd_data::db::error::DatabaseError::ValidationError(_) => StatusCode::BAD_REQUEST,
             plnd_data::db::error::DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             _ => {
-                eprintln!("post_plan error: {}", e);
+                tracing::error!(error = %e, "post_plan error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })

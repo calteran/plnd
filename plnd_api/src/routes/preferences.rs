@@ -59,7 +59,7 @@ pub async fn patch_preferences(
     .await
     .map(|p| Json(UserPreferencesResponse::from(p)))
     .map_err(|e| {
-        eprintln!("patch_preferences error: {}", e);
+        tracing::error!(error = %e, "patch_preferences error");
         StatusCode::INTERNAL_SERVER_ERROR
     })
 }
@@ -86,7 +86,7 @@ pub async fn get_preferences(
         .await
         .map(|p| Json(UserPreferencesResponse::from(p)))
         .map_err(|e| {
-            eprintln!("get_preferences DB error: {}", e);
+            tracing::error!(error = %e, "get_preferences DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }
