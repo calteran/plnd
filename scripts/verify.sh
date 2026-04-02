@@ -169,7 +169,7 @@ doppler run -- sh -c \
     "APP_DATABASE__URL='postgres://plnd:${VERIFY_DB_PASS}@localhost:5432/plnd_dev' \
      APP_AUTH__OIDC_INTERNAL_ISSUER_URL='http://localhost:8080/plnd-dev' \
      APP_AUTH__FRONTEND_ORIGIN='http://localhost:4200' \
-     ../target/debug/plnd_api" &
+     exec ../target/debug/plnd_api" &
 API_PID=$!
 
 timeout 30s bash -c \
