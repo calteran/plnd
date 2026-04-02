@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{Duration, NaiveDate, NaiveTime};
 use plnd_api::models::{PlanEntryRequest, PostSchedulePlanRequest};
 use plnd_api::routes::schedule::PeriodQuery;
 use plnd_data::db::query_types::{
@@ -82,6 +82,21 @@ fn test_post_schedule_plan_response_serde() {
     let json = serde_json::to_string(&resp).unwrap();
     assert!(json.contains("14"));
     assert!(json.contains("completed"));
+}
+
+#[test]
+fn test_carryover_lookback_window_boundary() {
+    // Carryover entries are bounded to 90 days before the period start.
+    // This verifies the date arithmetic: entries older than the lookback are excluded.
+    let start = NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
+    let lookback = start - Duration::days(90);
+    assert_eq!(lookback, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+    // A day within the window should be included (>= lookback and < start)
+    let within_window = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
+    assert!(within_window >= lookback && within_window < start);
+    // A day before the window should be excluded
+    let before_window = NaiveDate::from_ymd_opt(2025, 12, 31).unwrap();
+    assert!(before_window < lookback);
 }
 
 #[test]

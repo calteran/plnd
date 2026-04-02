@@ -8,6 +8,8 @@ use crate::db::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
 
+const CARRYOVER_LOOKBACK_DAYS: i64 = 90;
+
 const ENTRY_COLS: &str =
     "entry_id, user_id, template_id, task_type, task_ref_id, task_ref_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
@@ -31,14 +33,16 @@ pub async fn get_period(
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
 
+    let carryover_start = start - chrono::Duration::days(CARRYOVER_LOOKBACK_DAYS);
     let carryover: Vec<ScheduleEntry> = sqlx::query_as::<_, ScheduleEntry>(&format!(
         "SELECT {ENTRY_COLS} FROM schedule_entries
-         WHERE user_id = $1 AND date < $2
+         WHERE user_id = $1 AND date < $2 AND date >= $3
            AND status IN ('planned', 'deferred')
          ORDER BY date, scheduled_start"
     ))
     .bind(user_id)
     .bind(start)
+    .bind(carryover_start)
     .fetch_all(pool)
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
