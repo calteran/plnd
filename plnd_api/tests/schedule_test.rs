@@ -105,7 +105,7 @@ fn test_period_query_valid_dates_passes_guard() {
         end: NaiveDate::from_ymd_opt(2026, 4, 10).unwrap(),
     };
     assert!(
-        !(query.end < query.start),
+        query.end >= query.start,
         "end >= start should not trigger the guard"
     );
 }
@@ -118,7 +118,7 @@ fn test_period_query_same_date_passes_guard() {
         end: NaiveDate::from_ymd_opt(2026, 4, 5).unwrap(),
     };
     assert!(
-        !(query.end < query.start),
+        query.end >= query.start,
         "end == start should not trigger the guard"
     );
 }
