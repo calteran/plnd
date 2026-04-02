@@ -254,9 +254,9 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 **Tasks:**
 
-- [ ] **Prerequisite: DB Layer Migration** *(Issue [#158](https://github.com/calteran/plnd/issues/158))*
-  - [ ] Move DB layer from `plnd_api/src/db/` into `plnd_data`
-  - [ ] Establish clean dependency graph: `plnd_api` → `plnd_agent` → `plnd_data`
+- [x] **Prerequisite: DB Layer Migration** *(Issue [#158](https://github.com/calteran/plnd/issues/158) — completed in [#174](https://github.com/calteran/plnd/pull/174), [#177](https://github.com/calteran/plnd/pull/177))*
+  - [x] Move DB layer from `plnd_api/src/db/` into `plnd_data`
+  - [x] Establish clean dependency graph: `plnd_api` → `plnd_agent` → `plnd_data`
 
 - [ ] **Phase 3.0 — `plnd_agent` Foundation**
   - [ ] New `plnd_agent` workspace crate (no Axum dependency)
