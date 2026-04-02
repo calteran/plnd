@@ -1,11 +1,11 @@
 // Offline tests for the external client traits, DTOs, and error types.
 // No HTTP requests, no database — mirrors the domain_model_test.rs pattern.
 use async_trait::async_trait;
-use plnd_data::clients::dtos::{
+use plnd_data::providers::dtos::{
     ExternalDish, ExternalDishIngredient, ExternalExercise, ExternalIngredient, NutritionFacts,
     SearchQuery, SearchResult,
 };
-use plnd_data::clients::{
+use plnd_data::providers::{
     ExerciseProvider, ExternalClientError, NutritionProvider, OpenFoodFactsClient, RecipeProvider,
     TheMealDbClient, UsdaFdcClient,
 };

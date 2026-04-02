@@ -4,7 +4,7 @@ pub mod ingredients;
 
 pub use error::SeedError;
 
-use plnd_data::clients::{NutritionProvider, RecipeProvider};
+use plnd_data::providers::{NutritionProvider, RecipeProvider};
 use std::sync::Arc;
 
 /// Seed the catalog tables with real data from external providers.

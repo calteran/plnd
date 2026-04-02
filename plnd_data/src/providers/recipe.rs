@@ -1,5 +1,5 @@
-use crate::clients::dtos::ExternalDish;
-use crate::clients::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
+use crate::providers::dtos::ExternalDish;
+use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
 use async_trait::async_trait;
 
 /// Abstraction over any recipe / dish data provider (e.g. Spoonacular, Edamam).

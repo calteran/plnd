@@ -3,9 +3,9 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::clients::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
-use crate::clients::error::ExternalClientError;
-use crate::clients::nutrition::NutritionProvider;
+use crate::providers::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
+use crate::providers::error::ExternalClientError;
+use crate::providers::nutrition::NutritionProvider;
 
 pub struct UsdaFdcClient {
     http: Client,
@@ -250,8 +250,8 @@ impl NutritionProvider for UsdaFdcClient {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::clients::dtos::SearchQuery;
-    use crate::clients::error::ExternalClientError;
+    use crate::providers::dtos::SearchQuery;
+    use crate::providers::error::ExternalClientError;
 
     #[test]
     fn test_apply_nutrient_maps_all_known_ids() {

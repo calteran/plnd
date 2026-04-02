@@ -1,5 +1,5 @@
-use crate::clients::dtos::ExternalExercise;
-use crate::clients::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
+use crate::providers::dtos::ExternalExercise;
+use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
 use async_trait::async_trait;
 
 /// Abstraction over any exercise data provider (e.g. WGER, MuscleWiki).

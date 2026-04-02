@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::clients::dtos::Location;
-use crate::clients::error::ExternalClientError;
+use crate::providers::dtos::Location;
+use crate::providers::error::ExternalClientError;
 
 // ── Public types ──────────────────────────────────────────────────────────────
 

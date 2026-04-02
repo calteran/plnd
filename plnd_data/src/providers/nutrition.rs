@@ -1,5 +1,5 @@
-use crate::clients::dtos::ExternalIngredient;
-use crate::clients::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
+use crate::providers::dtos::ExternalIngredient;
+use crate::providers::{dtos::SearchQuery, dtos::SearchResult, error::ExternalClientError};
 use async_trait::async_trait;
 
 /// Abstraction over any nutrition / ingredient data provider (e.g. USDA FDC, OpenFoodFacts).

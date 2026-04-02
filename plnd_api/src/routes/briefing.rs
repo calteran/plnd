@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use chrono::{NaiveDate, Utc};
-use plnd_data::clients::{Location, NewsQuery};
+use plnd_data::providers::{Location, NewsQuery};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -52,8 +52,8 @@ pub struct WeatherResponse {
     pub precipitation_mm: f64,
 }
 
-impl From<plnd_data::clients::WeatherData> for WeatherResponse {
-    fn from(d: plnd_data::clients::WeatherData) -> Self {
+impl From<plnd_data::providers::WeatherData> for WeatherResponse {
+    fn from(d: plnd_data::providers::WeatherData) -> Self {
         Self {
             temperature_c: d.temperature_c,
             condition: d.condition,
@@ -70,8 +70,8 @@ pub struct NewsHeadlineResponse {
     pub url: Option<String>,
 }
 
-impl From<plnd_data::clients::NewsHeadline> for NewsHeadlineResponse {
-    fn from(h: plnd_data::clients::NewsHeadline) -> Self {
+impl From<plnd_data::providers::NewsHeadline> for NewsHeadlineResponse {
+    fn from(h: plnd_data::providers::NewsHeadline) -> Self {
         Self {
             title: h.title,
             url: h.url,

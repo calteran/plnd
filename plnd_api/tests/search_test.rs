@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use futures::StreamExt;
 use plnd_data::cache::{make_cache_key, SearchCache};
-use plnd_data::clients::dtos::{ExternalIngredient, SearchQuery, SearchResult};
-use plnd_data::clients::error::ExternalClientError;
-use plnd_data::clients::nutrition::NutritionProvider;
+use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery, SearchResult};
+use plnd_data::providers::error::ExternalClientError;
+use plnd_data::providers::nutrition::NutritionProvider;
 use plnd_data::search::{ProviderSearchEvent, ProviderSearchService};
 use std::sync::Arc;
 

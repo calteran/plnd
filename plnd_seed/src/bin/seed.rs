@@ -1,4 +1,4 @@
-use plnd_data::clients::{
+use plnd_data::providers::{
     NutritionProvider, OpenFoodFactsClient, RecipeProvider, TheMealDbClient, UsdaFdcClient,
 };
 use std::sync::Arc;

@@ -5,9 +5,9 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::clients::dtos::{ExternalDish, ExternalDishIngredient, SearchQuery, SearchResult};
-use crate::clients::error::ExternalClientError;
-use crate::clients::recipe::RecipeProvider;
+use crate::providers::dtos::{ExternalDish, ExternalDishIngredient, SearchQuery, SearchResult};
+use crate::providers::error::ExternalClientError;
+use crate::providers::recipe::RecipeProvider;
 
 pub struct TheMealDbClient {
     http: Client,

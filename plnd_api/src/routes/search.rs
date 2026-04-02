@@ -15,7 +15,7 @@ use crate::db::search::{
     LocalExerciseResult, LocalIngredientResult,
 };
 use crate::state::AppState;
-use plnd_data::clients::dtos::{SearchQuery, SearchResult};
+use plnd_data::providers::dtos::{SearchQuery, SearchResult};
 use plnd_data::search::ProviderSearchEvent;
 
 fn default_limit() -> u32 {

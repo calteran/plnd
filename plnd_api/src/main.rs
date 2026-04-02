@@ -23,7 +23,7 @@ use plnd_api::routes::{
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
-use plnd_data::clients::{
+use plnd_data::providers::{
     OpenFoodFactsClient, OpenMeteoProvider, RssFeedProvider, TheMealDbClient, UsdaFdcClient,
 };
 use plnd_data::search::ProviderSearchService;
@@ -121,9 +121,9 @@ async fn main() {
     // The seed is idempotent — safe to run on every startup.
     {
         let seed_pool = db_conn.get_pool().clone();
-        let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::clients::NutritionProvider>> =
+        let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::providers::NutritionProvider>> =
             vec![nutrition_usda.clone(), nutrition_off.clone()];
-        let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::clients::RecipeProvider>> =
+        let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::providers::RecipeProvider>> =
             vec![recipe_mdb.clone()];
         tokio::spawn(async move {
             if let Err(e) = plnd_seed::seed(&seed_pool, &seed_nutrition, &seed_recipe).await {

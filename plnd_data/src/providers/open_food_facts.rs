@@ -3,9 +3,9 @@ use reqwest::Client;
 use rust_decimal::Decimal;
 use serde::Deserialize;
 
-use crate::clients::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
-use crate::clients::error::ExternalClientError;
-use crate::clients::nutrition::NutritionProvider;
+use crate::providers::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, SearchResult};
+use crate::providers::error::ExternalClientError;
+use crate::providers::nutrition::NutritionProvider;
 
 pub struct OpenFoodFactsClient {
     http: Client,

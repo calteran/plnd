@@ -1,5 +1,5 @@
 use moka::future::Cache;
-use plnd_data::clients::{NewsHeadline, NewsProvider, WeatherData, WeatherProvider};
+use plnd_data::providers::{NewsHeadline, NewsProvider, WeatherData, WeatherProvider};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -38,7 +38,7 @@ impl BriefingState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use plnd_data::clients::{Location, NewsQuery, WeatherData};
+    use plnd_data::providers::{Location, NewsQuery, WeatherData};
 
     struct AlwaysSunnyWeather;
 
@@ -47,7 +47,7 @@ mod tests {
         async fn current(
             &self,
             _location: Location,
-        ) -> Result<WeatherData, plnd_data::clients::ExternalClientError> {
+        ) -> Result<WeatherData, plnd_data::providers::ExternalClientError> {
             Ok(WeatherData {
                 temperature_c: 22.0,
                 condition: "Clear sky".to_string(),
@@ -65,7 +65,7 @@ mod tests {
         async fn headlines(
             &self,
             _query: NewsQuery,
-        ) -> Result<Vec<NewsHeadline>, plnd_data::clients::ExternalClientError> {
+        ) -> Result<Vec<NewsHeadline>, plnd_data::providers::ExternalClientError> {
             Ok(vec![])
         }
     }
