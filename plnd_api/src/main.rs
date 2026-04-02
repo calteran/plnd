@@ -23,7 +23,9 @@ use plnd_api::routes::{
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
-use plnd_data::clients::{OpenFoodFactsClient, TheMealDbClient, UsdaFdcClient};
+use plnd_data::clients::{
+    OpenFoodFactsClient, OpenMeteoProvider, RssFeedProvider, TheMealDbClient, UsdaFdcClient,
+};
 use plnd_data::search::ProviderSearchService;
 
 #[tokio::main]
@@ -138,15 +140,11 @@ async fn main() {
         search_cache,
     );
 
-    let briefing = BriefingState::new(
-        config.external_providers.weather_latitude,
-        config.external_providers.weather_longitude,
-        config.external_providers.news_feed_url.clone(),
-    );
-    println!(
-        "  Briefing weather location: {}, {}",
-        config.external_providers.weather_latitude, config.external_providers.weather_longitude,
-    );
+    let weather_provider = Arc::new(OpenMeteoProvider::new());
+    let news_provider = Arc::new(RssFeedProvider::new(
+        &config.external_providers.news_feed_url,
+    ));
+    let briefing = BriefingState::new(weather_provider, news_provider);
     if config.external_providers.news_feed_url.is_empty() {
         println!("  Briefing news feed: disabled (news_feed_url not set)");
     } else {

@@ -1,6 +1,13 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+/// Geographic coordinate pair used by weather and news providers.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct Location {
+    pub latitude: f64,
+    pub longitude: f64,
+}
+
 /// Nutrition data matching the canonical `nutrition JSONB` shape in `catalog_ingredients`.
 /// All fields are `Option<f64>` so partial data from providers round-trips cleanly.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]

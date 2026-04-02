@@ -1,25 +1,87 @@
 use crate::auth::jwt::Claims;
-use crate::briefing::WeatherCacheEntry;
 use crate::db;
 use crate::state::AppState;
 use axum::{
-    extract::{Extension, State},
+    extract::{Extension, Query, State},
     http::StatusCode,
     Json,
 };
 use chrono::{NaiveDate, Utc};
-use serde::Serialize;
+use plnd_data::clients::{Location, NewsQuery};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
+// ── Query params ──────────────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct LocQuery {
+    pub loc: Option<String>,
+}
+
+/// Parse `"<lat>,<lon>"` into a `Location`. Returns `None` if missing or malformed.
+fn parse_loc(s: &str) -> Option<Location> {
+    let (lat_str, lon_str) = s.split_once(',')?;
+    let latitude = lat_str.trim().parse::<f64>().ok()?;
+    let longitude = lon_str.trim().parse::<f64>().ok()?;
+    if !latitude.is_finite() || !longitude.is_finite() {
+        return None;
+    }
+    Some(Location {
+        latitude,
+        longitude,
+    })
+}
+
+/// Round location to 1 decimal place for cache key stability (~11 km grid).
+fn round_location(loc: Location) -> Location {
+    Location {
+        latitude: (loc.latitude * 10.0).round() / 10.0,
+        longitude: (loc.longitude * 10.0).round() / 10.0,
+    }
+}
+
 // ── Response types ────────────────────────────────────────────────────────────
 
-/// `GET /briefing/weather` response
-pub type WeatherResponse = WeatherCacheEntry;
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct WeatherResponse {
+    pub temperature_c: f64,
+    pub condition: String,
+    pub high_c: f64,
+    pub low_c: f64,
+    pub precipitation_mm: f64,
+}
+
+impl From<plnd_data::clients::WeatherData> for WeatherResponse {
+    fn from(d: plnd_data::clients::WeatherData) -> Self {
+        Self {
+            temperature_c: d.temperature_c,
+            condition: d.condition,
+            high_c: d.high_c,
+            low_c: d.low_c,
+            precipitation_mm: d.precipitation_mm,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct NewsHeadlineResponse {
+    pub title: String,
+    pub url: Option<String>,
+}
+
+impl From<plnd_data::clients::NewsHeadline> for NewsHeadlineResponse {
+    fn from(h: plnd_data::clients::NewsHeadline) -> Self {
+        Self {
+            title: h.title,
+            url: h.url,
+        }
+    }
+}
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct NewsResponse {
-    pub headlines: Vec<String>,
+    pub headlines: Vec<NewsHeadlineResponse>,
 }
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
@@ -30,36 +92,17 @@ pub struct YesterdayResponse {
     pub meals_logged: i64,
 }
 
-// ── Open-Meteo deserialization structs (internal) ─────────────────────────────
-
-#[derive(serde::Deserialize)]
-struct OpenMeteoResponse {
-    current: OpenMeteoCurrentData,
-    daily: OpenMeteoDailyData,
-}
-
-#[derive(serde::Deserialize)]
-struct OpenMeteoCurrentData {
-    temperature_2m: f64,
-    precipitation: f64,
-    weather_code: u32,
-}
-
-#[derive(serde::Deserialize)]
-struct OpenMeteoDailyData {
-    temperature_2m_max: Vec<f64>,
-    temperature_2m_min: Vec<f64>,
-}
-
 // ── Handlers ─────────────────────────────────────────────────────────────────
 
 #[utoipa::path(
     get,
     path = "/briefing/weather",
     tag = "Briefing",
+    params(("loc" = String, Query, description = "Location as \"lat,lon\" e.g. \"51.5,-0.1\"")),
     security(("bearer_auth" = [])),
     responses(
-        (status = 200, description = "Current weather summary", body = WeatherCacheEntry),
+        (status = 200, description = "Current weather summary", body = WeatherResponse),
+        (status = 400, description = "Missing or malformed ?loc= parameter"),
         (status = 401, description = "Unauthorized"),
         (status = 503, description = "Weather service unavailable"),
     )
@@ -67,76 +110,47 @@ struct OpenMeteoDailyData {
 pub async fn get_weather(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
+    Query(params): Query<LocQuery>,
 ) -> Result<Json<WeatherResponse>, StatusCode> {
     let _user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    let lat = state.briefing.weather_latitude;
-    let lon = state.briefing.weather_longitude;
-    // Cache key is location-based, not user-based: all users share a single entry.
-    let cache_key = format!("weather:{lat:.4}:{lon:.4}");
+    let loc_str = params.loc.ok_or(StatusCode::BAD_REQUEST)?;
+    let location = parse_loc(&loc_str).ok_or(StatusCode::BAD_REQUEST)?;
+    let location = round_location(location);
+
+    let cache_key = format!("{:.1},{:.1}", location.latitude, location.longitude);
 
     if let Some(cached) = state.briefing.weather_cache.get(&cache_key).await {
-        return Ok(Json(cached));
+        return Ok(Json(WeatherResponse::from(cached)));
     }
 
-    let url = format!(
-        "https://api.open-meteo.com/v1/forecast\
-         ?latitude={lat}&longitude={lon}\
-         &current=temperature_2m,precipitation,weather_code\
-         &daily=temperature_2m_max,temperature_2m_min\
-         &forecast_days=1"
-    );
-
-    let resp: OpenMeteoResponse = state
+    let data = state
         .briefing
-        .http
-        .get(&url)
-        .send()
+        .weather
+        .current(location)
         .await
         .map_err(|e| {
             eprintln!("weather fetch error: {e}");
             StatusCode::SERVICE_UNAVAILABLE
-        })?
-        .json()
-        .await
-        .map_err(|e| {
-            eprintln!("weather parse error: {e}");
-            StatusCode::SERVICE_UNAVAILABLE
         })?;
-
-    let summary = WeatherCacheEntry {
-        temp_c: resp.current.temperature_2m,
-        condition: weather_code_to_condition(resp.current.weather_code).to_string(),
-        high_c: resp
-            .daily
-            .temperature_2m_max
-            .first()
-            .copied()
-            .unwrap_or(0.0),
-        low_c: resp
-            .daily
-            .temperature_2m_min
-            .first()
-            .copied()
-            .unwrap_or(0.0),
-        precipitation_flag: resp.current.precipitation > 0.0,
-    };
 
     state
         .briefing
         .weather_cache
-        .insert(cache_key, summary.clone())
+        .insert(cache_key, data.clone())
         .await;
-    Ok(Json(summary))
+    Ok(Json(WeatherResponse::from(data)))
 }
 
 #[utoipa::path(
     get,
     path = "/briefing/news",
     tag = "Briefing",
+    params(("loc" = String, Query, description = "Location as \"lat,lon\" e.g. \"51.5,-0.1\"")),
     security(("bearer_auth" = [])),
     responses(
         (status = 200, description = "Latest news headlines", body = NewsResponse),
+        (status = 400, description = "Missing or malformed ?loc= parameter"),
         (status = 401, description = "Unauthorized"),
         (status = 503, description = "News feed unavailable"),
     )
@@ -144,47 +158,38 @@ pub async fn get_weather(
 pub async fn get_news(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
+    Query(params): Query<LocQuery>,
 ) -> Result<Json<NewsResponse>, StatusCode> {
     let _user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    if state.briefing.news_feed_url.is_empty() {
-        return Ok(Json(NewsResponse { headlines: vec![] }));
+    let loc_str = params.loc.ok_or(StatusCode::BAD_REQUEST)?;
+    let location = parse_loc(&loc_str).ok_or(StatusCode::BAD_REQUEST)?;
+    let location = round_location(location);
+
+    let cache_key = format!("{:.1},{:.1}", location.latitude, location.longitude);
+
+    if let Some(cached) = state.briefing.news_cache.get(&cache_key).await {
+        let headlines = cached.into_iter().map(NewsHeadlineResponse::from).collect();
+        return Ok(Json(NewsResponse { headlines }));
     }
 
-    let feed_url = &state.briefing.news_feed_url;
+    let query = NewsQuery {
+        location,
+        feed_url: None,
+        limit: 3,
+    };
 
-    // Cache key is the feed URL — all users share a single entry per feed.
-    if let Some(cached) = state.briefing.news_cache.get(feed_url).await {
-        return Ok(Json(NewsResponse { headlines: cached }));
-    }
-
-    let bytes = state
-        .briefing
-        .http
-        .get(feed_url)
-        .send()
-        .await
-        .map_err(|e| {
-            eprintln!("news fetch error: {e}");
-            StatusCode::SERVICE_UNAVAILABLE
-        })?
-        .bytes()
-        .await
-        .map_err(|e| {
-            eprintln!("news read error: {e}");
-            StatusCode::SERVICE_UNAVAILABLE
-        })?;
-
-    let headlines = parse_feed_headlines(&bytes).map_err(|e| {
-        eprintln!("news parse error: {e}");
+    let data = state.briefing.news.headlines(query).await.map_err(|e| {
+        eprintln!("news fetch error: {e}");
         StatusCode::SERVICE_UNAVAILABLE
     })?;
 
     state
         .briefing
         .news_cache
-        .insert(feed_url.clone(), headlines.clone())
+        .insert(cache_key, data.clone())
         .await;
+    let headlines = data.into_iter().map(NewsHeadlineResponse::from).collect();
     Ok(Json(NewsResponse { headlines }))
 }
 
@@ -223,90 +228,56 @@ pub async fn get_yesterday(
     }))
 }
 
-// ── Pure functions ─────────────────────────────────────────────────────────────
-
-pub fn weather_code_to_condition(code: u32) -> &'static str {
-    match code {
-        0 => "Clear sky",
-        1..=3 => "Partly cloudy",
-        45 | 48 => "Foggy",
-        51..=67 => "Rainy",
-        71..=86 => "Snowy",
-        95..=99 => "Thunderstorm",
-        _ => "Cloudy",
-    }
-}
-
-pub fn parse_feed_headlines(content: &[u8]) -> Result<Vec<String>, String> {
-    use feed_rs::parser;
-    let feed = parser::parse(content).map_err(|e| e.to_string())?;
-    let headlines = feed
-        .entries
-        .iter()
-        .filter_map(|e| e.title.as_ref().map(|t| t.content.clone()))
-        .take(3)
-        .collect();
-    Ok(headlines)
-}
+// ── Pure function tests ───────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn weather_code_0_is_clear() {
-        assert_eq!(weather_code_to_condition(0), "Clear sky");
+    fn parse_loc_valid() {
+        let loc = parse_loc("51.5074,-0.1278").unwrap();
+        assert!((loc.latitude - 51.5074).abs() < 1e-9);
+        assert!((loc.longitude - (-0.1278)).abs() < 1e-9);
     }
 
     #[test]
-    fn weather_code_61_is_rainy() {
-        assert_eq!(weather_code_to_condition(61), "Rainy");
+    fn parse_loc_with_spaces() {
+        let loc = parse_loc("51.5, -0.1").unwrap();
+        assert!((loc.latitude - 51.5).abs() < 1e-9);
     }
 
     #[test]
-    fn weather_code_71_is_snowy() {
-        assert_eq!(weather_code_to_condition(71), "Snowy");
+    fn parse_loc_missing_comma_returns_none() {
+        assert!(parse_loc("51.5074").is_none());
     }
 
     #[test]
-    fn weather_code_95_is_thunderstorm() {
-        assert_eq!(weather_code_to_condition(95), "Thunderstorm");
+    fn parse_loc_non_numeric_returns_none() {
+        assert!(parse_loc("abc,def").is_none());
     }
 
     #[test]
-    fn weather_code_unknown_is_cloudy() {
-        assert_eq!(weather_code_to_condition(200), "Cloudy");
+    fn parse_loc_nan_returns_none() {
+        assert!(parse_loc("nan,0.0").is_none());
     }
 
     #[test]
-    fn parse_feed_headlines_returns_up_to_3() {
-        let rss = br#"<?xml version="1.0"?>
-<rss version="2.0"><channel>
-  <item><title>Headline One</title></item>
-  <item><title>Headline Two</title></item>
-  <item><title>Headline Three</title></item>
-  <item><title>Headline Four - should be excluded</title></item>
-</channel></rss>"#;
-        let result = parse_feed_headlines(rss).unwrap();
-        assert_eq!(result.len(), 3);
-        assert_eq!(result[0], "Headline One");
-        assert_eq!(result[2], "Headline Three");
+    fn round_location_1dp() {
+        let loc = round_location(Location {
+            latitude: 51.5074,
+            longitude: -0.1278,
+        });
+        assert!((loc.latitude - 51.5).abs() < 1e-9);
+        assert!((loc.longitude - (-0.1)).abs() < 1e-9);
     }
 
     #[test]
-    fn parse_feed_headlines_empty_feed_returns_empty_vec() {
-        let rss = br#"<?xml version="1.0"?><rss version="2.0"><channel></channel></rss>"#;
-        let result = parse_feed_headlines(rss).unwrap();
-        assert!(result.is_empty());
-    }
-
-    #[test]
-    fn parse_feed_handles_fewer_than_3_items() {
-        let rss = br#"<?xml version="1.0"?>
-<rss version="2.0"><channel>
-  <item><title>Only One</title></item>
-</channel></rss>"#;
-        let result = parse_feed_headlines(rss).unwrap();
-        assert_eq!(result.len(), 1);
+    fn round_location_rounds_up() {
+        let loc = round_location(Location {
+            latitude: 51.55,
+            longitude: 0.0,
+        });
+        assert!((loc.latitude - 51.6).abs() < 1e-9);
     }
 }

@@ -1,19 +1,24 @@
 pub mod dtos;
 pub mod error;
 pub mod exercise;
+pub mod news;
 pub mod nutrition;
 pub mod open_food_facts;
 pub mod recipe;
 pub mod themealdb;
 pub mod usda_fdc;
+pub mod weather;
 
+pub use dtos::Location;
 pub use error::ExternalClientError;
 pub use exercise::ExerciseProvider;
+pub use news::{NewsHeadline, NewsProvider, NewsQuery, RssFeedProvider};
 pub use nutrition::NutritionProvider;
 pub use open_food_facts::OpenFoodFactsClient;
 pub use recipe::RecipeProvider;
 pub use themealdb::TheMealDbClient;
 pub use usda_fdc::UsdaFdcClient;
+pub use weather::{OpenMeteoProvider, WeatherData, WeatherProvider};
 
 // TODO: update to production app name/URL before launch (required by Open Food Facts TOS etc.)
 pub(crate) const USER_AGENT: &str = concat!("com.tingeese.plnd-dev/", env!("CARGO_PKG_VERSION"));

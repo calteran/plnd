@@ -1,10 +1,9 @@
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
-use crate::briefing::WeatherCacheEntry;
 use crate::db::models::{DietaryRestriction, ReadyStatus, User, UserPreferences};
 use crate::routes::{
-    briefing::{NewsResponse, YesterdayResponse},
+    briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
     users::UpdateProfileRequest,
 };
@@ -59,7 +58,8 @@ impl Modify for BearerSecurityAddon {
         UpdateProfileRequest,
         CreateRestrictionRequest,
         UpdateRestrictionRequest,
-        WeatherCacheEntry,
+        WeatherResponse,
+        NewsHeadlineResponse,
         NewsResponse,
         YesterdayResponse,
     )),
