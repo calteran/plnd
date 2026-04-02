@@ -66,6 +66,16 @@ pub struct ClientErrorPayload {
 ///
 /// Unauthenticated callers are rate-limited at 20 requests/minute per IP.
 /// A valid backend JWT in the Authorization header bypasses the rate limit.
+#[utoipa::path(
+    post,
+    path = "/client_error",
+    tag = "System",
+    request_body = inline(serde_json::Value),
+    responses(
+        (status = 204, description = "Error logged"),
+        (status = 429, description = "Rate limit exceeded"),
+    )
+)]
 pub async fn report_client_error(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

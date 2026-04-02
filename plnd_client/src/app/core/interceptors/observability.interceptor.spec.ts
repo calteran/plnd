@@ -51,4 +51,20 @@ describe('observabilityInterceptor', () => {
     httpTesting.expectOne('/api/test').flush({ ok: true });
     expect(result).toEqual({ ok: true });
   });
+
+  it('calls fetch to report 4xx/5xx errors', () => {
+    const fetchSpy = spyOn(window, 'fetch').and.returnValue(
+      Promise.resolve(new Response(null, { status: 204 }))
+    );
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    http.get('/api/fail').subscribe({ error: () => {} });
+    httpTesting.expectOne('/api/fail').flush(
+      { message: 'Not Found' },
+      { status: 404, statusText: 'Not Found' }
+    );
+    expect(fetchSpy).toHaveBeenCalledOnceWith(
+      '/api/client_error',
+      jasmine.objectContaining({ method: 'POST', keepalive: true })
+    );
+  });
 });

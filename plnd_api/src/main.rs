@@ -62,7 +62,6 @@ async fn main() {
 
     tracing::info!(
         api_base_url = %config.api.base_url,
-        database_url = %config.database.url,
         log_level = %config.logging.level,
         "configuration loaded"
     );
@@ -139,7 +138,7 @@ async fn main() {
         tracing::info!("USDA FDC provider: ready");
     }
     tracing::info!(base_url = %config.external_providers.off_base_url, "Open Food Facts provider: ready");
-    tracing::info!(key = %config.external_providers.themealdb_api_key, "TheMealDB provider: ready");
+    tracing::info!("TheMealDB provider: ready");
 
     // Seed catalog tables in the background so the server binds immediately.
     // The seed is idempotent — safe to run on every startup.
