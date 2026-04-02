@@ -1,15 +1,18 @@
+use chrono::NaiveTime;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::{PatchPreferencesRequest, UserPreferences};
+use crate::db::models::UserPreferences;
 
 /// Upsert preferences: creates the row with defaults if absent, then applies any provided fields.
-/// Collapses the former get_or_create + UPDATE into a single round-trip.
 pub async fn patch_preferences(
     pool: &PgPool,
     user_id: Uuid,
-    req: &PatchPreferencesRequest,
+    week_start_day: Option<i16>,
+    planning_trigger_offset: Option<i16>,
+    default_plan_length_days: Option<i16>,
+    wake_time: Option<NaiveTime>,
 ) -> Result<UserPreferences, DatabaseError> {
     sqlx::query_as::<_, UserPreferences>(
         "INSERT INTO user_preferences
@@ -25,10 +28,10 @@ pub async fn patch_preferences(
                    default_plan_length_days, wake_time, created_at, updated_at",
     )
     .bind(user_id)
-    .bind(req.week_start_day)
-    .bind(req.planning_trigger_offset)
-    .bind(req.default_plan_length_days)
-    .bind(req.wake_time)
+    .bind(week_start_day)
+    .bind(planning_trigger_offset)
+    .bind(default_plan_length_days)
+    .bind(wake_time)
     .fetch_one(pool)
     .await
     .map_err(|e| DatabaseError::QueryError(e.to_string()))

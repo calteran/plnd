@@ -1893,6 +1893,7 @@ name = "plnd_data"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "feed-rs",
  "futures",
  "moka",
@@ -1900,9 +1901,11 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
+ "sqlx",
  "thiserror",
  "tokio",
  "tokio-stream",
+ "uuid",
 ]
 
 [[package]]

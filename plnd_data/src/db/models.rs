@@ -2,16 +2,10 @@ use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-#[derive(Serialize, utoipa::ToSchema)]
-pub struct ReadyStatus {
-    pub status: String,
-    pub database: String,
-    pub timestamp: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserPreferences {
     pub user_id: Uuid,
     pub week_start_day: i16,
@@ -22,7 +16,7 @@ pub struct UserPreferences {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DietaryRestriction {
     pub restriction_id: Uuid,
     pub user_id: Uuid,
@@ -33,7 +27,7 @@ pub struct DietaryRestriction {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
     pub user_id: Uuid,
     pub email: String,
@@ -50,7 +44,7 @@ pub struct User {
 // Catalog: Ingredients (layer 1 — atomic food items)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CatalogIngredient {
     pub ingredient_id: Uuid,
     pub name: String,
@@ -70,7 +64,7 @@ pub struct CatalogIngredient {
 // Catalog: Dishes (layer 2 — recipes composed of ingredients)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CatalogDish {
     pub dish_id: Uuid,
     pub name: String,
@@ -92,7 +86,7 @@ pub struct CatalogDish {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CatalogDishIngredient {
     pub dish_ingredient_id: Uuid,
     pub dish_id: Uuid,
@@ -108,7 +102,7 @@ pub struct CatalogDishIngredient {
 // Catalog: Meals (layer 3 — eating occasion templates composed of dishes)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CatalogMeal {
     pub meal_id: Uuid,
     pub name: String,
@@ -127,7 +121,7 @@ pub struct CatalogMeal {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CatalogMealDish {
     pub meal_dish_id: Uuid,
     pub meal_id: Uuid,
@@ -141,7 +135,7 @@ pub struct CatalogMealDish {
 // User: Personal dish library
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserDish {
     pub user_dish_id: Uuid,
     pub user_id: Uuid,
@@ -162,7 +156,7 @@ pub struct UserDish {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserDishIngredient {
     pub user_dish_ingredient_id: Uuid,
     pub user_dish_id: Uuid,
@@ -178,7 +172,7 @@ pub struct UserDishIngredient {
 // User: Personal meal library
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserMeal {
     pub user_meal_id: Uuid,
     pub user_id: Uuid,
@@ -196,7 +190,7 @@ pub struct UserMeal {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserMealDish {
     pub user_meal_dish_id: Uuid,
     pub user_meal_id: Uuid,
@@ -213,7 +207,7 @@ pub struct UserMealDish {
 
 /// Stable handle for a user's relationship with a dish.
 /// The client always uses user_dish_pref_id — it never changes even after a fork.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserDishPref {
     pub user_dish_pref_id: Uuid,
     pub user_id: Uuid,
@@ -228,7 +222,7 @@ pub struct UserDishPref {
 }
 
 /// UserDishPref enriched with display fields computed by the list/detail query.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserDishPrefDetail {
     pub user_dish_pref_id: Uuid,
     pub user_id: Uuid,
@@ -248,7 +242,7 @@ pub struct UserDishPrefDetail {
 }
 
 /// Stable handle for a user's relationship with a meal.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserMealPref {
     pub user_meal_pref_id: Uuid,
     pub user_id: Uuid,
@@ -263,7 +257,7 @@ pub struct UserMealPref {
 }
 
 /// UserMealPref enriched with display fields computed by the list/detail query.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserMealPrefDetail {
     pub user_meal_pref_id: Uuid,
     pub user_id: Uuid,
@@ -283,7 +277,7 @@ pub struct UserMealPrefDetail {
 }
 
 /// User preference for a catalog ingredient (blocked/notes only — no fork concept for ingredients).
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserIngredientPref {
     pub user_ingredient_pref_id: Uuid,
     pub user_id: Uuid,
@@ -298,7 +292,7 @@ pub struct UserIngredientPref {
 // Catalog: Exercises
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct CatalogExercise {
     pub exercise_id: Uuid,
     pub name: String,
@@ -319,7 +313,7 @@ pub struct CatalogExercise {
 // User: Personal exercise library
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserExercise {
     pub user_exercise_id: Uuid,
     pub user_id: Uuid,
@@ -342,7 +336,7 @@ pub struct UserExercise {
 // Family coordination
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Family {
     pub family_id: Uuid,
     pub name: String,
@@ -350,7 +344,7 @@ pub struct Family {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct FamilyMember {
     pub family_member_id: Uuid,
     pub family_id: Uuid,
@@ -360,7 +354,7 @@ pub struct FamilyMember {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct FamilyMeal {
     pub family_meal_id: Uuid,
     pub family_id: Uuid,
@@ -380,7 +374,7 @@ pub struct FamilyMeal {
 // Tasks (universal scheduling unit — base entity)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Task {
     pub task_id: Uuid,
     pub user_id: Uuid,
@@ -399,7 +393,7 @@ pub struct Task {
 // Task specialization tables (joined on demand by task_type)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct MealTask {
     pub task_id: Uuid,
     pub user_meal_id: Option<Uuid>,
@@ -408,7 +402,7 @@ pub struct MealTask {
     pub occasion_label: Option<String>, // free-form: "breakfast", "morning snack", etc.
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ExerciseTask {
     pub task_id: Uuid,
     pub user_exercise_id: Option<Uuid>,
@@ -416,14 +410,14 @@ pub struct ExerciseTask {
     pub muscle_groups: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct WorkTask {
     pub task_id: Uuid,
     pub project_label: Option<String>,
     pub focus_level_required: Option<String>, // 'low' | 'medium' | 'deep'
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct GenericTask {
     pub task_id: Uuid,
     pub category: Option<String>,
@@ -434,7 +428,7 @@ pub struct GenericTask {
 // Schedule templates (recurring patterns)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ScheduleTemplate {
     pub template_id: Uuid,
     pub user_id: Uuid,
@@ -457,7 +451,7 @@ pub struct ScheduleTemplate {
 // Schedule entries (concrete instances on a specific date)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ScheduleEntry {
     pub entry_id: Uuid,
     pub user_id: Uuid,
@@ -484,54 +478,31 @@ pub struct ScheduleEntry {
 // Weekly planning — response types
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SchedulePeriodResponse {
     pub entries: Vec<ScheduleEntry>,
     pub carryover: Vec<ScheduleEntry>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanStatusResponse {
     pub planned: bool,
     pub entry_count: i64,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct PostSchedulePlanResponse {
+    pub committed: i64,
+    pub planning_task_status: String,
+}
+
 // ---------------------------------------------------------------------------
-// Weekly planning — request types
+// Schedule commit input (DB-layer types, decoupled from HTTP request types)
 // ---------------------------------------------------------------------------
 
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
-pub struct PatchPreferencesRequest {
-    pub week_start_day: Option<i16>,
-    pub planning_trigger_offset: Option<i16>,
-    pub default_plan_length_days: Option<i16>,
-    pub wake_time: Option<NaiveTime>,
-}
-
-fn deserialize_hhmm<'de, D>(deserializer: D) -> Result<NaiveTime, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    NaiveTime::parse_from_str(&s, "%H:%M")
-        .or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S"))
-        .map_err(serde::de::Error::custom)
-}
-
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
-pub struct PlanEntryRequest {
-    pub date: NaiveDate,
-    pub task_type: String,
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
-    pub title: Option<String>,
-    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"
-    #[serde(deserialize_with = "deserialize_hhmm")]
-    pub scheduled_start: NaiveTime,
-    pub after_milepost: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+/// DB-layer carryover decision — used by `schedule::commit_plan`.
+/// The matching HTTP type (with utoipa) lives in `plnd_api/src/models.rs` and maps to this type at the route boundary.
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CarryoverDecision {
     Accept,
@@ -539,20 +510,26 @@ pub enum CarryoverDecision {
     Dismiss,
 }
 
-#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
-pub struct PostSchedulePlanRequest {
+/// Input to `schedule::commit_plan` — constructed from the HTTP request in plnd_api.
+#[derive(Debug, Clone)]
+pub struct CommitPlanInput {
     pub plan_start: NaiveDate,
     pub plan_end: NaiveDate,
     pub planning_task_id: Uuid,
-    pub entries: Vec<PlanEntryRequest>,
-    pub replace: Option<bool>,
-    /// Carryover decisions keyed by entry_id UUID string
-    #[serde(default)]
-    pub carryover_decisions: std::collections::HashMap<Uuid, CarryoverDecision>,
+    pub entries: Vec<PlanEntryInput>,
+    /// Pre-resolved from the HTTP request's `Option<bool>` with a default of `false`.
+    pub replace: bool,
+    pub carryover_decisions: HashMap<Uuid, CarryoverDecision>,
 }
 
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-pub struct PostSchedulePlanResponse {
-    pub committed: i64,
-    pub planning_task_status: String,
+/// One schedule entry to be committed, decoded from HTTP in plnd_api.
+#[derive(Debug, Clone)]
+pub struct PlanEntryInput {
+    pub date: NaiveDate,
+    pub task_type: String,
+    pub task_ref_id: Option<Uuid>,
+    pub task_ref_type: Option<String>,
+    pub title: Option<String>,
+    pub scheduled_start: NaiveTime,
+    pub after_milepost: Option<String>,
 }

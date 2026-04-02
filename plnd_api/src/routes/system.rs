@@ -1,4 +1,4 @@
-use crate::db::models::ReadyStatus;
+use crate::models::ReadyStatus;
 use crate::state::AppState;
 use axum::{extract::State, http::StatusCode, Json};
 use chrono::Utc;

@@ -10,11 +10,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::db::search::{
+use crate::state::AppState;
+use plnd_data::db::search::{
     search_dishes, search_exercises, search_ingredients, search_user_dishes, LocalDishResult,
     LocalExerciseResult, LocalIngredientResult,
 };
-use crate::state::AppState;
 use plnd_data::providers::dtos::{SearchQuery, SearchResult};
 use plnd_data::search::ProviderSearchEvent;
 

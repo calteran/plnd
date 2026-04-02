@@ -1,11 +1,11 @@
 use crate::auth::jwt::Claims;
-use crate::db;
 use crate::state::AppState;
 use axum::{
     extract::{Extension, State},
     http::{HeaderMap, StatusCode},
     Json,
 };
+use plnd_data::db;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 

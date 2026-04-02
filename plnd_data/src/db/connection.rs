@@ -24,7 +24,6 @@ impl Database {
     }
 
     /// Get a reference to the connection pool
-    #[allow(dead_code)]
     pub fn get_pool(&self) -> &PgPool {
         &self.pool
     }

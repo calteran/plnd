@@ -1,4 +1,4 @@
-use plnd_api::db::models::PatchPreferencesRequest;
+use plnd_api::models::PatchPreferencesRequest;
 
 #[test]
 fn test_patch_preferences_request_all_fields() {

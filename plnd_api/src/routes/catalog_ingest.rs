@@ -6,8 +6,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::db::catalog_ingest;
 use crate::state::AppState;
+use plnd_data::db::catalog_ingest;
 
 #[derive(Deserialize)]
 pub struct IngestIngredientBody {

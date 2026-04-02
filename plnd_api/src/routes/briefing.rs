@@ -1,5 +1,4 @@
 use crate::auth::jwt::Claims;
-use crate::db;
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Query, State},
@@ -7,6 +6,7 @@ use axum::{
     Json,
 };
 use chrono::{NaiveDate, Utc};
+use plnd_data::db;
 use plnd_data::providers::{Location, NewsQuery};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

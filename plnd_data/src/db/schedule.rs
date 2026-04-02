@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::db::models::{
-    CarryoverDecision, PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse,
+    CarryoverDecision, CommitPlanInput, PlanStatusResponse, PostSchedulePlanResponse,
     ScheduleEntry, SchedulePeriodResponse,
 };
 
@@ -73,9 +73,8 @@ pub async fn get_plan_status(
 pub async fn commit_plan(
     pool: &PgPool,
     user_id: Uuid,
-    req: &PostSchedulePlanRequest,
+    req: &CommitPlanInput,
 ) -> Result<PostSchedulePlanResponse, DatabaseError> {
-    let replace = req.replace.unwrap_or(false);
     let today = chrono::Utc::now().date_naive();
 
     let mut tx = pool
@@ -86,7 +85,7 @@ pub async fn commit_plan(
     // If replace=true, delete planned entries for unstarted days only (spec §303).
     // An unstarted day has no in_progress or completed entries; started days are
     // left completely untouched even if replace=true.
-    if replace {
+    if req.replace {
         let started_days: Vec<NaiveDate> = sqlx::query_scalar(
             "SELECT DISTINCT date FROM schedule_entries
              WHERE user_id = $1 AND date >= $2 AND date <= $3

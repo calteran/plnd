@@ -8,11 +8,11 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::db::{
+use crate::state::AppState;
+use plnd_data::db::{
     catalog_details,
     models::{CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish},
 };
-use crate::state::AppState;
 
 #[derive(Serialize)]
 pub struct DishDetailResponse {

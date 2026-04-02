@@ -1,12 +1,12 @@
+use crate::api_response::DietaryRestrictionResponse;
 use crate::auth::jwt::Claims;
-use crate::db;
-use crate::db::models::DietaryRestriction;
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
     Json,
 };
+use plnd_data::db;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -32,7 +32,7 @@ pub const MAX_NOTES_LEN: usize = 500;
     tag = "Dietary Restrictions",
     security(("bearer_auth" = [])),
     responses(
-        (status = 200, description = "List of dietary restrictions", body = Vec<DietaryRestriction>),
+        (status = 200, description = "List of dietary restrictions", body = Vec<DietaryRestrictionResponse>),
         (status = 401, description = "Unauthorized"),
     )
 )]
@@ -40,13 +40,19 @@ pub const MAX_NOTES_LEN: usize = 500;
 pub async fn list_restrictions(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-) -> Result<Json<Vec<DietaryRestriction>>, StatusCode> {
+) -> Result<Json<Vec<DietaryRestrictionResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let pool = state.db.get_pool();
 
     db::dietary_restrictions::list(pool, user_id)
         .await
-        .map(Json)
+        .map(|v| {
+            Json(
+                v.into_iter()
+                    .map(DietaryRestrictionResponse::from)
+                    .collect(),
+            )
+        })
         .map_err(|e| {
             eprintln!("list_restrictions DB error: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
@@ -60,7 +66,7 @@ pub async fn list_restrictions(
     security(("bearer_auth" = [])),
     request_body = CreateRestrictionRequest,
     responses(
-        (status = 201, description = "Restriction created", body = DietaryRestriction),
+        (status = 201, description = "Restriction created", body = DietaryRestrictionResponse),
         (status = 401, description = "Unauthorized"),
         (status = 409, description = "Duplicate restriction (same type and name)"),
         (status = 422, description = "Validation error"),
@@ -71,7 +77,7 @@ pub async fn create_restriction(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Json(body): Json<CreateRestrictionRequest>,
-) -> Result<(StatusCode, Json<DietaryRestriction>), StatusCode> {
+) -> Result<(StatusCode, Json<DietaryRestrictionResponse>), StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     if !VALID_TYPES.contains(&body.restriction_type.as_str()) {
@@ -99,7 +105,12 @@ pub async fn create_restriction(
         body.notes.as_deref(),
     )
     .await
-    .map(|r| (StatusCode::CREATED, Json(r)))
+    .map(|r| {
+        (
+            StatusCode::CREATED,
+            Json(DietaryRestrictionResponse::from(r)),
+        )
+    })
     .map_err(|e| {
         let msg = e.to_string();
         if msg.contains("uq_user_type_name") {
@@ -119,7 +130,7 @@ pub async fn create_restriction(
     params(("id" = uuid::Uuid, Path, description = "Restriction ID")),
     request_body = UpdateRestrictionRequest,
     responses(
-        (status = 200, description = "Updated restriction", body = DietaryRestriction),
+        (status = 200, description = "Updated restriction", body = DietaryRestrictionResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Restriction not found"),
         (status = 422, description = "Validation error"),
@@ -131,7 +142,7 @@ pub async fn update_restriction(
     Extension(claims): Extension<Claims>,
     Path(restriction_id): Path<Uuid>,
     Json(body): Json<UpdateRestrictionRequest>,
-) -> Result<Json<DietaryRestriction>, StatusCode> {
+) -> Result<Json<DietaryRestrictionResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     if let Some(ref n) = body.notes {
@@ -148,7 +159,7 @@ pub async fn update_restriction(
             eprintln!("update_restriction DB error: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?
-        .map(Json)
+        .map(|r| Json(DietaryRestrictionResponse::from(r)))
         .ok_or(StatusCode::NOT_FOUND)
 }
 

@@ -1,8 +1,6 @@
 use chrono::{NaiveDate, NaiveTime};
-use plnd_api::db::models::{
-    PlanEntryRequest, PlanStatusResponse, PostSchedulePlanRequest, PostSchedulePlanResponse,
-    SchedulePeriodResponse,
-};
+use plnd_api::models::{PlanEntryRequest, PostSchedulePlanRequest};
+use plnd_data::db::models::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 #[test]
 fn test_plan_entry_request_serde() {

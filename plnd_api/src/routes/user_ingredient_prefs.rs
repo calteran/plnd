@@ -8,8 +8,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::db::{models::UserIngredientPref, user_ingredient_prefs};
 use crate::state::AppState;
+use plnd_data::db::{models::UserIngredientPref, user_ingredient_prefs};
 
 #[derive(Deserialize)]
 pub struct UpsertIngredientPrefBody {

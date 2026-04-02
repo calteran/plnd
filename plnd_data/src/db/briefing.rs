@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 
-#[derive(Debug, Serialize, sqlx::FromRow, utoipa::ToSchema)]
+#[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct YesterdaySnapshot {
     pub tasks_total: i64,
     pub tasks_done: i64,
