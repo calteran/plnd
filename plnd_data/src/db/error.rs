@@ -15,7 +15,6 @@ pub enum DatabaseError {
     #[error("Validation error: {0}")]
     ValidationError(String),
 
-    #[allow(dead_code)]
     #[error("Migration failed: {0}")]
     MigrationError(String),
 
