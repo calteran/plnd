@@ -109,16 +109,9 @@ services-up:
     doppler run -- docker compose up -d --build client --wait
     @echo "✅ Services ready"
 
-# Full verification (quality checks + build + comprehensive tests)
+# Full verification — parallel pipeline (see scripts/verify.sh)
 verify:
-    @echo "🔍 Running full verification..."
-    just check && \
-    just verify-build && \
-    cargo nextest run --workspace && \
-    just test-ng-headless && \
-    just services-up && \
-    just test-e2e && \
-    echo "✅ All verifications passed"
+    @bash scripts/verify.sh
 
 # Combined quality check
 check:
@@ -137,6 +130,12 @@ playwright-install:
 test-e2e:
     @echo "Running Playwright e2e tests..."
     cd plnd_client && npm run e2e:ci
+
+# Run Playwright e2e tests against a natively-running API (no Docker build)
+# Requires: postgres on 5432, mock-oauth on 8080, and API binary running on 3000
+test-e2e-native:
+    @echo "Running Playwright e2e tests (native API)..."
+    cd plnd_client && CI=true npm run e2e:ci
 
 # Run Playwright e2e tests in dev mode (reuses existing ng serve if running)
 test-e2e-dev:
