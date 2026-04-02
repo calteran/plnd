@@ -8,7 +8,7 @@ init:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ Installing Homebrew packages..."
-    brew install util-linux libpq doppler/cli/doppler
+    brew install flock coreutils libpq doppler/cli/doppler
 
     echo "→ Installing Rust tools..."
     cargo install cargo-nextest --locked
@@ -19,7 +19,7 @@ init:
     cd plnd_client && npm ci
 
     echo "→ Installing Playwright browser..."
-    cd plnd_client && npx playwright install chromium
+    npx playwright install chromium
 
     echo "✅ Dev environment ready. Run 'doppler login' if you haven't already."
 
