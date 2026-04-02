@@ -1,6 +1,7 @@
 pub mod connection;
 pub mod error;
 pub mod models;
+pub mod query_types;
 
 pub mod briefing;
 pub mod catalog_details;
