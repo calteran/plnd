@@ -48,6 +48,23 @@ impl SearchParams {
     }
 }
 
+#[derive(Deserialize)]
+pub struct ExerciseSearchParams {
+    pub q: String,
+    #[serde(default = "default_limit")]
+    pub limit: u32,
+}
+
+impl ExerciseSearchParams {
+    fn into_search_query(self) -> SearchQuery {
+        SearchQuery {
+            query: self.q,
+            limit: self.limit,
+            exclude_allergens: vec![],
+        }
+    }
+}
+
 #[derive(Serialize, Default, utoipa::ToSchema)]
 pub struct IngredientSearchResponse {
     #[schema(value_type = Vec<Object>)]
@@ -193,7 +210,6 @@ pub async fn search_dishes_handler(
     params(
         ("q" = String, Query, description = "Search query"),
         ("limit" = Option<u32>, Query, description = "Max results (default 20)"),
-        ("exclude_allergens" = Option<String>, Query, description = "Comma-separated allergens to exclude"),
     ),
     security(("bearer_auth" = [])),
     responses(
@@ -205,7 +221,7 @@ pub async fn search_dishes_handler(
 pub async fn search_exercises_handler(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
-    Query(params): Query<SearchParams>,
+    Query(params): Query<ExerciseSearchParams>,
 ) -> Result<Json<ExerciseSearchResponse>, StatusCode> {
     let sq = params.into_search_query();
     let local = search_exercises(state.db.get_pool(), &sq.query, sq.limit as i64)
