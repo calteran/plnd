@@ -111,12 +111,11 @@ pub async fn create_restriction(
             Json(DietaryRestrictionResponse::from(r)),
         )
     })
-    .map_err(|e| {
-        let msg = e.to_string();
-        if msg.contains("uq_user_type_name") {
-            StatusCode::CONFLICT
-        } else {
-            eprintln!("create_restriction DB error: {}", msg);
+    .map_err(|e| match e {
+        db::error::DatabaseError::UniqueViolation => StatusCode::CONFLICT,
+        db::error::DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+        e => {
+            eprintln!("create_restriction DB error: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         }
     })

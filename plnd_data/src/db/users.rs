@@ -15,7 +15,7 @@ pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, D
     .bind(email)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Find a user by their UUID
@@ -28,7 +28,7 @@ pub async fn find_by_id(pool: &PgPool, user_id: Uuid) -> Result<Option<User>, Da
     .bind(user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Create a new user, returning the created record
@@ -56,7 +56,7 @@ pub async fn create(
     .bind(avatar_url)
     .fetch_one(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Find a user by their OAuth provider type and provider-issued user ID (sub)
@@ -76,7 +76,7 @@ pub async fn find_by_provider(
     .bind(provider_user_id)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Record an OAuth provider link for an existing user
@@ -99,7 +99,7 @@ pub async fn link_oauth_provider(
     .execute(pool)
     .await
     .map(|_| ())
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Update a user's display_name and/or avatar_url.
@@ -124,7 +124,7 @@ pub async fn update_profile(
     .bind(avatar_url)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Soft-deactivate a user (is_active = FALSE). Returns true if a row was updated.
@@ -134,7 +134,7 @@ pub async fn deactivate_user(pool: &PgPool, user_id: Uuid) -> Result<bool, Datab
         .execute(pool)
         .await
         .map(|r| r.rows_affected() > 0)
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))
+        .map_err(DatabaseError::from)
 }
 
 /// Update a user's last_login timestamp
@@ -144,7 +144,7 @@ pub async fn touch_last_login(pool: &PgPool, user_id: Uuid) -> Result<(), Databa
         .execute(pool)
         .await
         .map(|_| ())
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))
+        .map_err(DatabaseError::from)
 }
 
 /// Mark onboarding as completed for the given user.
@@ -158,5 +158,5 @@ pub async fn complete_onboarding(pool: &PgPool, user_id: Uuid) -> Result<bool, D
     .execute(pool)
     .await
     .map(|r| r.rows_affected() > 0)
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
