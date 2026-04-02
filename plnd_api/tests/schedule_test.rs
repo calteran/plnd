@@ -4,6 +4,7 @@ use plnd_api::routes::schedule::PeriodQuery;
 use plnd_data::db::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
+use plnd_data::db::schedule::CARRYOVER_LOOKBACK_DAYS;
 
 #[test]
 fn test_plan_entry_request_serde() {
@@ -86,10 +87,11 @@ fn test_post_schedule_plan_response_serde() {
 
 #[test]
 fn test_carryover_lookback_window_boundary() {
-    // Carryover entries are bounded to 90 days before the period start.
-    // This verifies the date arithmetic: entries older than the lookback are excluded.
+    // Carryover entries are bounded to CARRYOVER_LOOKBACK_DAYS before the period start.
+    // This verifies the date arithmetic using the real constant so the test stays in
+    // sync if the window is ever changed.
     let start = NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
-    let lookback = start - Duration::days(90);
+    let lookback = start - Duration::days(CARRYOVER_LOOKBACK_DAYS);
     assert_eq!(lookback, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
     // A day within the window should be included (>= lookback and < start)
     let within_window = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
