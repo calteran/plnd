@@ -39,6 +39,18 @@ if ! command -v timeout &>/dev/null; then
     echo "✗ 'timeout' not found — install coreutils: brew install coreutils" >&2
     exit 1
 fi
+if ! command -v flock &>/dev/null; then
+    echo "✗ 'flock' not found — install util-linux: brew install util-linux" >&2
+    exit 1
+fi
+
+# ── Semaphore: serialize concurrent verify runs ────────────────────────────────
+LOCK_FILE="/tmp/plnd-verify.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "⏳ Another verify is running — waiting for lock..."
+    flock 9
+fi
 
 # ── PID tracking ──────────────────────────────────────────────────────────────
 # Usage: some_command & track $! "human-readable label"
