@@ -1,10 +1,15 @@
-use axum::http::{HeaderValue, Method};
+use axum::http::{HeaderName, HeaderValue, Method};
 use axum::{
     middleware,
     routing::{delete, get, patch, post, put},
     Router,
 };
+use governor::{Quota, RateLimiter};
+use std::num::NonZeroU32;
 use tower_http::cors::CorsLayer;
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::trace::TraceLayer;
+use tracing_subscriber::EnvFilter;
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 use utoipa_swagger_ui::SwaggerUi;
@@ -33,30 +38,49 @@ async fn main() {
     let config = match config::load_config() {
         Ok(config) => config,
         Err(e) => {
+            // Subscriber not yet initialized — eprintln is the only option here
             eprintln!("Failed to load configuration: {}", e);
             std::process::exit(1);
         }
     };
 
-    println!("Loaded configuration:");
-    println!("  API Base URL: {}", config.api.base_url);
-    println!("  Database URL: {}", config.database.url);
-    println!("  Log Level: {}", config.logging.level);
+    // Initialize structured logging subscriber immediately after config loads.
+    // All tracing events after this point are captured and formatted.
+    if config.logging.pretty_print {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::new(&config.logging.level))
+            .with_target(true)
+            .pretty()
+            .init();
+    } else {
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::new(&config.logging.level))
+            .with_target(true)
+            .json()
+            .init();
+    }
+
+    tracing::info!(
+        api_base_url = %config.api.base_url,
+        database_url = %config.database.url,
+        log_level = %config.logging.level,
+        "configuration loaded"
+    );
 
     let db_conn =
         match Database::new(&config.database.url, config.database.max_connections as u32).await {
             Ok(db) => db,
             Err(e) => {
-                eprintln!("Failed to connect to database: {}", e);
+                tracing::error!(error = %e, "failed to connect to database");
                 std::process::exit(1);
             }
         };
 
     if let Err(e) = plnd_data::db::run_migrations(db_conn.get_pool()).await {
-        eprintln!("Failed to run database migrations: {}", e);
+        tracing::error!(error = %e, "failed to run database migrations");
         std::process::exit(1);
     }
-    println!("Database migrations applied successfully");
+    tracing::info!("database migrations applied successfully");
 
     let jwt = JwtService::new(
         config.auth.jwt.secret.clone(),
@@ -75,8 +99,11 @@ async fn main() {
     };
     let jwks = JwksCache::new(config.auth.oidc.issuer_url.clone(), internal_issuer);
 
-    println!("  OIDC issuer: {}", config.auth.oidc.issuer_url);
-    println!("  OIDC client_id: {}", config.auth.oidc.client_id);
+    tracing::info!(
+        issuer = %config.auth.oidc.issuer_url,
+        client_id = %config.auth.oidc.client_id,
+        "OIDC configured"
+    );
 
     let cors_origin: HeaderValue = config
         .auth
@@ -103,19 +130,14 @@ async fn main() {
     let recipe_mdb = Arc::new(TheMealDbProvider::new(
         &config.external_providers.themealdb_api_key,
     ));
+
     if config.external_providers.usda_fdc_api_key.is_empty() {
-        println!("  USDA FDC provider: no API key set (will return ConfigurationError at runtime)");
+        tracing::warn!("USDA FDC provider: no API key set (will return ConfigurationError at runtime)");
     } else {
-        println!("  USDA FDC provider: ready");
+        tracing::info!("USDA FDC provider: ready");
     }
-    println!(
-        "  Open Food Facts provider: ready ({})",
-        config.external_providers.off_base_url
-    );
-    println!(
-        "  TheMealDB provider: ready (key={})",
-        config.external_providers.themealdb_api_key
-    );
+    tracing::info!(base_url = %config.external_providers.off_base_url, "Open Food Facts provider: ready");
+    tracing::info!(key = %config.external_providers.themealdb_api_key, "TheMealDB provider: ready");
 
     // Seed catalog tables in the background so the server binds immediately.
     // The seed is idempotent — safe to run on every startup.
@@ -127,7 +149,7 @@ async fn main() {
             vec![recipe_mdb.clone()];
         tokio::spawn(async move {
             if let Err(e) = plnd_seed::seed(&seed_pool, &seed_nutrition, &seed_recipe).await {
-                eprintln!("Warning: catalog seed failed: {}", e);
+                tracing::warn!(error = %e, "catalog seed failed (non-fatal)");
             }
         });
     }
@@ -146,13 +168,15 @@ async fn main() {
     ));
     let briefing = BriefingState::new(weather_provider, news_provider);
     if config.external_providers.news_feed_url.is_empty() {
-        println!("  Briefing news feed: disabled (news_feed_url not set)");
+        tracing::warn!("briefing news feed disabled (news_feed_url not set)");
     } else {
-        println!(
-            "  Briefing news feed: {}",
-            config.external_providers.news_feed_url
-        );
+        tracing::info!(feed_url = %config.external_providers.news_feed_url, "briefing news feed configured");
     }
+
+    // Per-IP rate limiter for unauthenticated /api/client_error requests.
+    // 20 requests per minute per IP; authenticated requests bypass this.
+    let client_error_quota = Quota::per_minute(NonZeroU32::new(20).unwrap());
+    let client_error_limiter = Arc::new(RateLimiter::keyed(client_error_quota));
 
     let state = Arc::new(AppState {
         db: db_conn,
@@ -162,7 +186,10 @@ async fn main() {
         oidc_client_id: config.auth.oidc.client_id.clone(),
         provider_search,
         briefing,
+        client_error_limiter,
     });
+
+    let x_request_id = HeaderName::from_static("x-request-id");
 
     let cors = CorsLayer::new()
         .allow_origin(cors_origin)
@@ -176,7 +203,9 @@ async fn main() {
         .allow_headers([
             axum::http::header::AUTHORIZATION,
             axum::http::header::CONTENT_TYPE,
-        ]);
+            HeaderName::from_static("x-request-id"),
+        ])
+        .expose_headers([HeaderName::from_static("x-request-id")]);
 
     let protected = Router::new()
         .route("/users/me", get(users::get_me))
@@ -277,18 +306,22 @@ async fn main() {
     let public = Router::new()
         .route("/health", get(system::health_check))
         .route("/ready", get(system::readiness_check))
-        .route("/auth/token", post(auth::token_exchange));
+        .route("/auth/token", post(auth::token_exchange))
+        .route("/client_error", post(system::report_client_error));
 
     let app = public
         .merge(protected)
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
         .with_state(state)
+        .layer(TraceLayer::new_for_http())
+        .layer(PropagateRequestIdLayer::new(x_request_id.clone()))
+        .layer(SetRequestIdLayer::new(x_request_id, MakeRequestUuid))
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind(&config.api.base_url)
         .await
         .unwrap();
-    println!("API server listening on {}", listener.local_addr().unwrap());
+    tracing::info!(addr = %listener.local_addr().unwrap(), "API server listening");
     axum::serve(listener, app).await.unwrap();
 }
