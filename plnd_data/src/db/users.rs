@@ -84,7 +84,10 @@ pub async fn find_by_provider(
 }
 
 /// Record an OAuth provider link for an existing user
-#[tracing::instrument(skip(pool), fields(table = "oauth_providers", op = "link_oauth_provider"))]
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "oauth_providers", op = "link_oauth_provider")
+)]
 pub async fn link_oauth_provider(
     pool: &PgPool,
     user_id: Uuid,

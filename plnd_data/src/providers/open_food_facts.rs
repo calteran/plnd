@@ -138,7 +138,11 @@ impl NutritionProvider for OpenFoodFactsProvider {
         "openfoodfacts"
     }
 
-    #[tracing::instrument(name = "provider::open_food_facts::search_ingredients", skip(self), fields(provider = "open_food_facts"))]
+    #[tracing::instrument(
+        name = "provider::open_food_facts::search_ingredients",
+        skip(self),
+        fields(provider = "open_food_facts")
+    )]
     async fn search_ingredients(
         &self,
         query: &SearchQuery,

@@ -35,7 +35,10 @@ pub struct LocalExerciseResult {
     pub is_user_exercise: bool,
 }
 
-#[tracing::instrument(skip(pool, exclude_allergens), fields(table = "catalog_ingredients", op = "search_ingredients"))]
+#[tracing::instrument(
+    skip(pool, exclude_allergens),
+    fields(table = "catalog_ingredients", op = "search_ingredients")
+)]
 pub async fn search_ingredients(
     pool: &PgPool,
     q: &str,
@@ -129,7 +132,10 @@ pub async fn search_user_dishes(
     .await
 }
 
-#[tracing::instrument(skip(pool), fields(table = "catalog_exercises", op = "search_exercises"))]
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "catalog_exercises", op = "search_exercises")
+)]
 pub async fn search_exercises(
     pool: &PgPool,
     q: &str,

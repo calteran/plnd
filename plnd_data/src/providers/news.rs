@@ -72,7 +72,11 @@ impl RssFeedProvider {
 
 #[async_trait]
 impl NewsProvider for RssFeedProvider {
-    #[tracing::instrument(name = "provider::rss::headlines", skip(self), fields(provider = "rss"))]
+    #[tracing::instrument(
+        name = "provider::rss::headlines",
+        skip(self),
+        fields(provider = "rss")
+    )]
     async fn headlines(
         &self,
         query: NewsQuery,

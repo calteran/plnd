@@ -132,7 +132,9 @@ async fn main() {
     ));
 
     if config.external_providers.usda_fdc_api_key.is_empty() {
-        tracing::warn!("USDA FDC provider: no API key set (will return ConfigurationError at runtime)");
+        tracing::warn!(
+            "USDA FDC provider: no API key set (will return ConfigurationError at runtime)"
+        );
     } else {
         tracing::info!("USDA FDC provider: ready");
     }

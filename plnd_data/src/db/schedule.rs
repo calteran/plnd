@@ -78,7 +78,10 @@ pub async fn get_plan_status(
     })
 }
 
-#[tracing::instrument(skip(pool, req), fields(table = "schedule_entries", op = "commit_plan"))]
+#[tracing::instrument(
+    skip(pool, req),
+    fields(table = "schedule_entries", op = "commit_plan")
+)]
 pub async fn commit_plan(
     pool: &PgPool,
     user_id: Uuid,

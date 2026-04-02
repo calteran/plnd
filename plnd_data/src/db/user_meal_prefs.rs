@@ -58,7 +58,10 @@ pub async fn get(
         .map_err(Into::into)
 }
 
-#[tracing::instrument(skip(pool), fields(table = "user_meal_prefs", op = "create_from_catalog"))]
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_meal_prefs", op = "create_from_catalog")
+)]
 pub async fn create_from_catalog(
     pool: &PgPool,
     user_id: Uuid,
@@ -79,7 +82,10 @@ pub async fn create_from_catalog(
         .map(|opt| opt.expect("just inserted"))
 }
 
-#[tracing::instrument(skip(pool), fields(table = "user_meal_prefs", op = "create_from_scratch"))]
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_meal_prefs", op = "create_from_scratch")
+)]
 pub async fn create_from_scratch(
     pool: &PgPool,
     user_id: Uuid,
@@ -154,7 +160,10 @@ pub async fn update_metadata(
 
 /// Fork a catalog meal into user_meals (if not already forked), then apply update.
 /// Runs in a transaction. If pref already has a user_meal_id, skips the fork step.
-#[tracing::instrument(skip(pool), fields(table = "user_meal_prefs", op = "fork_and_update_recipe"))]
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_meal_prefs", op = "fork_and_update_recipe")
+)]
 pub async fn fork_and_update_recipe(
     pool: &PgPool,
     user_id: Uuid,
