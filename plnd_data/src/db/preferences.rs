@@ -34,7 +34,7 @@ pub async fn patch_preferences(
     .bind(wake_time)
     .fetch_one(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Get preferences for a user, creating a default row if none exists.
@@ -50,5 +50,5 @@ pub async fn get_or_create(pool: &PgPool, user_id: Uuid) -> Result<UserPreferenc
     .bind(user_id)
     .fetch_one(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }

@@ -31,5 +31,5 @@ pub async fn yesterday_snapshot(
     .bind(date)
     .fetch_one(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }

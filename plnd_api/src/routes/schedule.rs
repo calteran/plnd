@@ -164,6 +164,7 @@ pub async fn post_plan(
         .map(Json)
         .map_err(|e| match e {
             plnd_data::db::error::DatabaseError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            plnd_data::db::error::DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             _ => {
                 eprintln!("post_plan error: {}", e);
                 StatusCode::INTERNAL_SERVER_ERROR

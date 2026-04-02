@@ -41,17 +41,14 @@ pub async fn create_weekly_plan_task(
     .bind(scheduled_start)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(DatabaseError::from)?;
 
     if let Some(task) = existing {
         return Ok(task);
     }
 
     // Create in a transaction: tasks + generic_tasks
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
 
     let task: Task = sqlx::query_as::<_, Task>(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, energy_required, status)
@@ -63,7 +60,7 @@ pub async fn create_weekly_plan_task(
     .bind(scheduled_start)
     .fetch_one(&mut *tx)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(DatabaseError::from)?;
 
     sqlx::query(
         "INSERT INTO generic_tasks (task_id, category, priority)
@@ -72,11 +69,9 @@ pub async fn create_weekly_plan_task(
     .bind(task.task_id)
     .execute(&mut *tx)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(DatabaseError::from)?;
 
-    tx.commit()
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    tx.commit().await.map_err(DatabaseError::from)?;
 
     Ok(task)
 }

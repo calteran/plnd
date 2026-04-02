@@ -33,7 +33,7 @@ pub async fn get_period(
     .bind(end)
     .fetch_all(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(DatabaseError::from)?;
 
     let carryover_start = start - chrono::Duration::days(CARRYOVER_LOOKBACK_DAYS);
     let carryover: Vec<ScheduleEntry> = sqlx::query_as::<_, ScheduleEntry>(&format!(
@@ -47,7 +47,7 @@ pub async fn get_period(
     .bind(carryover_start)
     .fetch_all(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(DatabaseError::from)?;
 
     Ok(SchedulePeriodResponse { entries, carryover })
 }
@@ -68,7 +68,7 @@ pub async fn get_plan_status(
     .bind(end)
     .fetch_one(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(DatabaseError::from)?;
 
     Ok(PlanStatusResponse {
         planned: row.0 > 0,
@@ -83,10 +83,7 @@ pub async fn commit_plan(
 ) -> Result<PostSchedulePlanResponse, DatabaseError> {
     let today = chrono::Utc::now().date_naive();
 
-    let mut tx = pool
-        .begin()
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
 
     // If replace=true, delete planned entries for unstarted days only (spec §303).
     // An unstarted day has no in_progress or completed entries; started days are
@@ -102,7 +99,7 @@ pub async fn commit_plan(
         .bind(req.plan_end)
         .fetch_all(&mut *tx)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(DatabaseError::from)?;
 
         sqlx::query(
             "DELETE FROM schedule_entries
@@ -119,7 +116,7 @@ pub async fn commit_plan(
         .bind(&started_days)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(DatabaseError::from)?;
     }
 
     // Collect and batch-insert all new entries in a single unnest query
@@ -163,7 +160,7 @@ pub async fn commit_plan(
         .bind(&after_mileposts)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+        .map_err(DatabaseError::from)?;
     }
 
     // Mark planning task as completed
@@ -175,7 +172,7 @@ pub async fn commit_plan(
     .bind(user_id)
     .execute(&mut *tx)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    .map_err(DatabaseError::from)?;
 
     // Apply carryover decisions: update carry-over entries
     for (entry_id, decision) in &req.carryover_decisions {
@@ -196,7 +193,7 @@ pub async fn commit_plan(
                 .bind(user_id)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+                .map_err(DatabaseError::from)?;
             }
             CarryoverDecision::Defer => {
                 sqlx::query(
@@ -207,7 +204,7 @@ pub async fn commit_plan(
                 .bind(user_id)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+                .map_err(DatabaseError::from)?;
             }
             CarryoverDecision::Dismiss => {
                 sqlx::query(
@@ -218,14 +215,12 @@ pub async fn commit_plan(
                 .bind(user_id)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+                .map_err(DatabaseError::from)?;
             }
         }
     }
 
-    tx.commit()
-        .await
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    tx.commit().await.map_err(DatabaseError::from)?;
 
     Ok(PostSchedulePlanResponse {
         committed,

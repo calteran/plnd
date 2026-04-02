@@ -34,7 +34,7 @@ impl Database {
             .execute(&self.pool)
             .await
             .map(|_| ())
-            .map_err(|e| DatabaseError::QueryError(e.to_string()))
+            .map_err(DatabaseError::from)
     }
 }
 

@@ -109,6 +109,7 @@ pub async fn create(
                 Json(UserMealPrefDetailResponse::from(detail)),
             )),
             Err(DatabaseError::UniqueViolation) => Err(StatusCode::CONFLICT),
+            Err(DatabaseError::ConnectionLost) => Err(StatusCode::SERVICE_UNAVAILABLE),
             Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         }
     } else if let Some(name) = body.name {

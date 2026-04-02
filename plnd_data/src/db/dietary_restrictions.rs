@@ -15,7 +15,7 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<DietaryRestriction
     .bind(user_id)
     .fetch_all(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Insert a new dietary restriction, returning the created record.
@@ -37,7 +37,7 @@ pub async fn create(
     .bind(notes)
     .fetch_one(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Update the notes on an existing restriction. Returns None if the restriction was not found
@@ -60,7 +60,7 @@ pub async fn update(
     .bind(notes)
     .fetch_optional(pool)
     .await
-    .map_err(|e| DatabaseError::QueryError(e.to_string()))
+    .map_err(DatabaseError::from)
 }
 
 /// Delete a restriction. Returns true if a row was deleted, false if not found.
@@ -75,5 +75,5 @@ pub async fn delete(
         .execute(pool)
         .await
         .map(|r| r.rows_affected() > 0)
-        .map_err(|e| DatabaseError::QueryError(e.to_string()))
+        .map_err(DatabaseError::from)
 }
