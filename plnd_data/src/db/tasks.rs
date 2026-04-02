@@ -8,6 +8,7 @@ use crate::db::models::Task;
 /// Idempotently create the "Plan your week" generic task for a horizon.
 /// Inserts into `tasks` + `generic_tasks` in a transaction.
 /// Returns existing task if one already exists for the given plan_start.
+#[tracing::instrument(skip(pool), fields(table = "tasks", op = "create_weekly_plan_task"))]
 pub async fn create_weekly_plan_task(
     pool: &PgPool,
     user_id: Uuid,

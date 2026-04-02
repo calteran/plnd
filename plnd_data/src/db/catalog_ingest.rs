@@ -14,6 +14,7 @@ pub struct IngestIngredientParams<'a> {
     pub occasion_tags: &'a [String],
 }
 
+#[tracing::instrument(skip(pool, params), fields(table = "catalog_ingredients", op = "ingest_ingredient"))]
 pub async fn ingest_ingredient(
     pool: &PgPool,
     params: IngestIngredientParams<'_>,

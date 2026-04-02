@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::db::error::DatabaseError;
 
 /// Insert a new session record. Returns the session_id as a UUID string.
+#[tracing::instrument(skip(pool), fields(table = "sessions", op = "create"))]
 pub async fn create(
     pool: &PgPool,
     user_id: Uuid,
@@ -33,6 +34,7 @@ pub async fn create(
 }
 
 /// Returns true if the session identified by JTI exists, is not expired, and is not revoked.
+#[tracing::instrument(skip(pool), fields(table = "sessions", op = "validate"))]
 pub async fn validate(pool: &PgPool, jti: &str) -> Result<bool, DatabaseError> {
     #[derive(sqlx::FromRow)]
     struct Row {
@@ -54,6 +56,7 @@ pub async fn validate(pool: &PgPool, jti: &str) -> Result<bool, DatabaseError> {
 }
 
 /// Mark the session identified by JTI as revoked.
+#[tracing::instrument(skip(pool), fields(table = "sessions", op = "revoke"))]
 pub async fn revoke(pool: &PgPool, jti: &str) -> Result<(), DatabaseError> {
     sqlx::query("UPDATE auth_sessions SET is_revoked = TRUE WHERE token_hash = $1")
         .bind(jti)

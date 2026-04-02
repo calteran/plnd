@@ -5,6 +5,7 @@ use crate::db::error::DatabaseError;
 use crate::db::models::DietaryRestriction;
 
 /// List all dietary restrictions for a user, ordered by type then name.
+#[tracing::instrument(skip(pool), fields(table = "dietary_restrictions", op = "list"))]
 pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<DietaryRestriction>, DatabaseError> {
     sqlx::query_as::<_, DietaryRestriction>(
         "SELECT restriction_id, user_id, restriction_type, name, notes, created_at, updated_at
@@ -19,6 +20,7 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<DietaryRestriction
 }
 
 /// Insert a new dietary restriction, returning the created record.
+#[tracing::instrument(skip(pool), fields(table = "dietary_restrictions", op = "create"))]
 pub async fn create(
     pool: &PgPool,
     user_id: Uuid,
@@ -42,6 +44,7 @@ pub async fn create(
 
 /// Update the notes on an existing restriction. Returns None if the restriction was not found
 /// or does not belong to the given user.
+#[tracing::instrument(skip(pool), fields(table = "dietary_restrictions", op = "update"))]
 pub async fn update(
     pool: &PgPool,
     restriction_id: Uuid,
@@ -64,6 +67,7 @@ pub async fn update(
 }
 
 /// Delete a restriction. Returns true if a row was deleted, false if not found.
+#[tracing::instrument(skip(pool), fields(table = "dietary_restrictions", op = "delete"))]
 pub async fn delete(
     pool: &PgPool,
     restriction_id: Uuid,
