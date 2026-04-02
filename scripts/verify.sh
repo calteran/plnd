@@ -26,10 +26,19 @@ declare -a JOB_LABELS=()
 
 # ── Cleanup ────────────────────────────────────────────────────────────────────
 cleanup() {
-    [[ -n "${API_PID:-}" ]] && kill "$API_PID" 2>/dev/null || true
+    for pid in "${JOB_PIDS[@]+"${JOB_PIDS[@]}"}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+    if [[ -n "${API_PID:-}" ]]; then kill "$API_PID" 2>/dev/null || true; fi
     docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
+
+# ── Prerequisite check ─────────────────────────────────────────────────────────
+if ! command -v timeout &>/dev/null; then
+    echo "✗ 'timeout' not found — install coreutils: brew install coreutils" >&2
+    exit 1
+fi
 
 # ── PID tracking ──────────────────────────────────────────────────────────────
 # Usage: some_command & track $! "human-readable label"
@@ -125,7 +134,7 @@ track $! "nextest → clippy"
 echo "→ Waiting for services to be healthy..."
 
 timeout 30s bash -c \
-    'until docker exec plnd-verify-db pg_isready -U plnd 2>/dev/null; do sleep 1; done'
+    "until docker exec $VERIFY_DB_NAME pg_isready -U plnd 2>/dev/null; do sleep 1; done"
 
 timeout 30s bash -c \
     'until curl -sf http://localhost:8080/plnd-dev/.well-known/openid-configuration \
