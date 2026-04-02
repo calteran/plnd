@@ -63,6 +63,7 @@ just build            # Build all services
 just clean            # Clean build artifacts
 just stop             # Stop running services
 just logs             # View service logs
+just worktree-new     # Create a worktree with Angular deps installed (prevents LSP false positives)
 ```
 
 ## Development Standards

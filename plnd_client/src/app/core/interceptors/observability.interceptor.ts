@@ -60,7 +60,7 @@ export const observabilityInterceptor: HttpInterceptorFn = (
       if (error instanceof HttpErrorResponse) {
         const authHeader = reqWithId.headers.get('Authorization') ?? undefined;
         reportError({
-          message: `HTTP ${error.status} ${error.statusText} — ${req.method} ${req.url}`,
+          message: `HTTP ${error.status} — ${req.method} ${req.url}`,
           url: req.url,
           request_id: requestId,
           timestamp: new Date().toISOString(),
