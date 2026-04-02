@@ -170,6 +170,12 @@ test-e2e-report:
 seed:
     doppler run -- cargo run -p plnd_seed
 
+# Create a worktree and install Angular deps so the LSP resolves types immediately
+worktree-new branch:
+    git worktree add .worktrees/{{branch}} -b {{branch}}
+    cd .worktrees/{{branch}}/plnd_client && npm ci
+    @echo "✅ Worktree ready at .worktrees/{{branch}}"
+
 # Clean build artifacts
 clean:
     cargo clean
