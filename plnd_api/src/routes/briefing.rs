@@ -172,11 +172,11 @@ pub async fn get_news(
         limit: 3,
     };
 
-    let feed_url_key = query.feed_url.as_deref().unwrap_or("");
-    let cache_key = format!(
-        "{:.1},{:.1}:{}",
-        location.latitude, location.longitude, feed_url_key
-    );
+    let cache_key = if let Some(url) = query.feed_url.as_deref() {
+        format!("{:.1},{:.1}:{}", location.latitude, location.longitude, url)
+    } else {
+        format!("{:.1},{:.1}", location.latitude, location.longitude)
+    };
 
     if let Some(cached) = state.briefing.news_cache.get(&cache_key).await {
         let headlines = cached.into_iter().map(NewsHeadlineResponse::from).collect();
