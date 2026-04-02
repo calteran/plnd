@@ -48,31 +48,54 @@ impl SearchParams {
     }
 }
 
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, utoipa::ToSchema)]
 pub struct IngredientSearchResponse {
+    #[schema(value_type = Vec<Object>)]
     pub local: Vec<LocalIngredientResult>,
+    #[schema(value_type = Vec<Object>)]
     pub external: Vec<SearchResult>,
     pub providers_queried: Vec<String>,
     pub providers_from_cache: Vec<String>,
 }
 
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, utoipa::ToSchema)]
 pub struct DishSearchResponse {
+    #[schema(value_type = Vec<Object>)]
     pub local: Vec<LocalDishResult>,
+    #[schema(value_type = Vec<Object>)]
     pub user: Vec<LocalDishResult>,
+    #[schema(value_type = Vec<Object>)]
     pub external: Vec<SearchResult>,
     pub providers_queried: Vec<String>,
     pub providers_from_cache: Vec<String>,
 }
 
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, utoipa::ToSchema)]
 pub struct ExerciseSearchResponse {
+    #[schema(value_type = Vec<Object>)]
     pub local: Vec<LocalExerciseResult>,
+    #[schema(value_type = Vec<Object>)]
     pub external: Vec<SearchResult>,
     pub providers_queried: Vec<String>,
     pub providers_from_cache: Vec<String>,
 }
 
+#[utoipa::path(
+    get,
+    path = "/search/ingredients",
+    tag = "Search",
+    params(
+        ("q" = String, Query, description = "Search query"),
+        ("limit" = Option<u32>, Query, description = "Max results (default 20)"),
+        ("exclude_allergens" = Option<String>, Query, description = "Comma-separated allergens to exclude"),
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Ingredient search results", body = IngredientSearchResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn search_ingredients_handler(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -111,6 +134,22 @@ pub async fn search_ingredients_handler(
     Ok(Json(resp))
 }
 
+#[utoipa::path(
+    get,
+    path = "/search/dishes",
+    tag = "Search",
+    params(
+        ("q" = String, Query, description = "Search query"),
+        ("limit" = Option<u32>, Query, description = "Max results (default 20)"),
+        ("exclude_allergens" = Option<String>, Query, description = "Comma-separated allergens to exclude"),
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Dish search results", body = DishSearchResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn search_dishes_handler(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -147,6 +186,22 @@ pub async fn search_dishes_handler(
     Ok(Json(resp))
 }
 
+#[utoipa::path(
+    get,
+    path = "/search/exercises",
+    tag = "Search",
+    params(
+        ("q" = String, Query, description = "Search query"),
+        ("limit" = Option<u32>, Query, description = "Max results (default 20)"),
+        ("exclude_allergens" = Option<String>, Query, description = "Comma-separated allergens to exclude"),
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Exercise search results", body = ExerciseSearchResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
 pub async fn search_exercises_handler(
     State(state): State<Arc<AppState>>,
     Extension(_claims): Extension<Claims>,
