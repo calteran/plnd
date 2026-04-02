@@ -6,8 +6,8 @@ use plnd_data::providers::dtos::{
     SearchQuery, SearchResult,
 };
 use plnd_data::providers::{
-    ExerciseProvider, ExternalProviderError, NutritionProvider, OpenFoodFactsProvider, RecipeProvider,
-    TheMealDbProvider, UsdaFdcProvider,
+    ExerciseProvider, ExternalProviderError, NutritionProvider, OpenFoodFactsProvider,
+    RecipeProvider, TheMealDbProvider, UsdaFdcProvider,
 };
 use rust_decimal::Decimal;
 
