@@ -162,8 +162,9 @@ A new `just init` recipe sets up all local dev tooling in a single command. Inte
 ```
 just init installs:
   brew:
-    util-linux        ← flock (semaphore, Phase 2)
-    libpq             ← pg_isready (health check in verify.sh)
+    flock             ← semaphore
+    coreutils         ← timeout (health check in verify.sh)
+    libpq             ← pg_isready (optional health check)
     doppler           ← secrets CLI (if not present)
   cargo:
     cargo-nextest     ← fast test runner

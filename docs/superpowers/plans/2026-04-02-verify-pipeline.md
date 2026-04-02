@@ -103,27 +103,27 @@ docker run --rm -d \
     ghcr.io/navikt/mock-oauth2-server:3.0.1 > /dev/null
 
 # Rust read-only checks — no target/ lock, safe to parallelize with anything
-(cd "$PROJECT_ROOT" && cargo fmt --check) &
+(exec 9>&-; cd "$PROJECT_ROOT" && cargo fmt --check) &
 track $! "cargo fmt"
 
-(cd "$PROJECT_ROOT" && cargo deny check) &
+(exec 9>&-; cd "$PROJECT_ROOT" && cargo deny check) &
 track $! "cargo deny"
 
-(cd "$PROJECT_ROOT" && cargo machete) &
+(exec 9>&-; cd "$PROJECT_ROOT" && cargo machete) &
 track $! "cargo machete"
 
 # TypeScript checks
-(cd "$PROJECT_ROOT/plnd_client" && npx eslint "src/**/*.ts" "e2e/**/*.ts") &
+(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && npx eslint "src/**/*.ts" "e2e/**/*.ts") &
 track $! "eslint"
 
-(cd "$PROJECT_ROOT/plnd_client" && \
+(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && \
     npm run check-dependencies && \
     npm run check-licenses && \
     npm run check-circular) &
 track $! "ts-deps"
 
 # Angular unit tests — fully independent of Rust
-(cd "$PROJECT_ROOT/plnd_client" && \
+(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && \
     npx ng test --browsers=ChromeHeadless --watch=false --code-coverage) &
 track $! "ng test"
 
@@ -310,7 +310,7 @@ Target: under 2 minutes on the second run (incremental build cache warm)
 
 ### Task 4: Add Semaphore to `scripts/verify.sh`
 
-**Prerequisite:** `just init` (Task 5) must have run first to install `flock` via `util-linux`.
+**Prerequisite:** `just init` (Task 5) must have run first to install `flock` via the `flock` brew formula.
 
 **Files:**
 - Modify: `scripts/verify.sh`
@@ -378,7 +378,7 @@ init:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ Installing Homebrew packages..."
-    brew install util-linux libpq doppler/cli/doppler
+    brew install flock coreutils libpq doppler/cli/doppler
 
     echo "→ Installing Rust tools..."
     cargo install cargo-nextest --locked
@@ -389,7 +389,7 @@ init:
     cd plnd_client && npm ci
 
     echo "→ Installing Playwright browser..."
-    cd plnd_client && npx playwright install chromium
+    npx playwright install chromium
 
     echo "✅ Dev environment ready. Run 'doppler login' if you haven't already."
 ```
