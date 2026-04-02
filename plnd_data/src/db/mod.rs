@@ -9,10 +9,12 @@ pub mod dietary_restrictions;
 pub mod preferences;
 pub mod schedule;
 pub mod search;
+pub mod sessions;
 pub mod tasks;
 pub mod user_dish_prefs;
 pub mod user_ingredient_prefs;
 pub mod user_meal_prefs;
 pub mod users;
 
+pub use connection::run_migrations;
 pub use connection::Database;

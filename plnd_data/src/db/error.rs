@@ -9,10 +9,12 @@ pub enum DatabaseError {
     #[error("Database query failed: {0}")]
     QueryError(String),
 
+    #[error("Unique constraint violation")]
+    UniqueViolation,
+
     #[error("Validation error: {0}")]
     ValidationError(String),
 
-    #[allow(dead_code)]
     #[error("Migration failed: {0}")]
     MigrationError(String),
 
@@ -23,6 +25,12 @@ pub enum DatabaseError {
 
 impl From<sqlx::Error> for DatabaseError {
     fn from(error: sqlx::Error) -> Self {
-        DatabaseError::ConnectionError(error.to_string())
+        if let sqlx::Error::Database(ref db_err) = error {
+            // PostgreSQL unique_violation SQLSTATE 23505
+            if db_err.code().as_deref() == Some("23505") {
+                return DatabaseError::UniqueViolation;
+            }
+        }
+        DatabaseError::QueryError(error.to_string())
     }
 }

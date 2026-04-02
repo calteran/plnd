@@ -52,7 +52,7 @@ async fn main() {
             }
         };
 
-    if let Err(e) = sqlx::migrate!("./migrations").run(db_conn.get_pool()).await {
+    if let Err(e) = plnd_data::db::run_migrations(db_conn.get_pool()).await {
         eprintln!("Failed to run database migrations: {}", e);
         std::process::exit(1);
     }
@@ -63,7 +63,7 @@ async fn main() {
         config.auth.jwt.jwt_expiration,
     );
 
-    let session = SessionService::with_pool(db_conn.get_pool().clone());
+    let session = SessionService::with_db(db_conn.clone());
 
     // Build the JWKS cache. The internal_issuer_url (Docker-internal hostname) is used
     // for server-to-server JWKS fetching; the external issuer_url is used to validate

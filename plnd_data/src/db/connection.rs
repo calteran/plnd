@@ -37,3 +37,11 @@ impl Database {
             .map_err(|e| DatabaseError::QueryError(e.to_string()))
     }
 }
+
+/// Run all pending database migrations.
+pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), DatabaseError> {
+    sqlx::migrate!("./migrations")
+        .run(pool)
+        .await
+        .map_err(|e| DatabaseError::MigrationError(e.to_string()))
+}

@@ -10,12 +10,7 @@ use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::{models::UserDishPrefDetail, user_dish_prefs};
-
-fn is_unique_violation(e: &sqlx::Error) -> bool {
-    let s = e.to_string().to_lowercase();
-    s.contains("unique") || s.contains("duplicate key")
-}
+use plnd_data::db::{error::DatabaseError, models::UserDishPrefDetail, user_dish_prefs};
 
 pub async fn list(
     State(state): State<Arc<AppState>>,
@@ -62,7 +57,7 @@ pub async fn create(
     if let Some(catalog_id) = body.catalog_dish_id {
         match user_dish_prefs::create_from_catalog(state.db.get_pool(), user_id, catalog_id).await {
             Ok(detail) => Ok((StatusCode::CREATED, Json(detail))),
-            Err(e) if is_unique_violation(&e) => Err(StatusCode::CONFLICT),
+            Err(DatabaseError::UniqueViolation) => Err(StatusCode::CONFLICT),
             Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         }
     } else if let Some(name) = body.name {

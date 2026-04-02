@@ -1,6 +1,7 @@
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
+use super::error::DatabaseError;
 use super::models::UserMealPrefDetail;
 
 /// Single SQL fragment for selecting a UserMealPrefDetail row.
@@ -26,7 +27,7 @@ const PREF_DETAIL_SELECT: &str = r#"
     LEFT JOIN user_meals    um ON um.user_meal_id = p.user_meal_id
 "#;
 
-pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserMealPrefDetail>, sqlx::Error> {
+pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserMealPrefDetail>, DatabaseError> {
     let sql = format!(
         "{} WHERE p.user_id = $1 ORDER BY p.created_at",
         PREF_DETAIL_SELECT
@@ -35,13 +36,14 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserMealPrefDetail
         .bind(user_id)
         .fetch_all(pool)
         .await
+        .map_err(Into::into)
 }
 
 pub async fn get(
     pool: &PgPool,
     user_id: Uuid,
     pref_id: Uuid,
-) -> Result<Option<UserMealPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
     let sql = format!(
         "{} WHERE p.user_id = $1 AND p.user_meal_pref_id = $2",
         PREF_DETAIL_SELECT
@@ -51,13 +53,14 @@ pub async fn get(
         .bind(pref_id)
         .fetch_optional(pool)
         .await
+        .map_err(Into::into)
 }
 
 pub async fn create_from_catalog(
     pool: &PgPool,
     user_id: Uuid,
     catalog_meal_id: Uuid,
-) -> Result<UserMealPrefDetail, sqlx::Error> {
+) -> Result<UserMealPrefDetail, DatabaseError> {
     // Insert the pref record. If duplicate, the UNIQUE(user_id, catalog_meal_id) constraint
     // will return a unique violation error — the caller maps this to 409.
     let (pref_id,) = sqlx::query_as::<_, (Uuid,)>(
@@ -78,7 +81,7 @@ pub async fn create_from_scratch(
     user_id: Uuid,
     name: &str,
     description: Option<&str>,
-) -> Result<UserMealPrefDetail, sqlx::Error> {
+) -> Result<UserMealPrefDetail, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     // Create personal meal first
@@ -116,7 +119,7 @@ pub async fn update_metadata(
     is_safe_food: Option<bool>,
     is_blocked: Option<bool>,
     notes: Option<Option<String>>,
-) -> Result<Option<UserMealPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
     let rows = sqlx::query(
         r#"
         UPDATE user_meal_prefs SET
@@ -152,7 +155,7 @@ pub async fn fork_and_update_recipe(
     pref_id: Uuid,
     name: Option<&str>,
     description: Option<&str>,
-) -> Result<Option<UserMealPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     // Get current pref (lock row)
@@ -227,7 +230,7 @@ pub async fn fork_and_update_recipe(
     get(pool, user_id, pref_id).await
 }
 
-pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool, sqlx::Error> {
+pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool, DatabaseError> {
     // Also delete the personal user_meal (and its dishes) if it exists.
     let mut tx = pool.begin().await?;
 
@@ -274,7 +277,7 @@ pub async fn add_dish(
     user_id: Uuid,
     pref_id: Uuid,
     params: AddDishParams,
-) -> Result<Option<UserMealPrefDetail>, sqlx::Error> {
+) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     let user_meal_id = ensure_forked(&mut tx, user_id, pref_id).await?;
@@ -308,7 +311,7 @@ pub async fn remove_dish(
     user_id: Uuid,
     pref_id: Uuid,
     meal_dish_id: Uuid,
-) -> Result<Option<bool>, sqlx::Error> {
+) -> Result<Option<bool>, DatabaseError> {
     let mut tx = pool.begin().await?;
 
     let user_meal_id = ensure_forked(&mut tx, user_id, pref_id).await?;
@@ -334,7 +337,7 @@ async fn ensure_forked(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,
     pref_id: Uuid,
-) -> Result<Option<Uuid>, sqlx::Error> {
+) -> Result<Option<Uuid>, DatabaseError> {
     let row = sqlx::query_as::<_, (Option<Uuid>, Option<Uuid>)>(
         "SELECT user_meal_id, catalog_meal_id FROM user_meal_prefs \
          WHERE user_id = $1 AND user_meal_pref_id = $2 FOR UPDATE",
