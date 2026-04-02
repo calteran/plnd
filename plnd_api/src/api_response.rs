@@ -1,9 +1,11 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::db::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction, PlanStatusResponse, PostSchedulePlanResponse, ScheduleEntry,
-    SchedulePeriodResponse, Task, User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail,
-    UserPreferences,
+    DietaryRestriction, ScheduleEntry, Task, User, UserDishPrefDetail, UserIngredientPref,
+    UserMealPrefDetail, UserPreferences,
+};
+use plnd_data::db::query_types::{
+    PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
 use rust_decimal::Decimal;
 use serde::Serialize;
@@ -388,7 +390,7 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::SchedulePeriodResponse`.
+/// API response wrapper for `plnd_data::db::query_types::SchedulePeriodResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SchedulePeriodApiResponse {
     pub entries: Vec<ScheduleEntryResponse>,
@@ -412,7 +414,7 @@ impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::PlanStatusResponse`.
+/// API response wrapper for `plnd_data::db::query_types::PlanStatusResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct PlanStatusApiResponse {
     pub planned: bool,
@@ -428,7 +430,7 @@ impl From<PlanStatusResponse> for PlanStatusApiResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::PostSchedulePlanResponse`.
+/// API response wrapper for `plnd_data::db::query_types::PostSchedulePlanResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct PostSchedulePlanApiResponse {
     pub committed: i64,

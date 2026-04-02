@@ -475,28 +475,6 @@ pub struct ScheduleEntry {
 }
 
 // ---------------------------------------------------------------------------
-// Weekly planning — response types
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SchedulePeriodResponse {
-    pub entries: Vec<ScheduleEntry>,
-    pub carryover: Vec<ScheduleEntry>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlanStatusResponse {
-    pub planned: bool,
-    pub entry_count: i64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct PostSchedulePlanResponse {
-    pub committed: i64,
-    pub planning_task_status: String,
-}
-
-// ---------------------------------------------------------------------------
 // Schedule commit input (DB-layer types, decoupled from HTTP request types)
 // ---------------------------------------------------------------------------
 
