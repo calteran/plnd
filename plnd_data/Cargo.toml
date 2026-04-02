@@ -18,6 +18,7 @@ sqlx = { version = "0.8", features = ["postgres", "uuid", "chrono", "runtime-tok
 thiserror = "2.0"
 tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
+tracing = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
 
 [dev-dependencies]
