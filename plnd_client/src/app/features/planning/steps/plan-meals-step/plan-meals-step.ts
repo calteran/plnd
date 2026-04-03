@@ -329,7 +329,7 @@ export class PlanMealsStepComponent implements OnInit {
   reSuggest(date: string, slot: MealSlot): void {
     const list = this.mealSuggestionsService.suggestions(date, slot);
     if (!list.length) return;
-    const currentTitle = this.getMeal(date, slot)?.title;
+    const currentTitle = this.getMeal(date, slot)?.title ?? list[0]?.name;
     const currentIndex = list.findIndex(s => s.name === currentTitle);
     const next = list[(currentIndex + 1) % list.length];
     this.weekPlanService.setMeal(date, slot, { type: 'mock', title: next.name });

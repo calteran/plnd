@@ -142,10 +142,13 @@ describe('PlanMealsStepComponent', () => {
 
   it('should change suggestion text when 🔀 Suggest is clicked', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+    const before = firstCell.querySelector('.gc-text')!.textContent!.trim();
     (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
     fixture.detectChanges();
     const after = firstCell.querySelector('.gc-text')!.textContent!.trim();
-    // The cycled-to name must be one of the mock suggestions
+    // Must have cycled to a different suggestion
+    expect(after).not.toBe(before);
+    // And the new value must be from the mock list
     expect(MOCK_SUGGESTIONS.map(s => s.name)).toContain(after);
   });
 
