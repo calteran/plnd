@@ -1,7 +1,7 @@
 import { Component, OnInit, effect, inject, signal } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { NavbarAvatarComponent } from '../../shared/components/navbar-avatar/navbar-avatar';
-import { todayIso, toIsoDate } from '../../core/services/schedule.service';
+import { todayIso, localIsoDate } from '../../core/services/schedule.service';
 import { WeekPlanService } from '../../core/services/week-plan.service';
 import { PreferencesService } from '../../core/services/preferences.service';
 
@@ -33,7 +33,7 @@ export class MainLayoutComponent implements OnInit {
       planStart.setDate(today.getDate() + daysUntilStart);
       const planEnd = new Date(planStart);
       planEnd.setDate(planStart.getDate() + prefs.default_plan_length_days - 1);
-      this.weekPlanService.checkPlanStatus(toIsoDate(planStart), toIsoDate(planEnd));
+      this.weekPlanService.checkPlanStatus(localIsoDate(planStart), localIsoDate(planEnd));
     });
   }
 
