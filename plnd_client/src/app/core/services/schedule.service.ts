@@ -1,8 +1,15 @@
-import { Injectable, signal } from '@angular/core';
-import { ScheduleItem, ItemStatus, isMealAnchor } from '../models/schedule';
+import { Injectable, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { catchError, of } from 'rxjs';
+import { ConfigService } from './config.service';
+import { ScheduleItem, ItemType, MealAnchor, ScheduleTask, isMealAnchor } from '../models/schedule';
+import { ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {
+  private readonly http    = inject(HttpClient);
+  private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
+
   private readonly _items   = signal<ScheduleItem[]>([]);
   private readonly _loading = signal(false);
   private readonly _error   = signal<string | null>(null);
@@ -18,30 +25,37 @@ export class ScheduleService {
     this._loading.set(true);
     this._error.set(null);
 
-    // TODO: replace with HttpClient GET /schedule?date=<date>
-    setTimeout(() => {
-      if (this._date() !== date) return; // guard against stale callback
-      this._items.set(mockItems(date));
-      this._loading.set(false);
-    }, 300);
+    this.http
+      .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period`, {
+        params: { start: date, end: date },
+      })
+      .pipe(catchError(() => of({ entries: [], carryover: [] } satisfies SchedulePeriodResponse)))
+      .subscribe(resp => {
+        if (this._date() !== date) return; // stale response guard
+        this._items.set(resp.entries.map(mapEntry));
+        this._loading.set(false);
+      });
   }
 
   toggleItem(id: string): void {
-    this._items.update(items => items.map(item => {
-      if (isMealAnchor(item)) {
-        const hasMatch = item.duringMealTasks.some(t => t.id === id);
-        if (!hasMatch) return item; // preserve reference — no signal notification
-        return {
-          ...item,
-          duringMealTasks: item.duringMealTasks.map(t =>
-            t.id === id ? { ...t, status: flip(t.status) } : t
-          )
-        };
-      }
-      return item.id === id ? { ...item, status: flip(item.status) } : item;
-    }));
+    this._items.update(items =>
+      items.map(item => {
+        if (isMealAnchor(item)) {
+          if (!item.duringMealTasks.some(t => t.id === id)) return item;
+          return {
+            ...item,
+            duringMealTasks: item.duringMealTasks.map(t =>
+              t.id === id ? { ...t, status: flip(t.status) } : t,
+            ),
+          };
+        }
+        return item.id === id ? { ...item, status: flip(item.status) } : item;
+      }),
+    );
   }
 }
+
+// ── Utilities ────────────────────────────────────────────────────────────────
 
 export function toIsoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -57,32 +71,41 @@ export function offsetIso(days: number): string {
   return toIsoDate(d);
 }
 
-function flip(status: ItemStatus): ItemStatus {
+function flip(status: 'pending' | 'done'): 'pending' | 'done' {
   return status === 'done' ? 'pending' : 'done';
 }
 
-function mockItems(date: string): ScheduleItem[] {
-  const isToday = date === todayIso();
-  const done = (s: ItemStatus) => isToday ? 'done' : s;
+// ── API → model mapping ───────────────────────────────────────────────────────
 
-  return [
-    { id: 't1', type: 'task', label: '🧘 5-min stretch', status: done('pending') },
-    {
-      id: 'm1', name: 'Breakfast', emoji: '🥑',
-      description: 'Avocado toast + eggs',
-      status: isToday ? 'done' : 'planned',
-      duringMealTasks: [
-        { id: 't-dm1', type: 'task', label: '💊 Morning vitamins', status: done('pending') },
-        { id: 't-dm2', type: 'task', label: '📖 Read 10 pages',    status: 'pending' }
-      ]
-    },
-    { id: 't2', type: 'exercise',    label: '🏃 Morning run · 30 min',    status: done('pending') },
-    { id: 't3', type: 'task',        label: '✉️ Reply to dentist email',   status: 'pending' },
-    { id: 't4', type: 'appointment', label: '📅 Team standup',             status: 'pending', scheduledTime: '11 AM' },
-    { id: 't5', type: 'task',        label: '📞 Call pharmacy',            status: 'pending' },
-    { id: 'm2', name: 'Lunch',  emoji: '🥗', status: 'unplanned', duringMealTasks: [] },
-    { id: 't6', type: 'appointment', label: '🏥 GP appointment',           status: 'pending', scheduledTime: '2 PM' },
-    { id: 't7', type: 'task',        label: '🛒 Pick up prescription',     status: 'pending' },
-    { id: 'm3', name: 'Dinner', emoji: '🍽', status: 'unplanned', duringMealTasks: [] }
-  ];
+const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
+  breakfast: { name: 'Breakfast', emoji: '🥣' },
+  lunch:     { name: 'Lunch',     emoji: '🥗' },
+  dinner:    { name: 'Dinner',    emoji: '🍽' },
+};
+
+function mapEntry(e: ScheduleEntryDto): ScheduleItem {
+  if (e.task_type === 'meal') {
+    const slot = e.after_milepost ? MEAL_SLOTS[e.after_milepost] : undefined;
+    return {
+      id:    e.entry_id,
+      name:  slot?.name ?? e.title ?? 'Meal',
+      emoji: slot?.emoji ?? '🍴',
+      description: e.title ?? undefined,
+      status: e.status === 'completed' ? 'done'
+            : e.status === 'planned'   ? 'planned'
+            : 'unplanned',
+      duringMealTasks: [],
+    } satisfies MealAnchor;
+  }
+
+  const TYPE_MAP: Record<string, ItemType> = {
+    exercise:    'exercise',
+    appointment: 'appointment',
+  };
+  return {
+    id:     e.entry_id,
+    type:   TYPE_MAP[e.task_type] ?? 'task',
+    label:  e.title ?? e.task_type,
+    status: e.status === 'completed' ? 'done' : 'pending',
+  } satisfies ScheduleTask;
 }
