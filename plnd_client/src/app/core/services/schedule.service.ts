@@ -30,17 +30,17 @@ export class ScheduleService {
             params: { start: date, end: date },
           })
           .pipe(
-            map(resp => ({ date, resp, error: false as const })),
+            map(resp => ({ resp, error: false as const })),
             catchError(() =>
               of({
-                date,
                 resp: { entries: [], carryover: [] } satisfies SchedulePeriodResponse,
                 error: true as const,
               }),
             ),
           ),
       ),
-    ).pipe(takeUntilDestroyed()).subscribe(({ resp, error }) => {
+      takeUntilDestroyed(),
+    ).subscribe(({ resp, error }) => {
       if (error) this._error.set('Failed to load schedule');
       this._items.set(resp.entries.map(mapEntry));
       this._loading.set(false);
