@@ -256,7 +256,7 @@ export class WeekPlanService {
       for (const slot of STANDARD_MEAL_SLOTS) {
         const meal = meals[date]?.[slot];
         if (meal?.title === SKIP_SENTINEL) continue;
-        const fallbackTitle = this.mealSuggestionsService.suggestions(date, slot)[0]?.name ?? slot;
+        const fallbackTitle = this.mealSuggestionsService.suggestions(date, slot)[0]?.name ?? `(${slot})`;
         const resolved: PlannedMeal = meal ?? { type: 'mock', title: fallbackTitle };
         entries.push({
           date,
