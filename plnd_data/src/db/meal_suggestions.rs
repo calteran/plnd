@@ -6,8 +6,8 @@ use crate::db::error::DatabaseError;
 /// A meal or dish returned as a planning suggestion.
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct MealSuggestion {
-    pub id:              Uuid,
-    pub name:            String,
+    pub id: Uuid,
+    pub name: String,
     /// "meal" or "dish"
     pub suggestion_type: String,
 }
@@ -23,7 +23,10 @@ pub struct MealSuggestion {
 /// The `date` parameter is accepted for forward-compatibility (future
 /// implementations may filter by recency or season) but is not used in
 /// the query today.
-#[tracing::instrument(skip(pool), fields(table = "user_meals/user_dishes", op = "suggestions"))]
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "user_meals/user_dishes", op = "suggestions")
+)]
 pub async fn get_suggestions(
     pool: &PgPool,
     user_id: Uuid,

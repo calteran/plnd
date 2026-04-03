@@ -76,8 +76,8 @@ impl From<UserPreferences> for UserPreferencesResponse {
 /// API response item for `GET /my/meal-suggestions`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MealSuggestionResponse {
-    pub id:              Uuid,
-    pub name:            String,
+    pub id: Uuid,
+    pub name: String,
     /// "meal" or "dish"
     pub suggestion_type: String,
 }
@@ -85,8 +85,8 @@ pub struct MealSuggestionResponse {
 impl From<MealSuggestion> for MealSuggestionResponse {
     fn from(s: MealSuggestion) -> Self {
         Self {
-            id:              s.id,
-            name:            s.name,
+            id: s.id,
+            name: s.name,
             suggestion_type: s.suggestion_type,
         }
     }
