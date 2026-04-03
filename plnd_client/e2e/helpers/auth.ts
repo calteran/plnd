@@ -48,19 +48,8 @@ export const MOCK_BRIEFING_NEWS = {
   headlines: ['Test headline one', 'Test headline two', 'Test headline three'],
 };
 
-export const MOCK_SCHEDULE_PERIOD = {
-  entries: [
-    {
-      entry_id: 'e2e-entry-uuid',
-      task_type: 'task',
-      title: 'Morning exercise',
-      date: '2026-03-28',
-      scheduled_start: '2026-03-28T07:00:00Z',
-      status: 'pending',
-    },
-  ],
-  carryover: [],
-};
+// Today date as fixed by page.clock.setFixedTime in e2e tests.
+const E2E_TODAY = '2026-03-28';
 
 export const MOCK_BRIEFING_YESTERDAY = {
   tasks_done: 3,
@@ -85,9 +74,24 @@ export async function seedAuth(page: Page) {
   await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
     route.fulfill({ status: 200, json: [] })
   );
-  await page.route(`${API_BASE}/schedule/period**`, route =>
-    route.fulfill({ status: 200, json: MOCK_SCHEDULE_PERIOD })
-  );
+  await page.route(`${API_BASE}/schedule/period**`, route => {
+    const start = new URL(route.request().url()).searchParams.get('start') ?? E2E_TODAY;
+    const status = start === E2E_TODAY ? 'done' : 'pending';
+    return route.fulfill({
+      status: 200,
+      json: {
+        entries: [{
+          entry_id: 'e2e-entry-uuid',
+          task_type: 'task',
+          title: 'Morning exercise',
+          date: start,
+          scheduled_start: `${start}T07:00:00Z`,
+          status,
+        }],
+        carryover: [],
+      },
+    });
+  });
   await page.route(`${API_BASE}/briefing/weather`, route =>
     route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
   );
