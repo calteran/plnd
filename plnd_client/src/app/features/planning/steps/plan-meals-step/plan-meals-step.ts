@@ -1,9 +1,9 @@
-import { Component, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { MealSuggestionsService } from '../../../../core/services/meal-suggestions.service';
 import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
 import {
-  MealSlot, PlannedMeal, getMockSuggestion, MOCK_MEAL_SUGGESTIONS, SKIP_SENTINEL,
-  STANDARD_MEAL_SLOTS,
+  MealSlot, PlannedMeal, SKIP_SENTINEL, STANDARD_MEAL_SLOTS,
 } from '../../../../core/models/week-plan';
 const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
   breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
@@ -226,8 +226,9 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
     .input-hint { font-size: 9px; color: var(--color-text-muted); font-style: italic; }
   `],
 })
-export class PlanMealsStepComponent {
-  private readonly weekPlanService = inject(WeekPlanService);
+export class PlanMealsStepComponent implements OnInit {
+  private readonly weekPlanService        = inject(WeekPlanService);
+  private readonly mealSuggestionsService = inject(MealSuggestionsService);
 
   // Only one meal cell can be in edit mode at a time, so there is at most
   // one #mealInput in the DOM. ViewChild safely resolves to that single instance.
@@ -243,6 +244,14 @@ export class PlanMealsStepComponent {
   readonly editingCell = signal<{ date: string; slot: MealSlot } | null>(null);
   /** Current value in the open text input. */
   readonly editingValue = signal('');
+
+  ngOnInit(): void {
+    for (const day of this.horizonDays()) {
+      for (const slot of this.slots) {
+        this.mealSuggestionsService.load(day, slot as MealSlot);
+      }
+    }
+  }
 
   // ── Formatters ────────────────────────────────────────────
 
@@ -272,11 +281,12 @@ export class PlanMealsStepComponent {
     return e?.date === date && e?.slot === slot;
   }
 
-  /** Returns the displayed suggestion for a pending cell — persisted mock title or deterministic default. */
+  /** Returns the displayed suggestion for a pending cell — persisted mock title or first service suggestion. */
   getSuggestion(date: string, slot: MealSlot): string {
     const stored = this.getMeal(date, slot);
     if (stored?.type === 'mock') return stored.title;
-    return getMockSuggestion(date, slot);
+    const list = this.mealSuggestionsService.suggestions(date, slot);
+    return list[0]?.name ?? '—';
   }
 
   // ── Actions ───────────────────────────────────────────────
@@ -315,11 +325,13 @@ export class PlanMealsStepComponent {
     this.weekPlanService.clearMeal(date, slot);
   }
 
-  /** Cycles to the next mock suggestion and persists it so implicit acceptance uses the chosen one. */
+  /** Cycles to the next service suggestion and persists it so implicit acceptance uses the chosen one. */
   reSuggest(date: string, slot: MealSlot): void {
-    const currentTitle = this.getMeal(date, slot)?.title ?? getMockSuggestion(date, slot);
-    const currentIndex = MOCK_MEAL_SUGGESTIONS.indexOf(currentTitle);
-    const title = MOCK_MEAL_SUGGESTIONS[(currentIndex + 1) % MOCK_MEAL_SUGGESTIONS.length];
-    this.weekPlanService.setMeal(date, slot, { type: 'mock', title });
+    const list = this.mealSuggestionsService.suggestions(date, slot);
+    if (!list.length) return;
+    const currentTitle = this.getMeal(date, slot)?.title ?? list[0]?.name;
+    const currentIndex = list.findIndex(s => s.name === currentTitle);
+    const next = list[(currentIndex + 1) % list.length];
+    this.weekPlanService.setMeal(date, slot, { type: 'mock', title: next.name });
   }
 }

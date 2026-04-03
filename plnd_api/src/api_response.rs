@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
+use plnd_data::db::meal_suggestions::MealSuggestion;
 use plnd_data::db::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
     DietaryRestriction, ScheduleEntry, Task, User, UserDishPrefDetail, UserIngredientPref,
@@ -64,6 +65,29 @@ impl From<UserPreferences> for UserPreferencesResponse {
             wake_time: p.wake_time,
             created_at: p.created_at,
             updated_at: p.updated_at,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Meal suggestion response types
+// ---------------------------------------------------------------------------
+
+/// API response item for `GET /my/meal-suggestions`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct MealSuggestionResponse {
+    pub id: Uuid,
+    pub name: String,
+    /// "meal" or "dish"
+    pub suggestion_type: String,
+}
+
+impl From<MealSuggestion> for MealSuggestionResponse {
+    fn from(s: MealSuggestion) -> Self {
+        Self {
+            id: s.id,
+            name: s.name,
+            suggestion_type: s.suggestion_type,
         }
     }
 }

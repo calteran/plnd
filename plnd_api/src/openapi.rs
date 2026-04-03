@@ -4,8 +4,8 @@ use utoipa::{Modify, OpenApi};
 use crate::api_response::{
     CatalogDishIngredientResponse, CatalogIngredientResponse, CatalogMealDishResponse,
     DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse,
-    PlanStatusApiResponse, PostSchedulePlanApiResponse, ScheduleEntryResponse,
-    SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
+    MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
+    ScheduleEntryResponse, SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
     UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{CarryoverDecision, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus};
@@ -99,6 +99,8 @@ impl Modify for BearerSecurityAddon {
         crate::routes::search::search_exercises_handler,
         // Tasks
         crate::routes::tasks::post_weekly_plan_task,
+        // Meal Suggestions
+        crate::routes::meal_suggestions::get_suggestions,
         // Schedule
         crate::routes::schedule::get_period,
         crate::routes::schedule::get_plan_status,
@@ -147,6 +149,8 @@ impl Modify for BearerSecurityAddon {
         PatchMealBody,
         AddDishBody,
         UpsertIngredientPrefBody,
+        // Meal Suggestions
+        MealSuggestionResponse,
         // Search responses
         IngredientSearchResponse,
         DishSearchResponse,
@@ -166,6 +170,7 @@ impl Modify for BearerSecurityAddon {
         (name = "My Meals", description = "Personal meal library with fork-and-edit support"),
         (name = "Search", description = "Full-text search across catalog, personal library, and external providers"),
         (name = "Tasks", description = "Task management (weekly planning task creation)"),
+        (name = "Meal Suggestions", description = "Meal suggestions for a given date and slot"),
         (name = "Schedule", description = "Schedule period queries and weekly plan commits"),
     )
 )]

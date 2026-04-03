@@ -7,6 +7,7 @@ pub mod briefing;
 pub mod catalog_details;
 pub mod catalog_ingest;
 pub mod dietary_restrictions;
+pub mod meal_suggestions;
 pub mod preferences;
 pub mod schedule;
 pub mod search;

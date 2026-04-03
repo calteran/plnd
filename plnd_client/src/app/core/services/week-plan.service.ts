@@ -2,11 +2,12 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, noop, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
+import { MealSuggestionsService } from './meal-suggestions.service';
 import {
   CarryoverDecision, MealSlot, PlanDraftShape,
   PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
-  PlanStatusResponse, SchedulePeriodResponse, getMockSuggestion,
+  PlanStatusResponse, SchedulePeriodResponse,
   SKIP_SENTINEL, STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
 
@@ -14,8 +15,9 @@ interface WeeklyPlanTaskResponse { task_id: string; }
 
 @Injectable({ providedIn: 'root' })
 export class WeekPlanService {
-  private readonly http = inject(HttpClient);
-  private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
+  private readonly http                   = inject(HttpClient);
+  private readonly apiBase                = inject(ConfigService).getConfig().api.baseUrl;
+  private readonly mealSuggestionsService = inject(MealSuggestionsService);
 
   private readonly DRAFT_KEY = 'plnd:plan-draft';
   private readonly SCHEMA_VERSION = 1;
@@ -247,14 +249,15 @@ export class WeekPlanService {
     const entries: PlanEntryRequest[] = [];
 
     // Resolve all horizon day × standard slot combinations.
-    // Pending (no entry) → implicit acceptance via getMockSuggestion.
+    // Pending (no entry) → implicit acceptance via the first meal suggestion from MealSuggestionsService.
     // __skipped__ sentinel → omit from request.
     // Non-standard slots (e.g. snack) are never auto-filled; include them only if explicitly set.
     for (const date of this.horizonDays()) {
       for (const slot of STANDARD_MEAL_SLOTS) {
         const meal = meals[date]?.[slot];
         if (meal?.title === SKIP_SENTINEL) continue;
-        const resolved: PlannedMeal = meal ?? { type: 'mock', title: getMockSuggestion(date, slot) };
+        const fallbackTitle = this.mealSuggestionsService.suggestions(date, slot)[0]?.name ?? `(${slot})`;
+        const resolved: PlannedMeal = meal ?? { type: 'mock', title: fallbackTitle };
         entries.push({
           date,
           task_type: 'meal',
