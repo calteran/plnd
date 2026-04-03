@@ -71,6 +71,9 @@ export async function seedAuth(page: Page) {
   await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
     route.fulfill({ status: 200, json: [] })
   );
+  await page.route(`${API_BASE}/schedule/period**`, route =>
+    route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
+  );
   await page.route(`${API_BASE}/briefing/weather`, route =>
     route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
   );
