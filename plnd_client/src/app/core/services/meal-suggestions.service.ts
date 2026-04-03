@@ -1,7 +1,8 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable, catchError, of, shareReplay, tap } from 'rxjs';
 import { ConfigService } from './config.service';
+import { SKIP_AUTH_ERROR } from '../interceptors/auth-error.interceptor';
 import { MealSuggestion, MealSlot } from '../models/week-plan';
 
 @Injectable({ providedIn: 'root' })
@@ -37,7 +38,10 @@ export class MealSuggestionsService {
     this._cache.set(key, sig);
 
     const obs$ = this.http
-      .get<MealSuggestion[]>(`${this.apiBase}/my/meal-suggestions`, { params: { date, slot } })
+      .get<MealSuggestion[]>(`${this.apiBase}/my/meal-suggestions`, {
+        params: { date, slot },
+        context: new HttpContext().set(SKIP_AUTH_ERROR, true),
+      })
       .pipe(
         catchError(() => of([] as MealSuggestion[])),
         tap(data => sig.set(data)),

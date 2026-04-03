@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { ConfigService } from './config.service';
+import { SKIP_AUTH_ERROR } from '../interceptors/auth-error.interceptor';
 import { WeatherSummary, YesterdaySnapshot } from '../models/briefing';
 
 @Injectable({ providedIn: 'root' })
@@ -31,17 +32,19 @@ export class BriefingService {
     this._loaded = true;
     const base = this.config.getConfig().api.baseUrl;
 
-    this.http.get<WeatherSummary>(`${base}/briefing/weather`).subscribe({
+    const ctx = new HttpContext().set(SKIP_AUTH_ERROR, true);
+
+    this.http.get<WeatherSummary>(`${base}/briefing/weather`, { context: ctx }).subscribe({
       next:  w  => { this._weather.set(w);    this._weatherError.set(null); },
       error: () => this._weatherError.set('Weather unavailable'),
     });
 
-    this.http.get<{ headlines: string[] }>(`${base}/briefing/news`).subscribe({
+    this.http.get<{ headlines: string[] }>(`${base}/briefing/news`, { context: ctx }).subscribe({
       next:  n  => { this._news.set(n.headlines); this._newsError.set(null); },
       error: () => this._newsError.set('Headlines unavailable'),
     });
 
-    this.http.get<YesterdaySnapshot>(`${base}/briefing/yesterday`).subscribe({
+    this.http.get<YesterdaySnapshot>(`${base}/briefing/yesterday`, { context: ctx }).subscribe({
       next:  y  => { this._yesterday.set(y);  this._yesterdayError.set(null); },
       error: () => this._yesterdayError.set('Yesterday unavailable'),
     });
