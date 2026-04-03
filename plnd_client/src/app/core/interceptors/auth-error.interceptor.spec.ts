@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { noop } from 'rxjs';
-import { provideHttpClient, withInterceptors, HttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors, HttpClient, HttpContext } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { authErrorInterceptor } from './auth-error.interceptor';
+import { authErrorInterceptor, SKIP_AUTH_ERROR } from './auth-error.interceptor';
 import { AuthService } from '../services/auth.service';
 import { environment } from '../../../environments/environment';
 
@@ -88,5 +88,19 @@ describe('authErrorInterceptor', () => {
     http.get('/api/test').subscribe({ error: (e: unknown) => { caught = e; } });
     httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(caught).toBeTruthy();
+  });
+
+  it('does not call logout on a 401 when SKIP_AUTH_ERROR context token is set', () => {
+    const ctx = new HttpContext().set(SKIP_AUTH_ERROR, true);
+    http.get('/api/test', { context: ctx }).subscribe({ error: noop });
+    httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(authService.logout).not.toHaveBeenCalled();
+  });
+
+  it('still calls logout on a 401 when SKIP_AUTH_ERROR is explicitly false', () => {
+    const ctx = new HttpContext().set(SKIP_AUTH_ERROR, false);
+    http.get('/api/test', { context: ctx }).subscribe({ error: noop });
+    httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
+    expect(authService.logout).toHaveBeenCalledWith('session_expired');
   });
 });
