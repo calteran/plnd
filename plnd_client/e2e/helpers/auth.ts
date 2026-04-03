@@ -76,18 +76,28 @@ export async function seedAuth(page: Page) {
   );
   await page.route(`${API_BASE}/schedule/period**`, route => {
     const start = new URL(route.request().url()).searchParams.get('start') ?? E2E_TODAY;
-    const status = start === E2E_TODAY ? 'done' : 'pending';
+    const isToday = start === E2E_TODAY;
     return route.fulfill({
       status: 200,
       json: {
-        entries: [{
-          entry_id: 'e2e-entry-uuid',
-          task_type: 'task',
-          title: 'Morning exercise',
-          date: start,
-          scheduled_start: `${start}T07:00:00Z`,
-          status,
-        }],
+        entries: [
+          {
+            entry_id: 'e2e-meal-uuid',
+            task_type: 'meal',
+            date: start,
+            scheduled_start: `${start}T08:00:00Z`,
+            status: isToday ? 'completed' : 'planned',
+            after_milepost: 'breakfast',
+          },
+          {
+            entry_id: 'e2e-task-uuid',
+            task_type: 'task',
+            title: 'Morning stretch',
+            date: start,
+            scheduled_start: `${start}T07:00:00Z`,
+            status: isToday ? 'completed' : 'pending',
+          },
+        ],
         carryover: [],
       },
     });
