@@ -170,17 +170,45 @@ describe('WeekPlanService', () => {
     });
   });
 
-  it('buildCommitRequest includes mock suggestion for a pending (no-entry) slot', () => {
-    service.initSession('2026-03-24', '2026-03-24'); // single day
-    // No explicit meal set — all slots are pending
+  it('commitPlan defers plan POST until all pending-slot suggestions are loaded', () => {
+    service.initSession('2026-03-24', '2026-03-24');
+    let planPosted = false;
+    service.commitPlan('task-1').subscribe(() => { planPosted = true; });
+
+    // Plan POST must NOT fire before suggestion preloads complete
+    httpMock.expectNone(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+
+    // Flush the three standard-slot suggestion requests
+    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
+    expect(suggReqs.length).toBe(3);
+    suggReqs.forEach(r => r.flush([]));
+
+    // Now the plan POST should fire
+    const planReq = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+    planReq.flush({ committed: 3, planning_task_status: 'completed' });
+    expect(planPosted).toBeTrue();
+  });
+
+  it('buildCommitRequest includes actual suggestion name for a pending (no-entry) slot', () => {
+    service.initSession('2026-03-24', '2026-03-24');
     service.commitPlan('task-1').subscribe();
+
+    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
+    expect(suggReqs.length).toBe(3);
+    suggReqs.find(r => r.request.params.get('slot') === 'breakfast')
+      ?.flush([{ id: 's1', name: 'Oatmeal', suggestion_type: 'meal' }]);
+    suggReqs.find(r => r.request.params.get('slot') === 'lunch')
+      ?.flush([{ id: 's2', name: 'Salad', suggestion_type: 'meal' }]);
+    suggReqs.find(r => r.request.params.get('slot') === 'dinner')
+      ?.flush([{ id: 's3', name: 'Pasta', suggestion_type: 'meal' }]);
+
     const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
     const body = req.request.body as PostSchedulePlanRequest;
     const breakfast = body.entries.find(
       e => e.date === '2026-03-24' && e.after_milepost === 'breakfast',
     );
     expect(breakfast).toBeTruthy();
-    expect(breakfast!.title).toBeTruthy(); // mock suggestion title present
+    expect(breakfast!.title).toBe('Oatmeal');
     expect(breakfast!.task_type).toBe('meal');
     req.flush({ committed: 3, planning_task_status: 'completed' });
   });
@@ -189,6 +217,10 @@ describe('WeekPlanService', () => {
     service.initSession('2026-03-24', '2026-03-24');
     service.setMeal('2026-03-24', 'snack', { type: 'user_meal', title: 'Apple' });
     service.commitPlan('task-1').subscribe();
+
+    // Standard slots still need suggestion preloads (snack is non-standard)
+    httpMock.match(r => r.url.includes('/my/meal-suggestions')).forEach(r => r.flush([]));
+
     const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
     const body = req.request.body as PostSchedulePlanRequest;
     const snack = body.entries.find(
@@ -204,6 +236,12 @@ describe('WeekPlanService', () => {
     service.initSession('2026-03-24', '2026-03-24');
     service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: SKIP_SENTINEL });
     service.commitPlan('task-1').subscribe();
+
+    // Only lunch and dinner are unset — breakfast has a value (SKIP_SENTINEL), no suggestion needed
+    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
+    expect(suggReqs.length).toBe(2);
+    suggReqs.forEach(r => r.flush([]));
+
     const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
     const body = req.request.body as PostSchedulePlanRequest;
     const breakfast = body.entries.find(
@@ -217,6 +255,12 @@ describe('WeekPlanService', () => {
     service.initSession('2026-03-24', '2026-03-24');
     service.setMeal('2026-03-24', 'lunch', { type: 'user_meal', title: 'Greek yogurt' });
     service.commitPlan('task-1').subscribe();
+
+    // Only breakfast and dinner are unset — lunch has a value
+    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
+    expect(suggReqs.length).toBe(2);
+    suggReqs.forEach(r => r.flush([]));
+
     const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
     const body = req.request.body as PostSchedulePlanRequest;
     const lunch = body.entries.find(
