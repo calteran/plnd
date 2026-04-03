@@ -43,7 +43,10 @@ export class MealSuggestionsService {
         context: new HttpContext().set(SKIP_AUTH_ERROR, true),
       })
       .pipe(
-        catchError(() => of([] as MealSuggestion[])),
+        catchError(() => {
+          this._obs.delete(key);
+          return of([] as MealSuggestion[]);
+        }),
         tap(data => sig.set(data)),
         shareReplay(1),
       );
