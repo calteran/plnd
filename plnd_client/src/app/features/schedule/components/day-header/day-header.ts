@@ -43,8 +43,7 @@ export class DayHeaderComponent {
 
   private offset(days: number): string {
     const [y, m, d] = this.date().split('-').map(Number);
-    const date = new Date(y, m - 1, d);
-    date.setDate(date.getDate() + days);
+    const date = new Date(Date.UTC(y, m - 1, d + days));
     return toIsoDate(date);
   }
 }

@@ -76,18 +76,21 @@ test.describe('Day View', () => {
 
     test.describe('Loading state', () => {
       test('shows loading skeleton while schedule is fetching', async ({ page }) => {
-        // Freeze macrotask timers so the 300ms ScheduleService.loadDay timeout doesn't
-        // fire during navigation. Without this, Playwright serialises element queries
-        // after navigation completes, by which point the timer may have already fired
-        // (especially on fast CI runners). Angular signal-based change detection uses
-        // microtasks, so frozen macrotask timers don't break rendering.
-        await page.clock.install();
+        // Hold the schedule response so we can observe the skeleton while the
+        // request is in flight. ScheduleService now uses HttpClient (not setTimeout),
+        // so we control timing via the route handler rather than page.clock.
+        let releaseResponse!: () => void;
+        const hold = new Promise<void>(r => { releaseResponse = r; });
+        await page.route(`${API_BASE}/schedule/period**`, async route => {
+          await hold;
+          await route.fulfill({ status: 200, json: { entries: [], carryover: [] } });
+        });
+
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
-        await expect(dayView.getSkeletonList()).toBeVisible();
-        // Advance past the 300ms timer to confirm skeleton clears on load completion.
-        await page.clock.fastForward(400);
-        await expect(dayView.getSkeletonList()).not.toBeVisible();
+        await expect(dayView.getSkeletonList()).toBeVisible({ timeout: 2_000 });
+        releaseResponse();
+        await expect(dayView.getSkeletonList()).not.toBeVisible({ timeout: 2_000 });
       });
     });
 
@@ -107,9 +110,9 @@ test.describe('Day View', () => {
         await dayView.gotoDate('2026-03-28');
         await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
 
-        // mock data always includes Breakfast with 🥑
+        // seedAuth mock returns a breakfast meal; MEAL_SLOTS maps 'breakfast' → 🥣
         await expect(dayView.getMealRows().first()).toContainText('Breakfast');
-        await expect(dayView.getMealRows().first()).toContainText('🥑');
+        await expect(dayView.getMealRows().first()).toContainText('🥣');
       });
 
       test('task row shows task label', async ({ page }) => {
@@ -117,7 +120,7 @@ test.describe('Day View', () => {
         await dayView.gotoDate('2026-03-28');
         await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
 
-        // mock data always includes '5-min stretch' task
+        // seedAuth mock returns a 'Morning stretch' task
         await expect(dayView.getTaskRows().first()).toContainText('stretch');
       });
     });

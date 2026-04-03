@@ -14,7 +14,8 @@ path = "src/bin/seed.rs"
 
 [dependencies]
 plnd_data = { path = "../plnd_data" }
-sqlx = { version = "0.8", features = ["postgres", "uuid", "runtime-tokio", "json", "rust_decimal"] }
+sqlx = { version = "0.8", features = ["postgres", "uuid", "runtime-tokio", "json", "rust_decimal", "chrono"] }
+chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 serde_json = "1.0"
 rust_decimal = { version = "1", features = ["db-postgres"] }

@@ -1985,6 +1985,7 @@ name = "plnd_seed"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "plnd_data",
  "rust_decimal",
  "serde_json",

@@ -41,6 +41,11 @@ async fn main() -> anyhow::Result<()> {
 
     println!("Running catalog seed from external providers...");
     plnd_seed::seed(&pool, &nutrition_providers, &recipe_providers).await?;
+
+    println!("Running dev user seed...");
+    plnd_seed::dev_user::seed_dev_user(&pool).await?;
+    println!("Dev user seed complete.");
+
     println!("Done.");
     Ok(())
 }
