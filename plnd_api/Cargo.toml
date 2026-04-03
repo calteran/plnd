@@ -28,7 +28,7 @@ utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 utoipa-scalar = { version = "0.3", features = ["axum"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-governor = "0.6"
+governor = "0.10"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
