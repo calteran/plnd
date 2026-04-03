@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
-import { Subject, of } from 'rxjs';
-import { switchMap, map, catchError } from 'rxjs/operators';
+import { Subject, of, switchMap, map, catchError } from 'rxjs';
 import { ConfigService } from './config.service';
 import { ScheduleItem, ItemType, MealAnchor, ScheduleTask, isMealAnchor } from '../models/schedule';
 import { ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
@@ -40,8 +40,7 @@ export class ScheduleService {
             ),
           ),
       ),
-    ).subscribe(({ date, resp, error }) => {
-      if (this._date() !== date) return;
+    ).pipe(takeUntilDestroyed()).subscribe(({ date, resp, error }) => {
       if (error) this._error.set('Failed to load schedule');
       this._items.set(resp.entries.map(mapEntry));
       this._loading.set(false);
