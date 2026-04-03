@@ -1,4 +1,4 @@
-use chrono::{Duration, NaiveDate, NaiveTime, TimeZone, Utc};
+use chrono::{Duration, NaiveDate, NaiveTime, Utc};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
@@ -190,7 +190,7 @@ async fn seed_day(
 
     for (task_type, hhmm, after_milepost) in entries {
         let t = NaiveTime::parse_from_str(hhmm, "%H:%M").expect("hardcoded time strings are valid");
-        let scheduled_start = Utc.from_utc_datetime(&date.and_time(t));
+        let scheduled_start = date.and_time(t).and_utc();
 
         sqlx::query(
             "INSERT INTO schedule_entries

@@ -61,14 +61,21 @@ export function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+function localIsoDate(d: Date): string {
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
 export function todayIso(): string {
-  return toIsoDate(new Date());
+  return localIsoDate(new Date());
 }
 
 export function offsetIso(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return toIsoDate(d);
+  return localIsoDate(d);
 }
 
 function flip(status: 'pending' | 'done'): 'pending' | 'done' {
