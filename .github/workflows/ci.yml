@@ -125,6 +125,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Start mock OAuth server (background)
+        run: |
+          docker run -d \
+            --name mock-oauth-server \
+            -p 8080:8080 \
+            -e ISSUER_ID=plnd-dev \
+            -e INTERACTIVE_LOGIN=true \
+            -e JSON_CONFIG=true \
+            -v ${{ github.workspace }}/config/mock-oauth:/config \
+            ghcr.io/navikt/mock-oauth2-server:3.0.1
+
       - name: Set up Node.js
         uses: actions/setup-node@v6
         with:
@@ -154,10 +165,6 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: cd plnd_client && npx playwright install chromium --with-deps
 
-      - name: Install Playwright system dependencies
-        if: steps.cache-playwright.outputs.cache-hit == 'true'
-        run: cd plnd_client && npx playwright install-deps chromium
-
       - name: Download API binary
         uses: actions/download-artifact@v8
         with:
@@ -167,16 +174,8 @@ jobs:
       - name: Make API binary executable
         run: chmod +x target/debug/plnd_api
 
-      - name: Start mock OAuth server
+      - name: Wait for mock OAuth server
         run: |
-          docker run -d \
-            --name mock-oauth-server \
-            -p 8080:8080 \
-            -e ISSUER_ID=plnd-dev \
-            -e INTERACTIVE_LOGIN=true \
-            -e JSON_CONFIG=true \
-            -v ${{ github.workspace }}/config/mock-oauth:/config \
-            ghcr.io/navikt/mock-oauth2-server:3.0.1
           timeout 30s bash -c 'until curl -sf http://localhost:8080/plnd-dev/.well-known/openid-configuration; do sleep 1; done'
 
       - name: Start API server (background)
