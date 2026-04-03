@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, noop, tap, throwError } from 'rxjs';
+import { Observable, catchError, forkJoin, noop, of, switchMap, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
 import { MealSuggestionsService } from './meal-suggestions.service';
 import {
@@ -153,8 +153,23 @@ export class WeekPlanService {
 
   commitPlan(taskId: string, replace = false): Observable<PostSchedulePlanResponse> {
     this.isSubmittingSignal.set(true);
-    const req = this.buildCommitRequest(taskId, replace);
-    return this.http.post<PostSchedulePlanResponse>(`${this.apiBase}/schedule/plan`, req).pipe(
+
+    // Ensure meal suggestions are loaded for every standard slot that has no explicit
+    // meal set before building the request payload. This guards against the race where
+    // the wizard's suggestion component hasn't finished loading yet (issue #204).
+    const meals = this.scheduledMealsSignal();
+    const loads = this.horizonDays().flatMap(date =>
+      STANDARD_MEAL_SLOTS
+        .filter(slot => meals[date]?.[slot] === undefined)
+        .map(slot => this.mealSuggestionsService.ensureLoaded(date, slot))
+    );
+    const preload$: Observable<unknown> = loads.length ? forkJoin(loads) : of(null);
+
+    return preload$.pipe(
+      switchMap(() => {
+        const req = this.buildCommitRequest(taskId, replace);
+        return this.http.post<PostSchedulePlanResponse>(`${this.apiBase}/schedule/plan`, req);
+      }),
       tap(() => {
         this.clearDraft();
         this.hasUnplannedHorizonSignal.set(false);

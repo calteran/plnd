@@ -68,4 +68,44 @@ describe('MealSuggestionsService', () => {
       .flush('error', { status: 500, statusText: 'Server Error' });
     expect(svc.suggestions('2026-04-02', 'breakfast')).toEqual([]);
   });
+
+  describe('ensureLoaded()', () => {
+    it('fires GET /my/meal-suggestions and resolves with the suggestions', done => {
+      svc.ensureLoaded('2026-04-02', 'breakfast').subscribe(result => {
+        expect(result).toEqual(MOCK_SUGGESTIONS);
+        done();
+      });
+      httpMock.expectOne(r => r.url.includes('/my/meal-suggestions')).flush(MOCK_SUGGESTIONS);
+    });
+
+    it('also populates suggestions() after it resolves', done => {
+      svc.ensureLoaded('2026-04-02', 'breakfast').subscribe(() => {
+        expect(svc.suggestions('2026-04-02', 'breakfast')).toEqual(MOCK_SUGGESTIONS);
+        done();
+      });
+      httpMock.expectOne(r => r.url.includes('/my/meal-suggestions')).flush(MOCK_SUGGESTIONS);
+    });
+
+    it('replays to a late subscriber without firing a second HTTP request', done => {
+      // First subscriber triggers load
+      svc.ensureLoaded('2026-04-02', 'breakfast').subscribe();
+      httpMock.expectOne(r => r.url.includes('/my/meal-suggestions')).flush(MOCK_SUGGESTIONS);
+
+      // Second subscriber (after load complete) gets cached value, no new HTTP request
+      svc.ensureLoaded('2026-04-02', 'breakfast').subscribe(result => {
+        expect(result).toEqual(MOCK_SUGGESTIONS);
+        httpMock.expectNone(r => r.url.includes('/my/meal-suggestions'));
+        done();
+      });
+    });
+
+    it('resolves with [] and does not throw on HTTP error', done => {
+      svc.ensureLoaded('2026-04-02', 'dinner').subscribe(result => {
+        expect(result).toEqual([]);
+        done();
+      });
+      httpMock.expectOne(r => r.url.includes('/my/meal-suggestions'))
+        .flush('error', { status: 500, statusText: 'Server Error' });
+    });
+  });
 });
