@@ -107,5 +107,19 @@ describe('MealSuggestionsService', () => {
       httpMock.expectOne(r => r.url.includes('/my/meal-suggestions'))
         .flush('error', { status: 500, statusText: 'Server Error' });
     });
+
+    it('fires a new HTTP request after a previous error for the same key', done => {
+      // First call — fails
+      svc.ensureLoaded('2026-04-02', 'breakfast').subscribe();
+      httpMock.expectOne(r => r.url.includes('/my/meal-suggestions'))
+        .flush('error', { status: 500, statusText: 'Server Error' });
+
+      // Second call for the same key — must retry, not return stale empty cache
+      svc.ensureLoaded('2026-04-02', 'breakfast').subscribe(result => {
+        expect(result).toEqual(MOCK_SUGGESTIONS);
+        done();
+      });
+      httpMock.expectOne(r => r.url.includes('/my/meal-suggestions')).flush(MOCK_SUGGESTIONS);
+    });
   });
 });
