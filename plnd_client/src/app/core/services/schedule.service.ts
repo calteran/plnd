@@ -1,6 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, of } from 'rxjs';
 import { ConfigService } from './config.service';
 import { ScheduleItem, ItemType, MealAnchor, ScheduleTask, isMealAnchor } from '../models/schedule';
 import { ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
@@ -29,11 +28,17 @@ export class ScheduleService {
       .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period`, {
         params: { start: date, end: date },
       })
-      .pipe(catchError(() => of({ entries: [], carryover: [] } satisfies SchedulePeriodResponse)))
-      .subscribe(resp => {
-        if (this._date() !== date) return; // stale response guard
-        this._items.set(resp.entries.map(mapEntry));
-        this._loading.set(false);
+      .subscribe({
+        next: resp => {
+          if (this._date() !== date) return; // stale response guard
+          this._items.set(resp.entries.map(mapEntry));
+          this._loading.set(false);
+        },
+        error: () => {
+          if (this._date() !== date) return;
+          this._error.set('Failed to load schedule');
+          this._loading.set(false);
+        },
       });
   }
 
@@ -61,7 +66,7 @@ export function toIsoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function localIsoDate(d: Date): string {
+export function localIsoDate(d: Date): string {
   const y  = d.getFullYear();
   const m  = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');

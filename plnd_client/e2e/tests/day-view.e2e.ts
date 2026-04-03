@@ -2,25 +2,6 @@ import { test, expect } from '@playwright/test';
 import { DayViewPage } from '../pages/day-view.page';
 import { API_BASE, seedAuth } from '../helpers/auth';
 
-// A realistic schedule response: one meal row + one task row.
-// Used by tests that mock GET /schedule — requires HTTP implementation in ScheduleService.
-const MOCK_SCHEDULE_ITEMS = [
-  {
-    id: 'm1',
-    name: 'Breakfast',
-    emoji: '🥑',
-    description: 'Avocado toast',
-    status: 'planned',
-    duringMealTasks: [],
-  },
-  {
-    id: 't1',
-    type: 'task',
-    label: 'Morning stretch',
-    status: 'pending',
-  },
-];
-
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 test.describe('Day View', () => {
@@ -125,15 +106,10 @@ test.describe('Day View', () => {
       });
     });
 
-    // ── Tests below are marked test.fail() because ScheduleService.loadDay() currently
-    // ── uses setTimeout + mock data instead of HttpClient. Once replaced with
-    // ── GET /schedule?date=<date>, remove the test.fail() call from each test.
-
     test.describe('Empty state', () => {
       test('shows "Nothing planned yet" when the schedule is empty', async ({ page }) => {
-        test.fail(); // TODO: remove when ScheduleService uses HttpClient
-        await page.route(`${API_BASE}/schedule*`, route =>
-          route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+        await page.route(`${API_BASE}/schedule/period**`, route =>
+          route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
         );
 
         const dayView = new DayViewPage(page);
@@ -146,9 +122,8 @@ test.describe('Day View', () => {
 
     test.describe('Error state', () => {
       test('shows error message with retry button when the schedule API fails', async ({ page }) => {
-        test.fail(); // TODO: remove when ScheduleService uses HttpClient
-        await page.route(`${API_BASE}/schedule*`, route =>
-          route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'Internal Server Error' }) })
+        await page.route(`${API_BASE}/schedule/period**`, route =>
+          route.fulfill({ status: 500, json: { error: 'Internal Server Error' } })
         );
 
         const dayView = new DayViewPage(page);
@@ -159,15 +134,14 @@ test.describe('Day View', () => {
       });
 
       test('retry button re-fetches the schedule', async ({ page }) => {
-        test.fail(); // TODO: remove when ScheduleService uses HttpClient
-
         let callCount = 0;
-        await page.route(`${API_BASE}/schedule*`, route => {
+        await page.route(`${API_BASE}/schedule/period**`, async route => {
           callCount++;
           if (callCount === 1) {
-            return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ error: 'fail' }) });
+            await route.fulfill({ status: 500, json: { error: 'fail' } });
+          } else {
+            await route.fallback();
           }
-          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_SCHEDULE_ITEMS) });
         });
 
         const dayView = new DayViewPage(page);

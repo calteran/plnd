@@ -42,6 +42,9 @@ test.describe('Onboarding', () => {
     await page.route(`${API_BASE}/briefing/yesterday`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_YESTERDAY) })
     );
+    await page.route(`${API_BASE}/schedule/period**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ entries: [], carryover: [] }) })
+    );
 
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');
@@ -91,6 +94,9 @@ test.describe('Onboarding', () => {
     );
     await page.route(`${API_BASE}/briefing/yesterday`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_YESTERDAY) })
+    );
+    await page.route(`${API_BASE}/schedule/period**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ entries: [], carryover: [] }) })
     );
 
     await page.addInitScript(() => {
@@ -283,6 +289,9 @@ test.describe('Step 3 — dietary restrictions', () => {
     );
     await page.route(`${API_BASE}/briefing/yesterday`, route =>
       route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
+    );
+    await page.route(`${API_BASE}/schedule/period**`, route =>
+      route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
     );
 
     await page.getByRole('button', { name: 'Done' }).click();

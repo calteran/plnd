@@ -1,7 +1,7 @@
 import { Component, OnInit, effect, inject } from '@angular/core';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
-import { toIsoDate } from '../../../core/services/schedule.service';
+import { localIsoDate } from '../../../core/services/schedule.service';
 import { PlanReviewStepComponent } from '../steps/plan-review-step/plan-review-step';
 import { PlanTasksStepComponent } from '../steps/plan-tasks-step/plan-tasks-step';
 import { PlanMealsStepComponent } from '../steps/plan-meals-step/plan-meals-step';
@@ -129,8 +129,8 @@ export class PlanningWizardComponent implements OnInit {
       const planEnd = new Date(planStart);
       planEnd.setDate(planStart.getDate() + planLengthDays - 1);
 
-      const planStartIso = toIsoDate(planStart);
-      this.weekPlanService.initSession(planStartIso, toIsoDate(planEnd));
+      const planStartIso = localIsoDate(planStart);
+      this.weekPlanService.initSession(planStartIso, localIsoDate(planEnd));
       this.weekPlanService.createOrFetchPlanTask(planStartIso).subscribe({
         error: err => console.error('Failed to create planning task', err),
       });
