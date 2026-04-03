@@ -40,7 +40,7 @@ export class ScheduleService {
             ),
           ),
       ),
-    ).pipe(takeUntilDestroyed()).subscribe(({ date, resp, error }) => {
+    ).pipe(takeUntilDestroyed()).subscribe(({ resp, error }) => {
       if (error) this._error.set('Failed to load schedule');
       this._items.set(resp.entries.map(mapEntry));
       this._loading.set(false);
