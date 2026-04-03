@@ -112,6 +112,32 @@ describe('ScheduleService', () => {
     expect(svc.scheduleItems()).toEqual([]);
   });
 
+  it('calling loadDay a second time does not leave isLoading stuck when first request is superseded', () => {
+    svc.loadDay('2026-04-01');
+    svc.loadDay('2026-04-02');
+
+    // switchMap cancels the first request at the HTTP level; only the second is flushable
+    const reqs = httpMock.match(r => r.url.includes('/schedule/period'));
+    expect(reqs.length).toBe(2);
+    expect(reqs[0].cancelled).toBeTrue();
+    reqs[1].flush({ entries: [], carryover: [] });
+
+    expect(svc.isLoading()).toBeFalse();
+    expect(svc.date()).toBe('2026-04-02');
+  });
+
+  it('isLoading is cleared even when the second request errors after the first was superseded', () => {
+    svc.loadDay('2026-04-01');
+    svc.loadDay('2026-04-02');
+
+    const reqs = httpMock.match(r => r.url.includes('/schedule/period'));
+    expect(reqs[0].cancelled).toBeTrue();
+    reqs[1].flush('server error', { status: 500, statusText: 'Internal Server Error' });
+
+    expect(svc.isLoading()).toBeFalse();
+    expect(svc.loadError()).toBe('Failed to load schedule');
+  });
+
   it('toggleItem flips a task from pending to done', () => {
     svc.loadDay('2026-04-02');
     httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({

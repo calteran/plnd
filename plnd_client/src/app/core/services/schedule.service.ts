@@ -1,5 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Subject, of } from 'rxjs';
+import { switchMap, map, catchError } from 'rxjs/operators';
 import { ConfigService } from './config.service';
 import { ScheduleItem, ItemType, MealAnchor, ScheduleTask, isMealAnchor } from '../models/schedule';
 import { ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
@@ -9,37 +11,48 @@ export class ScheduleService {
   private readonly http    = inject(HttpClient);
   private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
 
-  private readonly _items   = signal<ScheduleItem[]>([]);
-  private readonly _loading = signal(false);
-  private readonly _error   = signal<string | null>(null);
-  private readonly _date    = signal(todayIso());
+  private readonly _items        = signal<ScheduleItem[]>([]);
+  private readonly _loading      = signal(false);
+  private readonly _error        = signal<string | null>(null);
+  private readonly _date         = signal(todayIso());
+  private readonly _loadTrigger$ = new Subject<string>();
 
   readonly scheduleItems = this._items.asReadonly();
   readonly isLoading     = this._loading.asReadonly();
   readonly loadError     = this._error.asReadonly();
   readonly date          = this._date.asReadonly();
 
+  constructor() {
+    this._loadTrigger$.pipe(
+      switchMap(date =>
+        this.http
+          .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period`, {
+            params: { start: date, end: date },
+          })
+          .pipe(
+            map(resp => ({ date, resp, error: false as const })),
+            catchError(() =>
+              of({
+                date,
+                resp: { entries: [], carryover: [] } satisfies SchedulePeriodResponse,
+                error: true as const,
+              }),
+            ),
+          ),
+      ),
+    ).subscribe(({ date, resp, error }) => {
+      if (this._date() !== date) return;
+      if (error) this._error.set('Failed to load schedule');
+      this._items.set(resp.entries.map(mapEntry));
+      this._loading.set(false);
+    });
+  }
+
   loadDay(date: string): void {
     this._date.set(date);
     this._loading.set(true);
     this._error.set(null);
-
-    this.http
-      .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period`, {
-        params: { start: date, end: date },
-      })
-      .subscribe({
-        next: resp => {
-          if (this._date() !== date) return; // stale response guard
-          this._items.set(resp.entries.map(mapEntry));
-          this._loading.set(false);
-        },
-        error: () => {
-          if (this._date() !== date) return;
-          this._error.set('Failed to load schedule');
-          this._loading.set(false);
-        },
-      });
+    this._loadTrigger$.next(date);
   }
 
   toggleItem(id: string): void {
