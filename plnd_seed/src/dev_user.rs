@@ -15,12 +15,11 @@ const MOCK_SUB: &str = "testuser";
 /// **Idempotent**: if `testuser@mock.plnd` already exists the function returns
 /// `Ok(())` immediately without modifying the database.
 pub async fn seed_dev_user(pool: &PgPool) -> Result<(), SeedError> {
-    let already_seeded: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)",
-    )
-    .bind(DEV_EMAIL)
-    .fetch_one(pool)
-    .await?;
+    let already_seeded: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)")
+            .bind(DEV_EMAIL)
+            .fetch_one(pool)
+            .await?;
 
     if already_seeded {
         println!("Dev user seed: {} already exists, skipping.", DEV_EMAIL);
@@ -28,12 +27,12 @@ pub async fn seed_dev_user(pool: &PgPool) -> Result<(), SeedError> {
     }
 
     let mut tx = pool.begin().await?;
-    let user_id = insert_user(&mut *tx).await?;
-    insert_oauth_provider(&mut *tx, user_id).await?;
-    insert_preferences(&mut *tx, user_id).await?;
-    let user_dish_ids = fork_catalog_dishes(&mut *tx, user_id).await?;
-    fork_catalog_meals(&mut *tx, user_id, &user_dish_ids).await?;
-    seed_schedule(&mut *tx, user_id).await?;
+    let user_id = insert_user(&mut tx).await?;
+    insert_oauth_provider(&mut tx, user_id).await?;
+    insert_preferences(&mut tx, user_id).await?;
+    let user_dish_ids = fork_catalog_dishes(&mut tx, user_id).await?;
+    fork_catalog_meals(&mut tx, user_id, &user_dish_ids).await?;
+    seed_schedule(&mut tx, user_id).await?;
     tx.commit().await?;
 
     println!("Dev user seed: testuser created with schedule data.");
@@ -80,10 +79,7 @@ async fn insert_preferences(tx: &mut PgConnection, user_id: Uuid) -> Result<(), 
     Ok(())
 }
 
-async fn fork_catalog_dishes(
-    tx: &mut PgConnection,
-    user_id: Uuid,
-) -> Result<Vec<Uuid>, SeedError> {
+async fn fork_catalog_dishes(tx: &mut PgConnection, user_id: Uuid) -> Result<Vec<Uuid>, SeedError> {
     // Grab the first 5 TheMealDB dishes (sorted by name for determinism).
     let rows: Vec<(Uuid, String, Vec<String>)> = sqlx::query_as(
         "SELECT dish_id, name, occasion_tags
@@ -123,8 +119,8 @@ async fn fork_catalog_meals(
     // Create one user_meal per standard slot, each referencing a forked user_dish.
     let slots: &[(&str, &str)] = &[
         ("Breakfast", "breakfast"),
-        ("Lunch",     "lunch"),
-        ("Dinner",    "dinner"),
+        ("Lunch", "lunch"),
+        ("Dinner", "dinner"),
     ];
 
     for (i, (meal_name, slot)) in slots.iter().enumerate() {
@@ -187,14 +183,13 @@ async fn seed_day(
     // (task_type, wall-clock time "HH:MM", after_milepost)
     let entries: &[(&str, &str, Option<&str>)] = &[
         ("exercise", "07:00", None),
-        ("meal",     "08:00", Some("breakfast")),
-        ("meal",     "12:30", Some("lunch")),
-        ("meal",     "18:30", Some("dinner")),
+        ("meal", "08:00", Some("breakfast")),
+        ("meal", "12:30", Some("lunch")),
+        ("meal", "18:30", Some("dinner")),
     ];
 
     for (task_type, hhmm, after_milepost) in entries {
-        let t = NaiveTime::parse_from_str(hhmm, "%H:%M")
-            .expect("hardcoded time strings are valid");
+        let t = NaiveTime::parse_from_str(hhmm, "%H:%M").expect("hardcoded time strings are valid");
         let scheduled_start = Utc.from_utc_datetime(&date.and_time(t));
 
         sqlx::query(

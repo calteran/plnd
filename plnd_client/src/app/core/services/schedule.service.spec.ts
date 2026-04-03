@@ -2,8 +2,9 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { ScheduleService } from './schedule.service';
-import { isMealAnchor, ScheduleTask } from '../models/schedule';
+import { isMealAnchor, MealAnchor, ScheduleItem, ScheduleTask } from '../models/schedule';
 import { ConfigService } from './config.service';
+import { WritableSignal } from '@angular/core';
 
 const MOCK_CONFIG = { api: { baseUrl: 'http://localhost:3000' } };
 
@@ -97,7 +98,7 @@ describe('ScheduleService', () => {
     const items = svc.scheduleItems();
     expect(items.length).toBe(1);
     expect(isMealAnchor(items[0])).toBeTrue();
-    const meal = items[0] as any;
+    const meal = items[0] as MealAnchor;
     expect(meal.name).toBe('Breakfast');
     expect(meal.status).toBe('planned');
   });
@@ -136,14 +137,14 @@ describe('ScheduleService', () => {
     httpMock.expectOne(r => r.url.includes('/schedule/period'))
       .flush({ entries: [], carryover: [] });
     // Manually inject a MealAnchor with a duringMealTask to test toggle logic
-    (svc as any)._items.set([{
+    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'm1', name: 'Breakfast', emoji: '🥣',
       status: 'planned', duringMealTasks: [
         { id: 't-dm2', type: 'task', label: 'Read 10 pages', status: 'pending' }
       ]
     }]);
     svc.toggleItem('t-dm2');
-    const meal = svc.scheduleItems()[0] as any;
+    const meal = svc.scheduleItems()[0] as MealAnchor;
     expect(meal.duringMealTasks[0].status).toBe('done');
   });
 });
