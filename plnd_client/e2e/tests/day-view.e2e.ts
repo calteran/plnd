@@ -76,11 +76,18 @@ test.describe('Day View', () => {
 
     test.describe('Loading state', () => {
       test('shows loading skeleton while schedule is fetching', async ({ page }) => {
+        // Freeze macrotask timers so the 300ms ScheduleService.loadDay timeout doesn't
+        // fire during navigation. Without this, Playwright serialises element queries
+        // after navigation completes, by which point the timer may have already fired
+        // (especially on fast CI runners). Angular signal-based change detection uses
+        // microtasks, so frozen macrotask timers don't break rendering.
+        await page.clock.install();
         const dayView = new DayViewPage(page);
-        // Navigate and immediately assert — skeleton is visible during the loading window.
-        const gotoPromise = dayView.gotoDate('2026-03-28');
-        await expect(dayView.getSkeletonList()).toBeVisible({ timeout: 2_000 });
-        await gotoPromise;
+        await dayView.gotoDate('2026-03-28');
+        await expect(dayView.getSkeletonList()).toBeVisible();
+        // Advance past the 300ms timer to confirm skeleton clears on load completion.
+        await page.clock.fastForward(400);
+        await expect(dayView.getSkeletonList()).not.toBeVisible();
       });
     });
 
