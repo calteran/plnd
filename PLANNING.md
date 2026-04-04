@@ -128,7 +128,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 COMPLETED
+### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 COMPLETED | Phase 3.0 COMPLETED
 
 ### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
@@ -258,14 +258,14 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] Move DB layer from `plnd_api/src/db/` into `plnd_data`
   - [x] Establish clean dependency graph: `plnd_api` → `plnd_agent` → `plnd_data`
 
-- [ ] **Phase 3.0 — `plnd_agent` Foundation**
-  - [ ] New `plnd_agent` workspace crate (no Axum dependency)
-  - [ ] `LlmProvider` trait with OpenAI-compatible and Anthropic implementations
-  - [ ] Mock provider for CI testing
-  - [ ] Tiered provider registry (Fast / Capable)
-  - [ ] `Tool` trait, `ToolRegistry`, and `AgentLoop` with parallel tool execution
-  - [ ] `UseCase` enum with prompt library and provider tier mapping
-  - [ ] LLM config section
+- [x] **Phase 3.0 — `plnd_agent` Foundation**
+  - [x] New `plnd_agent` workspace crate (no Axum dependency)
+  - [x] `LlmProvider` trait with OpenAI-compatible and Anthropic implementations
+  - [x] Mock provider for CI testing
+  - [x] Tiered provider registry (Fast / Capable)
+  - [x] `Tool` trait, `ToolRegistry`, and `AgentLoop` with parallel tool execution
+  - [x] `UseCase` enum with prompt library and provider tier mapping
+  - [x] LLM config section
 
 - [ ] **Phase 3.1 — Memory System**
   - [ ] `user_memories` DB migration

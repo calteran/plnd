@@ -333,8 +333,8 @@ impl AgentService {
     /// Test-only constructor that injects a pre-built registry.
     ///
     /// Uses a config with `max_iterations = 10` so the agent loop actually runs.
-    /// (`LlmConfig::default()` gives `max_iterations = 0` because the serde default
-    /// only fires during deserialization, not via `Default::default()`.)
+    /// (`LlmModelConfig::default()` returns `max_iterations = 10` via its explicit
+    /// `Default` impl; the field is set explicitly here for clarity.)
     fn new_with_registry(registry: ProviderRegistry) -> Self {
         use crate::config::LlmModelConfig;
         let model_cfg = LlmModelConfig {
