@@ -102,8 +102,14 @@ mod tests {
 
         assert_eq!(first.user_id, second.user_id);
         assert_eq!(first.week_start_day, second.week_start_day);
-        assert_eq!(first.planning_trigger_offset, second.planning_trigger_offset);
-        assert_eq!(first.default_plan_length_days, second.default_plan_length_days);
+        assert_eq!(
+            first.planning_trigger_offset,
+            second.planning_trigger_offset
+        );
+        assert_eq!(
+            first.default_plan_length_days,
+            second.default_plan_length_days
+        );
         assert_eq!(first.wake_time, second.wake_time);
     }
 

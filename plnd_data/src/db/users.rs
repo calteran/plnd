@@ -367,9 +367,13 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn link_oauth_provider_is_upsertable(pool: PgPool) {
         let uid = new_user(&pool).await;
-        link_oauth_provider(&pool, uid, "github", "gh-111").await.unwrap();
+        link_oauth_provider(&pool, uid, "github", "gh-111")
+            .await
+            .unwrap();
         // Re-linking with updated sub must not error
-        link_oauth_provider(&pool, uid, "github", "gh-222").await.unwrap();
+        link_oauth_provider(&pool, uid, "github", "gh-222")
+            .await
+            .unwrap();
 
         let found = find_by_provider(&pool, "github", "gh-222")
             .await
