@@ -172,3 +172,166 @@ pub async fn complete_onboarding(pool: &PgPool, user_id: Uuid) -> Result<bool, D
     .map(|r| r.rows_affected() > 0)
     .map_err(DatabaseError::from)
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a throwaway user and return its UUID.
+    async fn new_user(pool: &PgPool) -> Uuid {
+        create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    // -----------------------------------------------------------------------
+    // create
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_returns_full_record(pool: PgPool) {
+        let user = create(&pool, "alice@test.invalid", Some("Alice"), None)
+            .await
+            .unwrap();
+
+        assert_eq!(user.email, "alice@test.invalid");
+        assert_eq!(user.display_name.as_deref(), Some("Alice"));
+        assert!(user.is_active);
+        assert!(!user.onboarding_completed);
+        assert!(user.last_login.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_duplicate_email_errors(pool: PgPool) {
+        create(&pool, "dup@test.invalid", None, None).await.unwrap();
+        let err = create(&pool, "dup@test.invalid", None, None)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DatabaseError::UniqueViolation));
+    }
+
+    // -----------------------------------------------------------------------
+    // find_by_email
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_by_email_returns_user(pool: PgPool) {
+        let created = create(&pool, "findme@test.invalid", None, None)
+            .await
+            .unwrap();
+        let found = find_by_email(&pool, "findme@test.invalid")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.user_id, created.user_id);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_by_email_returns_none_unknown(pool: PgPool) {
+        let result = find_by_email(&pool, "nobody@test.invalid").await.unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // find_by_id
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_by_id_returns_user(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let found = find_by_id(&pool, uid).await.unwrap().unwrap();
+        assert_eq!(found.user_id, uid);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_by_id_returns_none_unknown(pool: PgPool) {
+        let result = find_by_id(&pool, Uuid::new_v4()).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // update_profile
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_profile_changes_fields(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let updated = update_profile(
+            &pool,
+            uid,
+            Some("New Name"),
+            Some("https://example.com/avatar.png"),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(updated.display_name.as_deref(), Some("New Name"));
+        assert_eq!(
+            updated.avatar_url.as_deref(),
+            Some("https://example.com/avatar.png")
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_profile_returns_none_unknown(pool: PgPool) {
+        let result = update_profile(&pool, Uuid::new_v4(), Some("Ghost"), None)
+            .await
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // deactivate_user
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn deactivate_user_sets_inactive(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let changed = deactivate_user(&pool, uid).await.unwrap();
+        assert!(changed);
+        let user = find_by_id(&pool, uid).await.unwrap().unwrap();
+        assert!(!user.is_active);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn deactivate_user_returns_false_unknown(pool: PgPool) {
+        let changed = deactivate_user(&pool, Uuid::new_v4()).await.unwrap();
+        assert!(!changed);
+    }
+
+    // -----------------------------------------------------------------------
+    // touch_last_login
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn touch_last_login_succeeds(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        touch_last_login(&pool, uid).await.unwrap();
+        let user = find_by_id(&pool, uid).await.unwrap().unwrap();
+        assert!(user.last_login.is_some());
+    }
+
+    // -----------------------------------------------------------------------
+    // complete_onboarding
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn complete_onboarding_returns_true(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let changed = complete_onboarding(&pool, uid).await.unwrap();
+        assert!(changed);
+        let user = find_by_id(&pool, uid).await.unwrap().unwrap();
+        assert!(user.onboarding_completed);
+    }
+}

@@ -54,3 +54,111 @@ pub async fn get_or_create(pool: &PgPool, user_id: Uuid) -> Result<UserPreferenc
     .await
     .map_err(DatabaseError::from)
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::users;
+    use chrono::NaiveTime;
+
+    /// Helper: create a throwaway user and return its UUID.
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    // -----------------------------------------------------------------------
+    // get_or_create
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_or_create_returns_defaults(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let prefs = get_or_create(&pool, uid).await.unwrap();
+
+        assert_eq!(prefs.user_id, uid);
+        assert_eq!(prefs.week_start_day, 1);
+        assert_eq!(prefs.planning_trigger_offset, 0);
+        assert_eq!(prefs.default_plan_length_days, 7);
+        assert_eq!(prefs.wake_time, NaiveTime::from_hms_opt(7, 0, 0).unwrap());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_or_create_is_idempotent(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let first = get_or_create(&pool, uid).await.unwrap();
+        let second = get_or_create(&pool, uid).await.unwrap();
+
+        assert_eq!(first.user_id, second.user_id);
+        assert_eq!(first.week_start_day, second.week_start_day);
+        assert_eq!(first.planning_trigger_offset, second.planning_trigger_offset);
+        assert_eq!(first.default_plan_length_days, second.default_plan_length_days);
+        assert_eq!(first.wake_time, second.wake_time);
+    }
+
+    // -----------------------------------------------------------------------
+    // patch_preferences
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn patch_preferences_updates_fields(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let wake = NaiveTime::from_hms_opt(8, 30, 0).unwrap();
+        let prefs = patch_preferences(&pool, uid, Some(0), Some(10), Some(3), Some(wake))
+            .await
+            .unwrap();
+
+        assert_eq!(prefs.week_start_day, 0);
+        assert_eq!(prefs.planning_trigger_offset, 10);
+        assert_eq!(prefs.default_plan_length_days, 3);
+        assert_eq!(prefs.wake_time, wake);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn patch_preferences_partial_update(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let wake = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        // Establish a baseline with all fields set
+        patch_preferences(&pool, uid, Some(0), Some(10), Some(5), Some(wake))
+            .await
+            .unwrap();
+
+        // Only change week_start_day — others must be preserved
+        let updated = patch_preferences(&pool, uid, Some(6), None, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(updated.week_start_day, 6);
+        assert_eq!(updated.planning_trigger_offset, 10);
+        assert_eq!(updated.default_plan_length_days, 5);
+        assert_eq!(updated.wake_time, wake);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn patch_preferences_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+
+        patch_preferences(&pool, uid_a, Some(0), None, None, None)
+            .await
+            .unwrap();
+        patch_preferences(&pool, uid_b, Some(6), None, None, None)
+            .await
+            .unwrap();
+
+        // User A's preference must be unaffected by user B's patch
+        let a_prefs = get_or_create(&pool, uid_a).await.unwrap();
+        assert_eq!(a_prefs.week_start_day, 0);
+    }
+}
