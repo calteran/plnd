@@ -28,6 +28,17 @@ pub struct DietaryRestriction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct UserMemory {
+    pub memory_id: Uuid,
+    pub user_id: Uuid,
+    pub category: String,
+    pub content: String,
+    pub tags: Vec<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct User {
     pub user_id: Uuid,
     pub email: String,
