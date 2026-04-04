@@ -304,9 +304,14 @@ impl AgentService {
 
 fn build_provider(config: &crate::config::LlmModelConfig) -> Box<dyn LlmProvider> {
     match config.provider.as_str() {
-        "anthropic" => Box::new(
-            AnthropicProvider::new(&config.api_key, &config.model).with_base_url(&config.base_url),
-        ),
+        "anthropic" => {
+            let mut p = AnthropicProvider::new(&config.api_key, &config.model)
+                .with_base_url(&config.base_url);
+            if let Some(v) = &config.api_version {
+                p = p.with_api_version(v);
+            }
+            Box::new(p)
+        }
         _ => Box::new(OpenAiCompatibleProvider::new(
             &config.base_url,
             &config.api_key,

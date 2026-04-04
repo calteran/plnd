@@ -14,6 +14,8 @@ pub struct LlmModelConfig {
     pub max_tokens: u32,
     #[serde(default = "default_max_iterations")]
     pub max_iterations: u32,
+    #[serde(default)]
+    pub api_version: Option<String>,
 }
 
 impl Default for LlmModelConfig {
@@ -25,6 +27,7 @@ impl Default for LlmModelConfig {
             api_key: String::new(),
             max_tokens: default_max_tokens(),
             max_iterations: default_max_iterations(),
+            api_version: None,
         }
     }
 }
@@ -77,5 +80,17 @@ mod tests {
         let config = LlmModelConfig::default();
         assert_eq!(config.max_tokens, 1024);
         assert_eq!(config.max_iterations, 10);
+    }
+
+    #[test]
+    fn test_api_version_serde_default() {
+        let toml_str = r#"
+            provider = "anthropic"
+            base_url = "https://api.anthropic.com"
+            model = "claude-sonnet-4-6"
+            api_key = "sk-test"
+        "#;
+        let config: LlmModelConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.api_version, None);
     }
 }

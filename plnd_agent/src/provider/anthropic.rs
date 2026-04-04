@@ -13,6 +13,7 @@ pub struct AnthropicProvider {
     api_key: String,
     model: String,
     base_url: String,
+    api_version: Option<String>,
 }
 
 impl AnthropicProvider {
@@ -22,6 +23,7 @@ impl AnthropicProvider {
             api_key: api_key.into(),
             model: model.into(),
             base_url: DEFAULT_BASE_URL.to_string(),
+            api_version: None,
         }
     }
 
@@ -29,6 +31,12 @@ impl AnthropicProvider {
     /// Note: AWS Bedrock uses a different request envelope and auth model — not supported here.
     pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
+        self
+    }
+
+    /// Override the `anthropic-version` header (defaults to `ANTHROPIC_VERSION`).
+    pub fn with_api_version(mut self, version: impl Into<String>) -> Self {
+        self.api_version = Some(version.into());
         self
     }
 }
@@ -202,7 +210,10 @@ impl LlmProvider for AnthropicProvider {
             .http
             .post(&url)
             .header("x-api-key", &self.api_key)
-            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header(
+                "anthropic-version",
+                self.api_version.as_deref().unwrap_or(ANTHROPIC_VERSION),
+            )
             .json(&body)
             .send()
             .await?;
