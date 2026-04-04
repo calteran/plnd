@@ -16,3 +16,4 @@ async-openai = "0.28"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
+toml  = "0.8"

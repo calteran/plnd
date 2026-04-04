@@ -15,6 +15,14 @@ fn test_load_config() {
 }
 
 #[test]
+fn test_llm_max_iterations_from_config() {
+    let config = plnd_api::config::load_config_with_path("").expect("Failed to load config");
+
+    assert_eq!(config.llm.fast.max_iterations, 10);
+    assert_eq!(config.llm.capable.max_iterations, 10);
+}
+
+#[test]
 fn test_config_validation() {
     let config = plnd_api::config::load_config_with_path("").expect("Failed to load config");
 

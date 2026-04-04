@@ -271,6 +271,10 @@ impl AgentService {
             ProviderTier::Fast => self.config.fast.max_tokens,
             ProviderTier::Capable => self.config.capable.max_tokens,
         };
+        let max_iterations = match tier {
+            ProviderTier::Fast => self.config.fast.max_iterations,
+            ProviderTier::Capable => self.config.capable.max_iterations,
+        };
 
         // Step 5: Build the initial message and fire the loop.
         // Wrap user input in untrusted delimiter per security spec.
@@ -284,7 +288,7 @@ impl AgentService {
         let agent_loop = AgentLoop {
             registry: &self.registry,
             tools: &tools,
-            max_iterations: 10, // TODO(#232): make configurable per use case
+            max_iterations,
             max_tokens,
         };
 
