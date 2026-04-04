@@ -1,6 +1,6 @@
 -- Migration 0017: User memories — persistent per-user memory entries for Phase 3.1 Memory System
 CREATE TABLE user_memories (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    memory_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     category    VARCHAR(50) NOT NULL,
     content     TEXT NOT NULL,
