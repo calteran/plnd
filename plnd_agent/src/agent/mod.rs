@@ -180,35 +180,47 @@ impl AgentLoop<'_> {
         tool_calls: Vec<ToolCall>,
     ) -> Vec<ToolResult> {
         let mut join_set: tokio::task::JoinSet<ToolResult> = tokio::task::JoinSet::new();
+        let mut call_id_map: std::collections::HashMap<tokio::task::Id, String> =
+            std::collections::HashMap::with_capacity(tool_calls.len());
 
         for tc in tool_calls {
             let tool_opt = self.tools.get(&tc.name);
             let ctx_clone = ctx.clone();
-            let call_id = tc.id.clone();
+            let call_id = tc.id;
 
-            join_set.spawn(async move {
-                let result = match tool_opt {
-                    Some(tool) => tool.execute(&ctx_clone, tc.arguments).await,
-                    None => Err(ToolError::NotFound(tc.name)),
-                };
-                ToolResult {
-                    tool_call_id: call_id,
-                    result,
+            let handle = join_set.spawn({
+                let call_id = call_id.clone();
+                async move {
+                    let result = match tool_opt {
+                        Some(tool) => tool.execute(&ctx_clone, tc.arguments).await,
+                        None => Err(ToolError::NotFound(tc.name)),
+                    };
+                    ToolResult {
+                        tool_call_id: call_id,
+                        result,
+                    }
                 }
             });
+            call_id_map.insert(handle.id(), call_id);
         }
 
         let mut results = Vec::new();
         while let Some(join_result) = join_set.join_next().await {
             match join_result {
                 Ok(tr) => results.push(tr),
-                Err(e) => results.push(ToolResult {
-                    tool_call_id: "unknown".to_string(),
-                    result: Err(ToolError::Execution {
-                        tool: "unknown".to_string(),
-                        reason: format!("task panicked: {e}"),
-                    }),
-                }),
+                Err(e) => {
+                    let call_id = call_id_map
+                        .get(&e.id())
+                        .cloned()
+                        .unwrap_or_else(|| "unknown".to_string());
+                    results.push(ToolResult {
+                        tool_call_id: call_id,
+                        result: Err(ToolError::Execution {
+                            tool: "unknown".to_string(),
+                            reason: format!("task panicked: {e}"),
+                        }),
+                    });
+                }
             }
         }
         results
@@ -487,6 +499,30 @@ mod tests {
         }
     }
 
+    // ── PanicTool: always panics to test JoinSet error handling ──────────────
+
+    struct PanicTool;
+
+    #[async_trait::async_trait]
+    impl Tool for PanicTool {
+        fn name(&self) -> &str {
+            "panic_tool"
+        }
+        fn description(&self) -> &str {
+            "Always panics"
+        }
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({})
+        }
+        async fn execute(
+            &self,
+            _ctx: &ToolContext,
+            _input: serde_json::Value,
+        ) -> Result<serde_json::Value, ToolError> {
+            panic!("deliberate test panic");
+        }
+    }
+
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     /// Provider always returns a tool call. With max_iterations = 3, the loop
@@ -601,6 +637,37 @@ mod tests {
             elapsed < Duration::from_millis(120),
             "tools should run in parallel; elapsed {elapsed:?} exceeds 120 ms ceiling"
         );
+    }
+
+    /// A tool that panics inside its spawned task must produce a `ToolResult`
+    /// whose `tool_call_id` matches the original call ID — not `"unknown"`.
+    ///
+    /// Regression test for issue #243.
+    #[tokio::test]
+    async fn test_panic_preserves_call_id() {
+        let registry = ProviderRegistry::new(); // unused — test calls execute_tools_parallel directly
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(PanicTool));
+
+        let agent_loop = run_loop(&registry, &tools, 1);
+        let ctx = ToolContext {
+            user_id: Uuid::nil(),
+        };
+
+        let tool_calls = vec![ToolCall {
+            id: "tc_panic_42".to_string(),
+            name: "panic_tool".to_string(),
+            arguments: serde_json::json!({}),
+        }];
+
+        let results = agent_loop.execute_tools_parallel(&ctx, tool_calls).await;
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(
+            results[0].tool_call_id, "tc_panic_42",
+            "panicked task must preserve the original tool_call_id"
+        );
+        assert!(results[0].result.is_err(), "result must be an error");
     }
 
     /// First batch contains a terminal tool AND a regular tool.
