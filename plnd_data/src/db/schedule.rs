@@ -233,3 +233,273 @@ pub async fn commit_plan(
         planning_task_status: "completed".to_string(),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use chrono::{Duration, NaiveDate, NaiveTime, Utc};
+    use sqlx::PgPool;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::db::{tasks, users};
+
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    async fn make_planning_task(pool: &PgPool, user_id: Uuid, plan_start: NaiveDate) -> Uuid {
+        tasks::create_weekly_plan_task(pool, user_id, plan_start, 0)
+            .await
+            .expect("failed to create planning task")
+            .task_id
+    }
+
+    fn tomorrow() -> NaiveDate {
+        Utc::now().date_naive() + Duration::days(1)
+    }
+
+    fn work_entry(date: NaiveDate) -> crate::db::models::PlanEntryInput {
+        crate::db::models::PlanEntryInput {
+            date,
+            task_type: "work".to_string(),
+            task_ref_id: None,
+            task_ref_type: None,
+            title: Some("Test task".to_string()),
+            scheduled_start: NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+            after_milepost: None,
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // get_period
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_period_returns_empty_for_new_user(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(7);
+
+        let result = get_period(&pool, uid, start, end).await.unwrap();
+
+        assert!(result.entries.is_empty());
+        assert!(result.carryover.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // get_plan_status
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_plan_status_unplanned_for_new_user(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(7);
+
+        let result = get_plan_status(&pool, uid, start, end).await.unwrap();
+
+        assert!(!result.planned);
+        assert_eq!(result.entry_count, 0);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_plan_status_reflects_committed_entries(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let status = get_plan_status(&pool, uid, start, end).await.unwrap();
+        assert!(status.planned);
+        assert_eq!(status.entry_count, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // commit_plan
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_inserts_schedule_entries(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![
+                work_entry(start),
+                work_entry(start + Duration::days(1)),
+                work_entry(start + Duration::days(2)),
+            ],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+        };
+
+        let resp = commit_plan(&pool, uid, &req).await.unwrap();
+        assert_eq!(resp.committed, 3);
+        assert_eq!(resp.planning_task_status, "completed");
+
+        let period = get_period(&pool, uid, start, end).await.unwrap();
+        assert_eq!(period.entries.len(), 3);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_handles_carryover_decisions(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let today = Utc::now().date_naive();
+        let plan_start = today + Duration::days(1);
+        let plan_end = plan_start + Duration::days(6);
+
+        // Raw-insert 3 carryover entries dated before plan_start (within lookback window)
+        let carryover_date = today - Duration::days(1);
+        let sched = (carryover_date.and_hms_opt(9, 0, 0).unwrap()).and_utc();
+
+        let id_accept: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
+             VALUES ($1, 'work', 'accept-me', $2, $3, 'planned') RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(carryover_date)
+        .bind(sched)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let id_defer: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
+             VALUES ($1, 'work', 'defer-me', $2, $3, 'planned') RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(carryover_date)
+        .bind(sched)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let id_dismiss: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
+             VALUES ($1, 'work', 'dismiss-me', $2, $3, 'planned') RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(carryover_date)
+        .bind(sched)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let task_id = make_planning_task(&pool, uid, plan_start).await;
+        let mut decisions = HashMap::new();
+        decisions.insert(id_accept, CarryoverDecision::Accept);
+        decisions.insert(id_defer, CarryoverDecision::Defer);
+        decisions.insert(id_dismiss, CarryoverDecision::Dismiss);
+
+        let req = CommitPlanInput {
+            plan_start,
+            plan_end,
+            planning_task_id: task_id,
+            entries: vec![],
+            replace: false,
+            carryover_decisions: decisions,
+        };
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let (date_a, status_a): (NaiveDate, String) =
+            sqlx::query_as("SELECT date, status FROM schedule_entries WHERE entry_id = $1")
+                .bind(id_accept)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(date_a, plan_start, "Accept should reschedule to plan_start");
+        assert_eq!(status_a, "planned");
+
+        let status_d: String =
+            sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
+                .bind(id_defer)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status_d, "deferred");
+
+        let status_x: String =
+            sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
+                .bind(id_dismiss)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(status_x, "skipped");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_is_atomic(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+
+        // First commit: establish 2 planned entries
+        let task_id_1 = make_planning_task(&pool, uid, start).await;
+        let initial_req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id_1,
+            entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &initial_req).await.unwrap();
+
+        // Second commit with replace=true but an invalid task_type that violates the DB CHECK.
+        // The DELETE will run first, then the INSERT should fail, rolling back the whole tx.
+        let task_id_2 = make_planning_task(&pool, uid, start + Duration::days(7)).await;
+        let bad_entry = crate::db::models::PlanEntryInput {
+            date: start,
+            task_type: "invalid_type".to_string(), // violates CHECK constraint
+            task_ref_id: None,
+            task_ref_type: None,
+            title: None,
+            scheduled_start: NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+            after_milepost: None,
+        };
+        let bad_req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id_2,
+            entries: vec![bad_entry],
+            replace: true,
+            carryover_decisions: HashMap::new(),
+        };
+
+        let result = commit_plan(&pool, uid, &bad_req).await;
+        assert!(result.is_err(), "expected error from CHECK violation");
+
+        // Original 2 entries must still be there — the DELETE was rolled back
+        let period = get_period(&pool, uid, start, end).await.unwrap();
+        assert_eq!(
+            period.entries.len(),
+            2,
+            "transaction rollback must preserve original entries"
+        );
+    }
+}
