@@ -180,13 +180,14 @@ impl AgentLoop<'_> {
         tool_calls: Vec<ToolCall>,
     ) -> Vec<ToolResult> {
         let mut join_set: tokio::task::JoinSet<ToolResult> = tokio::task::JoinSet::new();
-        let mut call_id_map: std::collections::HashMap<tokio::task::Id, String> =
+        let mut call_id_map: std::collections::HashMap<tokio::task::Id, (String, String)> =
             std::collections::HashMap::with_capacity(tool_calls.len());
 
         for tc in tool_calls {
             let tool_opt = self.tools.get(&tc.name);
             let ctx_clone = ctx.clone();
             let call_id = tc.id;
+            let tool_name = tc.name.clone();
 
             let handle = join_set.spawn({
                 let call_id = call_id.clone();
@@ -201,7 +202,7 @@ impl AgentLoop<'_> {
                     }
                 }
             });
-            call_id_map.insert(handle.id(), call_id);
+            call_id_map.insert(handle.id(), (call_id, tool_name));
         }
 
         let mut results = Vec::new();
@@ -209,13 +210,13 @@ impl AgentLoop<'_> {
             match join_result {
                 Ok(tr) => results.push(tr),
                 Err(e) => {
-                    let call_id = call_id_map
+                    let (call_id, tool_name) = call_id_map
                         .remove(&e.id())
-                        .unwrap_or_else(|| "unknown".to_string());
+                        .unwrap_or_else(|| ("unknown".to_string(), "unknown".to_string()));
                     results.push(ToolResult {
                         tool_call_id: call_id,
                         result: Err(ToolError::Execution {
-                            tool: "unknown".to_string(),
+                            tool: tool_name,
                             reason: format!("task panicked: {e}"),
                         }),
                     });
@@ -666,7 +667,15 @@ mod tests {
             results[0].tool_call_id, "tc_panic_42",
             "panicked task must preserve the original tool_call_id"
         );
-        assert!(results[0].result.is_err(), "result must be an error");
+        match &results[0].result {
+            Err(ToolError::Execution { tool, .. }) => {
+                assert_eq!(
+                    tool, "panic_tool",
+                    "panicked task must preserve the tool name"
+                );
+            }
+            other => panic!("expected ToolError::Execution, got {other:?}"),
+        }
     }
 
     /// First batch contains a terminal tool AND a regular tool.
