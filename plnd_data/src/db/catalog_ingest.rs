@@ -3,6 +3,8 @@ use serde_json::Value;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::error::DatabaseError;
+
 pub struct IngestIngredientParams<'a> {
     pub external_source: &'a str,
     pub external_id: &'a str,
@@ -21,7 +23,7 @@ pub struct IngestIngredientParams<'a> {
 pub async fn ingest_ingredient(
     pool: &PgPool,
     params: IngestIngredientParams<'_>,
-) -> Result<Uuid, sqlx::Error> {
+) -> Result<Uuid, DatabaseError> {
     // Try to insert; if duplicate (external_source, external_id), DO NOTHING.
     // Then SELECT to get the ID whether we inserted or it already existed.
     sqlx::query_as::<_, (Uuid,)>(
@@ -51,5 +53,6 @@ pub async fn ingest_ingredient(
     .bind(params.external_id)
     .fetch_one(pool)
     .await
+    .map_err(DatabaseError::from)
     .map(|(id,)| id)
 }

@@ -2,6 +2,8 @@ use serde::Serialize;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::error::DatabaseError;
+
 #[derive(sqlx::FromRow, Serialize, Clone, Debug)]
 pub struct LocalIngredientResult {
     pub ingredient_id: Uuid,
@@ -45,7 +47,7 @@ pub async fn search_ingredients(
     limit: i64,
     exclude_allergens: &[String],
     user_id: Option<Uuid>,
-) -> Result<Vec<LocalIngredientResult>, sqlx::Error> {
+) -> Result<Vec<LocalIngredientResult>, DatabaseError> {
     sqlx::query_as::<_, LocalIngredientResult>(
         r#"
         SELECT ingredient_id, name, description,
@@ -71,6 +73,7 @@ pub async fn search_ingredients(
     .bind(user_id)
     .fetch_all(pool)
     .await
+    .map_err(DatabaseError::from)
 }
 
 #[tracing::instrument(skip(pool), fields(table = "catalog_dishes", op = "search_dishes"))]
@@ -78,7 +81,7 @@ pub async fn search_dishes(
     pool: &PgPool,
     q: &str,
     limit: i64,
-) -> Result<Vec<LocalDishResult>, sqlx::Error> {
+) -> Result<Vec<LocalDishResult>, DatabaseError> {
     sqlx::query_as::<_, LocalDishResult>(
         r#"
         SELECT dish_id, name, description,
@@ -99,6 +102,7 @@ pub async fn search_dishes(
     .bind(limit)
     .fetch_all(pool)
     .await
+    .map_err(DatabaseError::from)
 }
 
 #[tracing::instrument(skip(pool), fields(table = "user_dishes", op = "search_user_dishes"))]
@@ -107,7 +111,7 @@ pub async fn search_user_dishes(
     user_id: Uuid,
     q: &str,
     limit: i64,
-) -> Result<Vec<LocalDishResult>, sqlx::Error> {
+) -> Result<Vec<LocalDishResult>, DatabaseError> {
     sqlx::query_as::<_, LocalDishResult>(
         r#"
         SELECT dish_id, name, description,
@@ -130,6 +134,7 @@ pub async fn search_user_dishes(
     .bind(limit)
     .fetch_all(pool)
     .await
+    .map_err(DatabaseError::from)
 }
 
 #[tracing::instrument(
@@ -140,7 +145,7 @@ pub async fn search_exercises(
     pool: &PgPool,
     q: &str,
     limit: i64,
-) -> Result<Vec<LocalExerciseResult>, sqlx::Error> {
+) -> Result<Vec<LocalExerciseResult>, DatabaseError> {
     sqlx::query_as::<_, LocalExerciseResult>(
         r#"
         SELECT exercise_id, name, description,
@@ -160,4 +165,5 @@ pub async fn search_exercises(
     .bind(limit)
     .fetch_all(pool)
     .await
+    .map_err(DatabaseError::from)
 }

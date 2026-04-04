@@ -1,6 +1,8 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use super::error::DatabaseError;
+
 use super::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
 };
@@ -12,7 +14,7 @@ use super::models::{
 pub async fn get_ingredient(
     pool: &PgPool,
     ingredient_id: Uuid,
-) -> Result<Option<CatalogIngredient>, sqlx::Error> {
+) -> Result<Option<CatalogIngredient>, DatabaseError> {
     sqlx::query_as::<_, CatalogIngredient>(
         "SELECT ingredient_id, name, description, serving_size_g, nutrition, allergens, occasion_tags, \
          external_id, external_source, contributed_by_user_id, created_at, updated_at \
@@ -21,13 +23,14 @@ pub async fn get_ingredient(
     .bind(ingredient_id)
     .fetch_optional(pool)
     .await
+    .map_err(DatabaseError::from)
 }
 
 #[tracing::instrument(skip(pool), fields(table = "catalog_dishes", op = "get_dish"))]
 pub async fn get_dish(
     pool: &PgPool,
     dish_id: Uuid,
-) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, sqlx::Error> {
+) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, DatabaseError> {
     let dish = sqlx::query_as::<_, CatalogDish>(
         "SELECT dish_id, name, description, instructions, prep_time_minutes, cook_time_minutes, \
          servings, allergens, allergens_overridden, occasion_tags, tags, nutrition, \
@@ -57,7 +60,7 @@ pub async fn get_dish(
 pub async fn get_meal(
     pool: &PgPool,
     meal_id: Uuid,
-) -> Result<Option<(CatalogMeal, Vec<CatalogMealDish>)>, sqlx::Error> {
+) -> Result<Option<(CatalogMeal, Vec<CatalogMealDish>)>, DatabaseError> {
     let meal = sqlx::query_as::<_, CatalogMeal>(
         "SELECT meal_id, name, description, servings, allergens, allergens_overridden, \
          occasion_tags, tags, nutrition, nutrition_overridden, external_id, external_source, \
