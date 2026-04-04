@@ -1,20 +1,12 @@
-import { HttpContextToken, HttpErrorResponse, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
+import { HttpErrorResponse, HttpHandlerFn, HttpInterceptorFn, HttpRequest } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../services/auth.service';
-
-/**
- * Set this context token to `true` on requests where a 401 should NOT trigger
- * a full session logout (e.g. background/prefetch requests, per-resource auth
- * failures that are expected and handled locally).
- *
- * Usage:
- *   this.http.get('/api/something', {
- *     context: new HttpContext().set(SKIP_AUTH_ERROR, true)
- *   })
- */
-export const SKIP_AUTH_ERROR = new HttpContextToken<boolean>(() => false);
+import { SKIP_AUTH_ERROR } from './auth-context-tokens';
+// Re-exported for callers that import SKIP_AUTH_ERROR from this file (e.g. spec files).
+// Service-layer callers should import directly from auth-context-tokens.
+export { SKIP_AUTH_ERROR } from './auth-context-tokens';
 
 /**
  * Functional HTTP interceptor that catches 401 Unauthorized responses from the

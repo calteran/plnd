@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { ConfigService } from './config.service';
-import { SKIP_AUTH_ERROR } from '../interceptors/auth-error.interceptor';
+import { SKIP_AUTH_ERROR } from '../interceptors/auth-context-tokens';
 import { WeatherSummary, YesterdaySnapshot } from '../models/briefing';
 
 @Injectable({ providedIn: 'root' })

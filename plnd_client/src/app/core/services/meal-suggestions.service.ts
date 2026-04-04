@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Observable, catchError, of, shareReplay, tap } from 'rxjs';
 import { ConfigService } from './config.service';
-import { SKIP_AUTH_ERROR } from '../interceptors/auth-error.interceptor';
+import { SKIP_AUTH_ERROR } from '../interceptors/auth-context-tokens';
 import { MealSuggestion, MealSlot } from '../models/week-plan';
 
 @Injectable({ providedIn: 'root' })
