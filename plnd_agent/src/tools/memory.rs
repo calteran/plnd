@@ -188,13 +188,8 @@ impl Tool for SaveMemoryTool {
         ctx: &ToolContext,
         input: serde_json::Value,
     ) -> Result<serde_json::Value, ToolError> {
-        if !self.limiter.check(ctx.user_id) {
-            return Err(ToolError::Execution {
-                tool: self.name().to_string(),
-                reason: "rate limit exceeded — too many memory writes".to_string(),
-            });
-        }
-
+        // Validate all inputs before consuming the rate-limit budget so that
+        // malformed LLM calls do not penalise the user's write allowance.
         let category = input
             .get("category")
             .and_then(|v| v.as_str())
@@ -222,6 +217,13 @@ impl Tool for SaveMemoryTool {
                     .collect()
             })
             .unwrap_or_default();
+
+        if !self.limiter.check(ctx.user_id) {
+            return Err(ToolError::Execution {
+                tool: self.name().to_string(),
+                reason: "rate limit exceeded — too many memory writes".to_string(),
+            });
+        }
 
         let memory = self
             .store
@@ -279,13 +281,7 @@ impl Tool for UpdateMemoryTool {
         ctx: &ToolContext,
         input: serde_json::Value,
     ) -> Result<serde_json::Value, ToolError> {
-        if !self.limiter.check(ctx.user_id) {
-            return Err(ToolError::Execution {
-                tool: self.name().to_string(),
-                reason: "rate limit exceeded — too many memory writes".to_string(),
-            });
-        }
-
+        // Validate all inputs before consuming the rate-limit budget.
         let memory_id = parse_uuid(&input, "memory_id", self.name())?;
 
         let content = input
@@ -295,6 +291,13 @@ impl Tool for UpdateMemoryTool {
                 tool: self.name().to_string(),
                 reason: "missing required field 'content'".to_string(),
             })?;
+
+        if !self.limiter.check(ctx.user_id) {
+            return Err(ToolError::Execution {
+                tool: self.name().to_string(),
+                reason: "rate limit exceeded — too many memory writes".to_string(),
+            });
+        }
 
         let memory = self
             .store
@@ -348,14 +351,15 @@ impl Tool for ForgetMemoryTool {
         ctx: &ToolContext,
         input: serde_json::Value,
     ) -> Result<serde_json::Value, ToolError> {
+        // Validate all inputs before consuming the rate-limit budget.
+        let memory_id = parse_uuid(&input, "memory_id", self.name())?;
+
         if !self.limiter.check(ctx.user_id) {
             return Err(ToolError::Execution {
                 tool: self.name().to_string(),
                 reason: "rate limit exceeded — too many memory writes".to_string(),
             });
         }
-
-        let memory_id = parse_uuid(&input, "memory_id", self.name())?;
 
         self.store
             .forget(ctx.user_id, memory_id)
