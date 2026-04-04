@@ -333,5 +333,48 @@ mod tests {
         assert!(changed);
         let user = find_by_id(&pool, uid).await.unwrap().unwrap();
         assert!(user.onboarding_completed);
+        // Idempotent: already-completed users return false, no error
+        let second = complete_onboarding(&pool, uid).await.unwrap();
+        assert!(!second);
+    }
+
+    // -----------------------------------------------------------------------
+    // find_by_provider / link_oauth_provider
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn link_and_find_by_provider(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        link_oauth_provider(&pool, uid, "google", "google-sub-123")
+            .await
+            .unwrap();
+
+        let found = find_by_provider(&pool, "google", "google-sub-123")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.user_id, uid);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_by_provider_returns_none_unknown(pool: PgPool) {
+        let result = find_by_provider(&pool, "google", "nonexistent-sub")
+            .await
+            .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn link_oauth_provider_is_upsertable(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        link_oauth_provider(&pool, uid, "github", "gh-111").await.unwrap();
+        // Re-linking with updated sub must not error
+        link_oauth_provider(&pool, uid, "github", "gh-222").await.unwrap();
+
+        let found = find_by_provider(&pool, "github", "gh-222")
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.user_id, uid);
     }
 }

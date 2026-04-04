@@ -107,6 +107,14 @@ mod tests {
         assert_eq!(first.wake_time, second.wake_time);
     }
 
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_or_create_rejects_unknown_user(pool: PgPool) {
+        // Documents that the user_preferences FK constraint enforces referential integrity:
+        // inserting prefs for a non-existent user_id must fail.
+        let err = get_or_create(&pool, Uuid::new_v4()).await.unwrap_err();
+        assert!(matches!(err, DatabaseError::QueryError(_)));
+    }
+
     // -----------------------------------------------------------------------
     // patch_preferences
     // -----------------------------------------------------------------------
