@@ -2,11 +2,10 @@
 # scripts/verify.sh — Parallel verification pipeline
 #
 # Execution model:
-#   • Everything fires immediately in parallel.
-#   • `cargo build` runs synchronously (critical path — gates e2e).
-#   • After build: nextest → clippy run in background (don't gate e2e).
-#   • E2E starts once build + services are healthy.
-#   • Final gate collects all background job exit codes.
+#   • All jobs fire immediately, in parallel where safe.
+#   • Output for every job is captured; terminal shows only ✓/✗ lines.
+#   • On failure the full captured log is dumped under the ✗ line.
+#   • Completions appear in real-time via a named FIFO + reader process.
 #
 # Services: ephemeral docker containers (--rm, auto-removed on stop).
 # Cleanup trap fires on EXIT, INT, and TERM.
@@ -20,18 +19,28 @@ VERIFY_DB_PASS="plnd_verify_local"
 VERIFY_DB_NAME="plnd-verify-db"
 VERIFY_OAUTH_NAME="plnd-verify-oauth"
 API_PID=""
+API_LOG=""
+READER_PID=""
+FIFO=""
 
 declare -a JOB_PIDS=()
-declare -a JOB_LABELS=()
+declare -a JOB_TMPFILES=()
 
 # ── Cleanup ────────────────────────────────────────────────────────────────────
 cleanup() {
-    exec 9>&- 2>/dev/null || true
+    exec 3>&- 2>/dev/null || true   # close FIFO write-end → reader gets EOF
+    exec 9>&- 2>/dev/null || true   # release flock
     for pid in "${JOB_PIDS[@]+"${JOB_PIDS[@]}"}"; do
         kill "$pid" 2>/dev/null || true
     done
     if [[ -n "${API_PID:-}" ]]; then kill "$API_PID" 2>/dev/null || true; fi
+    if [[ -n "${READER_PID:-}" ]]; then wait "$READER_PID" 2>/dev/null || true; fi
+    for f in "${JOB_TMPFILES[@]+"${JOB_TMPFILES[@]}"}"; do
+        rm -f "$f" 2>/dev/null || true
+    done
     docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
+    [[ -n "${FIFO:-}" ]] && rm -f "$FIFO" 2>/dev/null || true
+    [[ -n "${API_LOG:-}" ]] && rm -f "$API_LOG" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
@@ -57,26 +66,74 @@ if ! flock -n 9; then
     flock 9
 fi
 
-# ── PID tracking ──────────────────────────────────────────────────────────────
-# Usage: some_command & track $! "human-readable label"
-track() {
-    JOB_PIDS+=("$1")
-    JOB_LABELS+=("$2")
+# ── FIFO completion bus ────────────────────────────────────────────────────────
+# Each job writes one record: EXIT_CODE|LABEL|TMPFILE
+# Reader prints ✓/✗ in real-time; exits on EOF (all writers closed).
+FIFO=$(mktemp -u /tmp/plnd-verify-bus-XXXXXX)
+mkfifo "$FIFO"
+
+{
+    while IFS='|' read -r status label tmpfile; do
+        if [[ "$status" == "0" ]]; then
+            echo "  ✓ $label"
+        else
+            echo "  ✗ FAILED: $label"
+            if [[ -f "$tmpfile" && -s "$tmpfile" ]]; then
+                sed 's/^/    /' "$tmpfile"
+            fi
+        fi
+        rm -f "$tmpfile" 2>/dev/null || true
+    done
+} < "$FIFO" &
+READER_PID=$!
+exec 3>"$FIFO"   # keep main write-end open until we explicitly close it
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# NOTE: label must not contain '|' — it is the FIFO record field delimiter.
+
+# run_job label workdir cmd [args...]
+# Runs cmd in the background. Captures stdout+stderr to a tmpfile.
+# Reports exit status + log path via FIFO when complete.
+run_job() {
+    local label="$1" workdir="$2"; shift 2
+    local tmpfile
+    tmpfile=$(mktemp /tmp/plnd-verify-XXXXXX)
+    JOB_TMPFILES+=("$tmpfile")
+    (
+        exec 9>&-           # release lock fd in this subshell (main process keeps it)
+        local status=0
+        { (cd "$workdir" && "$@"); } > "$tmpfile" 2>&1 || status=$?
+        printf '%s|%s|%s\n' "$status" "$label" "$tmpfile" >&3
+        exit $status
+    ) &
+    JOB_PIDS+=($!)
 }
 
-# Wait for all tracked jobs; report failures; return non-zero if any failed.
-# Each PID is waited exactly once, so call this only once per set of tracked jobs.
+# run_sync label workdir cmd [args...]
+# Runs cmd synchronously. Captures stdout+stderr to a tmpfile.
+# Reports via FIFO when complete. On failure, exits the script (triggers cleanup).
+run_sync() {
+    local label="$1" workdir="$2"; shift 2
+    local tmpfile status=0
+    tmpfile=$(mktemp /tmp/plnd-verify-XXXXXX)
+    JOB_TMPFILES+=("$tmpfile")
+    { (cd "$workdir" && "$@") > "$tmpfile" 2>&1; } || status=$?
+    printf '%s|%s|%s\n' "$status" "$label" "$tmpfile" >&3
+    if [[ $status -ne 0 ]]; then
+        exit 1
+    fi
+}
+
+# wait_all — waits for all tracked background jobs; returns non-zero if any failed.
+# Printing is handled by the reader as each job completes.
 wait_all() {
-    local status=0 i
-    for i in "${!JOB_PIDS[@]}"; do
-        if ! wait "${JOB_PIDS[$i]}" 2>/dev/null; then
-            echo "  ✗ FAILED: ${JOB_LABELS[$i]}"
-            status=1
-        fi
+    local overall=0 pid
+    for pid in "${JOB_PIDS[@]+"${JOB_PIDS[@]}"}"; do
+        wait "$pid" 2>/dev/null || overall=1
     done
     JOB_PIDS=()
-    JOB_LABELS=()
-    return $status
+    return $overall
 }
 
 echo "◆ Starting verification..."
@@ -84,10 +141,7 @@ echo "◆ Starting verification..."
 # ── Kill any leftover containers from a previous run ──────────────────────────
 docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
 
-# ── Fire everything immediately ───────────────────────────────────────────────
-echo "→ Launching checks, services, and build in parallel..."
-
-# Supporting services — ephemeral, auto-removed when stopped (--rm)
+# ── Launch supporting services ─────────────────────────────────────────────────
 docker run --rm -d \
     --name "$VERIFY_DB_NAME" \
     -p 5432:5432 \
@@ -105,88 +159,72 @@ docker run --rm -d \
     -v "$PROJECT_ROOT/config/mock-oauth:/config" \
     ghcr.io/navikt/mock-oauth2-server:3.0.1 > /dev/null
 
-# Rust read-only checks — no target/ lock, safe to parallelize with anything
-(exec 9>&-; cd "$PROJECT_ROOT" && cargo fmt --check) &
-track $! "cargo fmt"
+# ── Rust read-only checks — no target/ lock, safe to parallelize ───────────────
+run_job "cargo fmt"     "$PROJECT_ROOT" cargo fmt --check
+run_job "cargo deny"    "$PROJECT_ROOT" cargo deny check
+run_job "cargo machete" "$PROJECT_ROOT" cargo machete
 
-(exec 9>&-; cd "$PROJECT_ROOT" && cargo deny check) &
-track $! "cargo deny"
+# ── TypeScript setup — install deps synchronously so all TS jobs can fork cleanly
+run_sync "npm ci" "$PROJECT_ROOT/plnd_client" npm ci
 
-(exec 9>&-; cd "$PROJECT_ROOT" && cargo machete) &
-track $! "cargo machete"
+# ── TypeScript checks (parallel, gated on npm ci) ─────────────────────────────
+run_job "eslint"  "$PROJECT_ROOT/plnd_client" \
+    npx eslint "src/**/*.ts" "e2e/**/*.ts"
 
-# TypeScript setup — install deps in main thread so all TS jobs can fork cleanly
-echo "→ Installing TypeScript dependencies..."
-(cd "$PROJECT_ROOT/plnd_client" && npm ci)
+run_job "ts-deps" "$PROJECT_ROOT/plnd_client" bash -c \
+    "npm run check-dependencies && npm run check-licenses && npm run check-circular"
 
-# TypeScript checks
-(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && npx eslint "src/**/*.ts" "e2e/**/*.ts") &
-track $! "eslint"
+run_job "ng test" "$PROJECT_ROOT/plnd_client" \
+    npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
 
-(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && \
-    npm run check-dependencies && \
-    npm run check-licenses && \
-    npm run check-circular) &
-track $! "ts-deps"
+# ── Cargo build (critical path — gates nextest, clippy, and e2e) ───────────────
+run_sync "cargo build" "$PROJECT_ROOT" cargo build --workspace
 
-# Angular unit tests — fully independent of Rust
-(exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && \
-    npx ng test --browsers=ChromeHeadless --watch=false --code-coverage) &
-track $! "ng test"
+# ── Post-build: nextest → clippy (sequential within, parallel with e2e) ────────
+run_job "nextest → clippy" "$PROJECT_ROOT" bash -c \
+    "cargo nextest run --workspace && \
+     cargo clippy --workspace --all-targets --all-features -- -D warnings"
 
-# ── Cargo build (critical path — gates e2e) ────────────────────────────────────
-# Runs synchronously. set -e will abort immediately if this fails.
-echo "→ Building API binary (critical path)..."
-cd "$PROJECT_ROOT"
-cargo build --workspace
+# ── E2E gate: wait for services, start API, run e2e ───────────────────────────
+wait_for_services() {
+    timeout 30s bash -c \
+        "until docker exec $VERIFY_DB_NAME pg_isready -U plnd 2>/dev/null; do sleep 1; done"
+    timeout 30s bash -c \
+        'until curl -sf http://localhost:8080/plnd-dev/.well-known/openid-configuration \
+         > /dev/null 2>&1; do sleep 1; done'
+}
+run_sync "services healthy" "$PROJECT_ROOT" wait_for_services
 
-# After build: start nextest → clippy in background.
-# Both share target/ so they must be sequential with each other,
-# but neither gates the e2e phase below.
-(
-    exec 9>&-
-    cd "$PROJECT_ROOT"
-    status=0
-    cargo nextest run --workspace \
-        || { echo "  ✗ cargo nextest failed"; status=1; }
-    cargo clippy --workspace --all-targets --all-features -- -D warnings \
-        || { echo "  ✗ cargo clippy failed"; status=1; }
-    exit $status
-) &
-track $! "nextest → clippy"
-
-# ── E2E gate ──────────────────────────────────────────────────────────────────
-echo "→ Waiting for services to be healthy..."
-
-timeout 30s bash -c \
-    "until docker exec $VERIFY_DB_NAME pg_isready -U plnd 2>/dev/null; do sleep 1; done"
-
-timeout 30s bash -c \
-    'until curl -sf http://localhost:8080/plnd-dev/.well-known/openid-configuration \
-     > /dev/null 2>&1; do sleep 1; done'
-
-echo "→ Starting API natively..."
+API_LOG=$(mktemp /tmp/plnd-verify-api-XXXXXX)
 cd "$PROJECT_ROOT/plnd_api"
-# doppler provides JWT_SECRET and other real credentials;
-# override Docker-specific hostnames with localhost equivalents.
 doppler run -- sh -c \
     "APP_DATABASE__URL='postgres://plnd:${VERIFY_DB_PASS}@localhost:5432/plnd_dev' \
      APP_AUTH__OIDC_INTERNAL_ISSUER_URL='http://localhost:8080/plnd-dev' \
      APP_AUTH__FRONTEND_ORIGIN='http://localhost:4200' \
-     exec ../target/debug/plnd_api" &
+     exec ../target/debug/plnd_api" \
+    > "$API_LOG" 2>&1 &
 API_PID=$!
+cd "$PROJECT_ROOT"
 
-timeout 30s bash -c \
-    'until curl -sf http://localhost:3000/health > /dev/null 2>&1; do sleep 1; done'
+wait_for_api() {
+    if ! timeout 30s bash -c \
+        'until curl -sf http://localhost:3000/health > /dev/null 2>&1; do sleep 1; done'
+    then
+        echo "API failed to become healthy within 30s. API log:"
+        cat "$API_LOG"
+        return 1
+    fi
+}
+run_sync "api healthy" "$PROJECT_ROOT" wait_for_api
 
-echo "→ Running e2e tests..."
-cd "$PROJECT_ROOT/plnd_client"
-# CI=true enables retries and disables interactive reporter.
-# Playwright starts ng serve itself via the webServer config.
-CI=true npm run e2e:ci
+run_sync "e2e tests" "$PROJECT_ROOT/plnd_client" bash -c "CI=true npm run e2e:ci"
 
-# ── Final gate: collect all background jobs ────────────────────────────────────
-echo "→ Collecting background job results..."
+# ── Final gate: collect all background job results ─────────────────────────────
 wait_all
+
+# Close FIFO write-end; let reader drain any buffered records, then exit.
+exec 3>&-
+wait "$READER_PID"
+READER_PID=""
 
 echo "✅ All verifications passed"
