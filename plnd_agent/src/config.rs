@@ -4,7 +4,7 @@ fn default_max_iterations() -> u32 {
 }
 
 /// Configuration for a single LLM endpoint (provider, model, credentials).
-#[derive(Debug, serde::Deserialize, Clone, Default)]
+#[derive(Debug, serde::Deserialize, Clone)]
 pub struct LlmModelConfig {
     pub provider: String,
     pub base_url: String,
@@ -14,6 +14,19 @@ pub struct LlmModelConfig {
     pub max_tokens: u32,
     #[serde(default = "default_max_iterations")]
     pub max_iterations: u32,
+}
+
+impl Default for LlmModelConfig {
+    fn default() -> Self {
+        Self {
+            provider: String::new(),
+            base_url: String::new(),
+            model: String::new(),
+            api_key: String::new(),
+            max_tokens: default_max_tokens(),
+            max_iterations: default_max_iterations(),
+        }
+    }
 }
 
 /// Dual-model LLM configuration: a fast model for low-latency tasks and a
@@ -48,14 +61,21 @@ mod tests {
 
     #[test]
     fn test_max_tokens_serde_default() {
-        let toml = r#"
+        let toml_str = r#"
             provider = "openai"
             base_url = "https://api.openai.com/v1"
             model = "gpt-4o"
             api_key = "sk-test"
         "#;
         let config: LlmModelConfig =
-            toml::from_str(toml).expect("should deserialize without max_tokens");
+            toml::from_str(toml_str).expect("should deserialize without max_tokens");
         assert_eq!(config.max_tokens, 1024);
+    }
+
+    #[test]
+    fn test_max_tokens_rust_default() {
+        let config = LlmModelConfig::default();
+        assert_eq!(config.max_tokens, 1024);
+        assert_eq!(config.max_iterations, 10);
     }
 }
