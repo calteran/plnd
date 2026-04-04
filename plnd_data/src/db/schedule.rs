@@ -238,12 +238,12 @@ pub async fn commit_plan(
 mod tests {
     use std::collections::HashMap;
 
-    use chrono::{Duration, NaiveDate, NaiveTime, Utc};
+    use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
     use sqlx::PgPool;
     use uuid::Uuid;
 
     use super::*;
-    use crate::db::{tasks, users};
+    use crate::db::{models::PlanEntryInput, tasks, users};
 
     async fn new_user(pool: &PgPool) -> Uuid {
         users::create(
@@ -268,8 +268,8 @@ mod tests {
         Utc::now().date_naive() + Duration::days(1)
     }
 
-    fn work_entry(date: NaiveDate) -> crate::db::models::PlanEntryInput {
-        crate::db::models::PlanEntryInput {
+    fn work_entry(date: NaiveDate) -> PlanEntryInput {
+        PlanEntryInput {
             date,
             task_type: "work".to_string(),
             task_ref_id: None,
@@ -426,14 +426,20 @@ mod tests {
         };
         commit_plan(&pool, uid, &req).await.unwrap();
 
-        let (date_a, status_a): (NaiveDate, String) =
-            sqlx::query_as("SELECT date, status FROM schedule_entries WHERE entry_id = $1")
-                .bind(id_accept)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let (date_a, status_a, sched_a): (NaiveDate, String, DateTime<Utc>) = sqlx::query_as(
+            "SELECT date, status, scheduled_start FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(id_accept)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(date_a, plan_start, "Accept should reschedule to plan_start");
         assert_eq!(status_a, "planned");
+        assert_eq!(
+            sched_a.time(),
+            NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+            "Time must be preserved"
+        );
 
         let status_d: String =
             sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
@@ -473,7 +479,7 @@ mod tests {
         // Second commit with replace=true but an invalid task_type that violates the DB CHECK.
         // The DELETE will run first, then the INSERT should fail, rolling back the whole tx.
         let task_id_2 = make_planning_task(&pool, uid, start + Duration::days(7)).await;
-        let bad_entry = crate::db::models::PlanEntryInput {
+        let bad_entry = PlanEntryInput {
             date: start,
             task_type: "invalid_type".to_string(), // violates CHECK constraint
             task_ref_id: None,
@@ -500,6 +506,17 @@ mod tests {
             period.entries.len(),
             2,
             "transaction rollback must preserve original entries"
+        );
+
+        let task_2_status: String =
+            sqlx::query_scalar("SELECT status FROM tasks WHERE task_id = $1")
+                .bind(task_id_2)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            task_2_status, "planned",
+            "planning task status must also be rolled back"
         );
     }
 }
