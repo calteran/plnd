@@ -331,9 +331,22 @@ impl std::fmt::Debug for AgentService {
 #[cfg(test)]
 impl AgentService {
     /// Test-only constructor that injects a pre-built registry.
+    ///
+    /// Uses a config with `max_iterations = 10` so the agent loop actually runs.
+    /// (`LlmConfig::default()` gives `max_iterations = 0` because the serde default
+    /// only fires during deserialization, not via `Default::default()`.)
     fn new_with_registry(registry: ProviderRegistry) -> Self {
+        use crate::config::LlmModelConfig;
+        let model_cfg = LlmModelConfig {
+            max_iterations: 10,
+            max_tokens: 1024,
+            ..LlmModelConfig::default()
+        };
         Self {
-            config: crate::config::LlmConfig::default(),
+            config: crate::config::LlmConfig {
+                fast: model_cfg.clone(),
+                capable: model_cfg,
+            },
             registry: Arc::new(registry),
         }
     }
