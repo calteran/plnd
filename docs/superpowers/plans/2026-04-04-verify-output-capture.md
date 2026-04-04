@@ -1,0 +1,321 @@
+# verify.sh Output Capture Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Rewrite `scripts/verify.sh` so all parallel job output is captured; the terminal shows only `✓ label` on success or `✗ label` + full log dump on failure, with ticks appearing in real-time as jobs complete.
+
+**Architecture:** A named FIFO acts as a single-channel completion bus. Each job writes one `EXIT_CODE|LABEL|TMPFILE` record when it finishes. A background reader process consumes records and prints results live. Two helpers (`run_job` / `run_sync`) replace all the inline `(exec 9>&-; ...) &` patterns.
+
+**Tech Stack:** Bash, mkfifo, mktemp, flock, docker, doppler — all already present in the script.
+
+---
+
+## File Map
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `scripts/verify.sh` | Rewrite | Add FIFO bus, reader process, `run_job`/`run_sync` helpers, simplify `wait_all`, replace all inline job patterns |
+
+---
+
+### Task 1: Rewrite `scripts/verify.sh`
+
+**Files:**
+- Modify: `scripts/verify.sh`
+
+This is a ground-up rewrite of the script body. The justfile `verify` recipe (`@bash scripts/verify.sh`) does not change.
+
+- [ ] **Step 1: Replace the file with the new implementation**
+
+Write the following complete contents to `scripts/verify.sh`:
+
+```bash
+#!/usr/bin/env bash
+# scripts/verify.sh — Parallel verification pipeline
+#
+# Execution model:
+#   • All jobs fire immediately, in parallel where safe.
+#   • Output for every job is captured; terminal shows only ✓/✗ lines.
+#   • On failure the full captured log is dumped under the ✗ line.
+#   • Completions appear in real-time via a named FIFO + reader process.
+#
+# Services: ephemeral docker containers (--rm, auto-removed on stop).
+# Cleanup trap fires on EXIT, INT, and TERM.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+VERIFY_DB_PASS="plnd_verify_local"
+VERIFY_DB_NAME="plnd-verify-db"
+VERIFY_OAUTH_NAME="plnd-verify-oauth"
+API_PID=""
+API_LOG=""
+READER_PID=""
+FIFO=""
+
+declare -a JOB_PIDS=()
+
+# ── Cleanup ────────────────────────────────────────────────────────────────────
+cleanup() {
+    exec 3>&- 2>/dev/null || true   # close FIFO write-end → reader gets EOF
+    exec 9>&- 2>/dev/null || true   # release flock
+    for pid in "${JOB_PIDS[@]+"${JOB_PIDS[@]}"}"; do
+        kill "$pid" 2>/dev/null || true
+    done
+    [[ -n "${API_PID:-}" ]] && kill "$API_PID" 2>/dev/null || true
+    [[ -n "${READER_PID:-}" ]] && wait "$READER_PID" 2>/dev/null || true
+    docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
+    [[ -n "${FIFO:-}" ]] && rm -f "$FIFO" 2>/dev/null || true
+    [[ -n "${API_LOG:-}" ]] && rm -f "$API_LOG" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
+# ── Prerequisite check ─────────────────────────────────────────────────────────
+if ! command -v timeout &>/dev/null; then
+    echo "✗ 'timeout' not found — install coreutils: brew install coreutils" >&2
+    exit 1
+fi
+if ! command -v flock &>/dev/null; then
+    echo "✗ 'flock' not found — install flock: brew install flock" >&2
+    exit 1
+fi
+if ! docker info &>/dev/null; then
+    echo "✗ Docker is not running — start Docker Desktop and retry" >&2
+    exit 1
+fi
+
+# ── Semaphore: serialize concurrent verify runs ────────────────────────────────
+LOCK_FILE="/tmp/plnd-verify.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+    echo "⏳ Another verify is running — waiting for lock..."
+    flock 9
+fi
+
+# ── FIFO completion bus ────────────────────────────────────────────────────────
+# Each job writes one record: EXIT_CODE|LABEL|TMPFILE
+# Reader prints ✓/✗ in real-time; exits on EOF (all writers closed).
+FIFO=$(mktemp -u /tmp/plnd-verify-bus-XXXXXX)
+mkfifo "$FIFO"
+
+{
+    while IFS='|' read -r status label tmpfile; do
+        if [[ "$status" == "0" ]]; then
+            echo "  ✓ $label"
+        else
+            echo "  ✗ FAILED: $label"
+            if [[ -f "$tmpfile" && -s "$tmpfile" ]]; then
+                sed 's/^/    /' "$tmpfile"
+            fi
+        fi
+        rm -f "$tmpfile" 2>/dev/null || true
+    done
+} < "$FIFO" &
+READER_PID=$!
+exec 3>"$FIFO"   # keep main write-end open until we explicitly close it
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# run_job label workdir cmd [args...]
+# Runs cmd in the background. Captures stdout+stderr to a tmpfile.
+# Reports exit status + log path via FIFO when complete.
+run_job() {
+    local label="$1" workdir="$2"; shift 2
+    local tmpfile
+    tmpfile=$(mktemp /tmp/plnd-verify-XXXXXX.log)
+    (
+        exec 9>&-           # release lock fd in this subshell (main process keeps it)
+        local status=0
+        cd "$workdir"
+        "$@" > "$tmpfile" 2>&1 || status=$?
+        printf '%s|%s|%s\n' "$status" "$label" "$tmpfile" >&3
+        exit $status
+    ) &
+    JOB_PIDS+=($!)
+}
+
+# run_sync label workdir cmd [args...]
+# Runs cmd synchronously. Captures stdout+stderr to a tmpfile.
+# Reports via FIFO when complete. On failure, exits the script (triggers cleanup).
+run_sync() {
+    local label="$1" workdir="$2"; shift 2
+    local tmpfile status=0
+    tmpfile=$(mktemp /tmp/plnd-verify-XXXXXX.log)
+    { (cd "$workdir" && "$@") > "$tmpfile" 2>&1; } || status=$?
+    printf '%s|%s|%s\n' "$status" "$label" "$tmpfile" >&3
+    if [[ $status -ne 0 ]]; then
+        exit 1
+    fi
+}
+
+# wait_all — waits for all tracked background jobs; returns non-zero if any failed.
+# Printing is handled by the reader as each job completes.
+wait_all() {
+    local overall=0 pid
+    for pid in "${JOB_PIDS[@]+"${JOB_PIDS[@]}"}"; do
+        wait "$pid" 2>/dev/null || overall=1
+    done
+    JOB_PIDS=()
+    return $overall
+}
+
+echo "◆ Starting verification..."
+
+# ── Kill any leftover containers from a previous run ──────────────────────────
+docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
+
+# ── Launch supporting services ─────────────────────────────────────────────────
+docker run --rm -d \
+    --name "$VERIFY_DB_NAME" \
+    -p 5432:5432 \
+    -e POSTGRES_USER=plnd \
+    -e POSTGRES_PASSWORD="$VERIFY_DB_PASS" \
+    -e POSTGRES_DB=plnd_dev \
+    postgres:15 > /dev/null
+
+docker run --rm -d \
+    --name "$VERIFY_OAUTH_NAME" \
+    -p 8080:8080 \
+    -e ISSUER_ID=plnd-dev \
+    -e INTERACTIVE_LOGIN=true \
+    -e JSON_CONFIG=true \
+    -v "$PROJECT_ROOT/config/mock-oauth:/config" \
+    ghcr.io/navikt/mock-oauth2-server:3.0.1 > /dev/null
+
+# ── Rust read-only checks — no target/ lock, safe to parallelize ───────────────
+run_job "cargo fmt"     "$PROJECT_ROOT" cargo fmt --check
+run_job "cargo deny"    "$PROJECT_ROOT" cargo deny check
+run_job "cargo machete" "$PROJECT_ROOT" cargo machete
+
+# ── TypeScript setup — install deps synchronously so all TS jobs can fork cleanly
+run_sync "npm ci" "$PROJECT_ROOT/plnd_client" npm ci
+
+# ── TypeScript checks (parallel, gated on npm ci) ─────────────────────────────
+run_job "eslint"  "$PROJECT_ROOT/plnd_client" \
+    npx eslint "src/**/*.ts" "e2e/**/*.ts"
+
+run_job "ts-deps" "$PROJECT_ROOT/plnd_client" bash -c \
+    "npm run check-dependencies && npm run check-licenses && npm run check-circular"
+
+run_job "ng test" "$PROJECT_ROOT/plnd_client" \
+    npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
+
+# ── Cargo build (critical path — gates nextest, clippy, and e2e) ───────────────
+run_sync "cargo build" "$PROJECT_ROOT" cargo build --workspace
+
+# ── Post-build: nextest → clippy (sequential within, parallel with e2e) ────────
+run_job "nextest → clippy" "$PROJECT_ROOT" bash -c \
+    "cargo nextest run --workspace && \
+     cargo clippy --workspace --all-targets --all-features -- -D warnings"
+
+# ── E2E gate: wait for services, start API, run e2e ───────────────────────────
+wait_for_services() {
+    timeout 30s bash -c \
+        "until docker exec $VERIFY_DB_NAME pg_isready -U plnd 2>/dev/null; do sleep 1; done"
+    timeout 30s bash -c \
+        'until curl -sf http://localhost:8080/plnd-dev/.well-known/openid-configuration \
+         > /dev/null 2>&1; do sleep 1; done'
+}
+run_sync "services healthy" "$PROJECT_ROOT" wait_for_services
+
+API_LOG=$(mktemp /tmp/plnd-verify-api-XXXXXX.log)
+cd "$PROJECT_ROOT/plnd_api"
+doppler run -- sh -c \
+    "APP_DATABASE__URL='postgres://plnd:${VERIFY_DB_PASS}@localhost:5432/plnd_dev' \
+     APP_AUTH__OIDC_INTERNAL_ISSUER_URL='http://localhost:8080/plnd-dev' \
+     APP_AUTH__FRONTEND_ORIGIN='http://localhost:4200' \
+     exec ../target/debug/plnd_api" \
+    > "$API_LOG" 2>&1 &
+API_PID=$!
+cd "$PROJECT_ROOT"
+
+wait_for_api() {
+    if ! timeout 30s bash -c \
+        'until curl -sf http://localhost:3000/health > /dev/null 2>&1; do sleep 1; done'
+    then
+        echo "API failed to become healthy within 30s. API log:"
+        cat "$API_LOG"
+        return 1
+    fi
+}
+run_sync "api healthy" "$PROJECT_ROOT" wait_for_api
+
+run_sync "e2e tests" "$PROJECT_ROOT/plnd_client" bash -c "CI=true npm run e2e:ci"
+
+# ── Final gate: collect all background job results ─────────────────────────────
+wait_all
+
+# Close FIFO write-end; let reader drain any buffered records, then exit.
+exec 3>&-
+wait "$READER_PID"
+READER_PID=""
+
+echo "✅ All verifications passed"
+```
+
+- [ ] **Step 2: Make the script executable (it should already be, but verify)**
+
+```bash
+chmod +x scripts/verify.sh
+```
+
+- [ ] **Step 3: Smoke-test the script syntax**
+
+```bash
+bash -n scripts/verify.sh
+```
+
+Expected: no output, exit 0. Any output means a syntax error — fix it before continuing.
+
+- [ ] **Step 4: Run verify to observe the new output format**
+
+```bash
+just verify
+```
+
+Expected output on full pass:
+```
+◆ Starting verification...
+  ✓ cargo fmt
+  ✓ cargo deny
+  ✓ cargo machete
+  ✓ npm ci
+  ✓ ng test
+  ✓ eslint
+  ✓ ts-deps
+  ✓ cargo build
+  ✓ nextest → clippy
+  ✓ services healthy
+  ✓ api healthy
+  ✓ e2e tests
+✅ All verifications passed
+```
+
+The order of the first several ticks may vary — that's expected (parallel completion order).
+
+If any check fails, its full log should appear indented under its `✗ FAILED:` line.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git checkout -b fix/verify-output-capture
+git add scripts/verify.sh docs/superpowers/specs/2026-04-04-verify-output-capture-design.md docs/superpowers/plans/2026-04-04-verify-output-capture.md
+git commit -m "fix(verify): capture parallel job output; show clean ✓/✗ per check
+
+Replaces interleaved stdout from parallel jobs with a named-FIFO
+completion bus. Each job captures to a tmpfile and writes one status
+record when done. A reader process prints ✓ label on success or
+dumps the full log on failure, in real-time as jobs complete."
+```
+
+---
+
+## Verification Checklist
+
+- [ ] `bash -n scripts/verify.sh` exits 0
+- [ ] `just verify` on a clean codebase shows only `✓` lines and `✅ All verifications passed`
+- [ ] Intentionally breaking a check (e.g., add a trailing space to a `.rs` file to fail `cargo fmt`) shows `✗ FAILED: cargo fmt` with the diff output, and other passing checks still report `✓`
+- [ ] Ctrl-C during a run cleans up Docker containers (check with `docker ps | grep plnd-verify`)
+- [ ] No `/tmp/plnd-verify-*.log` or `/tmp/plnd-verify-bus-*` files left after a completed run
