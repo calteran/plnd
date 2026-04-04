@@ -23,7 +23,7 @@ use plnd_api::briefing::BriefingState;
 use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
-    auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, meal_suggestions,
+    agent, auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, meal_suggestions,
     preferences, schedule, search, system, tasks, user_dish_prefs, user_ingredient_prefs,
     user_meal_prefs, users,
 };
@@ -181,6 +181,8 @@ async fn main() {
     let client_error_quota = Quota::per_minute(NonZeroU32::new(20).unwrap());
     let client_error_limiter = Arc::new(RateLimiter::keyed(client_error_quota));
 
+    let agent = plnd_agent::AgentService::new(&config.llm);
+
     let state = Arc::new(AppState {
         db: db_conn,
         jwt,
@@ -190,6 +192,7 @@ async fn main() {
         provider_search,
         briefing,
         client_error_limiter,
+        agent,
     });
 
     let x_request_id = HeaderName::from_static("x-request-id");
@@ -305,6 +308,8 @@ async fn main() {
         .route("/briefing/news", get(briefing::get_news))
         .route("/briefing/yesterday", get(briefing::get_yesterday))
         .route("/auth/logout", post(auth::logout))
+        .route("/agent/task", post(agent::post_task))
+        .route("/agent/meal-plan", post(agent::post_meal_plan))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

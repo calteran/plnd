@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+plnd_agent = { path = "../plnd_agent" }
 plnd_data = { path = "../plnd_data" }
 plnd_seed = { path = "../plnd_seed" }
 axum = "0.8"
