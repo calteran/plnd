@@ -110,10 +110,15 @@ mod tests {
 
     /// Helper: create a throwaway user and return its UUID.
     async fn new_user(pool: &PgPool) -> Uuid {
-        users::create(pool, &format!("{}@test.invalid", Uuid::new_v4()), None, None)
-            .await
-            .expect("failed to create test user")
-            .user_id
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
     }
 
     // -----------------------------------------------------------------------
@@ -142,8 +147,12 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn get_memories_no_filter_returns_all(pool: PgPool) {
         let uid = new_user(&pool).await;
-        create_memory(&pool, uid, "food", "a", vec![]).await.unwrap();
-        create_memory(&pool, uid, "schedule", "b", vec![]).await.unwrap();
+        create_memory(&pool, uid, "food", "a", vec![])
+            .await
+            .unwrap();
+        create_memory(&pool, uid, "schedule", "b", vec![])
+            .await
+            .unwrap();
 
         let all = get_memories(&pool, uid, &[]).await.unwrap();
         assert_eq!(all.len(), 2);
@@ -152,8 +161,12 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn get_memories_filters_by_single_category(pool: PgPool) {
         let uid = new_user(&pool).await;
-        create_memory(&pool, uid, "food", "a", vec![]).await.unwrap();
-        create_memory(&pool, uid, "schedule", "b", vec![]).await.unwrap();
+        create_memory(&pool, uid, "food", "a", vec![])
+            .await
+            .unwrap();
+        create_memory(&pool, uid, "schedule", "b", vec![])
+            .await
+            .unwrap();
 
         let food = get_memories(&pool, uid, &["food"]).await.unwrap();
         assert_eq!(food.len(), 1);
@@ -163,9 +176,15 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn get_memories_filters_by_multiple_categories(pool: PgPool) {
         let uid = new_user(&pool).await;
-        create_memory(&pool, uid, "food", "a", vec![]).await.unwrap();
-        create_memory(&pool, uid, "schedule", "b", vec![]).await.unwrap();
-        create_memory(&pool, uid, "energy", "c", vec![]).await.unwrap();
+        create_memory(&pool, uid, "food", "a", vec![])
+            .await
+            .unwrap();
+        create_memory(&pool, uid, "schedule", "b", vec![])
+            .await
+            .unwrap();
+        create_memory(&pool, uid, "energy", "c", vec![])
+            .await
+            .unwrap();
 
         let result = get_memories(&pool, uid, &["food", "energy"]).await.unwrap();
         assert_eq!(result.len(), 2);
@@ -178,8 +197,12 @@ mod tests {
     async fn get_memories_only_returns_own(pool: PgPool) {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
-        create_memory(&pool, uid_a, "food", "user A memory", vec![]).await.unwrap();
-        create_memory(&pool, uid_b, "food", "user B memory", vec![]).await.unwrap();
+        create_memory(&pool, uid_a, "food", "user A memory", vec![])
+            .await
+            .unwrap();
+        create_memory(&pool, uid_b, "food", "user B memory", vec![])
+            .await
+            .unwrap();
 
         let a_results = get_memories(&pool, uid_a, &[]).await.unwrap();
         assert_eq!(a_results.len(), 1);
@@ -193,7 +216,9 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn update_changes_content(pool: PgPool) {
         let uid = new_user(&pool).await;
-        let mem = create_memory(&pool, uid, "food", "original", vec![]).await.unwrap();
+        let mem = create_memory(&pool, uid, "food", "original", vec![])
+            .await
+            .unwrap();
 
         let updated = update_memory(&pool, mem.memory_id, uid, "updated content")
             .await
@@ -220,7 +245,9 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn delete_removes_record(pool: PgPool) {
         let uid = new_user(&pool).await;
-        let mem = create_memory(&pool, uid, "food", "to delete", vec![]).await.unwrap();
+        let mem = create_memory(&pool, uid, "food", "to delete", vec![])
+            .await
+            .unwrap();
 
         delete_memory(&pool, mem.memory_id, uid).await.unwrap();
 
@@ -231,7 +258,9 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn delete_is_idempotent(pool: PgPool) {
         let uid = new_user(&pool).await;
-        let mem = create_memory(&pool, uid, "food", "to delete", vec![]).await.unwrap();
+        let mem = create_memory(&pool, uid, "food", "to delete", vec![])
+            .await
+            .unwrap();
 
         delete_memory(&pool, mem.memory_id, uid).await.unwrap();
         delete_memory(&pool, mem.memory_id, uid).await.unwrap(); // second call must not error
