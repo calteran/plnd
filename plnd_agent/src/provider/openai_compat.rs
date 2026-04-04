@@ -2,15 +2,16 @@ use async_openai::{
     config::OpenAIConfig,
     types::{
         ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestUserMessageArgs,
-        ChatCompletionTool, ChatCompletionToolType, CreateChatCompletionRequestArgs,
-        FunctionObject,
+        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestToolMessageArgs,
+        ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionToolType,
+        CreateChatCompletionRequestArgs, FunctionObject,
     },
     Client,
 };
 
 use super::{
-    CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageRole, StopReason, ToolCall,
+    CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent, MessageRole,
+    StopReason, ToolCall,
 };
 
 pub struct OpenAiCompatibleProvider {
@@ -50,19 +51,51 @@ impl LlmProvider for OpenAiCompatibleProvider {
         );
 
         for msg in request.messages {
-            let message = match msg.role {
-                MessageRole::User => ChatCompletionRequestUserMessageArgs::default()
-                    .content(msg.content)
-                    .build()
-                    .map_err(|e| LlmError::Configuration(e.to_string()))?
-                    .into(),
-                MessageRole::Assistant => ChatCompletionRequestAssistantMessageArgs::default()
-                    .content(msg.content)
-                    .build()
-                    .map_err(|e| LlmError::Configuration(e.to_string()))?
-                    .into(),
-            };
-            messages.push(message);
+            match msg.role {
+                MessageRole::User => {
+                    let text = match msg.content {
+                        MessageContent::Text(t) => t,
+                        MessageContent::ToolResults(_) => String::new(),
+                    };
+                    messages.push(
+                        ChatCompletionRequestUserMessageArgs::default()
+                            .content(text)
+                            .build()
+                            .map_err(|e| LlmError::Configuration(e.to_string()))?
+                            .into(),
+                    );
+                }
+                MessageRole::Assistant => {
+                    let text = match msg.content {
+                        MessageContent::Text(t) => t,
+                        MessageContent::ToolResults(_) => String::new(),
+                    };
+                    messages.push(
+                        ChatCompletionRequestAssistantMessageArgs::default()
+                            .content(text)
+                            .build()
+                            .map_err(|e| LlmError::Configuration(e.to_string()))?
+                            .into(),
+                    );
+                }
+                // OpenAI expects one tool message per result, each with its
+                // own tool_call_id. All results from one assistant turn are
+                // consecutive messages with role "tool".
+                MessageRole::Tool => {
+                    if let MessageContent::ToolResults(parts) = msg.content {
+                        for part in parts {
+                            messages.push(
+                                ChatCompletionRequestToolMessageArgs::default()
+                                    .tool_call_id(part.tool_call_id)
+                                    .content(part.content)
+                                    .build()
+                                    .map_err(|e| LlmError::Configuration(e.to_string()))?
+                                    .into(),
+                            );
+                        }
+                    }
+                }
+            }
         }
 
         // Build tool definitions.
