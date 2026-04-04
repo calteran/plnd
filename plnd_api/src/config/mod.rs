@@ -73,6 +73,14 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.external_providers.themealdb_api_key = key;
     }
 
+    if let Ok(key) = std::env::var("APP_LLM__FAST__API_KEY") {
+        app_config.llm.fast.api_key = key;
+    }
+
+    if let Ok(key) = std::env::var("APP_LLM__CAPABLE__API_KEY") {
+        app_config.llm.capable.api_key = key;
+    }
+
     app_config
         .validate()
         .map_err(error::ConfigError::Validation)?;

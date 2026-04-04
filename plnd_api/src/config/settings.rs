@@ -140,6 +140,8 @@ pub struct AppConfig {
     pub auth: AuthConfig,
     #[serde(default)]
     pub external_providers: ExternalProvidersConfig,
+    #[serde(default)]
+    pub llm: plnd_agent::LlmConfig,
 }
 
 impl AppConfig {

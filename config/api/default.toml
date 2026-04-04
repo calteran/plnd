@@ -54,3 +54,19 @@ weather_longitude = -0.1278
 # Morning briefing — news
 # RSS or Atom feed URL. Leave empty to disable the headlines card.
 news_feed_url = ""
+
+[llm.fast]
+# Low-latency model for quick, structured tasks (intent parsing, suggestions).
+provider = "anthropic"
+base_url = "https://api.anthropic.com"
+model = "claude-haiku-4-5-20251001"
+api_key = ""  # Set via APP_LLM__FAST__API_KEY (Doppler: plnd/dev)
+max_tokens = 1024
+
+[llm.capable]
+# High-capability model for complex reasoning (meal planning, full-day analysis).
+provider = "anthropic"
+base_url = "https://api.anthropic.com"
+model = "claude-opus-4-6"
+api_key = ""  # Set via APP_LLM__CAPABLE__API_KEY (Doppler: plnd/dev)
+max_tokens = 4096

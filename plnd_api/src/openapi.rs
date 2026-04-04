@@ -105,6 +105,9 @@ impl Modify for BearerSecurityAddon {
         crate::routes::schedule::get_period,
         crate::routes::schedule::get_plan_status,
         crate::routes::schedule::post_plan,
+        // Agent
+        crate::routes::agent::post_task,
+        crate::routes::agent::post_meal_plan,
     ),
     components(schemas(
         // Existing
@@ -172,6 +175,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Tasks", description = "Task management (weekly planning task creation)"),
         (name = "Meal Suggestions", description = "Meal suggestions for a given date and slot"),
         (name = "Schedule", description = "Schedule period queries and weekly plan commits"),
+        (name = "Agent", description = "LLM-backed task parsing and meal planning (stubs — Phase 3.2/3.3)"),
     )
 )]
 pub struct ApiDoc;

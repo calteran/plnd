@@ -1,6 +1,7 @@
 use crate::auth::{JwksCache, JwtService, SessionService};
 use crate::briefing::BriefingState;
 use governor::DefaultKeyedRateLimiter;
+use plnd_agent::AgentService;
 use plnd_data::db::Database;
 use plnd_data::search::ProviderSearchService;
 use std::sync::Arc;
@@ -20,4 +21,7 @@ pub struct AppState {
     /// Per-IP rate limiter for unauthenticated POST /api/client_error requests.
     /// Authenticated requests (valid JWT) bypass this limiter entirely.
     pub client_error_limiter: Arc<DefaultKeyedRateLimiter<String>>,
+    /// Agent service for LLM-backed task and meal-plan generation.
+    /// Stub in Phase 3.1 — fully implemented in Phase 3.2/3.3.
+    pub agent: AgentService,
 }
