@@ -181,7 +181,7 @@ async fn main() {
     let client_error_quota = Quota::per_minute(NonZeroU32::new(20).unwrap());
     let client_error_limiter = Arc::new(RateLimiter::keyed(client_error_quota));
 
-    let agent = plnd_agent::AgentService::new(&config.llm);
+    let agent = plnd_agent::AgentService::new(&config.llm, db_conn.clone());
 
     let state = Arc::new(AppState {
         db: db_conn,
