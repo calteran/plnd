@@ -6,5 +6,5 @@ pub mod tools;
 
 pub use agent::{AgentError, AgentOutput, AgentService};
 pub use config::LlmConfig;
-pub use context::UseCase;
+pub use context::{AgentContext, UseCase};
 pub use tools::{Tool, ToolContext, ToolError, ToolRegistry};
