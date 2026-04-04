@@ -81,3 +81,162 @@ pub async fn delete(
         .map(|r| r.rows_affected() > 0)
         .map_err(DatabaseError::from)
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::users;
+
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    // -----------------------------------------------------------------------
+    // list
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn list_returns_empty_for_new_user(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let result = list(&pool, uid).await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // create
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_returns_restriction(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        let r = create(&pool, uid, "allergy", "peanuts", Some("anaphylactic"))
+            .await
+            .expect("create failed");
+
+        assert_eq!(r.user_id, uid);
+        assert_eq!(r.restriction_type, "allergy");
+        assert_eq!(r.name, "peanuts");
+        assert_eq!(r.notes.as_deref(), Some("anaphylactic"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn list_returns_created_restrictions(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        create(&pool, uid, "allergy", "peanuts", None)
+            .await
+            .unwrap();
+        create(&pool, uid, "intolerance", "lactose", None)
+            .await
+            .unwrap();
+
+        let result = list(&pool, uid).await.unwrap();
+        assert_eq!(result.len(), 2);
+        assert!(result.iter().all(|r| r.user_id == uid));
+    }
+
+    // -----------------------------------------------------------------------
+    // update
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_notes_returns_updated(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let r = create(&pool, uid, "allergy", "shellfish", None)
+            .await
+            .unwrap();
+
+        let updated = update(&pool, r.restriction_id, uid, Some("severe reaction"))
+            .await
+            .unwrap()
+            .expect("expected Some but got None");
+
+        assert_eq!(updated.restriction_id, r.restriction_id);
+        assert_eq!(updated.notes.as_deref(), Some("severe reaction"));
+        assert!(updated.updated_at >= r.updated_at);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_with_none_notes_preserves_existing(pool: PgPool) {
+        // COALESCE($3, notes) means passing None is a no-op — it cannot clear
+        // existing notes to NULL. This test documents that contract explicitly.
+        let uid = new_user(&pool).await;
+        let r = create(&pool, uid, "allergy", "shellfish", Some("existing note"))
+            .await
+            .unwrap();
+
+        let after = update(&pool, r.restriction_id, uid, None)
+            .await
+            .unwrap()
+            .expect("expected Some but got None");
+
+        assert_eq!(after.notes.as_deref(), Some("existing note"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_returns_none_for_wrong_user(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let r = create(&pool, uid_a, "allergy", "shellfish", None)
+            .await
+            .unwrap();
+
+        let result = update(&pool, r.restriction_id, uid_b, Some("hijacked"))
+            .await
+            .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // delete
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_returns_true(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let r = create(&pool, uid, "allergy", "peanuts", None)
+            .await
+            .unwrap();
+
+        let deleted = delete(&pool, r.restriction_id, uid).await.unwrap();
+        assert!(deleted);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_returns_false_for_unknown(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let deleted = delete(&pool, Uuid::new_v4(), uid).await.unwrap();
+        assert!(!deleted);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_enforces_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let r = create(&pool, uid_a, "allergy", "peanuts", None)
+            .await
+            .unwrap();
+
+        // uid_b cannot delete uid_a's restriction
+        let deleted = delete(&pool, r.restriction_id, uid_b).await.unwrap();
+        assert!(!deleted);
+
+        // Record must still exist for uid_a
+        let remaining = list(&pool, uid_a).await.unwrap();
+        assert_eq!(remaining.len(), 1);
+    }
+}
