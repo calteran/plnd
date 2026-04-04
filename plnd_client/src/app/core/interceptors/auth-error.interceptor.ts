@@ -4,9 +4,6 @@ import { catchError, throwError } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../services/auth.service';
 import { SKIP_AUTH_ERROR } from './auth-context-tokens';
-// Re-exported for callers that import SKIP_AUTH_ERROR from this file (e.g. spec files).
-// Service-layer callers should import directly from auth-context-tokens.
-export { SKIP_AUTH_ERROR } from './auth-context-tokens';
 
 /**
  * Functional HTTP interceptor that catches 401 Unauthorized responses from the

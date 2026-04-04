@@ -2,7 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { noop } from 'rxjs';
 import { provideHttpClient, withInterceptors, HttpClient, HttpContext } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { authErrorInterceptor, SKIP_AUTH_ERROR } from './auth-error.interceptor';
+import { authErrorInterceptor } from './auth-error.interceptor';
+import { SKIP_AUTH_ERROR } from './auth-context-tokens';
 import { AuthService } from '../services/auth.service';
 import { environment } from '../../../environments/environment';
 
