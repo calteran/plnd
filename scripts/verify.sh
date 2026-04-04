@@ -115,6 +115,10 @@ track $! "cargo deny"
 (exec 9>&-; cd "$PROJECT_ROOT" && cargo machete) &
 track $! "cargo machete"
 
+# TypeScript setup — install deps in main thread so all TS jobs can fork cleanly
+echo "→ Installing TypeScript dependencies..."
+(cd "$PROJECT_ROOT/plnd_client" && npm ci)
+
 # TypeScript checks
 (exec 9>&-; cd "$PROJECT_ROOT/plnd_client" && npx eslint "src/**/*.ts" "e2e/**/*.ts") &
 track $! "eslint"
