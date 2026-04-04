@@ -3,7 +3,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::config::LlmConfig;
-use crate::context::UseCase;
+use crate::context::AgentContext;
 use crate::provider::{
     AnthropicProvider, CompletionRequest, LlmError, LlmProvider, Message, MessageContent,
     MessageRole, OpenAiCompatibleProvider, ProviderRegistry, ProviderTier, ToolCall,
@@ -243,30 +243,33 @@ impl AgentService {
         }
     }
 
-    /// Run the agentic loop for the given use case and user input.
+    /// Run the agentic loop for the given context and tool registry.
     ///
-    /// - `user_id` must come from the authenticated session — never from `input`.
+    /// - `ctx.user_id` must come from the authenticated session — never from `ctx.input`.
     /// - `tools` is the pre-populated tool registry for this use case.
-    /// - `input` is wrapped in `<user_input>` XML delimiters before being sent
+    /// - `ctx.input` is wrapped in `<user_input>` XML delimiters before being sent
     ///   to the LLM, per the security spec.
+    /// - `ctx.memory_context`, if present, is prepended to the system prompt as a
+    ///   `<memory>` block so the LLM has relevant user context before any tool calls.
     pub async fn run(
         &self,
-        user_id: Uuid,
-        use_case: UseCase,
+        ctx: &AgentContext,
         tools: ToolRegistry,
-        input: &str,
     ) -> Result<AgentOutput, AgentError> {
         // Step 1: Load memories — no-op stub (filled in by Phase 3.1).
         // When implemented: load from plnd_data filtered by use_case memory categories.
 
         // Step 2: Resolve system prompt.
-        let system = use_case.system_prompt().to_string();
+        let base_system = ctx.use_case.system_prompt().to_string();
 
-        // Step 3: Inject memories into context — no-op stub.
-        // When implemented: prepend <memory ...> blocks to the first user message.
+        // Step 3: Inject memories into system prompt preamble if present.
+        let system = match &ctx.memory_context {
+            Some(mem) => format!("<memory>\n{}\n</memory>\n\n{}", mem, base_system),
+            None => base_system,
+        };
 
         // Step 4: Select provider tier.
-        let tier = use_case.provider_tier();
+        let tier = ctx.use_case.provider_tier();
         let (max_tokens, max_iterations) = match tier {
             ProviderTier::Fast => (self.config.fast.max_tokens, self.config.fast.max_iterations),
             ProviderTier::Capable => (
@@ -277,7 +280,7 @@ impl AgentService {
 
         // Step 5: Build the initial message and fire the loop.
         // Wrap user input in untrusted delimiter per security spec.
-        let wrapped = format!("<user_input>{}</user_input>", input);
+        let wrapped = format!("<user_input>{}</user_input>", ctx.input);
         let initial_messages = vec![Message {
             role: MessageRole::User,
             content: MessageContent::Text(wrapped),
@@ -292,7 +295,7 @@ impl AgentService {
         };
 
         agent_loop
-            .run(user_id, tier, system, initial_messages)
+            .run(ctx.user_id, tier, system, initial_messages)
             .await
     }
 }
@@ -326,6 +329,30 @@ impl std::fmt::Debug for AgentService {
 // ── Unit tests ────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
+impl AgentService {
+    /// Test-only constructor that injects a pre-built registry.
+    ///
+    /// Uses a config with `max_iterations = 10` so the agent loop actually runs.
+    /// (`LlmConfig::default()` gives `max_iterations = 0` because the serde default
+    /// only fires during deserialization, not via `Default::default()`.)
+    fn new_with_registry(registry: ProviderRegistry) -> Self {
+        use crate::config::LlmModelConfig;
+        let model_cfg = LlmModelConfig {
+            max_iterations: 10,
+            max_tokens: 1024,
+            ..LlmModelConfig::default()
+        };
+        Self {
+            config: crate::config::LlmConfig {
+                fast: model_cfg.clone(),
+                capable: model_cfg,
+            },
+            registry: Arc::new(registry),
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
@@ -335,6 +362,7 @@ mod tests {
     use tokio::time::Duration;
 
     use super::*;
+    use crate::context::{AgentContext, UseCase};
     use crate::provider::mock::MockLlmProvider;
     use crate::provider::{CompletionResponse, StopReason, ToolCall};
     use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -646,6 +674,121 @@ mod tests {
             call_count.load(Ordering::SeqCst),
             1,
             "LLM must not be called again after a terminal tool"
+        );
+    }
+
+    // ── AgentService::run — AgentContext wiring tests ─────────────────────────
+
+    /// When `memory_context` is `Some`, the system prompt sent to the LLM must
+    /// be prefixed with a `<memory>` block containing the memory text.
+    #[tokio::test]
+    async fn test_memory_context_prepended_to_system_prompt() {
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+        mock.push_response(CompletionResponse {
+            content: Some("done".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let service = AgentService::new_with_registry(make_registry(mock));
+
+        let ctx = AgentContext {
+            user_id: Uuid::nil(),
+            use_case: UseCase::TaskEntry,
+            input: "add milk to grocery list".to_string(),
+            memory_context: Some("user prefers oat milk".to_string()),
+        };
+
+        let result = service.run(&ctx, ToolRegistry::new()).await;
+        assert!(result.is_ok());
+
+        let req = last_request.lock().unwrap();
+        let system = &req.as_ref().unwrap().system;
+        assert!(
+            system.starts_with("<memory>"),
+            "system prompt must start with <memory> block; got: {system}"
+        );
+        assert!(
+            system.contains("user prefers oat milk"),
+            "memory text must appear in system prompt"
+        );
+        assert!(
+            system.contains("<user_input>"),
+            "base system prompt (which references <user_input>) must follow the memory block"
+        );
+    }
+
+    /// When `memory_context` is `None`, the system prompt must be the raw use-case
+    /// prompt with no `<memory>` preamble.
+    #[tokio::test]
+    async fn test_no_memory_context_omits_memory_block() {
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+        mock.push_response(CompletionResponse {
+            content: Some("done".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let service = AgentService::new_with_registry(make_registry(mock));
+
+        let ctx = AgentContext {
+            user_id: Uuid::nil(),
+            use_case: UseCase::TaskEntry,
+            input: "add milk to grocery list".to_string(),
+            memory_context: None,
+        };
+
+        let result = service.run(&ctx, ToolRegistry::new()).await;
+        assert!(result.is_ok());
+
+        let req = last_request.lock().unwrap();
+        let system = &req.as_ref().unwrap().system;
+        assert!(
+            !system.contains("<memory>"),
+            "system prompt must not contain <memory> block when memory_context is None"
+        );
+        assert_eq!(
+            system.as_str(),
+            UseCase::TaskEntry.system_prompt(),
+            "system prompt must be the raw use-case prompt"
+        );
+    }
+
+    /// User input must always be wrapped in `<user_input>` delimiters in the
+    /// first user message, regardless of memory context.
+    #[tokio::test]
+    async fn test_user_input_wrapped_in_delimiter() {
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+        mock.push_response(CompletionResponse {
+            content: Some("done".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let service = AgentService::new_with_registry(make_registry(mock));
+
+        let ctx = AgentContext {
+            user_id: Uuid::nil(),
+            use_case: UseCase::TaskEntry,
+            input: "replace vacuum filter".to_string(),
+            memory_context: None,
+        };
+
+        let result = service.run(&ctx, ToolRegistry::new()).await;
+        assert!(result.is_ok());
+
+        let req = last_request.lock().unwrap();
+        let first_message = &req.as_ref().unwrap().messages[0];
+        let MessageContent::Text(ref text) = first_message.content else {
+            panic!("expected Text message content");
+        };
+        assert_eq!(
+            text.as_str(),
+            "<user_input>replace vacuum filter</user_input>",
+            "user input must be wrapped in security delimiters"
         );
     }
 }
