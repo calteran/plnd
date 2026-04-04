@@ -170,6 +170,23 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn update_with_none_notes_preserves_existing(pool: PgPool) {
+        // COALESCE($3, notes) means passing None is a no-op — it cannot clear
+        // existing notes to NULL. This test documents that contract explicitly.
+        let uid = new_user(&pool).await;
+        let r = create(&pool, uid, "allergy", "shellfish", Some("existing note"))
+            .await
+            .unwrap();
+
+        let after = update(&pool, r.restriction_id, uid, None)
+            .await
+            .unwrap()
+            .expect("expected Some but got None");
+
+        assert_eq!(after.notes.as_deref(), Some("existing note"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn update_returns_none_for_wrong_user(pool: PgPool) {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
