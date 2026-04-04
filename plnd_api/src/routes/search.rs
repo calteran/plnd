@@ -129,7 +129,10 @@ pub async fn search_ingredients_handler(
         Some(user_id),
     )
     .await
-    .unwrap_or_default();
+    .map_err(|e| {
+        tracing::error!(error = %e, "search_ingredients DB error");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     let mut stream = state.provider_search.search_ingredients(sq);
     let mut resp = IngredientSearchResponse {
@@ -178,10 +181,16 @@ pub async fn search_dishes_handler(
     let sq = params.into_search_query();
     let local = search_dishes(state.db.get_pool(), &sq.query, sq.limit as i64)
         .await
-        .unwrap_or_default();
+        .map_err(|e| {
+            tracing::error!(error = %e, "search_dishes DB error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
     let user = search_user_dishes(state.db.get_pool(), user_id, &sq.query, sq.limit as i64)
         .await
-        .unwrap_or_default();
+        .map_err(|e| {
+            tracing::error!(error = %e, "search_user_dishes DB error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let mut stream = state.provider_search.search_dishes(sq);
     let mut resp = DishSearchResponse {
@@ -229,7 +238,10 @@ pub async fn search_exercises_handler(
     let sq = params.into_search_query();
     let local = search_exercises(state.db.get_pool(), &sq.query, sq.limit as i64)
         .await
-        .unwrap_or_default();
+        .map_err(|e| {
+            tracing::error!(error = %e, "search_exercises DB error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let mut stream = state.provider_search.search_exercises(sq);
     let mut resp = ExerciseSearchResponse {
