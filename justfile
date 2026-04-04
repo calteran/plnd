@@ -27,6 +27,13 @@ init:
 dev:
     doppler run -- docker compose build --no-cache && doppler run -- docker compose up -d --force-recreate
 
+# Run full dev stack including local Ollama LLM (opt-in, pulls model on first start)
+# Requires Docker with sufficient RAM for the model (phi3 ~2 GB, llama3.2 ~2 GB).
+# Override models via OLLAMA_FAST_MODEL / OLLAMA_CAPABLE_MODEL env vars.
+dev-llm:
+    doppler run -- docker compose -f docker-compose.yml -f docker-compose.local-llm.yml build --no-cache && \
+    doppler run -- docker compose -f docker-compose.yml -f docker-compose.local-llm.yml --profile local-llm up -d --force-recreate
+
 # Run API service locally (requires PostgreSQL)
 api:
     cd plnd_api && doppler run -- cargo run

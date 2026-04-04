@@ -80,6 +80,29 @@ services:
       retries: 10
       start_period: 10s
 
+  ollama:
+    image: ollama/ollama:latest
+    profiles: [local-llm]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./scripts/ollama-entrypoint.sh:/entrypoint.sh:ro
+    environment:
+      - OLLAMA_FAST_MODEL=${OLLAMA_FAST_MODEL:-phi3}
+      - OLLAMA_CAPABLE_MODEL=${OLLAMA_CAPABLE_MODEL:-llama3.2}
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    healthcheck:
+      # /api/tags is ready as soon as ollama serve starts — before model pulls
+      # complete. The api service depends_on this healthcheck, so the first
+      # inference request may be slow while a model pull is still in progress.
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
 volumes:
   postgres_data:
   node_modules:
+  ollama_data:

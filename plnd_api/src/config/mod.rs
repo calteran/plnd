@@ -73,8 +73,32 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.external_providers.themealdb_api_key = key;
     }
 
+    if let Ok(v) = std::env::var("APP_LLM__FAST__PROVIDER") {
+        app_config.llm.fast.provider = v;
+    }
+
+    if let Ok(v) = std::env::var("APP_LLM__FAST__BASE_URL") {
+        app_config.llm.fast.base_url = v;
+    }
+
+    if let Ok(v) = std::env::var("APP_LLM__FAST__MODEL") {
+        app_config.llm.fast.model = v;
+    }
+
     if let Ok(key) = std::env::var("APP_LLM__FAST__API_KEY") {
         app_config.llm.fast.api_key = key;
+    }
+
+    if let Ok(v) = std::env::var("APP_LLM__CAPABLE__PROVIDER") {
+        app_config.llm.capable.provider = v;
+    }
+
+    if let Ok(v) = std::env::var("APP_LLM__CAPABLE__BASE_URL") {
+        app_config.llm.capable.base_url = v;
+    }
+
+    if let Ok(v) = std::env::var("APP_LLM__CAPABLE__MODEL") {
+        app_config.llm.capable.model = v;
     }
 
     if let Ok(key) = std::env::var("APP_LLM__CAPABLE__API_KEY") {
