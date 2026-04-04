@@ -44,17 +44,12 @@ just verify           # Full quality + build + tests (run before every commit)
 just verify-build     # Compile check only (safe, no server)
 just test-run-server  # Server startup test (15s timeout, auto-kills)
 
-# Testing
-just test-ci          # All tests: Rust nextest + headless Angular
-
 # Utilities
 just build            # Build all services
 just clean            # Clean build artifacts
 just stop             # Stop running services
 just logs             # View service logs
 ```
-
-> **Note**: Never run `just test` directly — it launches interactive processes that do not terminate. Always use `just test-ci`.
 
 ## Documentation
 

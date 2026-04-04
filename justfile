@@ -1,3 +1,5 @@
+# ── Setup / One-time ─────────────────────────────────────────────────────────
+
 # Build all services
 build:
     cargo build --workspace
@@ -22,6 +24,18 @@ init:
     npx playwright install chromium
 
     echo "✅ Dev environment ready. Run 'doppler login' if you haven't already."
+
+# Install Playwright browser binaries (run once after npm install)
+playwright-install:
+    cd plnd_client && npx playwright install chromium
+
+# Create a worktree and install Angular deps so the LSP resolves types immediately
+worktree-new branch:
+    git worktree add .worktrees/{{branch}} -b {{branch}}
+    cd .worktrees/{{branch}}/plnd_client && npm ci
+    @echo "✅ Worktree ready at .worktrees/{{branch}}"
+
+# ── Daily Development ─────────────────────────────────────────────────────────
 
 # Run development environment (PostgreSQL + Client) in detached mode
 dev:
@@ -58,28 +72,7 @@ stop:
 logs:
     docker compose logs -f
 
-# Run tests with nextest
-test:
-    cargo nextest run --workspace
-    cd plnd_client && npm test
-
-# Run tests with nextest (verbose)
-test-verbose:
-    cargo nextest run --workspace --verbose
-
-# Run Angular tests with headless Chrome (automated testing)
-test-ng-headless:
-    @echo "🧪 Running Angular tests with headless Chrome..."
-    cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
-
-# Comprehensive test suite for CI/automated environments (Rust with nextest + Angular headless)
-test-ci:
-    @echo "🚀 Running comprehensive CI test suite..."
-    cargo nextest run --workspace && \
-    just test-ng-headless && \
-    just services-up && \
-    just test-e2e && \
-    echo "✅ All CI tests passed"
+# ── Quality ───────────────────────────────────────────────────────────────────
 
 # Rust quality commands
 fmt:
@@ -103,6 +96,28 @@ ts-deps:
     cd plnd_client && npm run check-licenses
     cd plnd_client && npm run check-circular
 
+# Combined quality check (all quality gates, no tests)
+check:
+    just fmt
+    just clippy
+    just deny
+    just machete
+    just ts-lint
+    just ts-deps
+
+# Full verification — parallel pipeline (see scripts/verify.sh)
+# Runs quality checks + build + unit tests + e2e. Use before every commit.
+verify:
+    @bash scripts/verify.sh
+
+# ── Compilation & Server Validation ──────────────────────────────────────────
+
+# Verify compilation only (no server startup)
+verify-build:
+    @echo "🔨 Verifying build..."
+    cargo build --workspace && \
+    echo "✅ Build successful"
+
 # Test server startup (15 second timeout - will auto-kill)
 # timeout exits 124 when it kills the process (success); any other code means the server crashed.
 test-run-server:
@@ -119,11 +134,16 @@ test-run-server:
         exit 1
     fi
 
-# Verify compilation only (no server startup)
-verify-build:
-    @echo "🔨 Verifying build..."
-    cargo build --workspace && \
-    echo "✅ Build successful"
+# ── Testing ───────────────────────────────────────────────────────────────────
+
+# For unit tests: use test-ng-headless (Angular) or `cargo nextest run --workspace` (Rust)
+# For full pre-commit validation: use `verify` — it is parallel, faster, and more comprehensive
+# Note: `just test` and `just test-ci` have been removed; use `verify` instead
+
+# Run Angular tests with headless Chrome
+test-ng-headless:
+    @echo "🧪 Running Angular tests with headless Chrome..."
+    cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
 
 # Ensure Docker stack is running and all services are healthy (idempotent)
 # --build client: rebuilds the Angular image so e2e tests always run against
@@ -135,23 +155,6 @@ services-up:
     @echo "🐳 Ensuring Docker stack is up and healthy..."
     doppler run -- docker compose up -d --build client --wait
     @echo "✅ Services ready"
-
-# Full verification — parallel pipeline (see scripts/verify.sh)
-verify:
-    @bash scripts/verify.sh
-
-# Combined quality check
-check:
-    just fmt
-    just clippy
-    just deny
-    just machete
-    just ts-lint
-    just ts-deps
-
-# Install Playwright browser binaries (run once after npm install)
-playwright-install:
-    cd plnd_client && npx playwright install chromium
 
 # Run Playwright e2e tests (CI-safe, requires Docker stack + Angular)
 test-e2e:
@@ -173,15 +176,11 @@ test-e2e-dev:
 test-e2e-report:
     cd plnd_client && npm run e2e:report
 
+# ── Utilities ─────────────────────────────────────────────────────────────────
+
 # Seed catalog data from external providers (requires running DB)
 seed:
     doppler run -- cargo run -p plnd_seed
-
-# Create a worktree and install Angular deps so the LSP resolves types immediately
-worktree-new branch:
-    git worktree add .worktrees/{{branch}} -b {{branch}}
-    cd .worktrees/{{branch}}/plnd_client && npm ci
-    @echo "✅ Worktree ready at .worktrees/{{branch}}"
 
 # Clean build artifacts
 clean:

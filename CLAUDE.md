@@ -17,9 +17,9 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 ## Critical Rules
 
 ### Testing
-- **NEVER run `just test`** — it launches interactive processes that do not terminate
-- **ALWAYS use `just test-ci`** for all testing (runs nextest + headless Angular)
-- Angular-only: `just test-ng-headless`
+- **NEVER run `just test` or `just test-ci`** — both have been removed from the justfile
+- **ALWAYS use `just verify`** for pre-commit validation (parallel pipeline: quality + build + tests + e2e)
+- Unit tests only: `just test-ng-headless` (Angular) or `cargo nextest run --workspace` (Rust)
 
 ### Server Processes
 - **NEVER run `cargo run` directly**
@@ -54,8 +54,7 @@ just verify-build     # Compile check only (safe, no server)
 just test-run-server  # Server startup test (15s timeout, auto-kills)
 just verify           # Full quality + build + tests (run before every commit)
 
-# Testing (CI-safe)
-just test-ci          # All tests: nextest + headless Angular
+# Testing (unit tests only — use verify for full pre-commit validation)
 just test-ng-headless # Angular unit tests (headless Chrome)
 
 # Utilities
