@@ -1,14 +1,18 @@
 use std::collections::VecDeque;
-use std::sync::Mutex;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 
 use super::{
-    CompletionRequest, CompletionResponse, LlmError, LlmProvider, Message, MessageRole, StopReason,
-    ToolCall,
+    CompletionRequest, CompletionResponse, LlmError, LlmProvider, Message, MessageContent,
+    MessageRole, StopReason, ToolCall,
 };
 
 pub struct MockLlmProvider {
     responses: Mutex<VecDeque<Result<CompletionResponse, LlmError>>>,
     name: String,
+    call_count: Arc<AtomicUsize>,
 }
 
 impl MockLlmProvider {
@@ -16,6 +20,7 @@ impl MockLlmProvider {
         Self {
             responses: Mutex::new(VecDeque::new()),
             name: name.into(),
+            call_count: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -26,11 +31,24 @@ impl MockLlmProvider {
     pub fn push_error(&self, error: LlmError) {
         self.responses.lock().unwrap().push_back(Err(error));
     }
+
+    /// Returns the number of times `complete()` has been called.
+    /// Useful in tests for asserting loop iteration counts.
+    pub fn call_count(&self) -> usize {
+        self.call_count.load(Ordering::SeqCst)
+    }
+
+    /// Returns a clone of the shared call-count handle so tests can inspect
+    /// it after the mock has been moved into a `Box<dyn LlmProvider>`.
+    pub fn call_count_handle(&self) -> Arc<AtomicUsize> {
+        Arc::clone(&self.call_count)
+    }
 }
 
 #[async_trait::async_trait]
 impl LlmProvider for MockLlmProvider {
     async fn complete(&self, _request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+        self.call_count.fetch_add(1, Ordering::SeqCst);
         self.responses
             .lock()
             .unwrap()
@@ -54,7 +72,8 @@ mod tests {
             system: "You are a test assistant.".to_string(),
             messages: vec![Message {
                 role: MessageRole::User,
-                content: "test".to_string(),
+                content: MessageContent::Text("test".to_string()),
+                tool_calls: vec![],
             }],
             tools: vec![],
             max_tokens: 100,
@@ -114,5 +133,26 @@ mod tests {
         let result = provider.complete(minimal_request()).await.unwrap();
 
         assert_eq!(result.stop_reason, StopReason::MaxTokens);
+    }
+
+    #[tokio::test]
+    async fn test_call_count_tracks_invocations() {
+        let provider = MockLlmProvider::new("test");
+        provider.push_response(CompletionResponse {
+            content: Some("a".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+        provider.push_response(CompletionResponse {
+            content: Some("b".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        assert_eq!(provider.call_count(), 0);
+        provider.complete(minimal_request()).await.unwrap();
+        assert_eq!(provider.call_count(), 1);
+        provider.complete(minimal_request()).await.unwrap();
+        assert_eq!(provider.call_count(), 2);
     }
 }

@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageRole, StopReason, ToolCall,
+    CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent, MessageRole,
+    StopReason, ToolCall,
 };
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -39,15 +40,45 @@ struct AnthropicRequest<'a> {
     model: &'a str,
     max_tokens: u32,
     system: &'a str,
-    messages: Vec<AnthropicMessage<'a>>,
+    messages: Vec<AnthropicMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<AnthropicToolDef<'a>>,
 }
 
+/// Outgoing message for the Anthropic wire format. Uses owned types because
+/// tool-result turns require allocated content block arrays.
 #[derive(Serialize)]
-struct AnthropicMessage<'a> {
-    role: &'a str,
-    content: &'a str,
+struct AnthropicMessage {
+    role: &'static str,
+    content: AnthropicMessageContent,
+}
+
+/// Anthropic accepts either a plain string or an array of typed content blocks.
+#[derive(Serialize)]
+#[serde(untagged)]
+enum AnthropicMessageContent {
+    Text(String),
+    Blocks(Vec<AnthropicBlock>),
+}
+
+/// A single typed content block in an Anthropic message.
+#[derive(Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum AnthropicBlock {
+    Text {
+        text: String,
+    },
+    /// Represents a tool call made by the assistant in a previous turn.
+    /// Must be included in the assistant message that precedes `ToolResult` blocks.
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -81,15 +112,70 @@ enum AnthropicContentBlock {
 #[async_trait::async_trait]
 impl LlmProvider for AnthropicProvider {
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
-        let messages: Vec<AnthropicMessage<'_>> = request
+        let messages: Vec<AnthropicMessage> = request
             .messages
-            .iter()
-            .map(|m| AnthropicMessage {
-                role: match m.role {
-                    MessageRole::User => "user",
-                    MessageRole::Assistant => "assistant",
+            .into_iter()
+            .map(|m| match m.role {
+                MessageRole::User => AnthropicMessage {
+                    role: "user",
+                    content: match m.content {
+                        MessageContent::Text(t) => AnthropicMessageContent::Text(t),
+                        MessageContent::ToolResults(_) => {
+                            unreachable!("User role should never carry ToolResults content")
+                        }
+                    },
                 },
-                content: &m.content,
+                MessageRole::Assistant => {
+                    let text = match m.content {
+                        MessageContent::Text(t) => t,
+                        MessageContent::ToolResults(_) => {
+                            unreachable!("Assistant role should never carry ToolResults content")
+                        }
+                    };
+                    if m.tool_calls.is_empty() {
+                        AnthropicMessage {
+                            role: "assistant",
+                            content: AnthropicMessageContent::Text(text),
+                        }
+                    } else {
+                        // Anthropic requires tool calls to appear as `tool_use`
+                        // content blocks in the assistant message so that the
+                        // subsequent `tool_result` blocks are understood in context.
+                        let mut blocks: Vec<AnthropicBlock> = Vec::new();
+                        if !text.is_empty() {
+                            blocks.push(AnthropicBlock::Text { text });
+                        }
+                        for tc in m.tool_calls {
+                            blocks.push(AnthropicBlock::ToolUse {
+                                id: tc.id,
+                                name: tc.name,
+                                input: tc.arguments,
+                            });
+                        }
+                        AnthropicMessage {
+                            role: "assistant",
+                            content: AnthropicMessageContent::Blocks(blocks),
+                        }
+                    }
+                }
+                // Anthropic tool results are submitted as a "user" role message
+                // containing an array of tool_result content blocks — one per
+                // tool call from the previous assistant turn.
+                MessageRole::Tool => AnthropicMessage {
+                    role: "user",
+                    content: match m.content {
+                        MessageContent::ToolResults(parts) => AnthropicMessageContent::Blocks(
+                            parts
+                                .into_iter()
+                                .map(|p| AnthropicBlock::ToolResult {
+                                    tool_use_id: p.tool_call_id,
+                                    content: p.content,
+                                })
+                                .collect(),
+                        ),
+                        MessageContent::Text(t) => AnthropicMessageContent::Text(t),
+                    },
+                },
             })
             .collect();
 

@@ -55,12 +55,56 @@ pub enum StopReason {
 pub enum MessageRole {
     User,
     Assistant,
+    /// The tool-result turn: one entry per tool call executed in the previous
+    /// assistant turn. The associated [`Message`]'s `content` must be
+    /// `MessageContent::ToolResults`.
+    Tool,
+}
+
+/// One tool-result entry, keyed by the opaque provider-generated call ID.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ToolResultPart {
+    pub tool_call_id: String,
+    pub content: String,
+}
+
+/// Typed content for a [`Message`].
+///
+/// - Plain text for `User` and `Assistant` turns.
+/// - A structured list of tool results for `Tool` turns.
+///
+/// Uses `#[serde(untagged)]` so `Text` serializes as a bare JSON string and
+/// `ToolResults` as a JSON array — no discriminant wrapper.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
+pub enum MessageContent {
+    Text(String),
+    ToolResults(Vec<ToolResultPart>),
+}
+
+impl From<String> for MessageContent {
+    fn from(s: String) -> Self {
+        MessageContent::Text(s)
+    }
+}
+
+impl From<&str> for MessageContent {
+    fn from(s: &str) -> Self {
+        MessageContent::Text(s.to_string())
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Message {
     pub role: MessageRole,
-    pub content: String,
+    pub content: MessageContent,
+    /// Tool calls made by the assistant in this turn.
+    ///
+    /// Must be populated on `MessageRole::Assistant` messages that contain tool
+    /// calls so that subsequent `MessageRole::Tool` result messages are
+    /// understood by the provider in context. Empty for all other roles.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ToolCall>,
 }
 
 /// A tool the LLM may call. `schema` must be a valid JSON Schema object.
