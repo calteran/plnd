@@ -54,13 +54,13 @@ impl UseCase {
 ///
 /// Constructed by the caller before invoking [`AgentService::run`]. The
 /// `user_id` comes from the authenticated session — never from the LLM.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentContext {
     /// Authenticated user making the request.
     pub user_id: uuid::Uuid,
     /// Which use case this run executes.
     pub use_case: UseCase,
-    /// Raw user input, wrapped in `<user_input>` delimiters by the agent runner.
+    /// Raw user input that will be wrapped in `<user_input>` delimiters by the agent runner.
     pub input: String,
     /// Optional memory block injected into the system prompt preamble.
     pub memory_context: Option<String>,
