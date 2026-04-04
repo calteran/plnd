@@ -19,15 +19,19 @@ pub struct OpenAiCompatibleProvider {
 }
 
 impl OpenAiCompatibleProvider {
-    pub fn new(base_url: &str, api_key: &str, model: impl Into<String>) -> Result<Self, LlmError> {
+    pub fn new(
+        base_url: impl Into<String>,
+        api_key: impl Into<String>,
+        model: impl Into<String>,
+    ) -> Self {
         let config = OpenAIConfig::new()
-            .with_api_base(base_url)
-            .with_api_key(api_key);
+            .with_api_base(base_url.into())
+            .with_api_key(api_key.into());
         let client = Client::with_config(config);
-        Ok(Self {
+        Self {
             client,
             model: model.into(),
-        })
+        }
     }
 }
 
@@ -95,7 +99,14 @@ impl LlmProvider for OpenAiCompatibleProvider {
             .chat()
             .create(oai_request)
             .await
-            .map_err(|e| LlmError::Http(e.to_string()))?;
+            .map_err(|e| match e {
+                async_openai::error::OpenAIError::ApiError(ae) => LlmError::Api {
+                    // HTTP status is not preserved in OpenAIError::ApiError
+                    status: 0,
+                    message: ae.to_string(),
+                },
+                other => LlmError::Http(other.to_string()),
+            })?;
 
         let choice = response
             .choices
