@@ -1,0 +1,19 @@
+# Compose override for local LLM development.
+# Use via: just dev-llm
+# Overrides the api service's LLM config to point at the local Ollama container.
+# Models default to phi3 (fast) and llama3.2 (capable) but can be overridden via
+# OLLAMA_FAST_MODEL and OLLAMA_CAPABLE_MODEL environment variables.
+services:
+  api:
+    environment:
+      - APP_LLM__FAST__PROVIDER=openai_compat
+      - APP_LLM__FAST__BASE_URL=http://ollama:11434/v1
+      - APP_LLM__FAST__MODEL=${OLLAMA_FAST_MODEL:-phi3}
+      - APP_LLM__FAST__API_KEY=
+      - APP_LLM__CAPABLE__PROVIDER=openai_compat
+      - APP_LLM__CAPABLE__BASE_URL=http://ollama:11434/v1
+      - APP_LLM__CAPABLE__MODEL=${OLLAMA_CAPABLE_MODEL:-llama3.2}
+      - APP_LLM__CAPABLE__API_KEY=
+    depends_on:
+      ollama:
+        condition: service_healthy
