@@ -428,3 +428,300 @@ async fn ensure_forked(
 
     Ok(Some(new_ud_id))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::users;
+
+    /// Helper: create a throwaway user and return its UUID.
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    // -----------------------------------------------------------------------
+    // create_from_scratch
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_from_scratch_returns_detail(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let pref = create_from_scratch(
+            &pool,
+            uid,
+            "Test Dish",
+            Some("instructions"),
+            Some(10),
+            Some(20),
+        )
+        .await
+        .expect("create_from_scratch failed");
+
+        assert_eq!(pref.user_id, uid);
+        assert_eq!(pref.name, "Test Dish");
+        assert_eq!(pref.source, "personal");
+        assert!(pref.has_personal_recipe);
+        assert!(pref.user_dish_id.is_some());
+        assert!(pref.catalog_dish_id.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // list
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn list_returns_created_dish(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid_a, "Listed Dish", None, None, None)
+            .await
+            .unwrap();
+        // Create a pref for a second user — must not appear in uid_a's list
+        create_from_scratch(&pool, uid_b, "Other User Dish", None, None, None)
+            .await
+            .unwrap();
+
+        let results = list(&pool, uid_a).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].user_dish_pref_id, pref.user_dish_pref_id);
+    }
+
+    // -----------------------------------------------------------------------
+    // get
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_returns_dish(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid, "Get Dish", None, None, None)
+            .await
+            .unwrap();
+
+        let found = get(&pool, uid, pref.user_dish_pref_id).await.unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().user_dish_pref_id, pref.user_dish_pref_id);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_returns_none_for_wrong_user(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid_a, "Private Dish", None, None, None)
+            .await
+            .unwrap();
+
+        let found = get(&pool, uid_b, pref.user_dish_pref_id).await.unwrap();
+        assert!(found.is_none());
+    }
+
+    // -----------------------------------------------------------------------
+    // update_metadata
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_metadata_sets_rating_and_flags(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid, "Rated Dish", None, None, None)
+            .await
+            .unwrap();
+
+        let updated = update_metadata(
+            &pool,
+            uid,
+            pref.user_dish_pref_id,
+            Some(Some(5)),
+            Some(true),
+            Some(false),
+            Some(Some("comfort food".to_string())),
+        )
+        .await
+        .unwrap();
+
+        let updated = updated.expect("update returned None");
+        assert_eq!(updated.rating, Some(5));
+        assert!(updated.is_safe_food);
+        assert!(!updated.is_blocked);
+        assert_eq!(updated.notes.as_deref(), Some("comfort food"));
+    }
+
+    // -----------------------------------------------------------------------
+    // fork_and_update_recipe
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn fork_and_update_recipe_returns_updated(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid, "Original Dish", None, Some(5), None)
+            .await
+            .unwrap();
+
+        let updated = fork_and_update_recipe(
+            &pool,
+            uid,
+            pref.user_dish_pref_id,
+            Some("Updated Dish"),
+            Some("New instructions"),
+            Some(15),
+            Some(30),
+        )
+        .await
+        .unwrap();
+
+        let updated = updated.expect("fork_and_update_recipe returned None");
+        assert_eq!(updated.name, "Updated Dish");
+        assert!(updated.has_personal_recipe);
+        // user_dish_id must not change (no new fork was needed)
+        assert_eq!(updated.user_dish_id, pref.user_dish_id);
+
+        // Verify instructions and timing were persisted in user_dishes
+        let (instructions, prep_time, cook_time): (Option<String>, Option<i32>, Option<i32>) =
+            sqlx::query_as(
+                "SELECT instructions, prep_time_minutes, cook_time_minutes \
+                 FROM user_dishes WHERE user_dish_id = $1",
+            )
+            .bind(updated.user_dish_id.unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(instructions.as_deref(), Some("New instructions"));
+        assert_eq!(prep_time, Some(15));
+        assert_eq!(cook_time, Some(30));
+    }
+
+    // -----------------------------------------------------------------------
+    // add_ingredient / remove_ingredient
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn add_ingredient_links_ingredient(pool: PgPool) {
+        use rust_decimal::Decimal;
+
+        let uid = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid, "Dish With Ingredient", None, None, None)
+            .await
+            .unwrap();
+
+        // Seed a catalog ingredient via direct SQL
+        let (ingredient_id,): (Uuid,) = sqlx::query_as(
+            "INSERT INTO catalog_ingredients (name, allergens, occasion_tags) \
+             VALUES ('test ingredient', '{}', '{}') RETURNING ingredient_id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let params = AddIngredientParams {
+            ingredient_id,
+            quantity: Decimal::new(2, 0),
+            unit: "cups".to_string(),
+            preparation_note: None,
+            is_optional: false,
+            sort_order: 0,
+        };
+
+        let result = add_ingredient(&pool, uid, pref.user_dish_pref_id, params)
+            .await
+            .unwrap();
+        assert!(result.is_some());
+
+        let (linked_ingredient_id,): (Uuid,) = sqlx::query_as(
+            "SELECT ingredient_id FROM user_dish_ingredients WHERE user_dish_id = $1",
+        )
+        .bind(pref.user_dish_id.unwrap())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(linked_ingredient_id, ingredient_id);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn remove_ingredient_unlinks(pool: PgPool) {
+        use rust_decimal::Decimal;
+
+        let uid = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid, "Dish Lose Ingredient", None, None, None)
+            .await
+            .unwrap();
+
+        let (ingredient_id,): (Uuid,) = sqlx::query_as(
+            "INSERT INTO catalog_ingredients (name, allergens, occasion_tags) \
+             VALUES ('removable ingredient', '{}', '{}') RETURNING ingredient_id",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let params = AddIngredientParams {
+            ingredient_id,
+            quantity: Decimal::new(1, 0),
+            unit: "tbsp".to_string(),
+            preparation_note: None,
+            is_optional: false,
+            sort_order: 0,
+        };
+        add_ingredient(&pool, uid, pref.user_dish_pref_id, params)
+            .await
+            .unwrap();
+
+        let removed = remove_ingredient(&pool, uid, pref.user_dish_pref_id, ingredient_id)
+            .await
+            .unwrap();
+        assert_eq!(removed, Some(true));
+
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM user_dish_ingredients WHERE user_dish_id = $1")
+                .bind(pref.user_dish_id.unwrap())
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count.0, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // delete
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_returns_true(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid, "Dish To Delete", None, None, None)
+            .await
+            .unwrap();
+
+        let user_dish_id = pref.user_dish_id.unwrap();
+        let deleted = delete(&pool, uid, pref.user_dish_pref_id).await.unwrap();
+        assert!(deleted);
+
+        let found = get(&pool, uid, pref.user_dish_pref_id).await.unwrap();
+        assert!(found.is_none());
+
+        // The personal user_dish must also be deleted (cascade)
+        let dish_count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM user_dishes WHERE user_dish_id = $1")
+                .bind(user_dish_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(dish_count.0, 0);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_wrong_user_returns_false(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let pref = create_from_scratch(&pool, uid_a, "Dish Not Yours", None, None, None)
+            .await
+            .unwrap();
+
+        let deleted = delete(&pool, uid_b, pref.user_dish_pref_id).await.unwrap();
+        assert!(!deleted);
+    }
+}
