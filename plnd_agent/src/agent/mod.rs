@@ -2,7 +2,7 @@ use crate::config::LlmConfig;
 
 /// Thin service wrapper that holds LLM configuration.
 /// Full implementation added in Phase 3.2.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AgentService {
     pub config: LlmConfig,
 }
