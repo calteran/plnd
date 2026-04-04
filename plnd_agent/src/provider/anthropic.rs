@@ -111,7 +111,7 @@ impl LlmProvider for AnthropicProvider {
                     content: match m.content {
                         MessageContent::Text(t) => AnthropicMessageContent::Text(t),
                         MessageContent::ToolResults(_) => {
-                            AnthropicMessageContent::Text(String::new())
+                            unreachable!("User role should never carry ToolResults content")
                         }
                     },
                 },
@@ -120,7 +120,7 @@ impl LlmProvider for AnthropicProvider {
                     content: match m.content {
                         MessageContent::Text(t) => AnthropicMessageContent::Text(t),
                         MessageContent::ToolResults(_) => {
-                            AnthropicMessageContent::Text(String::new())
+                            unreachable!("Assistant role should never carry ToolResults content")
                         }
                     },
                 },

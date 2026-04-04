@@ -145,6 +145,11 @@ impl AgentLoop<'_> {
             }
         }
 
+        // If the loop exits because max_iterations was reached (rather than a
+        // natural end-turn or terminal tool), the last tool-result message was
+        // appended to history but the LLM never consumed it. This is intentional:
+        // the ceiling exists to prevent runaway loops, and the caller receives
+        // whatever content was last captured (possibly empty string).
         Ok(AgentOutput {
             content: last_content.unwrap_or_default(),
         })
@@ -263,7 +268,7 @@ impl AgentService {
         let agent_loop = AgentLoop {
             registry: &self.registry,
             tools: &tools,
-            max_iterations: 10,
+            max_iterations: 10, // TODO(#232): make configurable per use case
             max_tokens,
         };
 
@@ -477,8 +482,9 @@ mod tests {
         );
     }
 
-    /// Three slow tools each take 50 ms. Serial execution would take ~150 ms;
-    /// parallel execution should complete well under 120 ms.
+    /// One slow tool invoked three times in parallel — each call takes 50 ms.
+    /// Serial execution would take ~150 ms; parallel execution should complete
+    /// well under 120 ms.
     #[tokio::test]
     async fn test_tools_execute_in_parallel() {
         let tool_counter = Arc::new(AtomicUsize::new(0));

@@ -55,7 +55,9 @@ impl LlmProvider for OpenAiCompatibleProvider {
                 MessageRole::User => {
                     let text = match msg.content {
                         MessageContent::Text(t) => t,
-                        MessageContent::ToolResults(_) => String::new(),
+                        MessageContent::ToolResults(_) => {
+                            unreachable!("User role should never carry ToolResults content")
+                        }
                     };
                     messages.push(
                         ChatCompletionRequestUserMessageArgs::default()
@@ -68,7 +70,9 @@ impl LlmProvider for OpenAiCompatibleProvider {
                 MessageRole::Assistant => {
                     let text = match msg.content {
                         MessageContent::Text(t) => t,
-                        MessageContent::ToolResults(_) => String::new(),
+                        MessageContent::ToolResults(_) => {
+                            unreachable!("Assistant role should never carry ToolResults content")
+                        }
                     };
                     messages.push(
                         ChatCompletionRequestAssistantMessageArgs::default()
