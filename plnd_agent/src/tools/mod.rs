@@ -1,3 +1,6 @@
+pub mod memory;
+pub use memory::register_memory_tools;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
