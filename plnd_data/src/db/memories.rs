@@ -238,6 +238,20 @@ mod tests {
         assert!(matches!(err, DatabaseError::NotFound));
     }
 
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_cannot_touch_other_users_memory(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let mem = create_memory(&pool, uid_a, "food", "original", vec![])
+            .await
+            .unwrap();
+
+        let err = update_memory(&pool, mem.memory_id, uid_b, "hijacked")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DatabaseError::NotFound));
+    }
+
     // -----------------------------------------------------------------------
     // delete_memory
     // -----------------------------------------------------------------------
@@ -264,5 +278,20 @@ mod tests {
 
         delete_memory(&pool, mem.memory_id, uid).await.unwrap();
         delete_memory(&pool, mem.memory_id, uid).await.unwrap(); // second call must not error
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_cannot_touch_other_users_memory(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let mem = create_memory(&pool, uid_a, "food", "should survive", vec![])
+            .await
+            .unwrap();
+
+        // uid_b's delete is a silent no-op — the record must still exist for uid_a
+        delete_memory(&pool, mem.memory_id, uid_b).await.unwrap();
+
+        let remaining = get_memories(&pool, uid_a, &[]).await.unwrap();
+        assert_eq!(remaining.len(), 1);
     }
 }
