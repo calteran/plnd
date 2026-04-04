@@ -13,6 +13,7 @@ pub struct MockLlmProvider {
     responses: Mutex<VecDeque<Result<CompletionResponse, LlmError>>>,
     name: String,
     call_count: Arc<AtomicUsize>,
+    last_request: Arc<Mutex<Option<CompletionRequest>>>,
 }
 
 impl MockLlmProvider {
@@ -21,7 +22,14 @@ impl MockLlmProvider {
             responses: Mutex::new(VecDeque::new()),
             name: name.into(),
             call_count: Arc::new(AtomicUsize::new(0)),
+            last_request: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Returns a clone of the shared last-request handle so tests can inspect
+    /// the most recent `CompletionRequest` after the mock has been moved.
+    pub fn last_request_handle(&self) -> Arc<Mutex<Option<CompletionRequest>>> {
+        Arc::clone(&self.last_request)
     }
 
     pub fn push_response(&self, response: CompletionResponse) {
@@ -47,8 +55,9 @@ impl MockLlmProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for MockLlmProvider {
-    async fn complete(&self, _request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
+        *self.last_request.lock().unwrap() = Some(request);
         self.responses
             .lock()
             .unwrap()
