@@ -62,6 +62,7 @@ base_url = "https://api.anthropic.com"
 model = "claude-haiku-4-5-20251001"
 api_key = ""  # Set via APP_LLM__FAST__API_KEY (Doppler: plnd/dev)
 max_tokens = 1024
+max_iterations = 10
 
 [llm.capable]
 # High-capability model for complex reasoning (meal planning, full-day analysis).
@@ -70,3 +71,4 @@ base_url = "https://api.anthropic.com"
 model = "claude-opus-4-6"
 api_key = ""  # Set via APP_LLM__CAPABLE__API_KEY (Doppler: plnd/dev)
 max_tokens = 4096
+max_iterations = 10
