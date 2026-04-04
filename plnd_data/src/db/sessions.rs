@@ -65,3 +65,91 @@ pub async fn revoke(pool: &PgPool, jti: &str) -> Result<(), DatabaseError> {
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::users;
+
+    /// Helper: create a throwaway user and return its UUID.
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    // -----------------------------------------------------------------------
+    // create
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_returns_token(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let jti = Uuid::new_v4().to_string();
+
+        let token = create(&pool, uid, &jti, None, None)
+            .await
+            .expect("create failed");
+
+        assert!(!token.is_empty());
+        // Returned value must parse as a valid UUID
+        token.parse::<Uuid>().expect("token is not a valid UUID");
+    }
+
+    // -----------------------------------------------------------------------
+    // validate
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn validate_returns_true_for_active_session(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let jti = Uuid::new_v4().to_string();
+
+        create(&pool, uid, &jti, None, None).await.unwrap();
+
+        let valid = validate(&pool, &jti).await.unwrap();
+        assert!(valid);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn validate_returns_false_for_unknown_jti(pool: PgPool) {
+        let jti = Uuid::new_v4().to_string(); // never inserted
+
+        let valid = validate(&pool, &jti).await.unwrap();
+        assert!(!valid);
+    }
+
+    // -----------------------------------------------------------------------
+    // revoke
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn revoke_invalidates_session(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let jti = Uuid::new_v4().to_string();
+
+        create(&pool, uid, &jti, None, None).await.unwrap();
+        revoke(&pool, &jti).await.unwrap();
+
+        let valid = validate(&pool, &jti).await.unwrap();
+        assert!(!valid, "session should be invalid after revoke");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn revoke_unknown_jti_is_noop(pool: PgPool) {
+        let jti = Uuid::new_v4().to_string(); // never inserted
+        revoke(&pool, &jti)
+            .await
+            .expect("revoke of unknown JTI should not error");
+    }
+}

@@ -76,3 +76,98 @@ pub async fn create_weekly_plan_task(
 
     Ok(task)
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::users;
+    use chrono::NaiveDate;
+
+    /// Helper: create a throwaway user and return its UUID.
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    fn plan_start() -> NaiveDate {
+        NaiveDate::from_ymd_opt(2026, 5, 5).unwrap()
+    }
+
+    // -----------------------------------------------------------------------
+    // create_weekly_plan_task
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_weekly_plan_task_inserts_both_tables(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        let task = create_weekly_plan_task(&pool, uid, plan_start(), 0)
+            .await
+            .expect("create_weekly_plan_task failed");
+
+        // Verify Task fields
+        assert_eq!(task.user_id, uid);
+        assert_eq!(task.title, "Plan your week");
+        assert_eq!(task.task_type, "custom");
+        assert_eq!(task.energy_required, "low");
+        assert_eq!(task.status, "planned");
+
+        // Verify the generic_tasks row was inserted
+        let category: String =
+            sqlx::query_scalar("SELECT category FROM generic_tasks WHERE task_id = $1")
+                .bind(task.task_id)
+                .fetch_one(&pool)
+                .await
+                .expect("generic_tasks row not found");
+
+        assert_eq!(category, "weekly_plan");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_weekly_plan_task_is_idempotent(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        let first = create_weekly_plan_task(&pool, uid, plan_start(), 0)
+            .await
+            .unwrap();
+        let second = create_weekly_plan_task(&pool, uid, plan_start(), 0)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            first.task_id, second.task_id,
+            "second call must return the same task"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_weekly_plan_task_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+
+        let task_a = create_weekly_plan_task(&pool, uid_a, plan_start(), 0)
+            .await
+            .unwrap();
+        let task_b = create_weekly_plan_task(&pool, uid_b, plan_start(), 0)
+            .await
+            .unwrap();
+
+        assert_ne!(
+            task_a.task_id, task_b.task_id,
+            "users must get separate tasks"
+        );
+        assert_eq!(task_a.user_id, uid_a);
+        assert_eq!(task_b.user_id, uid_b);
+    }
+}
