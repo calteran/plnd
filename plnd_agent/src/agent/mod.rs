@@ -381,7 +381,9 @@ mod tests {
     use super::*;
     use crate::context::{AgentContext, UseCase};
     use crate::provider::mock::MockLlmProvider;
-    use crate::provider::{CompletionResponse, StopReason, ToolCall};
+    use crate::provider::{
+        CompletionResponse, LlmError, MessageContent, MessageRole, StopReason, ToolCall,
+    };
     use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
     // ── Test helpers ──────────────────────────────────────────────────────────
@@ -520,6 +522,33 @@ mod tests {
             _input: serde_json::Value,
         ) -> Result<serde_json::Value, ToolError> {
             panic!("deliberate test panic");
+        }
+    }
+
+    // ── FailTool: always returns ToolError::Execution ────────────────────────
+
+    struct FailTool;
+
+    #[async_trait::async_trait]
+    impl Tool for FailTool {
+        fn name(&self) -> &str {
+            "fail_tool"
+        }
+        fn description(&self) -> &str {
+            "Always fails with an execution error"
+        }
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({})
+        }
+        async fn execute(
+            &self,
+            _ctx: &ToolContext,
+            _input: serde_json::Value,
+        ) -> Result<serde_json::Value, ToolError> {
+            Err(ToolError::Execution {
+                tool: "fail_tool".to_string(),
+                reason: "boom".to_string(),
+            })
         }
     }
 
@@ -869,6 +898,179 @@ mod tests {
             text.as_str(),
             "<user_input>replace vacuum filter</user_input>",
             "user input must be wrapped in security delimiters"
+        );
+    }
+
+    // ── Error-path tests ──────────────────────────────────────────────────────
+
+    /// When the LLM provider returns an error, the loop must propagate it as
+    /// `AgentError::Llm` — not swallow or wrap it in some other variant.
+    #[tokio::test]
+    async fn test_llm_provider_error_propagates_as_agent_error_llm() {
+        let mock = MockLlmProvider::new("test");
+        mock.push_error(LlmError::Http("connection refused".to_string()));
+
+        let registry = make_registry(mock);
+        let tools = ToolRegistry::new();
+        let agent_loop = run_loop(&registry, &tools, 10);
+
+        let result = agent_loop
+            .run(
+                Uuid::nil(),
+                ProviderTier::Capable,
+                "sys".into(),
+                user_message("go"),
+            )
+            .await;
+
+        assert!(result.is_err(), "loop must fail when the LLM errors");
+        assert!(
+            matches!(result.unwrap_err(), AgentError::Llm(_)),
+            "error must be AgentError::Llm"
+        );
+    }
+
+    /// When a registered tool returns `Err(ToolError::Execution)`, the loop must
+    /// NOT treat it as a fatal error.  Instead it must serialize the error into a
+    /// tool-result message and pass it back to the LLM so the LLM can recover.
+    #[tokio::test]
+    async fn test_tool_execution_failure_sent_back_as_tool_result() {
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+
+        // First response: call the failing tool.
+        mock.push_response(CompletionResponse {
+            content: None,
+            tool_calls: vec![ToolCall {
+                id: "tc_fail".to_string(),
+                name: "fail_tool".to_string(),
+                arguments: serde_json::json!({}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        });
+        // Second response: LLM acknowledges and ends turn.
+        mock.push_response(CompletionResponse {
+            content: Some("recovered".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let registry = make_registry(mock);
+        let mut tools = ToolRegistry::new();
+        tools.register(Arc::new(FailTool));
+
+        let agent_loop = run_loop(&registry, &tools, 10);
+        let result = agent_loop
+            .run(
+                Uuid::nil(),
+                ProviderTier::Capable,
+                "sys".into(),
+                user_message("go"),
+            )
+            .await;
+
+        assert!(result.is_ok(), "tool execution error must not be fatal");
+
+        // The second LLM request must contain the tool-result message with the
+        // serialized error so the LLM could reason about the failure.
+        let req = last_request.lock().unwrap();
+        let messages = &req.as_ref().unwrap().messages;
+        let tool_msg = messages
+            .iter()
+            .find(|m| m.role == MessageRole::Tool)
+            .expect("a Tool-role message must be present in the second request");
+        let MessageContent::ToolResults(ref parts) = tool_msg.content else {
+            panic!("Tool message must have ToolResults content");
+        };
+        assert_eq!(parts.len(), 1);
+        assert!(
+            parts[0].content.contains("boom"),
+            "tool result must contain the execution error reason; got: {}",
+            parts[0].content
+        );
+    }
+
+    /// When the LLM calls a tool that is not registered, the loop must NOT crash.
+    /// Instead it must return a `ToolError::NotFound` result to the LLM so it can
+    /// recover, then continue the loop normally.
+    #[tokio::test]
+    async fn test_unregistered_tool_call_returns_not_found_in_tool_result() {
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+
+        // First response: call a tool that was never registered.
+        mock.push_response(CompletionResponse {
+            content: None,
+            tool_calls: vec![ToolCall {
+                id: "tc_ghost".to_string(),
+                name: "ghost_tool".to_string(),
+                arguments: serde_json::json!({}),
+            }],
+            stop_reason: StopReason::ToolUse,
+        });
+        // Second response: LLM ends turn after receiving the error.
+        mock.push_response(CompletionResponse {
+            content: Some("done".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let registry = make_registry(mock);
+        let tools = ToolRegistry::new(); // no tools registered
+
+        let agent_loop = run_loop(&registry, &tools, 10);
+        let result = agent_loop
+            .run(
+                Uuid::nil(),
+                ProviderTier::Capable,
+                "sys".into(),
+                user_message("go"),
+            )
+            .await;
+
+        assert!(result.is_ok(), "unknown tool call must not be fatal");
+
+        let req = last_request.lock().unwrap();
+        let messages = &req.as_ref().unwrap().messages;
+        let tool_msg = messages
+            .iter()
+            .find(|m| m.role == MessageRole::Tool)
+            .expect("a Tool-role message must be present in the second request");
+        let MessageContent::ToolResults(ref parts) = tool_msg.content else {
+            panic!("Tool message must have ToolResults content");
+        };
+        assert_eq!(parts.len(), 1);
+        assert!(
+            parts[0].content.contains("ghost_tool"),
+            "tool result must identify the missing tool by name; got: {}",
+            parts[0].content
+        );
+    }
+
+    /// When the `ProviderRegistry` has no entry for the requested tier, the loop
+    /// must return `AgentError::NoProvider` immediately — before any LLM call.
+    #[tokio::test]
+    async fn test_no_provider_for_tier_returns_agent_error_no_provider() {
+        let registry = ProviderRegistry::new(); // intentionally empty
+        let tools = ToolRegistry::new();
+
+        let agent_loop = run_loop(&registry, &tools, 10);
+        let result = agent_loop
+            .run(
+                Uuid::nil(),
+                ProviderTier::Capable,
+                "sys".into(),
+                user_message("go"),
+            )
+            .await;
+
+        assert!(result.is_err(), "missing provider must be an error");
+        assert!(
+            matches!(
+                result.unwrap_err(),
+                AgentError::NoProvider(ProviderTier::Capable)
+            ),
+            "error must be AgentError::NoProvider(Capable)"
         );
     }
 }
