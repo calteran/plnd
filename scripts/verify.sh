@@ -180,12 +180,7 @@ run_job "ng test" "$PROJECT_ROOT/plnd_client" \
 # ── Cargo build (critical path — gates nextest, clippy, and e2e) ───────────────
 run_sync "cargo build" "$PROJECT_ROOT" cargo build --workspace
 
-# ── Post-build: nextest → clippy (sequential within, parallel with e2e) ────────
-run_job "nextest → clippy" "$PROJECT_ROOT" bash -c \
-    "cargo nextest run --workspace && \
-     cargo clippy --workspace --all-targets --all-features -- -D warnings"
-
-# ── E2E gate: wait for services, start API, run e2e ───────────────────────────
+# ── Services must be healthy before nextest — sqlx::test creates per-test DBs ──
 wait_for_services() {
     timeout 30s bash -c \
         "until docker exec $VERIFY_DB_NAME pg_isready -U plnd 2>/dev/null; do sleep 1; done"
@@ -194,6 +189,15 @@ wait_for_services() {
          > /dev/null 2>&1; do sleep 1; done'
 }
 run_sync "services healthy" "$PROJECT_ROOT" wait_for_services
+
+# ── Post-build: nextest → clippy (sequential within, parallel with e2e) ────────
+# DATABASE_URL is required by sqlx::test to create isolated per-test databases.
+run_job "nextest → clippy" "$PROJECT_ROOT" bash -c \
+    "DATABASE_URL='postgres://plnd:${VERIFY_DB_PASS}@localhost:5432/plnd_dev' \
+     cargo nextest run --workspace && \
+     cargo clippy --workspace --all-targets --all-features -- -D warnings"
+
+# ── E2E gate: start API, run e2e (services already verified healthy above) ─────
 
 API_LOG=$(mktemp /tmp/plnd-verify-api-XXXXXX)
 cd "$PROJECT_ROOT/plnd_api"

@@ -61,6 +61,8 @@ jobs:
 
       - name: Run tests
         run: cargo nextest run --workspace
+        env:
+          DATABASE_URL: postgres://plnd:plnd_dev@localhost/plnd_dev
 
       - name: Upload API binary
         uses: actions/upload-artifact@v7
