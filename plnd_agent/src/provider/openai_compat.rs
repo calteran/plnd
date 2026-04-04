@@ -1,10 +1,11 @@
 use async_openai::{
     config::OpenAIConfig,
     types::{
-        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestToolMessageArgs,
-        ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionToolType,
-        CreateChatCompletionRequestArgs, FunctionObject,
+        ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessageArgs,
+        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
+        ChatCompletionRequestToolMessageArgs, ChatCompletionRequestUserMessageArgs,
+        ChatCompletionTool, ChatCompletionToolType, CreateChatCompletionRequestArgs, FunctionCall,
+        FunctionObject,
     },
     Client,
 };
@@ -74,9 +75,29 @@ impl LlmProvider for OpenAiCompatibleProvider {
                             unreachable!("Assistant role should never carry ToolResults content")
                         }
                     };
+                    let mut builder = ChatCompletionRequestAssistantMessageArgs::default();
+                    if !text.is_empty() {
+                        builder.content(text);
+                    }
+                    if !msg.tool_calls.is_empty() {
+                        // OpenAI requires the assistant's tool calls to be echoed back
+                        // so that the following tool-result messages are understood.
+                        let oai_calls: Vec<ChatCompletionMessageToolCall> = msg
+                            .tool_calls
+                            .into_iter()
+                            .map(|tc| ChatCompletionMessageToolCall {
+                                id: tc.id,
+                                r#type: ChatCompletionToolType::Function,
+                                function: FunctionCall {
+                                    name: tc.name,
+                                    arguments: tc.arguments.to_string(),
+                                },
+                            })
+                            .collect();
+                        builder.tool_calls(oai_calls);
+                    }
                     messages.push(
-                        ChatCompletionRequestAssistantMessageArgs::default()
-                            .content(text)
+                        builder
                             .build()
                             .map_err(|e| LlmError::Configuration(e.to_string()))?
                             .into(),

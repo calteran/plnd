@@ -44,6 +44,17 @@ struct ToolResult {
     result: Result<serde_json::Value, ToolError>,
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/// Convert a `serde_json::Value` to a string without double-quoting plain
+/// string values. `Value::String("ok")` → `"ok"`, not `"\"ok\""`.
+fn json_to_string(v: serde_json::Value) -> String {
+    match v {
+        serde_json::Value::String(s) => s,
+        other => other.to_string(),
+    }
+}
+
 // ── AgentLoop ─────────────────────────────────────────────────────────────────
 
 /// Core agentic loop: LLM call → parallel tool execution → append results →
@@ -90,10 +101,13 @@ impl AgentLoop<'_> {
                 }
             }
 
-            // Record the assistant turn in history.
+            // Record the assistant turn in history, including any tool calls so
+            // that subsequent tool-result messages are understood in context by
+            // both Anthropic and OpenAI APIs.
             messages.push(Message {
                 role: MessageRole::Assistant,
                 content: MessageContent::Text(response.content.clone().unwrap_or_default()),
+                tool_calls: response.tool_calls.clone(),
             });
 
             // No tool calls → natural end turn.
@@ -116,7 +130,7 @@ impl AgentLoop<'_> {
             if let Some(ref term_id) = terminal_call_id {
                 if let Some(tr) = tool_results.iter().find(|r| &r.tool_call_id == term_id) {
                     if let Ok(ref val) = tr.result {
-                        last_content = Some(val.to_string());
+                        last_content = Some(json_to_string(val.clone()));
                     }
                 }
             }
@@ -128,7 +142,7 @@ impl AgentLoop<'_> {
                 .map(|tr| ToolResultPart {
                     tool_call_id: tr.tool_call_id,
                     content: match tr.result {
-                        Ok(val) => val.to_string(),
+                        Ok(val) => json_to_string(val),
                         Err(e) => serde_json::json!({ "error": e.to_string() }).to_string(),
                     },
                 })
@@ -137,6 +151,7 @@ impl AgentLoop<'_> {
             messages.push(Message {
                 role: MessageRole::Tool,
                 content: MessageContent::ToolResults(parts),
+                tool_calls: vec![],
             });
 
             // Terminal tool was in the batch → stop after executing everything.
@@ -263,6 +278,7 @@ impl AgentService {
         let initial_messages = vec![Message {
             role: MessageRole::User,
             content: MessageContent::Text(wrapped),
+            tool_calls: vec![],
         }];
 
         let agent_loop = AgentLoop {
@@ -345,6 +361,7 @@ mod tests {
         vec![Message {
             role: MessageRole::User,
             content: MessageContent::Text(text.to_string()),
+            tool_calls: vec![],
         }]
     }
 

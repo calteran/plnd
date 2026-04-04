@@ -73,6 +73,7 @@ mod tests {
             messages: vec![Message {
                 role: MessageRole::User,
                 content: MessageContent::Text("test".to_string()),
+                tool_calls: vec![],
             }],
             tools: vec![],
             max_tokens: 100,

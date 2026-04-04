@@ -98,6 +98,13 @@ impl From<&str> for MessageContent {
 pub struct Message {
     pub role: MessageRole,
     pub content: MessageContent,
+    /// Tool calls made by the assistant in this turn.
+    ///
+    /// Must be populated on `MessageRole::Assistant` messages that contain tool
+    /// calls so that subsequent `MessageRole::Tool` result messages are
+    /// understood by the provider in context. Empty for all other roles.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_calls: Vec<ToolCall>,
 }
 
 /// A tool the LLM may call. `schema` must be a valid JSON Schema object.
