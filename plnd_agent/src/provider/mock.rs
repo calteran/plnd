@@ -4,10 +4,9 @@ use std::sync::{
     Arc, Mutex,
 };
 
-use super::{
-    CompletionRequest, CompletionResponse, LlmError, LlmProvider, Message, MessageContent,
-    MessageRole, StopReason, ToolCall,
-};
+use super::{CompletionRequest, CompletionResponse, LlmError, LlmProvider};
+#[cfg(test)]
+use super::{Message, MessageContent, MessageRole, StopReason, ToolCall};
 
 pub struct MockLlmProvider {
     responses: Mutex<VecDeque<Result<CompletionResponse, LlmError>>>,

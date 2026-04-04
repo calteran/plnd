@@ -32,7 +32,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 governor = "0.10"
 
 [dev-dependencies]
-tokio = { version = "1", features = ["full", "test-util"] }
+tokio      = { version = "1", features = ["full", "test-util"] }
+plnd_agent = { path = "../plnd_agent", features = ["test-utils"] }
 
 
 [package.metadata.nextest]
