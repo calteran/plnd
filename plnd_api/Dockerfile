@@ -5,6 +5,7 @@ WORKDIR /app
 COPY Cargo.toml .
 COPY plnd_api plnd_api
 COPY plnd_data plnd_data
+COPY plnd_agent plnd_agent
 COPY plnd_seed plnd_seed
 COPY config/api /app/config/api
 

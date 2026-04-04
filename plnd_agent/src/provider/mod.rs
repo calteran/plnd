@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 pub mod anthropic;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-utils"))]
 pub mod mock;
 pub mod openai_compat;
 
