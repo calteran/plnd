@@ -836,10 +836,15 @@ mod tests {
 
     // ── Helpers for DB-backed tests ───────────────────────────────────────────
 
-    /// Connect to the test DB from `DATABASE_URL`, or return `None` to skip.
+    /// Connect to the test DB from `DATABASE_URL`, run migrations, or return
+    /// `None` to skip the test.
     async fn test_db() -> Option<plnd_data::db::Database> {
         let url = std::env::var("DATABASE_URL").ok()?;
-        plnd_data::db::Database::new(&url, 1).await.ok()
+        let db = plnd_data::db::Database::new(&url, 1).await.ok()?;
+        plnd_data::db::connection::run_migrations(db.get_pool())
+            .await
+            .ok()?;
+        Some(db)
     }
 
     /// Create a throwaway user and return its UUID.
