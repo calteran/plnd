@@ -210,8 +210,7 @@ impl AgentLoop<'_> {
                 Ok(tr) => results.push(tr),
                 Err(e) => {
                     let call_id = call_id_map
-                        .get(&e.id())
-                        .cloned()
+                        .remove(&e.id())
                         .unwrap_or_else(|| "unknown".to_string());
                     results.push(ToolResult {
                         tool_call_id: call_id,
