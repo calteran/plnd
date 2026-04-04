@@ -11,13 +11,17 @@ ollama serve &
 SERVER_PID=$!
 
 echo "-> Waiting for Ollama to start..."
-until curl -sf http://localhost:11434/api/tags > /dev/null 2>&1; do
+until ollama list > /dev/null 2>&1; do
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    echo "Ollama server failed to start" >&2
+    exit 1
+  fi
   sleep 1
 done
 
 pull_if_missing() {
   local model="$1"
-  if ollama list | grep -q "^${model}"; then
+  if ollama list | awk 'NR>1 {print $1}' | grep -qx "${model}\(:latest\)\?"; then
     echo "-> Model already cached: $model"
   else
     echo "-> Pulling model: $model"
