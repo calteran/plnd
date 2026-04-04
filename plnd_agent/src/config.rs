@@ -10,6 +10,7 @@ pub struct LlmModelConfig {
     pub base_url: String,
     pub model: String,
     pub api_key: String,
+    #[serde(default = "default_max_tokens")]
     pub max_tokens: u32,
     #[serde(default = "default_max_iterations")]
     pub max_iterations: u32,
@@ -21,6 +22,10 @@ pub struct LlmModelConfig {
 pub struct LlmConfig {
     pub fast: LlmModelConfig,
     pub capable: LlmModelConfig,
+}
+
+fn default_max_tokens() -> u32 {
+    1024
 }
 
 #[cfg(test)]
@@ -39,5 +44,18 @@ mod tests {
         "#;
         let config: LlmModelConfig = toml::from_str(toml_str).unwrap();
         assert_eq!(config.max_iterations, 10);
+    }
+
+    #[test]
+    fn test_max_tokens_serde_default() {
+        let toml = r#"
+            provider = "openai"
+            base_url = "https://api.openai.com/v1"
+            model = "gpt-4o"
+            api_key = "sk-test"
+        "#;
+        let config: LlmModelConfig =
+            toml::from_str(toml).expect("should deserialize without max_tokens");
+        assert_eq!(config.max_tokens, 1024);
     }
 }
