@@ -14,8 +14,8 @@ pub async fn create_memory(
     tags: Vec<String>,
 ) -> Result<UserMemory, DatabaseError> {
     sqlx::query_as::<_, UserMemory>(
-        "INSERT INTO user_memories (memory_id, user_id, category, content, tags)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4)
+        "INSERT INTO user_memories (user_id, category, content, tags)
+         VALUES ($1, $2, $3, $4)
          RETURNING memory_id, user_id, category, content, tags, created_at, updated_at",
     )
     .bind(user_id)
