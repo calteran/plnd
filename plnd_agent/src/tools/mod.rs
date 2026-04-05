@@ -1,6 +1,9 @@
 pub mod memory;
 pub use memory::register_memory_tools;
 
+pub mod schedule;
+pub use schedule::register_schedule_tools;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 

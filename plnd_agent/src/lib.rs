@@ -7,4 +7,6 @@ pub mod tools;
 pub use agent::{AgentError, AgentOutput, AgentService};
 pub use config::LlmConfig;
 pub use context::{AgentContext, UseCase};
-pub use tools::{register_memory_tools, Tool, ToolContext, ToolError, ToolRegistry};
+pub use tools::{
+    register_memory_tools, register_schedule_tools, Tool, ToolContext, ToolError, ToolRegistry,
+};
