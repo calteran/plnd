@@ -125,6 +125,9 @@ pub async fn create_user_task(
 /// Applies time-of-day heuristics: `high` → 9 am UTC, `medium` → 10 am UTC, `low` → 1 pm UTC.
 /// Scans `schedule_entries` for conflicts, checking up to 14 days forward from `after`.
 /// Returns `(slot_start, slot_end)` for the first conflict-free slot found.
+///
+/// Only the preferred hour is tried per day — if that slot has a conflict, the entire
+/// day is skipped and the heuristic hour on the next day is tried.
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "find_free_slot"))]
 pub async fn find_free_slot(
     pool: &PgPool,
@@ -135,8 +138,13 @@ pub async fn find_free_slot(
 ) -> Result<(DateTime<Utc>, DateTime<Utc>), DatabaseError> {
     let preferred_hour: u32 = match energy_level {
         "high" => 9,
+        "medium" => 10,
         "low" => 13,
-        _ => 10, // medium and any unknown value
+        other => {
+            return Err(DatabaseError::QueryError(format!(
+                "invalid energy_level: {other}"
+            )))
+        }
     };
 
     let duration = Duration::minutes(duration_minutes as i64);
@@ -163,13 +171,13 @@ pub async fn find_free_slot(
             "SELECT COUNT(*) FROM schedule_entries
              WHERE user_id = $1
                AND date = $2
-               AND scheduled_start < $4
-               AND (scheduled_end IS NULL OR scheduled_end > $3)",
+               AND scheduled_start < $3
+               AND (scheduled_end IS NULL OR scheduled_end > $4)",
         )
         .bind(user_id)
         .bind(candidate_date)
-        .bind(candidate_start)
         .bind(candidate_end)
+        .bind(candidate_start)
         .fetch_one(pool)
         .await
         .map_err(DatabaseError::from)?;
@@ -391,6 +399,34 @@ mod tests {
 
         assert!(start >= after, "slot must not be before `after`");
         assert_eq!(end - start, Duration::minutes(30));
+        assert_eq!(start.hour(), 10, "medium energy should prefer 10am");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_free_slot_skips_conflicting_day(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        // Insert a conflict at the 10am medium-energy slot on May 10
+        let conflict_start = Utc.with_ymd_and_hms(2026, 5, 10, 10, 0, 0).unwrap();
+        let conflict_end = Utc.with_ymd_and_hms(2026, 5, 10, 10, 30, 0).unwrap();
+        sqlx::query(
+            "INSERT INTO schedule_entries (user_id, task_type, date, scheduled_start, scheduled_end, status)
+             VALUES ($1, 'custom', $2, $3, $4, 'planned')",
+        )
+        .bind(uid)
+        .bind(chrono::NaiveDate::from_ymd_opt(2026, 5, 10).unwrap())
+        .bind(conflict_start)
+        .bind(conflict_end)
+        .execute(&pool)
+        .await
+        .expect("failed to insert conflict");
+
+        let after = Utc.with_ymd_and_hms(2026, 5, 10, 8, 0, 0).unwrap();
+        let (start, _) = find_free_slot(&pool, uid, "medium", 30, after)
+            .await
+            .expect("find_free_slot failed");
+
+        // May 10 is blocked — slot must fall on May 11 at 10am
+        assert_eq!(start, Utc.with_ymd_and_hms(2026, 5, 11, 10, 0, 0).unwrap());
     }
 
     #[sqlx::test(migrations = "./migrations")]
