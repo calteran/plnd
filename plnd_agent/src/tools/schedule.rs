@@ -279,8 +279,8 @@ impl Tool for RequestClarificationTool {
 
     fn description(&self) -> &str {
         "Signal that required task fields are missing and surface them to the user. \
-         Call this instead of create_task when you cannot confidently determine all \
-         required task properties (e.g. duration_minutes is completely unknown). \
+         Call this instead of create_task when any required task property cannot be \
+         confidently inferred from the input or prior context. \
          This is a terminal tool — calling it ends the agent loop."
     }
 
@@ -311,7 +311,10 @@ impl Tool for RequestClarificationTool {
             .get("ui_signals")
             .and_then(|v| v.as_array())
             .cloned()
-            .unwrap_or_default();
+            .ok_or_else(|| ToolError::InvalidInput {
+                tool: self.name().to_string(),
+                reason: "missing required field 'ui_signals'".to_string(),
+            })?;
 
         Ok(serde_json::json!({
             "actions_taken": [],
