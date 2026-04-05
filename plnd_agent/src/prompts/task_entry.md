@@ -83,18 +83,16 @@ Set `confirmation` to a short, friendly summary of what was scheduled — derive
 
 ## Structured output
 
-Your final response must be a JSON object with exactly this shape:
+The terminal tools (`create_task` and `request_clarification`) produce the final API response directly — you do not construct this JSON yourself. This section documents the expected response shape for reference:
 
 ```json
 {
   "actions_taken": [
-    { "type": "task_created", "task_id": "<uuid from create_task>", "scheduled_at": "<ISO 8601 from find_schedule_slot>" }
+    { "type": "task_created", "task_id": "<DB-generated UUID>", "scheduled_at": "<ISO 8601>" }
   ],
   "ui_signals": [],
   "confirmation": "..."
 }
 ```
 
-- `actions_taken` — populate when `create_task` succeeds. Include the `task_id` returned by the tool and the `scheduled_at` from `find_schedule_slot`. Use an empty array when clarification was requested instead.
-- `ui_signals` — pass through unchanged from `request_clarification`, or `[]` when the task was created.
-- `confirmation` — empty string `""` when clarification is pending.
+Your only responsibility is to supply the correct tool arguments (especially `confirmation` for `create_task` and `ui_signals` for `request_clarification`). The tool handles `actions_taken` automatically using the database-returned `task_id`.

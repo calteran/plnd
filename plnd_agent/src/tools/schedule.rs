@@ -513,26 +513,4 @@ mod tests {
             assert_eq!(result["ui_signals"][0]["field"], "duration_minutes");
         });
     }
-
-    #[test]
-    fn create_task_output_shape_is_structured() {
-        // Pin the expected output shape for CreateTaskTool — actions_taken must
-        // be an array of objects with type/task_id/scheduled_at, not strings.
-        // (Integration test against a live DB lives in plnd_data; this pins the contract.)
-        let task_id = uuid::Uuid::new_v4();
-        let scheduled_at = "2026-04-05T20:00:00Z";
-        let output = serde_json::json!({
-            "actions_taken": [{
-                "type": "task_created",
-                "task_id": task_id,
-                "scheduled_at": scheduled_at
-            }],
-            "ui_signals": [],
-            "confirmation": "Test task scheduled for Sunday at 8:00 PM (30 min, low energy)."
-        });
-        let action = &output["actions_taken"][0];
-        assert_eq!(action["type"], "task_created");
-        assert!(action["task_id"].is_string());
-        assert!(action["scheduled_at"].is_string());
-    }
 }
