@@ -20,9 +20,8 @@ use crate::state::AppState;
     request_body = TaskEntryRequest,
     responses(
         (status = 200, description = "Task created", body = TaskEntryResponse),
-        (status = 400, description = "Bad request — agent output unparseable"),
         (status = 401, description = "Unauthorized"),
-        (status = 500, description = "Internal server error"),
+        (status = 500, description = "Internal server error — agent failure or unparseable output"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -50,14 +49,15 @@ pub async fn post_task(
         input,
     };
 
-    let output = state
-        .agent
-        .run(&ctx, tools)
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let output = state.agent.run(&ctx, tools).await.map_err(|e| {
+        tracing::error!(error = %e, "agent run failed");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
-    let response: TaskEntryResponse =
-        serde_json::from_str(&output.content).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let response: TaskEntryResponse = serde_json::from_str(&output.content).map_err(|e| {
+        tracing::error!(error = %e, content = %output.content, "failed to parse agent output");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     Ok(Json(response))
 }
