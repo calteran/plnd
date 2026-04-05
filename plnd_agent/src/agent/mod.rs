@@ -268,6 +268,8 @@ impl AgentService {
     /// - `tools` is the pre-populated tool registry for this use case.
     /// - `ctx.input` is wrapped in `<user_input>` XML delimiters before being sent
     ///   to the LLM, per the security spec.
+    /// - `ctx.prior_context`, if `Some`, is prepended *before* the `<user_input>` block
+    ///   so the model treats it as trusted system data rather than untrusted user input.
     /// - `ctx.memory_context`, if present, is prepended to the system prompt as a
     ///   `<memory>` block so the LLM has relevant user context before any tool calls.
     pub async fn run(
