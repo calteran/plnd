@@ -111,4 +111,32 @@ mod tests {
         assert_eq!(resp.ui_signals.len(), 0);
         assert!(!resp.confirmation.is_empty());
     }
+
+    #[test]
+    fn task_entry_request_context_is_optional() {
+        // Existing payloads without context must still deserialize
+        let json = r#"{"input": "take out trash"}"#;
+        let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.input, "take out trash");
+        assert!(req.context.is_none());
+    }
+
+    #[test]
+    fn task_entry_request_deserializes_with_context() {
+        let json = r#"{
+            "input": "book dentist",
+            "context": [
+                {
+                    "signals": [{"type": "show_select", "field": "duration_minutes"}],
+                    "answers": {"duration_minutes": 60}
+                }
+            ]
+        }"#;
+        let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.input, "book dentist");
+        let ctx = req.context.unwrap();
+        assert_eq!(ctx.len(), 1);
+        assert_eq!(ctx[0].signals.len(), 1);
+        assert_eq!(ctx[0].answers["duration_minutes"], 60);
+    }
 }

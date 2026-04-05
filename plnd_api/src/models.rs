@@ -91,9 +91,16 @@ pub struct PostSchedulePlanRequest {
 // Agent
 // ---------------------------------------------------------------------------
 
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ConversationTurn {
+    pub signals: Vec<serde_json::Value>,
+    pub answers: serde_json::Map<String, serde_json::Value>,
+}
+
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct TaskEntryRequest {
     pub input: String,
+    pub context: Option<Vec<ConversationTurn>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
