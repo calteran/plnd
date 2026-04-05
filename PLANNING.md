@@ -286,7 +286,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [ ] Angular: planning wizard with locked-slot model for user-pinned meals
 
 **Deliverables:**
-- [ ] Platform-independent LLM abstraction (`plnd_agent` crate)
+- [x] Platform-independent LLM abstraction (`plnd_agent` crate)
 - [ ] Intent-driven task entry with autonomous scheduling and UI signals
 - [ ] AI-powered weekly meal planning with iterative rebalancing
 - [x] User memory system
