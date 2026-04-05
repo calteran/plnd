@@ -80,3 +80,21 @@ Rules:
 ## confirmation
 
 Set `confirmation` to a short, friendly summary of what was scheduled — derive the day and time from the `find_schedule_slot` response. This string is shown directly to the user. Example: `"Replace vacuum filter scheduled for Tuesday at 10:00 AM (30 min, low energy)."`
+
+## Structured output
+
+Your final response must be a JSON object with exactly this shape:
+
+```json
+{
+  "actions_taken": [
+    { "type": "task_created", "task_id": "<uuid from create_task>", "scheduled_at": "<ISO 8601 from find_schedule_slot>" }
+  ],
+  "ui_signals": [],
+  "confirmation": "..."
+}
+```
+
+- `actions_taken` — populate when `create_task` succeeds. Include the `task_id` returned by the tool and the `scheduled_at` from `find_schedule_slot`. Use an empty array when clarification was requested instead.
+- `ui_signals` — pass through unchanged from `request_clarification`, or `[]` when the task was created.
+- `confirmation` — empty string `""` when clarification is pending.
