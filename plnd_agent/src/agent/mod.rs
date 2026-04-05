@@ -23,6 +23,9 @@ pub enum AgentError {
 
     #[error("Tool error: {0}")]
     Tool(#[from] ToolError),
+
+    #[error("Database error: {0}")]
+    Database(#[from] plnd_data::db::error::DatabaseError),
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────
@@ -238,12 +241,15 @@ impl AgentLoop<'_> {
 pub struct AgentService {
     pub config: LlmConfig,
     registry: Arc<ProviderRegistry>,
+    /// Database for loading user memories. `None` only in unit-test constructors
+    /// that do not exercise the memory-loading path.
+    db: Option<plnd_data::db::Database>,
 }
 
 impl AgentService {
     /// Build an `AgentService` from LLM configuration, eagerly constructing
     /// HTTP clients for each provider tier.
-    pub fn new(config: &LlmConfig) -> Self {
+    pub fn new(config: &LlmConfig, db: plnd_data::db::Database) -> Self {
         let mut registry = ProviderRegistry::new();
 
         registry.register(ProviderTier::Fast, build_provider(&config.fast));
@@ -252,6 +258,7 @@ impl AgentService {
         Self {
             config: config.clone(),
             registry: Arc::new(registry),
+            db: Some(db),
         }
     }
 
@@ -268,15 +275,37 @@ impl AgentService {
         ctx: &AgentContext,
         tools: ToolRegistry,
     ) -> Result<AgentOutput, AgentError> {
-        // Step 1: Load memories — no-op stub (filled in by Phase 3.1).
-        // When implemented: load from plnd_data filtered by use_case memory categories.
+        // Step 1: Load memories filtered by use case.
+        let memory_entries = if let Some(ref db) = self.db {
+            let memories = plnd_data::db::memories::get_memories(
+                db.get_pool(),
+                ctx.user_id,
+                ctx.use_case.memory_categories(),
+            )
+            .await?;
+            if memories.is_empty() {
+                None
+            } else {
+                Some(
+                    memories
+                        .iter()
+                        .map(|m| {
+                            format!("  <entry category=\"{}\">{}</entry>", m.category, m.content)
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                )
+            }
+        } else {
+            None
+        };
 
         // Step 2: Resolve system prompt.
         let base_system = ctx.use_case.system_prompt().to_string();
 
         // Step 3: Inject memories into system prompt preamble if present.
-        let system = match &ctx.memory_context {
-            Some(mem) => format!("<memory>\n{}\n</memory>\n\n{}", mem, base_system),
+        let system = match memory_entries {
+            Some(ref entries) => format!("<memory>\n{}\n</memory>\n\n{}", entries, base_system),
             None => base_system,
         };
 
@@ -339,6 +368,7 @@ impl std::fmt::Debug for AgentService {
         f.debug_struct("AgentService")
             .field("fast_provider", &self.config.fast.provider)
             .field("capable_provider", &self.config.capable.provider)
+            .field("db", &self.db.as_ref().map(|_| "<Database>"))
             .finish()
     }
 }
@@ -349,9 +379,8 @@ impl std::fmt::Debug for AgentService {
 impl AgentService {
     /// Test-only constructor that injects a pre-built registry.
     ///
-    /// Uses a config with `max_iterations = 10` so the agent loop actually runs.
-    /// (`LlmModelConfig::default()` returns `max_iterations = 10` via its explicit
-    /// `Default` impl; the field is set explicitly here for clarity.)
+    /// Sets `db = None` so memory loading is skipped. Use
+    /// `new_with_registry_and_db` for tests that exercise the memory path.
     fn new_with_registry(registry: ProviderRegistry) -> Self {
         use crate::config::LlmModelConfig;
         let model_cfg = LlmModelConfig {
@@ -365,6 +394,25 @@ impl AgentService {
                 capable: model_cfg,
             },
             registry: Arc::new(registry),
+            db: None,
+        }
+    }
+
+    /// Test-only constructor that exercises the memory-loading path.
+    fn new_with_registry_and_db(registry: ProviderRegistry, db: plnd_data::db::Database) -> Self {
+        use crate::config::LlmModelConfig;
+        let model_cfg = LlmModelConfig {
+            max_iterations: 10,
+            max_tokens: 1024,
+            ..LlmModelConfig::default()
+        };
+        Self {
+            config: crate::config::LlmConfig {
+                fast: model_cfg.clone(),
+                capable: model_cfg,
+            },
+            registry: Arc::new(registry),
+            db: Some(db),
         }
     }
 }
@@ -786,12 +834,56 @@ mod tests {
         );
     }
 
+    // ── Helpers for DB-backed tests ───────────────────────────────────────────
+
+    /// Connect to the test DB from `DATABASE_URL`, run migrations, or return
+    /// `None` to skip the test.
+    async fn test_db() -> Option<plnd_data::db::Database> {
+        let url = std::env::var("DATABASE_URL").ok()?;
+        let db = plnd_data::db::Database::new(&url, 1).await.ok()?;
+        plnd_data::db::connection::run_migrations(db.get_pool())
+            .await
+            .ok()?;
+        Some(db)
+    }
+
+    /// Create a throwaway user and return its UUID.
+    async fn new_user(db: &plnd_data::db::Database) -> Uuid {
+        plnd_data::db::users::create(
+            db.get_pool(),
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
     // ── AgentService::run — AgentContext wiring tests ─────────────────────────
 
-    /// When `memory_context` is `Some`, the system prompt sent to the LLM must
-    /// be prefixed with a `<memory>` block containing the memory text.
+    /// When the DB has memories for this user+use_case, the system prompt sent
+    /// to the LLM must be prefixed with a `<memory>` block containing the
+    /// matching entries.
+    ///
+    /// Requires `DATABASE_URL` to be set (provided by `just verify`).
     #[tokio::test]
     async fn test_memory_context_prepended_to_system_prompt() {
+        let db = match test_db().await {
+            Some(db) => db,
+            None => return, // skip when running without a DB
+        };
+        let user_id = new_user(&db).await;
+        plnd_data::db::memories::create_memory(
+            db.get_pool(),
+            user_id,
+            "habits",
+            "user prefers oat milk",
+            vec![],
+        )
+        .await
+        .expect("seed failed");
+
         let mock = MockLlmProvider::new("test");
         let last_request = mock.last_request_handle();
         mock.push_response(CompletionResponse {
@@ -800,13 +892,11 @@ mod tests {
             stop_reason: StopReason::EndTurn,
         });
 
-        let service = AgentService::new_with_registry(make_registry(mock));
-
+        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
         let ctx = AgentContext {
-            user_id: Uuid::nil(),
+            user_id,
             use_case: UseCase::TaskEntry,
             input: "add milk to grocery list".to_string(),
-            memory_context: Some("user prefers oat milk".to_string()),
         };
 
         let result = service.run(&ctx, ToolRegistry::new()).await;
@@ -828,10 +918,19 @@ mod tests {
         );
     }
 
-    /// When `memory_context` is `None`, the system prompt must be the raw use-case
-    /// prompt with no `<memory>` preamble.
+    /// When the DB has no memories for this user, the system prompt must be the
+    /// raw use-case prompt with no `<memory>` preamble.
+    ///
+    /// Requires `DATABASE_URL` to be set (provided by `just verify`).
     #[tokio::test]
-    async fn test_no_memory_context_omits_memory_block() {
+    async fn test_no_memories_omits_memory_block() {
+        let db = match test_db().await {
+            Some(db) => db,
+            None => return,
+        };
+        // Real user with no memories seeded.
+        let user_id = new_user(&db).await;
+
         let mock = MockLlmProvider::new("test");
         let last_request = mock.last_request_handle();
         mock.push_response(CompletionResponse {
@@ -840,13 +939,11 @@ mod tests {
             stop_reason: StopReason::EndTurn,
         });
 
-        let service = AgentService::new_with_registry(make_registry(mock));
-
+        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
         let ctx = AgentContext {
-            user_id: Uuid::nil(),
+            user_id,
             use_case: UseCase::TaskEntry,
             input: "add milk to grocery list".to_string(),
-            memory_context: None,
         };
 
         let result = service.run(&ctx, ToolRegistry::new()).await;
@@ -856,7 +953,7 @@ mod tests {
         let system = &req.as_ref().unwrap().system;
         assert!(
             !system.contains("<memory>"),
-            "system prompt must not contain <memory> block when memory_context is None"
+            "system prompt must not contain <memory> block when user has no memories"
         );
         assert_eq!(
             system.as_str(),
@@ -865,8 +962,116 @@ mod tests {
         );
     }
 
+    /// Task entry run must receive habits/schedule/energy memories but not food.
+    ///
+    /// Requires `DATABASE_URL` to be set (provided by `just verify`).
+    #[tokio::test]
+    async fn test_task_entry_injects_task_memories_not_food() {
+        let db = match test_db().await {
+            Some(db) => db,
+            None => return,
+        };
+        let user_id = new_user(&db).await;
+        for (cat, content) in [
+            ("habits", "wakes up at 7am"),
+            ("schedule", "productive in the mornings"),
+            ("energy", "low energy after lunch"),
+            ("food", "likes spicy food"),
+        ] {
+            plnd_data::db::memories::create_memory(db.get_pool(), user_id, cat, content, vec![])
+                .await
+                .expect("seed failed");
+        }
+
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+        mock.push_response(CompletionResponse {
+            content: Some("done".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        let ctx = AgentContext {
+            user_id,
+            use_case: UseCase::TaskEntry,
+            input: "add task".to_string(),
+        };
+
+        service.run(&ctx, ToolRegistry::new()).await.unwrap();
+
+        let req = last_request.lock().unwrap();
+        let system = &req.as_ref().unwrap().system;
+        assert!(system.contains("wakes up at 7am"), "habits memory missing");
+        assert!(
+            system.contains("productive in the mornings"),
+            "schedule memory missing"
+        );
+        assert!(
+            system.contains("low energy after lunch"),
+            "energy memory missing"
+        );
+        assert!(
+            !system.contains("likes spicy food"),
+            "food memory must not appear in TaskEntry run"
+        );
+    }
+
+    /// Meal planning run must receive food/habits memories but not schedule.
+    ///
+    /// Requires `DATABASE_URL` to be set (provided by `just verify`).
+    #[tokio::test]
+    async fn test_meal_planning_injects_meal_memories_not_schedule() {
+        let db = match test_db().await {
+            Some(db) => db,
+            None => return,
+        };
+        let user_id = new_user(&db).await;
+        for (cat, content) in [
+            ("food", "likes mediterranean cuisine"),
+            ("habits", "fridays = sandwich"),
+            ("schedule", "productive in the mornings"),
+        ] {
+            plnd_data::db::memories::create_memory(db.get_pool(), user_id, cat, content, vec![])
+                .await
+                .expect("seed failed");
+        }
+
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+        mock.push_response(CompletionResponse {
+            content: Some("done".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        let ctx = AgentContext {
+            user_id,
+            use_case: UseCase::MealPlanning,
+            input: "plan my meals".to_string(),
+        };
+
+        service.run(&ctx, ToolRegistry::new()).await.unwrap();
+
+        let req = last_request.lock().unwrap();
+        let system = &req.as_ref().unwrap().system;
+        assert!(
+            system.contains("likes mediterranean cuisine"),
+            "food memory missing"
+        );
+        assert!(
+            system.contains("fridays = sandwich"),
+            "habits memory missing"
+        );
+        assert!(
+            !system.contains("productive in the mornings"),
+            "schedule memory must not appear in MealPlanning run"
+        );
+    }
+
     /// User input must always be wrapped in `<user_input>` delimiters in the
-    /// first user message, regardless of memory context.
+    /// first user message.
     #[tokio::test]
     async fn test_user_input_wrapped_in_delimiter() {
         let mock = MockLlmProvider::new("test");
@@ -877,13 +1082,13 @@ mod tests {
             stop_reason: StopReason::EndTurn,
         });
 
+        // new_with_registry sets db = None, so memory loading is skipped.
         let service = AgentService::new_with_registry(make_registry(mock));
 
         let ctx = AgentContext {
             user_id: Uuid::nil(),
             use_case: UseCase::TaskEntry,
             input: "replace vacuum filter".to_string(),
-            memory_context: None,
         };
 
         let result = service.run(&ctx, ToolRegistry::new()).await;

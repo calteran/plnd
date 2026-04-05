@@ -36,6 +36,18 @@ impl UseCase {
         }
     }
 
+    /// Returns the memory categories to load from the DB for this use case.
+    ///
+    /// Memories are filtered to these categories before being injected into the
+    /// system prompt, keeping the context focused and relevant.
+    pub fn memory_categories(&self) -> &'static [&'static str] {
+        match self {
+            UseCase::TaskEntry => &["habits", "schedule", "energy"],
+            UseCase::MealPlanning => &["food", "habits"],
+            UseCase::MealRebalance => &["food", "habits"],
+        }
+    }
+
     /// Returns the [`ProviderTier`] to use for this use case.
     ///
     /// All current use cases require the Capable tier for complex reasoning.
@@ -62,8 +74,6 @@ pub struct AgentContext {
     pub use_case: UseCase,
     /// Raw user input that will be wrapped in `<user_input>` delimiters by the agent runner.
     pub input: String,
-    /// Optional memory block injected into the system prompt preamble.
-    pub memory_context: Option<String>,
 }
 
 #[cfg(test)]
@@ -101,6 +111,33 @@ mod tests {
     #[test]
     fn meal_rebalance_prompt_mentions_rebalance() {
         assert!(UseCase::MealRebalance.system_prompt().contains("rebalance"));
+    }
+
+    #[test]
+    fn task_entry_categories_exclude_food() {
+        let cats = UseCase::TaskEntry.memory_categories();
+        assert!(cats.contains(&"habits"), "TaskEntry must include habits");
+        assert!(
+            cats.contains(&"schedule"),
+            "TaskEntry must include schedule"
+        );
+        assert!(cats.contains(&"energy"), "TaskEntry must include energy");
+        assert!(!cats.contains(&"food"), "TaskEntry must not include food");
+    }
+
+    #[test]
+    fn meal_planning_categories_exclude_schedule() {
+        let cats = UseCase::MealPlanning.memory_categories();
+        assert!(cats.contains(&"food"), "MealPlanning must include food");
+        assert!(cats.contains(&"habits"), "MealPlanning must include habits");
+        assert!(
+            !cats.contains(&"schedule"),
+            "MealPlanning must not include schedule"
+        );
+        assert!(
+            !cats.contains(&"energy"),
+            "MealPlanning must not include energy"
+        );
     }
 
     #[test]
