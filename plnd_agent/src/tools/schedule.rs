@@ -267,6 +267,60 @@ impl Tool for CreateTaskTool {
     }
 }
 
+// ── RequestClarificationTool ──────────────────────────────────────────────────
+
+pub struct RequestClarificationTool;
+
+#[async_trait::async_trait]
+impl Tool for RequestClarificationTool {
+    fn name(&self) -> &str {
+        "request_clarification"
+    }
+
+    fn description(&self) -> &str {
+        "Signal that required task fields are missing and surface them to the user. \
+         Call this instead of create_task when you cannot confidently determine all \
+         required task properties (e.g. duration_minutes is completely unknown). \
+         This is a terminal tool — calling it ends the agent loop."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["ui_signals"],
+            "properties": {
+                "ui_signals": {
+                    "type": "array",
+                    "items": {},
+                    "description": "UI hints for fields that need user input."
+                }
+            }
+        })
+    }
+
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
+    async fn execute(
+        &self,
+        _ctx: &ToolContext,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        let ui_signals = input
+            .get("ui_signals")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        Ok(serde_json::json!({
+            "actions_taken": [],
+            "ui_signals": ui_signals,
+            "confirmation": ""
+        }))
+    }
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 /// Register both schedule tools into `registry`.
@@ -280,6 +334,7 @@ impl Tool for CreateTaskTool {
 pub fn register_schedule_tools(registry: &mut ToolRegistry, store: Arc<TaskStore>) {
     registry.register(Arc::new(FindScheduleSlotTool(store.clone())));
     registry.register(Arc::new(CreateTaskTool(store)));
+    registry.register(Arc::new(RequestClarificationTool));
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -397,5 +452,55 @@ mod tests {
         let schema = create_task_schema();
         assert!(schema_requires_field(&schema, "title"));
         assert!(schema_requires_field(&schema, "confirmation"));
+    }
+
+    fn clarification_schema() -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["ui_signals"],
+            "properties": {
+                "ui_signals": {
+                    "type": "array",
+                    "items": {},
+                    "description": "UI hints for fields that need user input."
+                }
+            }
+        })
+    }
+
+    #[test]
+    fn request_clarification_is_terminal() {
+        let tool = RequestClarificationTool;
+        assert!(tool.is_terminal());
+    }
+
+    #[test]
+    fn request_clarification_schema_has_no_user_id() {
+        let schema = clarification_schema();
+        assert!(!has_user_id_property(&schema));
+        assert!(!schema_requires_user_id(&schema));
+    }
+
+    #[test]
+    fn request_clarification_schema_requires_ui_signals() {
+        let schema = clarification_schema();
+        assert!(schema_requires_field(&schema, "ui_signals"));
+    }
+
+    #[test]
+    fn request_clarification_execute_returns_partial_response() {
+        use uuid::Uuid;
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let tool = RequestClarificationTool;
+            let ctx = ToolContext { user_id: Uuid::nil() };
+            let input = serde_json::json!({
+                "ui_signals": [{"type": "show_select", "field": "duration_minutes"}]
+            });
+            let result = tool.execute(&ctx, input).await.unwrap();
+            assert_eq!(result["confirmation"], "");
+            assert_eq!(result["actions_taken"], serde_json::json!([]));
+            assert_eq!(result["ui_signals"][0]["field"], "duration_minutes");
+        });
     }
 }
