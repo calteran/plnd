@@ -11,7 +11,7 @@ use crate::auth::jwt::Claims;
 use crate::models::{TaskEntryRequest, TaskEntryResponse};
 use crate::state::AppState;
 
-fn build_context_str(context: Option<&Vec<crate::models::ConversationTurn>>) -> String {
+fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> String {
     match context {
         Some(turns) if !turns.is_empty() => {
             let turns_xml: String = turns
@@ -63,7 +63,7 @@ pub async fn post_task(
     register_schedule_tools(&mut tools, task_store);
 
     let today = Utc::now().format("%Y-%m-%d");
-    let context_str = build_context_str(body.context.as_ref());
+    let context_str = build_context_str(body.context.as_deref());
     let input = format!("{context_str}[Today: {today}] {}", body.input);
 
     let ctx = AgentContext {
@@ -171,7 +171,7 @@ mod tests {
 
     #[test]
     fn build_context_str_empty_when_empty_vec() {
-        let result = super::build_context_str(Some(&vec![]));
+        let result = super::build_context_str(Some(&[]));
         assert_eq!(result, "");
     }
 
@@ -186,7 +186,8 @@ mod tests {
                 m
             },
         };
-        let result = super::build_context_str(Some(&vec![turn]));
+        let turns = [turn];
+        let result = super::build_context_str(Some(&turns));
         assert!(result.starts_with("<prior_context>"));
         assert!(result.contains("<turn index=\"1\">"));
         assert!(result.contains("<signals>"));
