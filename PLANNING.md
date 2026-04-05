@@ -267,11 +267,11 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] `UseCase` enum with prompt library and provider tier mapping
   - [x] LLM config section
 
-- [ ] **Phase 3.1 — Memory System**
-  - [ ] `user_memories` DB migration
-  - [ ] Memory CRUD in `plnd_data`
-  - [ ] Memory injection into agent context filtered by use case
-  - [ ] Memory tools: get, save, update, forget
+- [x] **Phase 3.1 — Memory System**
+  - [x] `user_memories` DB migration
+  - [x] Memory CRUD in `plnd_data`
+  - [x] Memory injection into agent context filtered by use case
+  - [x] Memory tools: get, save, update, forget
 
 - [ ] **Phase 3.2 — Task Entry**
   - [ ] Schedule tools: find slot, create task
@@ -289,7 +289,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 - [ ] Platform-independent LLM abstraction (`plnd_agent` crate)
 - [ ] Intent-driven task entry with autonomous scheduling and UI signals
 - [ ] AI-powered weekly meal planning with iterative rebalancing
-- [ ] User memory system
+- [x] User memory system
 
 ### Phase 3.5: Background Agent Jobs *(deferred)*
 **Goal**: Autonomous background agents for memory improvement and proactive insights; deployable as independent binaries separate from `plnd_api`
