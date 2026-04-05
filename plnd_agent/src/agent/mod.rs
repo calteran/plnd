@@ -268,6 +268,8 @@ impl AgentService {
     /// - `tools` is the pre-populated tool registry for this use case.
     /// - `ctx.input` is wrapped in `<user_input>` XML delimiters before being sent
     ///   to the LLM, per the security spec.
+    /// - `ctx.prior_context`, if `Some`, is prepended *before* the `<user_input>` block
+    ///   so the model treats it as trusted system data rather than untrusted user input.
     /// - `ctx.memory_context`, if present, is prepended to the system prompt as a
     ///   `<memory>` block so the LLM has relevant user context before any tool calls.
     pub async fn run(
@@ -320,8 +322,10 @@ impl AgentService {
         };
 
         // Step 5: Build the initial message and fire the loop.
-        // Wrap user input in untrusted delimiter per security spec.
-        let wrapped = format!("<user_input>{}</user_input>", ctx.input);
+        // prior_context (trusted system data) is emitted before the <user_input> wrapper so
+        // the model does not treat it as untrusted user input per the security spec.
+        let prior = ctx.prior_context.as_deref().unwrap_or("");
+        let wrapped = format!("{}<user_input>{}</user_input>", prior, ctx.input);
         let initial_messages = vec![Message {
             role: MessageRole::User,
             content: MessageContent::Text(wrapped),
@@ -897,6 +901,7 @@ mod tests {
             user_id,
             use_case: UseCase::TaskEntry,
             input: "add milk to grocery list".to_string(),
+            prior_context: None,
         };
 
         let result = service.run(&ctx, ToolRegistry::new()).await;
@@ -944,6 +949,7 @@ mod tests {
             user_id,
             use_case: UseCase::TaskEntry,
             input: "add milk to grocery list".to_string(),
+            prior_context: None,
         };
 
         let result = service.run(&ctx, ToolRegistry::new()).await;
@@ -996,6 +1002,7 @@ mod tests {
             user_id,
             use_case: UseCase::TaskEntry,
             input: "add task".to_string(),
+            prior_context: None,
         };
 
         service.run(&ctx, ToolRegistry::new()).await.unwrap();
@@ -1050,6 +1057,7 @@ mod tests {
             user_id,
             use_case: UseCase::MealPlanning,
             input: "plan my meals".to_string(),
+            prior_context: None,
         };
 
         service.run(&ctx, ToolRegistry::new()).await.unwrap();
@@ -1089,6 +1097,7 @@ mod tests {
             user_id: Uuid::nil(),
             use_case: UseCase::TaskEntry,
             input: "replace vacuum filter".to_string(),
+            prior_context: None,
         };
 
         let result = service.run(&ctx, ToolRegistry::new()).await;
@@ -1103,6 +1112,44 @@ mod tests {
             text.as_str(),
             "<user_input>replace vacuum filter</user_input>",
             "user input must be wrapped in security delimiters"
+        );
+    }
+
+    /// prior_context must be emitted *before* the `<user_input>` wrapper so the
+    /// model treats it as trusted system data rather than untrusted user input.
+    #[tokio::test]
+    async fn test_prior_context_prepended_before_user_input() {
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+        mock.push_response(CompletionResponse {
+            content: Some("done".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        let service = AgentService::new_with_registry(make_registry(mock));
+
+        let prior = "<prior_context>\n  <turn index=\"1\">\n    <signals>[]</signals>\n    <answers>{}</answers>\n  </turn>\n</prior_context>\n".to_string();
+        let ctx = AgentContext {
+            user_id: Uuid::nil(),
+            use_case: UseCase::TaskEntry,
+            input: "book dentist".to_string(),
+            prior_context: Some(prior.clone()),
+        };
+
+        let result = service.run(&ctx, ToolRegistry::new()).await;
+        assert!(result.is_ok());
+
+        let req = last_request.lock().unwrap();
+        let first_message = &req.as_ref().unwrap().messages[0];
+        let MessageContent::Text(ref text) = first_message.content else {
+            panic!("expected Text message content");
+        };
+        let expected = format!("{}<user_input>book dentist</user_input>", prior);
+        assert_eq!(
+            text.as_str(),
+            expected,
+            "prior_context must appear outside <user_input> delimiters"
         );
     }
 
