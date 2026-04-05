@@ -115,7 +115,7 @@ pub async fn post_meal_plan(
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{TaskEntryRequest, TaskEntryResponse};
+    use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
 
     #[test]
     fn task_entry_request_deserializes() {
@@ -134,14 +134,60 @@ mod tests {
     #[test]
     fn task_entry_response_deserializes() {
         let json = r#"{
-            "actions_taken": ["created task 'Take out trash' scheduled at 2026-04-05T20:00:00Z"],
+            "actions_taken": [
+                {
+                    "type": "task_created",
+                    "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                    "scheduled_at": "2026-04-05T20:00:00Z"
+                }
+            ],
             "ui_signals": [],
             "confirmation": "Take out trash scheduled for tonight at 8:00 PM (15 min, low energy)."
         }"#;
         let resp: TaskEntryResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.actions_taken.len(), 1);
+        assert_eq!(resp.actions_taken[0].r#type, "task_created");
+        assert!(resp.actions_taken[0].task_id.is_some());
+        assert!(resp.actions_taken[0].scheduled_at.is_some());
         assert_eq!(resp.ui_signals.len(), 0);
         assert!(!resp.confirmation.is_empty());
+    }
+
+    #[test]
+    fn task_entry_response_deserializes_clarification_response() {
+        let json = r#"{
+            "actions_taken": [],
+            "ui_signals": [{"type": "show_select", "field": "duration_minutes", "options": [15, 30, 60]}],
+            "confirmation": ""
+        }"#;
+        let resp: TaskEntryResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.actions_taken.len(), 0);
+        assert_eq!(resp.ui_signals.len(), 1);
+        assert_eq!(resp.confirmation, "");
+    }
+
+    #[test]
+    fn action_taken_deserializes_from_create_task_output() {
+        // Pin the ActionTaken deserialization contract: the shape produced by
+        // CreateTaskTool::execute must round-trip through the ActionTaken struct.
+        let json = r#"{
+            "type": "task_created",
+            "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+            "scheduled_at": "2026-04-05T20:00:00Z"
+        }"#;
+        let action: ActionTaken = serde_json::from_str(json).unwrap();
+        assert_eq!(action.r#type, "task_created");
+        assert!(action.task_id.is_some());
+        assert!(action.scheduled_at.is_some());
+    }
+
+    #[test]
+    fn action_taken_allows_null_optional_fields() {
+        let json = r#"{"type": "task_created", "task_id": null, "scheduled_at": null}"#;
+        let action: ActionTaken = serde_json::from_str(json).unwrap();
+        assert_eq!(action.r#type, "task_created");
+        assert!(action.task_id.is_none());
+        assert!(action.scheduled_at.is_none());
     }
 
     #[test]

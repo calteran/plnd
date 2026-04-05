@@ -248,7 +248,8 @@ impl Tool for CreateTaskTool {
             .cloned()
             .unwrap_or(serde_json::Value::Array(vec![]));
 
-        self.0
+        let task = self
+            .0
             .create_user_task(
                 ctx.user_id,
                 &title,
@@ -260,7 +261,11 @@ impl Tool for CreateTaskTool {
             .map_err(|e| db_err(self.name(), e))?;
 
         Ok(serde_json::json!({
-            "actions_taken": [format!("created task '{}' scheduled at {}", title, scheduled_at)],
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": task.task_id,
+                "scheduled_at": scheduled_at
+            }],
             "ui_signals": ui_signals,
             "confirmation": confirmation
         }))

@@ -1,4 +1,4 @@
-use chrono::{NaiveDate, NaiveTime};
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -92,6 +92,13 @@ pub struct PostSchedulePlanRequest {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct ActionTaken {
+    pub r#type: String,
+    pub task_id: Option<Uuid>,
+    pub scheduled_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct ConversationTurn {
     pub signals: Vec<serde_json::Value>,
     pub answers: serde_json::Map<String, serde_json::Value>,
@@ -105,7 +112,7 @@ pub struct TaskEntryRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct TaskEntryResponse {
-    pub actions_taken: Vec<String>,
+    pub actions_taken: Vec<ActionTaken>,
     pub ui_signals: Vec<serde_json::Value>,
     pub confirmation: String,
 }
