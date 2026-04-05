@@ -57,7 +57,7 @@ impl Tool for FindScheduleSlotTool {
             "properties": {
                 "energy_level": {
                     "type": "string",
-                    "enum": ["low", "medium", "high"],
+                    "enum": VALID_ENERGY_LEVELS,
                     "description": "Energy level required for the task."
                 },
                 "duration_minutes": {
