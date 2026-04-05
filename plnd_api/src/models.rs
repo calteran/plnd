@@ -86,3 +86,19 @@ pub struct PostSchedulePlanRequest {
     #[serde(default)]
     pub carryover_decisions: HashMap<Uuid, CarryoverDecision>,
 }
+
+// ---------------------------------------------------------------------------
+// Agent
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct TaskEntryRequest {
+    pub input: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct TaskEntryResponse {
+    pub actions_taken: Vec<String>,
+    pub ui_signals: Vec<serde_json::Value>,
+    pub confirmation: String,
+}
