@@ -64,12 +64,14 @@ pub async fn post_task(
 
     let today = Utc::now().format("%Y-%m-%d");
     let context_str = build_context_str(body.context.as_deref());
-    let input = format!("{context_str}[Today: {today}] {}", body.input);
+    let prior_context = if context_str.is_empty() { None } else { Some(context_str) };
+    let input = format!("[Today: {today}] {}", body.input);
 
     let ctx = AgentContext {
         user_id,
         use_case: UseCase::TaskEntry,
         input,
+        prior_context,
     };
 
     let output = state.agent.run(&ctx, tools).await.map_err(|e| {

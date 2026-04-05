@@ -74,6 +74,9 @@ pub struct AgentContext {
     pub use_case: UseCase,
     /// Raw user input that will be wrapped in `<user_input>` delimiters by the agent runner.
     pub input: String,
+    /// Trusted system context (e.g. prior conversation turns). Prepended *before* the
+    /// `<user_input>` wrapper so the model treats it as trusted system data, not user input.
+    pub prior_context: Option<String>,
 }
 
 #[cfg(test)]
