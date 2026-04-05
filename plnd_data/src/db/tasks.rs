@@ -1,4 +1,4 @@
-use chrono::NaiveDate;
+use chrono::{DateTime, Duration, NaiveDate, NaiveTime, TimeZone, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -77,6 +77,159 @@ pub async fn create_weekly_plan_task(
     Ok(task)
 }
 
+/// Create a user-defined task with a given title, energy level, scheduled time, and duration.
+/// Inserts into `tasks` (type=`'custom'`) and `generic_tasks` (category=`'user_created'`)
+/// in a single transaction.
+#[tracing::instrument(skip(pool), fields(table = "tasks", op = "create_user_task"))]
+pub async fn create_user_task(
+    pool: &PgPool,
+    user_id: Uuid,
+    title: &str,
+    energy_level: &str,
+    scheduled_at: DateTime<Utc>,
+    duration_minutes: i32,
+) -> Result<Task, DatabaseError> {
+    let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
+
+    let task: Task = sqlx::query_as::<_, Task>(
+        "INSERT INTO tasks (user_id, title, task_type, scheduled_start, duration_minutes, energy_required, status)
+         VALUES ($1, $2, 'custom', $3, $4, $5, 'planned')
+         RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
+                   energy_required, status, is_milepost, created_at, updated_at",
+    )
+    .bind(user_id)
+    .bind(title)
+    .bind(scheduled_at)
+    .bind(duration_minutes)
+    .bind(energy_level)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    sqlx::query(
+        "INSERT INTO generic_tasks (task_id, category, priority)
+         VALUES ($1, 'user_created', 'normal')",
+    )
+    .bind(task.task_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    tx.commit().await.map_err(DatabaseError::from)?;
+
+    Ok(task)
+}
+
+/// Find the next free time slot for a user based on energy level and duration.
+///
+/// Applies time-of-day heuristics: `high` → 9 am UTC, `medium` → 10 am UTC, `low` → 1 pm UTC.
+/// Scans `schedule_entries` for conflicts, checking up to 14 days forward from `after`.
+/// Returns `(slot_start, slot_end)` for the first conflict-free slot found.
+#[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "find_free_slot"))]
+pub async fn find_free_slot(
+    pool: &PgPool,
+    user_id: Uuid,
+    energy_level: &str,
+    duration_minutes: i32,
+    after: DateTime<Utc>,
+) -> Result<(DateTime<Utc>, DateTime<Utc>), DatabaseError> {
+    let preferred_hour: u32 = match energy_level {
+        "high" => 9,
+        "low" => 13,
+        _ => 10, // medium and any unknown value
+    };
+
+    let duration = Duration::minutes(duration_minutes as i64);
+    let start_date = after.date_naive();
+
+    for day_offset in 0..14i64 {
+        let candidate_date = start_date
+            + chrono::TimeDelta::try_days(day_offset)
+                .ok_or_else(|| DatabaseError::QueryError("day offset overflow".into()))?;
+
+        let naive_time = NaiveTime::from_hms_opt(preferred_hour, 0, 0)
+            .ok_or_else(|| DatabaseError::QueryError("invalid heuristic hour".into()))?;
+        let naive_dt = candidate_date.and_time(naive_time);
+        let mut candidate_start = Utc.from_utc_datetime(&naive_dt);
+
+        // On the first day, never schedule before `after`
+        if candidate_start < after {
+            candidate_start = after;
+        }
+
+        let candidate_end = candidate_start + duration;
+
+        let conflict_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM schedule_entries
+             WHERE user_id = $1
+               AND date = $2
+               AND scheduled_start < $4
+               AND (scheduled_end IS NULL OR scheduled_end > $3)",
+        )
+        .bind(user_id)
+        .bind(candidate_date)
+        .bind(candidate_start)
+        .bind(candidate_end)
+        .fetch_one(pool)
+        .await
+        .map_err(DatabaseError::from)?;
+
+        if conflict_count == 0 {
+            return Ok((candidate_start, candidate_end));
+        }
+    }
+
+    Err(DatabaseError::QueryError(
+        "no free slot found in 14 days".into(),
+    ))
+}
+
+// ── TaskStore ─────────────────────────────────────────────────────────────────
+
+/// Owned handle for task scheduling operations.
+///
+/// Wraps [`PgPool`] so callers (e.g. `plnd_agent` tools) do not need a direct
+/// sqlx dependency — sqlx is a private implementation detail of `plnd_data`.
+#[derive(Clone)]
+pub struct TaskStore {
+    pool: PgPool,
+}
+
+impl TaskStore {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub async fn create_user_task(
+        &self,
+        user_id: Uuid,
+        title: &str,
+        energy_level: &str,
+        scheduled_at: DateTime<Utc>,
+        duration_minutes: i32,
+    ) -> Result<Task, DatabaseError> {
+        create_user_task(
+            &self.pool,
+            user_id,
+            title,
+            energy_level,
+            scheduled_at,
+            duration_minutes,
+        )
+        .await
+    }
+
+    pub async fn find_free_slot(
+        &self,
+        user_id: Uuid,
+        energy_level: &str,
+        duration_minutes: i32,
+        after: DateTime<Utc>,
+    ) -> Result<(DateTime<Utc>, DateTime<Utc>), DatabaseError> {
+        find_free_slot(&self.pool, user_id, energy_level, duration_minutes, after).await
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -85,7 +238,7 @@ pub async fn create_weekly_plan_task(
 mod tests {
     use super::*;
     use crate::db::users;
-    use chrono::NaiveDate;
+    use chrono::{NaiveDate, Timelike};
 
     /// Helper: create a throwaway user and return its UUID.
     async fn new_user(pool: &PgPool) -> Uuid {
@@ -169,5 +322,86 @@ mod tests {
         );
         assert_eq!(task_a.user_id, uid_a);
         assert_eq!(task_b.user_id, uid_b);
+    }
+
+    // -----------------------------------------------------------------------
+    // create_user_task
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_user_task_inserts_task_and_generic(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let scheduled_at = Utc.with_ymd_and_hms(2026, 5, 10, 9, 0, 0).unwrap();
+
+        let task = create_user_task(&pool, uid, "Buy groceries", "medium", scheduled_at, 30)
+            .await
+            .expect("create_user_task failed");
+
+        assert_eq!(task.user_id, uid);
+        assert_eq!(task.title, "Buy groceries");
+        assert_eq!(task.task_type, "custom");
+        assert_eq!(task.energy_required, "medium");
+        assert_eq!(task.status, "planned");
+        assert_eq!(task.duration_minutes, Some(30));
+
+        let category: String =
+            sqlx::query_scalar("SELECT category FROM generic_tasks WHERE task_id = $1")
+                .bind(task.task_id)
+                .fetch_one(&pool)
+                .await
+                .expect("generic_tasks row not found");
+
+        assert_eq!(category, "user_created");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_user_task_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let scheduled_at = Utc.with_ymd_and_hms(2026, 5, 10, 9, 0, 0).unwrap();
+
+        let task_a = create_user_task(&pool, uid_a, "Task A", "high", scheduled_at, 60)
+            .await
+            .unwrap();
+        let task_b = create_user_task(&pool, uid_b, "Task B", "high", scheduled_at, 60)
+            .await
+            .unwrap();
+
+        assert_ne!(
+            task_a.task_id, task_b.task_id,
+            "users must get separate tasks"
+        );
+        assert_eq!(task_a.user_id, uid_a);
+        assert_eq!(task_b.user_id, uid_b);
+    }
+
+    // -----------------------------------------------------------------------
+    // find_free_slot
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_free_slot_returns_slot_when_clear(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        // No schedule_entries — first candidate slot must be returned immediately
+        let after = Utc.with_ymd_and_hms(2026, 5, 10, 8, 0, 0).unwrap();
+
+        let (start, end) = find_free_slot(&pool, uid, "medium", 30, after)
+            .await
+            .expect("find_free_slot failed");
+
+        assert!(start >= after, "slot must not be before `after`");
+        assert_eq!(end - start, Duration::minutes(30));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn find_free_slot_respects_energy_level(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let after = Utc.with_ymd_and_hms(2026, 5, 10, 0, 0, 0).unwrap();
+
+        let (high_start, _) = find_free_slot(&pool, uid, "high", 30, after).await.unwrap();
+        let (low_start, _) = find_free_slot(&pool, uid, "low", 30, after).await.unwrap();
+
+        assert_eq!(high_start.hour(), 9, "high energy should prefer 9am");
+        assert_eq!(low_start.hour(), 13, "low energy should prefer 1pm");
     }
 }
