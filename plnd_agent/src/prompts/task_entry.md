@@ -44,6 +44,7 @@ When `<prior_context>` is present in the input, it contains signal/answer pairs 
 ```
 
 Rules:
+- On first-turn requests there is no `<prior_context>` block; proceed directly to step 4 based on the user input alone.
 - Extract every answered field from `<answers>` and use those values directly — do not surface them again in `ui_signals`.
 - If all required fields are now known (from the original input plus answers), proceed to step 4a.
 - If fields are still missing after reviewing all prior context, proceed to step 4b.

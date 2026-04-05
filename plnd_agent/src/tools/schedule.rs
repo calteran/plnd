@@ -291,7 +291,7 @@ impl Tool for RequestClarificationTool {
             "properties": {
                 "ui_signals": {
                     "type": "array",
-                    "items": {},
+                    "items": { "type": "object" },
                     "description": "UI hints for fields that need user input."
                 }
             }
@@ -464,7 +464,7 @@ mod tests {
             "properties": {
                 "ui_signals": {
                     "type": "array",
-                    "items": {},
+                    "items": { "type": "object" },
                     "description": "UI hints for fields that need user input."
                 }
             }
@@ -496,7 +496,9 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let tool = RequestClarificationTool;
-            let ctx = ToolContext { user_id: Uuid::nil() };
+            let ctx = ToolContext {
+                user_id: Uuid::nil(),
+            };
             let input = serde_json::json!({
                 "ui_signals": [{"type": "show_select", "field": "duration_minutes"}]
             });

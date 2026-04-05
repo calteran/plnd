@@ -190,7 +190,9 @@ mod tests {
         assert!(result.starts_with("<prior_context>"));
         assert!(result.contains("<turn index=\"1\">"));
         assert!(result.contains("<signals>"));
+        assert!(result.contains("<answers>"));
         assert!(result.contains("duration_minutes"));
+        assert!(result.contains("\"duration_minutes\":60"));
         assert!(result.ends_with("</prior_context>\n"));
     }
 }
