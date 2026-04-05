@@ -64,13 +64,12 @@ pub async fn post_task(
 
     let today = Utc::now().format("%Y-%m-%d");
     let context_str = build_context_str(body.context.as_deref());
-    let prior_context = if context_str.is_empty() { None } else { Some(context_str) };
-    let input = format!("[Today: {today}] {}", body.input);
+    let prior_context = Some(format!("{context_str}[Today: {today}]\n"));
 
     let ctx = AgentContext {
         user_id,
         use_case: UseCase::TaskEntry,
-        input,
+        input: body.input.clone(),
         prior_context,
     };
 
