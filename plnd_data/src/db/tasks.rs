@@ -158,24 +158,26 @@ pub async fn find_free_slot(
         let naive_time = NaiveTime::from_hms_opt(preferred_hour, 0, 0)
             .ok_or_else(|| DatabaseError::QueryError("invalid heuristic hour".into()))?;
         let naive_dt = candidate_date.and_time(naive_time);
-        let mut candidate_start = Utc.from_utc_datetime(&naive_dt);
+        let candidate_start = Utc.from_utc_datetime(&naive_dt);
 
-        // On the first day, never schedule before `after`
+        // If the preferred hour has already passed (e.g. `after` is 11am for a 10am slot),
+        // skip this day entirely — only the heuristic hour is tried per day.
         if candidate_start < after {
-            candidate_start = after;
+            continue;
         }
 
         let candidate_end = candidate_start + duration;
 
+        // Use timestamp-range overlap (not date filter) so overnight entries from the
+        // previous day are correctly detected as conflicts.
+        // Uses the (user_id, scheduled_start) index for performance.
         let conflict_count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM schedule_entries
              WHERE user_id = $1
-               AND date = $2
-               AND scheduled_start < $3
-               AND (scheduled_end IS NULL OR scheduled_end > $4)",
+               AND scheduled_start < $2
+               AND (scheduled_end IS NULL OR scheduled_end > $3)",
         )
         .bind(user_id)
-        .bind(candidate_date)
         .bind(candidate_end)
         .bind(candidate_start)
         .fetch_one(pool)
