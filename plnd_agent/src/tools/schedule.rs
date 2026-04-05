@@ -6,6 +6,25 @@ use plnd_data::db::TaskStore;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
+// ── Valid energy levels ───────────────────────────────────────────────────────
+
+const VALID_ENERGY_LEVELS: &[&str] = &["low", "medium", "high"];
+
+fn validate_energy_level(level: &str, tool: &str) -> Result<(), ToolError> {
+    if VALID_ENERGY_LEVELS.contains(&level) {
+        Ok(())
+    } else {
+        Err(ToolError::InvalidInput {
+            tool: tool.to_string(),
+            reason: format!(
+                "unknown energy_level '{}'; must be one of: {}",
+                level,
+                VALID_ENERGY_LEVELS.join(", ")
+            ),
+        })
+    }
+}
+
 // ── Helper: map DatabaseError → ToolError ─────────────────────────────────────
 
 fn db_err(tool: &str, e: DatabaseError) -> ToolError {
@@ -71,6 +90,8 @@ impl Tool for FindScheduleSlotTool {
             })?
             .to_string();
 
+        validate_energy_level(&energy_level, self.name())?;
+
         let duration_minutes = input
             .get("duration_minutes")
             .and_then(|v| v.as_i64())
@@ -130,7 +151,7 @@ impl Tool for CreateTaskTool {
                 },
                 "energy_level": {
                     "type": "string",
-                    "enum": ["low", "medium", "high"],
+                    "enum": VALID_ENERGY_LEVELS,
                     "description": "Energy level required for the task."
                 },
                 "scheduled_at": {
@@ -184,6 +205,8 @@ impl Tool for CreateTaskTool {
                 reason: "missing required field 'energy_level'".to_string(),
             })?
             .to_string();
+
+        validate_energy_level(&energy_level, self.name())?;
 
         let scheduled_at_str = input
             .get("scheduled_at")
@@ -263,6 +286,8 @@ pub fn register_schedule_tools(registry: &mut ToolRegistry, store: Arc<TaskStore
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     // TaskStore requires a live PgPool. Schema tests don't call execute(), so
     // we test schemas by reproducing the exact JSON the tools return — this
     // avoids a test-only DB dependency while still pinning the contract.
@@ -296,7 +321,7 @@ mod tests {
             "properties": {
                 "energy_level": {
                     "type": "string",
-                    "enum": ["low", "medium", "high"],
+                    "enum": VALID_ENERGY_LEVELS,
                     "description": "Energy level required for the task."
                 },
                 "duration_minutes": {
@@ -325,7 +350,7 @@ mod tests {
                 },
                 "energy_level": {
                     "type": "string",
-                    "enum": ["low", "medium", "high"],
+                    "enum": VALID_ENERGY_LEVELS,
                     "description": "Energy level required for the task."
                 },
                 "scheduled_at": {
