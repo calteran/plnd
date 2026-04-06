@@ -96,7 +96,7 @@ export class DayViewComponent implements OnInit {
       .subscribe(params => {
         this.scheduleService.loadDay(params['date']);
         if (this.isToday()) {
-          this.briefingService.load();
+          this.briefingService.load(params['date']);
         }
       });
   }

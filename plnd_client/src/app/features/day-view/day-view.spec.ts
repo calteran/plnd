@@ -150,7 +150,7 @@ describe('DayViewComponent (isToday wiring)', () => {
   it('renders briefing-header and calls briefing.load() for today', async () => {
     const { f, briefing } = await setupWithDate(TODAY_DATE);
     expect(f.debugElement.query(By.css('app-briefing-header'))).toBeTruthy();
-    expect(briefing.load).toHaveBeenCalled();
+    expect(briefing.load).toHaveBeenCalledWith(TODAY_DATE);
   });
 
   it('does not render briefing-header for a past date', async () => {
