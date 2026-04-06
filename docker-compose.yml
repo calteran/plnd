@@ -93,10 +93,11 @@ services:
       - OLLAMA_CAPABLE_MODEL=${OLLAMA_CAPABLE_MODEL:-llama3.2}
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
     healthcheck:
-      # /api/tags is ready as soon as ollama serve starts — before model pulls
-      # complete. The api service depends_on this healthcheck, so the first
-      # inference request may be slow while a model pull is still in progress.
-      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags"]
+      # `ollama list` queries the server API and is guaranteed to be in the image.
+      # It succeeds as soon as ollama serve starts — before model pulls complete.
+      # The api service depends_on this healthcheck, so the first inference
+      # request may be slow while a model pull is still in progress.
+      test: ["CMD", "ollama", "list"]
       interval: 10s
       timeout: 5s
       retries: 20
