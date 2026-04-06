@@ -201,12 +201,15 @@ run_job "nextest → clippy" "$PROJECT_ROOT" bash -c \
 
 API_LOG=$(mktemp /tmp/plnd-verify-api-XXXXXX)
 cd "$PROJECT_ROOT/plnd_api"
+# Close fd 3 (FIFO write-end) in the API subprocess so the reader can see
+# EOF once the main script closes fd 3.  Without this, the API process keeps
+# the write-end open and `wait "$READER_PID"` hangs indefinitely.
 doppler run -- sh -c \
     "APP_DATABASE__URL='postgres://plnd:${VERIFY_DB_PASS}@localhost:5432/plnd_dev' \
      APP_AUTH__OIDC_INTERNAL_ISSUER_URL='http://localhost:8080/plnd-dev' \
      APP_AUTH__FRONTEND_ORIGIN='http://localhost:4200' \
      exec ../target/debug/plnd_api" \
-    > "$API_LOG" 2>&1 &
+    > "$API_LOG" 2>&1 3>&- &
 API_PID=$!
 cd "$PROJECT_ROOT"
 
