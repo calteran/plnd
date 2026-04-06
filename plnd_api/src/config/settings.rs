@@ -113,9 +113,9 @@ pub struct ExternalProvidersConfig {
     /// Basic-auth password for the OFf staging server (`off`). Leave empty for production.
     #[serde(default)]
     pub off_basic_auth_password: String,
-    /// RSS/Atom feed URL for briefing headlines. Leave empty to disable news.
+    /// RSS/Atom feed URLs for briefing headlines. Empty list disables news.
     #[serde(default)]
-    pub news_feed_url: String,
+    pub news_feed_urls: Vec<String>,
 }
 
 fn default_themealdb_key() -> String {

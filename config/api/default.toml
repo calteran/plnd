@@ -52,8 +52,13 @@ weather_latitude  = 51.5074
 weather_longitude = -0.1278
 
 # Morning briefing — news
-# RSS or Atom feed URL. Leave empty to disable the headlines card.
-news_feed_url = ""
+# RSS/Atom feed URLs to aggregate. Headlines are merged and sorted newest-first.
+# Leave empty to disable the headlines card.
+news_feed_urls = [
+  "https://xkcd.com/rss.xml",
+  "https://news.ycombinator.com/rss",
+  "https://en.wikipedia.org/w/api.php?action=featuredfeed&feed=featured&feedformat=atom",
+]
 
 [llm.fast]
 # Low-latency model for quick, structured tasks (intent parsing, suggestions).
