@@ -167,13 +167,16 @@ async fn main() {
 
     let weather_provider = Arc::new(OpenMeteoProvider::new());
     let news_provider = Arc::new(RssFeedProvider::new(
-        &config.external_providers.news_feed_url,
+        &config.external_providers.news_feed_urls,
     ));
     let briefing = BriefingState::new(weather_provider, news_provider);
-    if config.external_providers.news_feed_url.is_empty() {
-        tracing::warn!("briefing news feed disabled (news_feed_url not set)");
+    if config.external_providers.news_feed_urls.is_empty() {
+        tracing::warn!("briefing news feed disabled (news_feed_urls not set)");
     } else {
-        tracing::info!(feed_url = %config.external_providers.news_feed_url, "briefing news feed configured");
+        tracing::info!(
+            feed_count = config.external_providers.news_feed_urls.len(),
+            "briefing news feeds configured"
+        );
     }
 
     // Per-IP rate limiter for unauthenticated /api/client_error requests.

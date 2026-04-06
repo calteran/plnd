@@ -69,7 +69,7 @@ export class BriefingService {
         this._weatherError.set('Location unavailable');
         this._newsError.set('Location unavailable');
       },
-      { maximumAge: 60_000, timeout: 15_000 },
+      { maximumAge: Infinity, timeout: 15_000 },
     );
   }
 }
