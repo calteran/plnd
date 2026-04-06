@@ -102,5 +102,12 @@ export class DayViewComponent implements OnInit {
   onDateChange(date: string): void { this.router.navigate(['/day', date]); }
   retry(): void { this.scheduleService.loadDay(this.scheduleService.date()); }
   onPlanMeal(_mealId: string): void { /* TODO: open meal planning panel */ }
-  onItemAdded(_entry: AddedEntry): void { /* TODO: add item to service */ }
+  onItemAdded(entry: AddedEntry): void {
+    this.scheduleService.addItem({
+      id:     entry.id ?? crypto.randomUUID(),
+      type:   entry.type,
+      label:  entry.label,
+      status: 'pending',
+    });
+  }
 }

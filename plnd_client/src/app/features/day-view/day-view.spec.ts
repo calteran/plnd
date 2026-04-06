@@ -26,6 +26,7 @@ function makeScheduleServiceMock(overrides: Partial<{
     date:          date.asReadonly(),
     loadDay:    jasmine.createSpy('loadDay'),
     toggleItem: jasmine.createSpy('toggleItem'),
+    addItem:    jasmine.createSpy('addItem'),
   };
 }
 
@@ -165,5 +166,31 @@ describe('DayViewComponent (isToday wiring)', () => {
   it('does not render yesterday-snapshot for a future date', async () => {
     const { f } = await setupWithDate('2030-12-31');
     expect(f.debugElement.query(By.css('app-yesterday-snapshot'))).toBeFalsy();
+  });
+});
+
+describe('DayViewComponent (onItemAdded)', () => {
+  it('calls scheduleService.addItem with a ScheduleTask built from the AddedEntry', async () => {
+    const items: ScheduleItem[] = [
+      { id: 't1', type: 'task', label: 'Existing', status: 'pending' }
+    ];
+    const svc = makeScheduleServiceMock({ scheduleItems: items });
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: ActivatedRoute, useValue: mockActivatedRoute },
+      ],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+
+    f.componentInstance.onItemAdded({ label: 'call mum', type: 'task', id: 'srv-1' });
+
+    expect(svc.addItem).toHaveBeenCalledWith(
+      jasmine.objectContaining({ id: 'srv-1', label: 'call mum', type: 'task', status: 'pending' }),
+    );
   });
 });
