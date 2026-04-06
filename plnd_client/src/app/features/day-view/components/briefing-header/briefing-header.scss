@@ -35,6 +35,11 @@
   color: var(--color-text-secondary);
 }
 
+.weather-precipitation {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
 .news-content {
   display: flex;
   flex-direction: column;
