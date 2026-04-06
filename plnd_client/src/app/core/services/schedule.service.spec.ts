@@ -173,4 +173,11 @@ describe('ScheduleService', () => {
     const meal = svc.scheduleItems()[0] as MealAnchor;
     expect(meal.duringMealTasks[0].status).toBe('done');
   });
+
+  it('addItem appends a ScheduleTask to scheduleItems', () => {
+    const task: ScheduleTask = { id: 'new-1', type: 'task', label: 'call mum', status: 'pending' };
+    svc.addItem(task);
+    expect(svc.scheduleItems()).toContain(task);
+    expect(svc.scheduleItems().length).toBe(1);
+  });
 });
