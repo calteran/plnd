@@ -16,6 +16,9 @@ import { BriefingService } from '../../../../core/services/briefing.service';
             <span class="weather-range">
               {{ Math.round(w.high_c) }}° / {{ Math.round(w.low_c) }}°
             </span>
+            @if (w.precipitation_mm) {
+              <span class="weather-precipitation">{{ w.precipitation_mm }}mm</span>
+            }
           </div>
         } @else if (briefing.weatherError()) {
           <span class="unavailable-text">{{ briefing.weatherError() }}</span>

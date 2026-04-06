@@ -37,11 +37,11 @@ export const MOCK_PREFS = {
 };
 
 export const MOCK_BRIEFING_WEATHER = {
-  temp_c: 18,
+  temperature_c: 18,
   condition: 'Clear',
   high_c: 22,
   low_c: 14,
-  precipitation_flag: false,
+  precipitation_mm: 3.5,
 };
 
 export const MOCK_BRIEFING_NEWS = {

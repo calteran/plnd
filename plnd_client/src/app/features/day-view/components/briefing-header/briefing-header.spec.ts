@@ -45,6 +45,15 @@ describe('BriefingHeaderComponent', () => {
     const f = await setup({ weather: w });
     expect(f.nativeElement.textContent).toContain('14');
     expect(f.nativeElement.textContent).toContain('Rainy');
+    expect(f.nativeElement.textContent).toContain('5.2mm');
+  });
+
+  it('does not render precipitation when precipitation_mm is 0', async () => {
+    const w: WeatherSummary = {
+      temperature_c: 20, condition: 'Sunny', high_c: 24, low_c: 16, precipitation_mm: 0,
+    };
+    const f = await setup({ weather: w });
+    expect(f.nativeElement.textContent).not.toContain('mm');
   });
 
   it('renders weather unavailable state when weatherError is set', async () => {
