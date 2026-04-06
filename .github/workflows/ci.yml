@@ -14,7 +14,7 @@ jobs:
   # ── Job 1: Rust lint + build + unit tests ───────────────────────────────────
   backend:
     name: Backend
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     services:
       postgres:
         image: postgres:15
@@ -74,7 +74,7 @@ jobs:
   # ── Job 2: Angular lint + unit tests ───────────────────────────────────────
   client:
     name: Client
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
 
@@ -108,7 +108,7 @@ jobs:
   # ── Job 3: End-to-end tests ─────────────────────────────────────────────────
   e2e:
     name: E2E (Playwright)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [backend, client]
     services:
       postgres:
