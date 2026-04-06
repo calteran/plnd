@@ -145,6 +145,58 @@ describe('AddEntryComponent', () => {
     expect(options[1].nativeElement.value).toBe('home');
   });
 
+  it('does not call createTask a second time while a request is already in flight', async () => {
+    const subject = new Subject<TaskEntryResponse>();
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(subject.asObservable());
+    openPanel(f);
+    typeText(f, 'buy groceries');
+    clickSubmit(f);
+    clickSubmit(f); // second click while in flight — should be ignored
+    expect(agentSpy.createTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('merges sig.default into answers for fields the user did not interact with', async () => {
+    const checkboxSignal = { type: 'show_checkbox' as const, field: 'urgent', label: 'Urgent?', default: true };
+    const f = await setup();
+    agentSpy.createTask.and.returnValues(
+      of(makeResponse({ ui_signals: [checkboxSignal] })),
+      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
+    );
+    openPanel(f);
+    typeText(f, 'buy groceries');
+    clickSubmit(f);
+
+    // Click Continue without touching the checkbox (user accepts the default)
+    const continueBtn = f.debugElement.query(By.css('.btn-continue'));
+    continueBtn.nativeElement.click();
+    f.detectChanges();
+
+    const secondCall = agentSpy.createTask.calls.mostRecent().args[0];
+    expect(secondCall.context?.[0].answers['urgent']).toBe(true);
+  });
+
+  it('discards conversation context when input text changes between turns', async () => {
+    const checkboxSignal = { type: 'show_checkbox' as const, field: 'urgent', label: 'Urgent?' };
+    const f = await setup();
+    agentSpy.createTask.and.returnValues(
+      of(makeResponse({ ui_signals: [checkboxSignal] })),
+      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
+    );
+    openPanel(f);
+    typeText(f, 'buy groceries');
+    clickSubmit(f); // first turn — gets signals back
+
+    // Change input while signals are pending (Add button is hidden; submit via Enter binding)
+    typeText(f, 'something different');
+    const input = f.debugElement.query(By.css('.entry-input')).nativeElement;
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    f.detectChanges();
+
+    const secondCall = agentSpy.createTask.calls.mostRecent().args[0];
+    expect(secondCall.context).toEqual([]);
+  });
+
   it('re-calls createTask with accumulated context when Continue is clicked', async () => {
     const firstSignals = [{ type: 'show_checkbox' as const, field: 'urgent', label: 'Urgent?' }];
     const f = await setup();

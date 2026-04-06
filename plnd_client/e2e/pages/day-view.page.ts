@@ -31,6 +31,7 @@ export class DayViewPage {
   getAddRow() { return this.page.getByRole('button', { name: 'Open entry form' }); }
   getEntryInput() { return this.page.getByLabel('Add something to your day'); }
   getAddButton() { return this.page.getByRole('button', { name: 'Add', exact: true }); }
+  getContinueButton() { return this.page.getByRole('button', { name: 'Continue', exact: true }); }
   getCancelButton() { return this.page.getByRole('button', { name: 'Cancel', exact: true }); }
   getLoadingIndicator() { return this.page.locator('.loading'); }
   getAgentConfirmation() { return this.page.locator('.agent-confirmation'); }

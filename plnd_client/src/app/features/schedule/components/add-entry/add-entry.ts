@@ -47,7 +47,7 @@ export interface AddedEntry {
                   <label class="signal-label">
                     <input
                       type="checkbox"
-                      [checked]="!!signalAnswers()[sig.field]"
+                      [checked]="signalAnswers()[sig.field] ?? sig.default ?? false"
                       (change)="setAnswer(sig.field, $any($event.target).checked)"
                     />
                     {{ sig.label ?? sig.field }}
@@ -96,6 +96,8 @@ export class AddEntryComponent {
   @ViewChild('entryInput') private entryInput?: ElementRef<HTMLInputElement>;
 
   private readonly agentService = inject(AgentService);
+  /** Anchors the input text that opened the current conversation thread. */
+  private _conversationInput = '';
 
   readonly added              = output<AddedEntry>();
   readonly isOpen             = signal(false);
@@ -121,6 +123,7 @@ export class AddEntryComponent {
     this.conversationHistory.set([]);
     this.confirmation.set(null);
     this.errorMessage.set(null);
+    this._conversationInput = '';
   }
 
   setAnswer(field: string, value: unknown): void {
@@ -128,10 +131,15 @@ export class AddEntryComponent {
   }
 
   continueWithAnswers(): void {
-    this.conversationHistory.update(h => [
-      ...h,
-      { signals: this.pendingSignals(), answers: this.signalAnswers() },
-    ]);
+    const signals = this.pendingSignals();
+    // Merge sig.default for any field the user did not explicitly interact with
+    const answers: Record<string, unknown> = { ...this.signalAnswers() };
+    for (const sig of signals) {
+      if (!(sig.field in answers) && sig.default !== undefined) {
+        answers[sig.field] = sig.default;
+      }
+    }
+    this.conversationHistory.update(h => [...h, { signals, answers }]);
     this.pendingSignals.set([]);
     this.signalAnswers.set({});
     this.submit();
@@ -139,7 +147,19 @@ export class AddEntryComponent {
 
   submit(): void {
     const input = this._text().trim();
-    if (!input) return;
+    if (!input || this.isLoading()) return;
+
+    // New input while mid-conversation → discard the stale context
+    if (this.conversationHistory().length > 0 && input !== this._conversationInput) {
+      this.conversationHistory.set([]);
+      this.pendingSignals.set([]);
+      this.signalAnswers.set({});
+    }
+
+    // Anchor the input text for this conversation thread
+    if (this.conversationHistory().length === 0) {
+      this._conversationInput = input;
+    }
 
     this.isLoading.set(true);
     this.errorMessage.set(null);
