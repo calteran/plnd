@@ -52,12 +52,10 @@ worktree-new branch:
 
 # ── Daily Development ─────────────────────────────────────────────────────────
 
-# Run development environment including local Ollama LLM (PostgreSQL + Client + Ollama).
-# Pulls model on first start — requires Docker with sufficient RAM (phi3 ~2 GB, llama3.2 ~2 GB).
-# Override models via OLLAMA_FAST_MODEL / OLLAMA_CAPABLE_MODEL env vars.
+# Run full development environment (all services including Ollama LLM) in detached mode
+# Models default to phi3 (fast) and llama3.2 (capable); override via OLLAMA_FAST_MODEL / OLLAMA_CAPABLE_MODEL.
 dev:
-    doppler run -- docker compose -f docker-compose.yml -f docker-compose.local-llm.yml --profile local-llm build --no-cache && \
-    doppler run -- docker compose -f docker-compose.yml -f docker-compose.local-llm.yml --profile local-llm up -d --force-recreate
+    doppler run -- docker compose build --no-cache && doppler run -- docker compose up -d --force-recreate
 
 # Run API service locally (requires PostgreSQL)
 api:
