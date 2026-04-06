@@ -165,7 +165,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.cache-playwright.outputs.cache-hit != 'true'
-        run: cd plnd_client && npx playwright install chromium --with-deps
+        run: cd plnd_client && npx playwright install chromium
 
       - name: Download API binary
         uses: actions/download-artifact@v8
