@@ -61,7 +61,7 @@ dev:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ Starting infrastructure (db, mock-oauth-server, ollama)..."
-    doppler run -- docker compose up -d --wait --wait-timeout 120 db mock-oauth-server ollama
+    doppler run -- docker compose up -d --wait --wait-timeout 120
     echo "→ Infrastructure healthy. Starting API and client..."
     mprocs
 
@@ -167,7 +167,7 @@ test-ng-headless:
 # verify.sh manages its own ephemeral containers independently.
 services-up:
     @echo "🐳 Ensuring infrastructure is up and healthy..."
-    doppler run -- docker compose up -d --wait db mock-oauth-server ollama
+    doppler run -- docker compose up -d --wait
     @echo "✅ Infrastructure ready"
 
 # Run Playwright e2e tests (CI-safe, requires Docker stack + Angular)
