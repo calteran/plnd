@@ -1,22 +1,19 @@
-import { Component, ElementRef, ViewChild, output, signal, computed } from '@angular/core';
-import { ReactiveFormsModule, FormControl } from '@angular/forms';
+import { Component, ElementRef, ViewChild, inject, output, signal } from '@angular/core';
+import { AgentService } from '../../../../core/services/agent.service';
+import { ConversationTurn, UiSignal } from '../../../../core/models/agent';
 import { ItemType } from '../../../../core/models/schedule';
 
+/** Emitted after agent confirmation so parent components can respond (e.g. schedule reload). */
 export interface AddedEntry {
   label: string;
   type: ItemType;
-  time?: string;
-  location?: string;
   duration?: number;
 }
-
-const EXERCISE_KEYWORDS = /\b(run|walk|jog|cycle|swim|workout|gym|stretch|yoga|hike|bike)\b/i;
-const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
 
 @Component({
   selector: 'app-add-entry',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [],
   template: `
     @if (!isOpen()) {
       <div class="add-row" (click)="open()" role="button" tabindex="0"
@@ -38,27 +35,57 @@ const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
           aria-label="Add something to your day"
         />
 
-        @if (parsedType() === 'appointment') {
-          <div class="morph-form morph-form--appointment">
-            <input class="morph-field" type="time" [formControl]="timeControl" aria-label="Appointment time" />
-            <input class="morph-field" [formControl]="locationControl" placeholder="Location (optional)" aria-label="Location" />
+        @if (isLoading()) {
+          <div class="loading" aria-live="polite" aria-label="Loading">…</div>
+        }
+
+        @if (pendingSignals().length > 0) {
+          <div class="signal-form">
+            @for (sig of pendingSignals(); track sig.field) {
+              @switch (sig.type) {
+                @case ('show_checkbox') {
+                  <label class="signal-label">
+                    <input
+                      type="checkbox"
+                      [checked]="!!signalAnswers()[sig.field]"
+                      (change)="setAnswer(sig.field, $any($event.target).checked)"
+                    />
+                    {{ sig.label ?? sig.field }}
+                  </label>
+                }
+                @case ('show_select') {
+                  <label class="signal-label">
+                    {{ sig.label ?? sig.field }}
+                    <select
+                      [value]="signalAnswers()[sig.field] ?? sig.default ?? ''"
+                      (change)="setAnswer(sig.field, $any($event.target).value)"
+                    >
+                      @for (opt of sig.options ?? []; track opt) {
+                        <option [value]="opt">{{ opt }}</option>
+                      }
+                    </select>
+                  </label>
+                }
+              }
+            }
           </div>
         }
 
-        @if (parsedType() === 'exercise') {
-          <div class="morph-form morph-form--exercise">
-            <input class="morph-field" type="number" [formControl]="durationControl"
-                   placeholder="Duration (minutes)" aria-label="Duration in minutes" min="1" />
-          </div>
+        @if (confirmation()) {
+          <p class="agent-confirmation">{{ confirmation() }}</p>
         }
 
-        @if (parseHint()) {
-          <p class="parse-hint">{{ parseHint() }}</p>
+        @if (errorMessage()) {
+          <p class="agent-error">{{ errorMessage() }}</p>
         }
 
         <div class="entry-actions">
           <button class="btn-cancel" type="button" (click)="close()">Cancel</button>
-          <button class="btn-add" type="button" (click)="submit()" [disabled]="!_text().trim()">Add</button>
+          @if (pendingSignals().length > 0) {
+            <button class="btn-continue" type="button" (click)="continueWithAnswers()">Continue</button>
+          } @else {
+            <button class="btn-add" type="button" (click)="submit()" [disabled]="!_text().trim() || isLoading()">Add</button>
+          }
         </div>
       </div>
     }
@@ -68,26 +95,17 @@ const TIME_PATTERN       = /\b\d{1,2}(:\d{2})?\s*(am|pm)\b/i;
 export class AddEntryComponent {
   @ViewChild('entryInput') private entryInput?: ElementRef<HTMLInputElement>;
 
-  readonly added = output<AddedEntry>();
+  private readonly agentService = inject(AgentService);
 
-  readonly isOpen          = signal(false);
-  // _text is a signal (not FormControl) so computed() tracks it reactively on every keystroke
-  protected readonly _text = signal('');
-  readonly timeControl     = new FormControl('');
-  readonly locationControl = new FormControl('');
-  readonly durationControl = new FormControl<number | null>(null);
-
-  readonly parsedType = computed<ItemType>(() => {
-    const text = this._text();
-    if (TIME_PATTERN.test(text)) return 'appointment';
-    if (EXERCISE_KEYWORDS.test(text)) return 'exercise';
-    return 'task';
-  });
-
-  readonly parseHint = computed(() => {
-    // Hint logic deferred to LLM integration
-    return null;
-  });
+  readonly added              = output<AddedEntry>();
+  readonly isOpen             = signal(false);
+  protected readonly _text    = signal('');
+  readonly isLoading          = signal(false);
+  readonly pendingSignals     = signal<UiSignal[]>([]);
+  readonly signalAnswers      = signal<Record<string, unknown>>({});
+  readonly conversationHistory = signal<ConversationTurn[]>([]);
+  readonly confirmation       = signal<string | null>(null);
+  readonly errorMessage       = signal<string | null>(null);
 
   open(): void {
     this.isOpen.set(true);
@@ -97,23 +115,54 @@ export class AddEntryComponent {
   close(): void {
     this.isOpen.set(false);
     this._text.set('');
-    this.timeControl.reset('');
-    this.locationControl.reset('');
-    this.durationControl.reset(null);
+    this.isLoading.set(false);
+    this.pendingSignals.set([]);
+    this.signalAnswers.set({});
+    this.conversationHistory.set([]);
+    this.confirmation.set(null);
+    this.errorMessage.set(null);
+  }
+
+  setAnswer(field: string, value: unknown): void {
+    this.signalAnswers.update(a => ({ ...a, [field]: value }));
+  }
+
+  continueWithAnswers(): void {
+    this.conversationHistory.update(h => [
+      ...h,
+      { signals: this.pendingSignals(), answers: this.signalAnswers() },
+    ]);
+    this.pendingSignals.set([]);
+    this.signalAnswers.set({});
+    this.submit();
   }
 
   submit(): void {
-    const label = this._text().trim();
-    if (!label) return;
-    const type = this.parsedType();
-    const entry: AddedEntry = { label, type };
-    if (type === 'appointment') {
-      entry.time     = this.timeControl.value     || undefined;
-      entry.location = this.locationControl.value || undefined;
-    } else if (type === 'exercise') {
-      entry.duration = this.durationControl.value ?? undefined;
-    }
-    this.added.emit(entry);
-    this.close();
+    const input = this._text().trim();
+    if (!input) return;
+
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+    this.confirmation.set(null);
+
+    this.agentService
+      .createTask({ input, context: this.conversationHistory() })
+      .subscribe({
+        next: res => {
+          this.isLoading.set(false);
+          if (res.ui_signals.length > 0) {
+            this.pendingSignals.set(res.ui_signals);
+          } else {
+            this.confirmation.set(res.confirmation);
+            this.added.emit({ label: input, type: 'task' });
+            this.conversationHistory.set([]);
+            this.pendingSignals.set([]);
+          }
+        },
+        error: () => {
+          this.isLoading.set(false);
+          this.errorMessage.set('Something went wrong. Please try again.');
+        },
+      });
   }
 }

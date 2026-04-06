@@ -58,8 +58,8 @@ test.describe('Day View — Add Entry', () => {
     });
   });
 
-  test.describe('smart type detection', () => {
-    async function openAndType(page: Page, text: string) {
+  test.describe('agent integration', () => {
+    async function openAndFill(page: Page, text: string) {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
       await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
@@ -68,41 +68,51 @@ test.describe('Day View — Add Entry', () => {
       return dayView;
     }
 
-    test('exercise keyword shows duration field', async ({ page }) => {
-      const dayView = await openAndType(page, 'yoga for a bit');
-      await expect(dayView.getMorphExercise()).toBeVisible();
-      await expect(dayView.getMorphAppointment()).not.toBeVisible();
-      await expect(dayView.getMorphExercise().getByLabel('Duration in minutes')).toBeVisible();
+    test('shows loading indicator while agent request is in flight', async ({ page }) => {
+      // Delay the agent response so we can observe the loading state
+      await page.route(`${API_BASE}/agent/task`, async route => {
+        await new Promise(r => setTimeout(r, 500));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task added!' }),
+        });
+      });
+
+      const dayView = await openAndFill(page, 'call mum');
+      await dayView.getAddButton().click();
+      await expect(dayView.getLoadingIndicator()).toBeVisible();
+      await expect(dayView.getAgentConfirmation()).toBeVisible({ timeout: 2_000 });
     });
 
-    test('time pattern shows appointment fields (time picker + location)', async ({ page }) => {
-      const dayView = await openAndType(page, 'dentist 2pm');
-      await expect(dayView.getMorphAppointment()).toBeVisible();
-      await expect(dayView.getMorphExercise()).not.toBeVisible();
-      await expect(dayView.getMorphAppointment().getByLabel('Appointment time')).toBeVisible();
-      await expect(dayView.getMorphAppointment().getByLabel('Location')).toBeVisible();
+    test('shows confirmation message after agent responds', async ({ page }) => {
+      await page.route(`${API_BASE}/agent/task`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task scheduled!' }),
+        }),
+      );
+
+      const dayView = await openAndFill(page, 'call mum');
+      await dayView.getAddButton().click();
+      await expect(dayView.getAgentConfirmation()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getAgentConfirmation()).toContainText('Task scheduled!');
     });
 
-    test('generic text shows no morph fields (task default)', async ({ page }) => {
-      const dayView = await openAndType(page, 'call mum');
-      await expect(dayView.getMorphExercise()).not.toBeVisible();
-      await expect(dayView.getMorphAppointment()).not.toBeVisible();
+    test('shows error message when agent call fails', async ({ page }) => {
+      await page.route(`${API_BASE}/agent/task`, route =>
+        route.fulfill({ status: 500 }),
+      );
+
+      const dayView = await openAndFill(page, 'call mum');
+      await dayView.getAddButton().click();
+      await expect(dayView.getAgentError()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getAgentError()).toContainText('Something went wrong');
     });
   });
 
   test.describe('deferred features', () => {
-    test('parse hint updates based on detected type', async ({ page }) => {
-      // TODO: remove test.fail() when parseHint() is implemented (LLM integration, Phase 3)
-      test.fail();
-      const dayView = new DayViewPage(page);
-      await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
-      await dayView.openAddEntry();
-      await dayView.getEntryInput().fill('yoga');
-      await expect(dayView.getParseHint()).toBeVisible();
-      await expect(dayView.getParseHint()).toContainText(/exercise/i);
-    });
-
     test('submitting the form adds the entry to the schedule list', async ({ page }) => {
       // TODO: remove test.fail() when DayViewComponent.onItemAdded() is implemented
       test.fail();

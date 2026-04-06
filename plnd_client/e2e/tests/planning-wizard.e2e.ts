@@ -320,6 +320,14 @@ test.describe('Planning Wizard', () => {
     });
 
     test('adding a task to a day appends it to that day list', async ({ page }) => {
+      await page.route(`${API_BASE}/agent/task`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task added!' }),
+        }),
+      );
+
       // Target the second accordion (2026-03-31) — starts empty
       const second = page.locator('.day-accordion').nth(1);
       const addAffordance = second.locator('.add-affordance');
@@ -353,6 +361,14 @@ test.describe('Planning Wizard', () => {
     });
 
     test('adding a floating task appends it to the floating list', async ({ page }) => {
+      await page.route(`${API_BASE}/agent/task`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task added!' }),
+        }),
+      );
+
       const floatAdd = page.locator('.float-add-affordance');
 
       await floatAdd.locator('.add-row').click();
