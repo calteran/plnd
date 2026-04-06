@@ -30,7 +30,7 @@ import { BriefingService } from '../../../../core/services/briefing.service';
           <div class="news-content">
             <span class="news-label">Headlines</span>
             <ul class="headlines-list">
-              @for (h of headlines; track $index) {
+              @for (h of headlines; track h.title) {
                 <li>{{ h.title }}</li>
               }
             </ul>

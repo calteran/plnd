@@ -47,6 +47,8 @@ export class BriefingService {
       return;
     }
 
+    // Angular signals are zone-agnostic, so the .set() calls inside these callbacks
+    // trigger change detection correctly even though geolocation fires outside NgZone.
     navigator.geolocation.getCurrentPosition(
       pos => {
         const loc = `${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`;
