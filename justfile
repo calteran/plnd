@@ -29,6 +29,21 @@ init:
 playwright-install:
     cd plnd_client && npx playwright install chromium
 
+# Provision an OrbStack Linux VM as a GitHub Actions self-hosted runner
+# Token is auto-fetched via gh CLI. Pass name to pin a specific VM name.
+setup-runner name="":
+    @bash scripts/setup-runner.sh {{ if name != "" { "--name " + name } else { "" } }}
+
+# Deregister all runners for this machine from GitHub and delete their VMs
+teardown-runners:
+    @bash scripts/teardown-runners.sh
+
+# Stream live runner service logs (Ctrl-C to stop); pass slot number for a specific runner
+watch-runner slot="1":
+    #!/usr/bin/env bash
+    machine=$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/-*$//')
+    exec orb run -m "plnd-${machine}-{{slot}}" sudo journalctl -fu "actions.runner.*"
+
 # Create a worktree and install Angular deps so the LSP resolves types immediately
 worktree-new branch:
     git worktree add .worktrees/{{branch}} -b {{branch}}
