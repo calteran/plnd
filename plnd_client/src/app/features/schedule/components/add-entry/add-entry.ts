@@ -100,12 +100,12 @@ export class AddEntryComponent {
   readonly added              = output<AddedEntry>();
   readonly isOpen             = signal(false);
   protected readonly _text    = signal('');
-  readonly isLoading          = signal(false);
-  readonly pendingSignals     = signal<UiSignal[]>([]);
-  readonly signalAnswers      = signal<Record<string, unknown>>({});
-  readonly conversationHistory = signal<ConversationTurn[]>([]);
-  readonly confirmation       = signal<string | null>(null);
-  readonly errorMessage       = signal<string | null>(null);
+  readonly isLoading                      = signal(false);
+  protected readonly pendingSignals       = signal<UiSignal[]>([]);
+  protected readonly signalAnswers        = signal<Record<string, unknown>>({});
+  protected readonly conversationHistory  = signal<ConversationTurn[]>([]);
+  protected readonly confirmation         = signal<string | null>(null);
+  protected readonly errorMessage         = signal<string | null>(null);
 
   open(): void {
     this.isOpen.set(true);

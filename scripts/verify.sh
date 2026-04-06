@@ -103,7 +103,7 @@ run_job() {
     (
         exec 9>&-           # release lock fd in this subshell (main process keeps it)
         local status=0
-        { (cd "$workdir" && "$@"); } > "$tmpfile" 2>&1 || status=$?
+        { (cd "$workdir" && "$@") 3>&-; } > "$tmpfile" 2>&1 || status=$?
         printf '%s|%s|%s\n' "$status" "$label" "$tmpfile" >&3
         exit $status
     ) &
