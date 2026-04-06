@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ErrorHandler } from '@angular/core';
 import { GlobalErrorHandlerService } from './error-handler.service';
+import { environment } from '../../environments/environment';
 
 describe('GlobalErrorHandlerService', () => {
   let handler: GlobalErrorHandlerService;
@@ -20,11 +21,11 @@ describe('GlobalErrorHandlerService', () => {
     );
   });
 
-  it('calls fetch with POST /api/client_error on handleError', () => {
+  it('calls fetch with POST to the backend client_error endpoint on handleError', () => {
     const err = new Error('test unhandled error');
     handler.handleError(err);
     expect(fetchSpy).toHaveBeenCalledOnceWith(
-      '/api/client_error',
+      `${environment.api.baseUrl}/client_error`,
       jasmine.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

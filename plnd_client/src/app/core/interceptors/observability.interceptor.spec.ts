@@ -9,10 +9,12 @@ import {
   provideHttpClientTesting
 } from '@angular/common/http/testing';
 import { observabilityInterceptor } from './observability.interceptor';
+import { ConfigService } from '../services/config.service';
 
 describe('observabilityInterceptor', () => {
   let http: HttpClient;
   let httpTesting: HttpTestingController;
+  let configService: ConfigService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -23,6 +25,7 @@ describe('observabilityInterceptor', () => {
     });
     http = TestBed.inject(HttpClient);
     httpTesting = TestBed.inject(HttpTestingController);
+    configService = TestBed.inject(ConfigService);
   });
 
   afterEach(() => httpTesting.verify());
@@ -63,7 +66,7 @@ describe('observabilityInterceptor', () => {
       { status: 404, statusText: 'Not Found' }
     );
     expect(fetchSpy).toHaveBeenCalledOnceWith(
-      '/api/client_error',
+      `${configService.getConfig().api.baseUrl}/client_error`,
       jasmine.objectContaining({ method: 'POST', keepalive: true })
     );
   });
