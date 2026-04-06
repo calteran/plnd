@@ -23,7 +23,7 @@ _machine=$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 
 VM_NAMES=()
 while IFS= read -r vm; do
     [[ -n "$vm" ]] && VM_NAMES+=("$vm")
-done < <(orb list 2>/dev/null | awk 'NR>1 {print $1}' | grep -E "^plnd-${_machine}-[0-9]+$" || true)
+done < <(orb list 2>/dev/null | awk '{print $1}' | grep -E "^plnd-${_machine}-[0-9]+$" || true)
 unset _machine
 
 if [[ ${#VM_NAMES[@]} -eq 0 ]]; then
@@ -71,7 +71,7 @@ for VM_NAME in "${VM_NAMES[@]}"; do
 
     # ── Delete the VM ─────────────────────────────────────────────────────────
     echo "    → Deleting VM..."
-    if orb delete "$VM_NAME" 2>/dev/null; then
+    if orb delete --force "$VM_NAME" 2>/dev/null; then
         echo "    ✓ VM deleted"
     else
         echo "    ✗ VM delete failed — remove manually with: orb delete $VM_NAME"
