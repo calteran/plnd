@@ -38,7 +38,7 @@ On each cache miss:
 4. Merge all entries, sort descending by publish timestamp
 5. Take first N (currently 3) → return `Vec<NewsHeadline>`
 
-Entries without a publish or update date fall back to the current timestamp (sorts to top, treated as fresh).
+Entries without a publish or update date fall back to Unix epoch (timestamp `0`), sorting them to the bottom of the merged list. This treats undated content as potentially stale rather than assuming it is fresh.
 
 ### Error Handling
 
