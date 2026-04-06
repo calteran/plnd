@@ -10,7 +10,7 @@ init:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ Installing Homebrew packages..."
-    brew install flock coreutils libpq doppler/cli/doppler
+    brew install flock coreutils libpq dopplerhq/cli/doppler mprocs
 
     echo "→ Installing Rust tools..."
     cargo install cargo-nextest --locked
@@ -52,10 +52,18 @@ worktree-new branch:
 
 # ── Daily Development ─────────────────────────────────────────────────────────
 
-# Run full development environment (all services including Ollama LLM) in detached mode
+# Start infrastructure in Docker, then run API and client natively with split-pane logs.
+# Press q or Ctrl-C to stop API and client — infra containers keep running.
+# Use `just stop` to also bring down the infrastructure.
 # Models default to phi3 (fast) and llama3.2 (capable); override via OLLAMA_FAST_MODEL / OLLAMA_CAPABLE_MODEL.
+# Requires: mprocs (brew install mprocs), doppler
 dev:
-    doppler run -- docker compose build --no-cache && doppler run -- docker compose up -d --force-recreate
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "→ Starting infrastructure (db, mock-oauth-server, ollama)..."
+    doppler run -- docker compose up -d --wait --wait-timeout 120
+    echo "→ Infrastructure healthy. Starting API and client..."
+    mprocs
 
 # Run API service locally (requires PostgreSQL)
 api:
@@ -77,7 +85,10 @@ db:
 stop:
     docker compose down
 
-# View logs
+alias down := stop
+
+# View infra container logs (db, mock-oauth-server, ollama).
+# API and client logs appear in the mprocs TUI when using `just dev`.
 logs:
     docker compose logs -f
 
@@ -154,16 +165,12 @@ test-ng-headless:
     @echo "🧪 Running Angular tests with headless Chrome..."
     cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
 
-# Ensure Docker stack is running and all services are healthy (idempotent)
-# --build client: rebuilds the Angular image so e2e tests always run against
-# the latest compiled code (avoids stale-cache failures).
-# Trade-off: adds a Docker build step on every `just verify` run, even for
-# backend-only changes. If this becomes a bottleneck, move --build to a
-# dedicated e2e recipe and keep services-up as a plain `up -d --wait`.
+# Ensure infrastructure containers are running and healthy (convenience helper — not used by verify).
+# verify.sh manages its own ephemeral containers independently.
 services-up:
-    @echo "🐳 Ensuring Docker stack is up and healthy..."
-    doppler run -- docker compose up -d --build client --wait
-    @echo "✅ Services ready"
+    @echo "🐳 Ensuring infrastructure is up and healthy..."
+    doppler run -- docker compose up -d --wait
+    @echo "✅ Infrastructure ready"
 
 # Run Playwright e2e tests (CI-safe, requires Docker stack + Angular)
 test-e2e:

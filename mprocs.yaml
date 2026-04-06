@@ -1,0 +1,8 @@
+procs:
+  api:
+    shell: "trap 'kill 0' INT TERM EXIT; doppler run -- cargo run & wait"
+    cwd: plnd_api
+
+  client:
+    shell: "trap 'kill 0' INT TERM EXIT; npx ng serve & wait"
+    cwd: plnd_client
