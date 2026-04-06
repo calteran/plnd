@@ -41,8 +41,8 @@ services:
       - ollama_data:/root/.ollama
       - ./scripts/ollama-entrypoint.sh:/entrypoint.sh:ro
     environment:
-      - OLLAMA_FAST_MODEL=${OLLAMA_FAST_MODEL:-phi3}
-      - OLLAMA_CAPABLE_MODEL=${OLLAMA_CAPABLE_MODEL:-llama3.2}
+      - OLLAMA_FAST_MODEL=${OLLAMA_FAST_MODEL:-qwen2.5:3b}
+      - OLLAMA_CAPABLE_MODEL=${OLLAMA_CAPABLE_MODEL:-qwen2.5:14b}
     entrypoint: ["/bin/bash", "/entrypoint.sh"]
     healthcheck:
       # `ollama list` queries the server API and is guaranteed to be in the image.

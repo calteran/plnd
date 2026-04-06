@@ -4,8 +4,8 @@
 # server process.
 set -euo pipefail
 
-FAST_MODEL="${OLLAMA_FAST_MODEL:-phi3}"
-CAPABLE_MODEL="${OLLAMA_CAPABLE_MODEL:-llama3.2}"
+FAST_MODEL="${OLLAMA_FAST_MODEL:-qwen2.5:3b}"
+CAPABLE_MODEL="${OLLAMA_CAPABLE_MODEL:-qwen2.5:14b}"
 
 ollama serve &
 SERVER_PID=$!
