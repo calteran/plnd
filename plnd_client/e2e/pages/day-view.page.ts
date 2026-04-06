@@ -30,11 +30,12 @@ export class DayViewPage {
   // Add-entry form
   getAddRow() { return this.page.getByRole('button', { name: 'Open entry form' }); }
   getEntryInput() { return this.page.getByLabel('Add something to your day'); }
-  getMorphExercise() { return this.page.locator('.morph-form--exercise'); }
-  getMorphAppointment() { return this.page.locator('.morph-form--appointment'); }
   getAddButton() { return this.page.getByRole('button', { name: 'Add', exact: true }); }
+  getContinueButton() { return this.page.getByRole('button', { name: 'Continue', exact: true }); }
   getCancelButton() { return this.page.getByRole('button', { name: 'Cancel', exact: true }); }
-  getParseHint() { return this.page.locator('.parse-hint'); }
+  getLoadingIndicator() { return this.page.locator('.loading'); }
+  getAgentConfirmation() { return this.page.locator('.agent-confirmation'); }
+  getAgentError() { return this.page.locator('.agent-error'); }
 
   /** Click "Add something…" and wait for the text input to appear. */
   async openAddEntry() {
