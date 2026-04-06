@@ -85,6 +85,8 @@ db:
 stop:
     docker compose down
 
+alias down := stop
+
 # View infra container logs (db, mock-oauth-server, ollama).
 # API and client logs appear in the mprocs TUI when using `just dev`.
 logs:
