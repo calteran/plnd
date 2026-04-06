@@ -1,9 +1,14 @@
 export interface WeatherSummary {
-  temp_c: number;
+  temperature_c: number;
   condition: string;
   high_c: number;
   low_c: number;
-  precipitation_flag: boolean;
+  precipitation_mm: number;
+}
+
+export interface NewsHeadline {
+  title: string;
+  url?: string;
 }
 
 export interface YesterdaySnapshot {

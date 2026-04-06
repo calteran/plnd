@@ -46,28 +46,30 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
             <button class="retry-link" (click)="retry()">Tap to retry.</button>
           </p>
         </div>
-      } @else if (scheduleService.scheduleItems().length === 0) {
-        <div class="empty-state">
-          <p>Nothing planned yet. Add something to get started.</p>
-        </div>
       } @else {
-        <div class="schedule-list">
-          @for (item of scheduleService.scheduleItems(); track item.id) {
-            @if (isMealAnchor(item)) {
-              <app-meal-row
-                [meal]="item"
-                (toggled)="scheduleService.toggleItem($event)"
-                (planMeal)="onPlanMeal($event)"
-              />
-            } @else {
-              <app-task-row
-                [item]="item"
-                (toggled)="scheduleService.toggleItem($event)"
-              />
+        @if (scheduleService.scheduleItems().length === 0) {
+          <div class="empty-state">
+            <p>Nothing planned yet. Add something to get started.</p>
+          </div>
+        } @else {
+          <div class="schedule-list">
+            @for (item of scheduleService.scheduleItems(); track item.id) {
+              @if (isMealAnchor(item)) {
+                <app-meal-row
+                  [meal]="item"
+                  (toggled)="scheduleService.toggleItem($event)"
+                  (planMeal)="onPlanMeal($event)"
+                />
+              } @else {
+                <app-task-row
+                  [item]="item"
+                  (toggled)="scheduleService.toggleItem($event)"
+                />
+              }
             }
-          }
-          <app-add-entry (added)="onItemAdded($event)" />
-        </div>
+          </div>
+        }
+        <app-add-entry (added)="onItemAdded($event)" />
       }
 
       @if (isToday()) {

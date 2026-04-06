@@ -3,11 +3,11 @@ import { By } from '@angular/platform-browser';
 import { signal } from '@angular/core';
 import { BriefingHeaderComponent } from './briefing-header';
 import { BriefingService } from '../../../../core/services/briefing.service';
-import type { WeatherSummary } from '../../../../core/models/briefing';
+import type { NewsHeadline, WeatherSummary } from '../../../../core/models/briefing';
 
 function makeMockBriefing(overrides: {
   weather?: WeatherSummary | null;
-  news?: string[] | null;
+  news?: NewsHeadline[] | null;
   weatherError?: string | null;
   newsError?: string | null;
 } = {}) {
@@ -40,7 +40,7 @@ describe('BriefingHeaderComponent', () => {
 
   it('renders weather data when available', async () => {
     const w: WeatherSummary = {
-      temp_c: 14, condition: 'Rainy', high_c: 17, low_c: 11, precipitation_flag: true,
+      temperature_c: 14, condition: 'Rainy', high_c: 17, low_c: 11, precipitation_mm: 5.2,
     };
     const f = await setup({ weather: w });
     expect(f.nativeElement.textContent).toContain('14');
@@ -54,7 +54,7 @@ describe('BriefingHeaderComponent', () => {
   });
 
   it('renders news headlines when available', async () => {
-    const f = await setup({ news: ['Story A', 'Story B'] });
+    const f = await setup({ news: [{ title: 'Story A' }, { title: 'Story B' }] });
     expect(f.nativeElement.textContent).toContain('Story A');
     expect(f.nativeElement.textContent).toContain('Story B');
   });

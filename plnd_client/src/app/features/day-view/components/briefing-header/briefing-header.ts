@@ -11,7 +11,7 @@ import { BriefingService } from '../../../../core/services/briefing.service';
       <div class="briefing-card">
         @if (briefing.weather(); as w) {
           <div class="weather-content">
-            <span class="weather-temp">{{ Math.round(w.temp_c) }}°</span>
+            <span class="weather-temp">{{ Math.round(w.temperature_c) }}°</span>
             <span class="weather-condition">{{ w.condition }}</span>
             <span class="weather-range">
               {{ Math.round(w.high_c) }}° / {{ Math.round(w.low_c) }}°
@@ -30,8 +30,8 @@ import { BriefingService } from '../../../../core/services/briefing.service';
           <div class="news-content">
             <span class="news-label">Headlines</span>
             <ul class="headlines-list">
-              @for (h of headlines; track $index) {
-                <li>{{ h }}</li>
+              @for (h of headlines; track h.title) {
+                <li>{{ h.title }}</li>
               }
             </ul>
           </div>
