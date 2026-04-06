@@ -59,6 +59,22 @@ describe('BriefingHeaderComponent', () => {
     expect(f.nativeElement.textContent).toContain('Story B');
   });
 
+  it('renders headline as a link when url is present', async () => {
+    const f = await setup({ news: [{ title: 'Linked Story', url: 'https://example.com/story' }] });
+    const link = f.debugElement.query(By.css('.headlines-list a'));
+    expect(link).toBeTruthy();
+    expect(link.nativeElement.textContent.trim()).toBe('Linked Story');
+    expect(link.nativeElement.getAttribute('target')).toBe('_blank');
+    expect(link.nativeElement.getAttribute('rel')).toBe('noopener');
+  });
+
+  it('renders headline as plain text when url is absent', async () => {
+    const f = await setup({ news: [{ title: 'Plain Story' }] });
+    const link = f.debugElement.query(By.css('.headlines-list a'));
+    expect(link).toBeFalsy();
+    expect(f.nativeElement.textContent).toContain('Plain Story');
+  });
+
   it('renders news unavailable state when newsError is set', async () => {
     const f = await setup({ newsError: 'Headlines unavailable' });
     expect(f.nativeElement.textContent).toContain('Headlines unavailable');

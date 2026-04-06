@@ -31,7 +31,13 @@ import { BriefingService } from '../../../../core/services/briefing.service';
             <span class="news-label">Headlines</span>
             <ul class="headlines-list">
               @for (h of headlines; track h.title) {
-                <li>{{ h.title }}</li>
+                <li>
+                  @if (h.url) {
+                    <a [href]="h.url" target="_blank" rel="noopener">{{ h.title }}</a>
+                  } @else {
+                    {{ h.title }}
+                  }
+                </li>
               }
             </ul>
           </div>
