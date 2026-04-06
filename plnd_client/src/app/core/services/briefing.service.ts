@@ -63,11 +63,12 @@ export class BriefingService {
           error: () => this._newsError.set('Headlines unavailable'),
         });
       },
-      () => {
+      err => {
+        console.warn('[BriefingService] geolocation error', err.code, err.message);
         this._weatherError.set('Location unavailable');
         this._newsError.set('Location unavailable');
       },
-      { timeout: 5000 },
+      { timeout: 15000 },
     );
   }
 }
