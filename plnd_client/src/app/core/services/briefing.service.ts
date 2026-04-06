@@ -26,8 +26,9 @@ export class BriefingService {
   private _loaded = false;
 
   /** Fire all briefing requests. Yesterday loads unconditionally; weather and news
-   *  require a location — resolved via browser geolocation (5 s timeout). If location
-   *  is denied or unavailable, weather/news are omitted rather than returning 400.
+   *  require a location — resolved via browser geolocation (no artificial timeout so the
+   *  skeleton waits until a fix arrives or the OS reports denial/unavailability). If
+   *  location is denied or unavailable, weather/news are omitted rather than returning 400.
    *  No-ops if already called — prevents duplicate in-flight requests on rapid re-renders. */
   load(): void {
     if (this._loaded) return;
@@ -68,7 +69,6 @@ export class BriefingService {
         this._weatherError.set('Location unavailable');
         this._newsError.set('Location unavailable');
       },
-      { timeout: 15000 },
     );
   }
 }
