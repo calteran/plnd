@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Subject, of, throwError } from 'rxjs';
-import { AddEntryComponent } from './add-entry';
+import { AddEntryComponent, AddedEntry } from './add-entry';
 import { AgentService } from '../../../../core/services/agent.service';
 import { TaskEntryResponse } from '../../../../core/models/agent';
 
@@ -229,5 +229,74 @@ describe('AddEntryComponent', () => {
     expect(f.debugElement.query(By.css('.agent-error'))).toBeTruthy();
     expect(f.nativeElement.textContent).toContain('Something went wrong');
     expect(f.componentInstance.isLoading()).toBeFalse();
+  });
+
+  it('emits the type from actions_taken[0].type when the agent returns a known type', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(
+      of(makeResponse({
+        actions_taken: [{ type: 'exercise', task_id: 'abc' }],
+        confirmation: 'Exercise scheduled!',
+      })),
+    );
+    openPanel(f);
+    typeText(f, 'morning run');
+
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => (emitted = e));
+    clickSubmit(f);
+
+    expect(emitted?.type).toBe('exercise');
+  });
+
+  it('emits "appointment" when actions_taken[0].type is "appointment"', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(
+      of(makeResponse({
+        actions_taken: [{ type: 'appointment', task_id: 'appt-1' }],
+        confirmation: 'Appointment scheduled!',
+      })),
+    );
+    openPanel(f);
+    typeText(f, 'dentist 2pm');
+
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => (emitted = e));
+    clickSubmit(f);
+
+    expect(emitted?.type).toBe('appointment');
+  });
+
+  it('emits type "task" when actions_taken is empty', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(
+      of(makeResponse({ actions_taken: [], confirmation: 'Task added!' })),
+    );
+    openPanel(f);
+    typeText(f, 'buy groceries');
+
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => (emitted = e));
+    clickSubmit(f);
+
+    expect(emitted?.type).toBe('task');
+  });
+
+  it('emits the task_id from actions_taken[0] as id', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(
+      of(makeResponse({
+        actions_taken: [{ type: 'task', task_id: 'server-id-123' }],
+        confirmation: 'Task added!',
+      })),
+    );
+    openPanel(f);
+    typeText(f, 'buy groceries');
+
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => (emitted = e));
+    clickSubmit(f);
+
+    expect(emitted?.id).toBe('server-id-123');
   });
 });
