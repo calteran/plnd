@@ -70,6 +70,10 @@ export class ScheduleService {
       }),
     );
   }
+
+  addItem(task: ScheduleTask): void {
+    this._items.update(items => [...items, task]);
+  }
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────

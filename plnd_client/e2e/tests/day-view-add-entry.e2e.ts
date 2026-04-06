@@ -110,35 +110,42 @@ test.describe('Day View — Add Entry', () => {
       await expect(dayView.getAgentError()).toBeVisible({ timeout: 2_000 });
       await expect(dayView.getAgentError()).toContainText('Something went wrong');
     });
-  });
 
-  test.describe('deferred features', () => {
     test('submitting the form adds the entry to the schedule list', async ({ page }) => {
-      // TODO: remove test.fail() when DayViewComponent.onItemAdded() is implemented
-      test.fail();
-      const MOCK_CREATED_ENTRY = {
-        id: 'new-entry-1',
-        type: 'task',
-        label: 'call mum',
-        status: 'pending',
+      const SEED_ITEM = {
+        entry_id: 'seed-1',
+        task_type: 'custom',
+        title: 'Existing task',
+        status: 'planned',
+        date: '2026-03-28',
+        scheduled_start: '2026-03-28T09:00:00Z',
       };
-      await page.route(`${API_BASE}/schedule**`, route => {
-        if (route.request().method() === 'POST') {
-          return route.fulfill({
-            status: 201,
-            contentType: 'application/json',
-            body: JSON.stringify(MOCK_CREATED_ENTRY),
-          });
-        }
-        return route.continue();
-      });
+      await page.route(`${API_BASE}/schedule/period**`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ entries: [SEED_ITEM], carryover: [] }),
+        }),
+      );
+      await page.route(`${API_BASE}/agent/task`, route =>
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            actions_taken: [{ type: 'task', task_id: 'new-entry-1' }],
+            ui_signals: [],
+            confirmation: 'Task added!',
+          }),
+        }),
+      );
+
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
       await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
       await dayView.openAddEntry();
       await dayView.getEntryInput().fill('call mum');
       await dayView.getAddButton().click();
-      await expect(dayView.getScheduleList()).toContainText('call mum');
+      await expect(dayView.getScheduleList()).toContainText('call mum', { timeout: 3_000 });
     });
   });
 

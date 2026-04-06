@@ -7,7 +7,14 @@ import { ItemType } from '../../../../core/models/schedule';
 export interface AddedEntry {
   label: string;
   type: ItemType;
+  id?: string;
   duration?: number;
+}
+
+// Keep in sync with ItemType in core/models/schedule.ts
+function toItemType(actionType: string | undefined): ItemType {
+  if (actionType === 'exercise' || actionType === 'appointment') return actionType;
+  return 'task';
 }
 
 @Component({
@@ -174,7 +181,8 @@ export class AddEntryComponent {
             this.pendingSignals.set(res.ui_signals);
           } else {
             this.confirmation.set(res.confirmation);
-            this.added.emit({ label: input, type: 'task' });
+            const action = res.actions_taken[0];
+            this.added.emit({ label: input, type: toItemType(action?.type), id: action?.task_id });
             this.conversationHistory.set([]);
             this.pendingSignals.set([]);
           }
