@@ -124,10 +124,14 @@ echo "  → Installing Playwright system dependencies..."
 vm bash -c '
     set -euo pipefail
     export DEBIAN_FRONTEND=noninteractive
+    # Refresh apt cache — required when re-running against an existing VM where
+    # the cache may have expired, or when universe packages are not yet indexed.
+    sudo apt-get update -qq
     sudo apt-get install -y -qq --no-install-recommends \
         libasound2t64 libatk-bridge2.0-0t64 libatk1.0-0t64 libatspi2.0-0t64 \
         libcairo2 libcups2t64 libdbus-1-3 libdrm2 libgbm1 libglib2.0-0t64 \
-        libnspr4 libnss3 libpango-1.0-0 libx11-6 libxcb1 libxcomposite1 \
+        libnspr4 libnss3 libpango-1.0-0 libwayland-client0 \
+        libx11-6 libxcb1 libxcb-shm0 libxcomposite1 \
         libxdamage1 libxext6 libxfixes3 libxkbcommon0 libxrandr2 xvfb \
         fonts-noto-color-emoji fonts-unifont libfontconfig1 libfreetype6 \
         xfonts-cyrillic xfonts-scalable fonts-liberation fonts-ipafont-gothic \
