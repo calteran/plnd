@@ -63,28 +63,28 @@ describe('BriefingService', () => {
   const Y = { tasks_done: 4, tasks_total: 6, meals_logged: 2, meals_planned: 3 };
 
   it('sets weather signal on successful fetch', () => {
-    service.load();
+    service.load('2026-04-06');
     flushAll(W, N, Y);
     expect(service.weather()?.temperature_c).toBe(14);
     expect(service.weatherError()).toBeNull();
   });
 
   it('sets news signal on successful fetch', () => {
-    service.load();
+    service.load('2026-04-06');
     flushAll(W, N, Y);
     expect(service.news()).toEqual([{ title: 'Story A' }, { title: 'Story B' }]);
     expect(service.newsError()).toBeNull();
   });
 
   it('sets yesterday signal on successful fetch', () => {
-    service.load();
+    service.load('2026-04-06');
     flushAll(W, N, Y);
     expect(service.yesterday()?.tasks_done).toBe(4);
     expect(service.yesterdayError()).toBeNull();
   });
 
   it('sets weatherError and leaves news intact when weather fails', () => {
-    service.load();
+    service.load('2026-04-06');
     httpMock
       .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/weather'))
       .error(new ErrorEvent('Network error'));
@@ -100,7 +100,7 @@ describe('BriefingService', () => {
   });
 
   it('sets newsError and leaves weather intact when news fails', () => {
-    service.load();
+    service.load('2026-04-06');
     httpMock
       .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/weather'))
       .flush(W);
@@ -114,15 +114,26 @@ describe('BriefingService', () => {
     expect(service.weather()?.temperature_c).toBe(14);
   });
 
-  it('does not fire duplicate requests when load() is called twice', () => {
-    service.load();
-    service.load(); // should be a no-op
+  it('does not fire duplicate requests when load() is called twice for the same date', () => {
+    service.load('2026-04-06');
+    service.load('2026-04-06'); // same date — should be a no-op
+    flushAll(W, N, Y);
+    expect(service.weather()?.temperature_c).toBe(14);
+  });
+
+  it('re-fetches and clears stale signals when called for a different date', () => {
+    service.load('2026-04-06');
+    flushAll(W, N, Y);
+    expect(service.weather()?.temperature_c).toBe(14);
+
+    service.load('2026-04-07'); // new date — signals reset immediately, fresh requests fire
+    expect(service.weather()).toBeNull();
     flushAll(W, N, Y);
     expect(service.weather()?.temperature_c).toBe(14);
   });
 
   it('sets yesterdayError when yesterday fails', () => {
-    service.load();
+    service.load('2026-04-06');
     httpMock
       .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/weather'))
       .flush(W);
@@ -145,7 +156,7 @@ describe('BriefingService', () => {
         } as GeolocationPositionError);
       }
     );
-    service.load();
+    service.load('2026-04-06');
     httpMock.expectOne('http://localhost:3000/briefing/yesterday').flush(Y);
     expect(service.weatherError()).toBe('Location unavailable');
     expect(service.newsError()).toBe('Location unavailable');

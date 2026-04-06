@@ -23,16 +23,25 @@ export class BriefingService {
   readonly newsError      = this._newsError.asReadonly();
   readonly yesterdayError = this._yesterdayError.asReadonly();
 
-  private _loaded = false;
+  private _loadedForDate: string | null = null;
 
-  /** Fire all briefing requests. Yesterday loads unconditionally; weather and news
-   *  require a location — resolved via browser geolocation. A cached fix up to 60 s old
-   *  is accepted (returns immediately on revisits); fresh fixes time out after 15 s. If
-   *  location is denied or unavailable, weather/news are omitted rather than returning 400.
-   *  No-ops if already called — prevents duplicate in-flight requests on rapid re-renders. */
-  load(): void {
-    if (this._loaded) return;
-    this._loaded = true;
+  /** Fire all briefing requests for the given calendar date. Yesterday loads
+   *  unconditionally; weather and news require a location — resolved via browser
+   *  geolocation. A cached fix up to 60 s old is accepted (returns immediately on
+   *  revisits); fresh fixes time out after 15 s. If location is denied or unavailable,
+   *  weather/news are omitted rather than returning 400.
+   *  No-ops when called again for the same date — prevents duplicate in-flight requests
+   *  on rapid re-renders. Re-fetches fresh data when called for a different date (e.g.
+   *  returning to today after the day rolls over). */
+  load(date: string): void {
+    if (this._loadedForDate === date) return;
+    this._loadedForDate = date;
+    this._weather.set(null);
+    this._news.set(null);
+    this._yesterday.set(null);
+    this._weatherError.set(null);
+    this._newsError.set(null);
+    this._yesterdayError.set(null);
     const base = this.config.getConfig().api.baseUrl;
 
     const ctx = new HttpContext().set(SKIP_AUTH_ERROR, true);
