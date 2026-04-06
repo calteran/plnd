@@ -1,4 +1,5 @@
 import { ErrorHandler, Injectable } from '@angular/core';
+import { environment } from '../../environments/environment';
 
 interface ClientErrorPayload {
   message: string;
@@ -31,7 +32,7 @@ export class GlobalErrorHandlerService implements ErrorHandler {
       user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown',
     };
 
-    fetch('/api/client_error', {
+    fetch(`${environment.api.baseUrl}/client_error`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

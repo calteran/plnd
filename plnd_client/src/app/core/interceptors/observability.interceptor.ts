@@ -4,7 +4,9 @@ import {
   HttpInterceptorFn,
   HttpRequest,
 } from '@angular/common/http';
+import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
+import { ConfigService } from '../services/config.service';
 
 /**
  * Payload sent to POST /api/client_error.
@@ -24,12 +26,12 @@ interface ClientErrorPayload {
  * avoid re-entering the interceptor chain and causing recursion.
  * Uses keepalive: true so the request survives page navigation/unload.
  */
-function reportError(payload: ClientErrorPayload, authHeader?: string): void {
+function reportError(payload: ClientErrorPayload, baseUrl: string, authHeader?: string): void {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (authHeader) {
     headers['Authorization'] = authHeader;
   }
-  fetch('/api/client_error', {
+  fetch(`${baseUrl}/client_error`, {
     method: 'POST',
     headers,
     body: JSON.stringify(payload),
@@ -50,6 +52,9 @@ export const observabilityInterceptor: HttpInterceptorFn = (
   req: HttpRequest<unknown>,
   next: HttpHandlerFn
 ) => {
+  const config = inject(ConfigService);
+  const baseUrl = config.getConfig().api.baseUrl;
+
   const requestId = crypto.randomUUID();
   const reqWithId = req.clone({
     setHeaders: { 'X-Request-ID': requestId },
@@ -65,7 +70,7 @@ export const observabilityInterceptor: HttpInterceptorFn = (
           request_id: requestId,
           timestamp: new Date().toISOString(),
           user_agent: navigator.userAgent,
-        }, authHeader);
+        }, baseUrl, authHeader);
       }
       return throwError(() => error);
     })

@@ -63,7 +63,7 @@ describe('observabilityInterceptor', () => {
       { status: 404, statusText: 'Not Found' }
     );
     expect(fetchSpy).toHaveBeenCalledOnceWith(
-      '/api/client_error',
+      'http://localhost:3000/client_error',
       jasmine.objectContaining({ method: 'POST', keepalive: true })
     );
   });

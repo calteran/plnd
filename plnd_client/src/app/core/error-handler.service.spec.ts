@@ -20,11 +20,11 @@ describe('GlobalErrorHandlerService', () => {
     );
   });
 
-  it('calls fetch with POST /api/client_error on handleError', () => {
+  it('calls fetch with POST to the backend client_error endpoint on handleError', () => {
     const err = new Error('test unhandled error');
     handler.handleError(err);
     expect(fetchSpy).toHaveBeenCalledOnceWith(
-      '/api/client_error',
+      'http://localhost:3000/client_error',
       jasmine.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
