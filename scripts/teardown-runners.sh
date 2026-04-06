@@ -5,26 +5,26 @@
 #   ./scripts/teardown-runners.sh
 #   just teardown-runners
 #
-# Discovers every OrbStack VM named <hostname>-1, <hostname>-2, … (matching the
-# naming scheme used by setup-runner.sh), deregisters each from GitHub Actions,
-# stops its runner service, and deletes the VM.
+# Discovers every OrbStack VM named plnd-<hostname>-<N> via `orb list` (handles
+# gaps in numbering), deregisters each from GitHub Actions, stops its runner
+# service, and deletes the VM.
 
 set -euo pipefail
 export GH_PAGER=cat   # prevent gh from invoking less when stdout is a TTY
 
-REPO_URL="https://github.com/calteran/plnd"
+REPO_SLUG=$(gh repo view --json nameWithOwner -q .nameWithOwner)
+REPO_URL="https://github.com/${REPO_SLUG}"
 
 # ── Discover runner VMs ───────────────────────────────────────────────────────
-# Mirrors the naming logic in setup-runner.sh: <hostname>-<N>
+# Uses `orb list` to find all VMs matching plnd-<hostname>-<N>, handling gaps
+# in numbering (e.g. if a previous teardown removed slot 2 but not 3).
 _machine=$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/-*$//')
 
 VM_NAMES=()
-_n=1
-while orb info "plnd-${_machine}-${_n}" &>/dev/null; do
-    VM_NAMES+=("plnd-${_machine}-${_n}")
-    _n=$((_n + 1))
-done
-unset _machine _n
+while IFS= read -r vm; do
+    [[ -n "$vm" ]] && VM_NAMES+=("$vm")
+done < <(orb list 2>/dev/null | awk 'NR>1 {print $1}' | grep -E "^plnd-${_machine}-[0-9]+$" || true)
+unset _machine
 
 if [[ ${#VM_NAMES[@]} -eq 0 ]]; then
     echo "✓ No runner VMs found for this machine."
@@ -45,10 +45,10 @@ for VM_NAME in "${VM_NAMES[@]}"; do
         echo "    ✗ gh not found — deregister manually at: $REPO_URL/settings/actions/runners"
         OVERALL=1
     else
-        RUNNER_ID=$(gh api "repos/calteran/plnd/actions/runners" \
+        RUNNER_ID=$(gh api "repos/${REPO_SLUG}/actions/runners" \
             --jq ".runners[] | select(.name==\"$VM_NAME\") | .id" 2>/dev/null || true)
         if [[ -n "$RUNNER_ID" ]]; then
-            gh api -X DELETE "repos/calteran/plnd/actions/runners/$RUNNER_ID" 2>/dev/null || true
+            gh api -X DELETE "repos/${REPO_SLUG}/actions/runners/$RUNNER_ID" 2>/dev/null || true
             echo "    ✓ Deregistered (GitHub id: $RUNNER_ID)"
         else
             echo "    ✓ Not found on GitHub (already removed)"

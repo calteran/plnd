@@ -17,7 +17,7 @@
 
 set -euo pipefail
 
-REPO_URL="https://github.com/calteran/plnd"
+REPO_URL="https://github.com/$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 RUNNER_TOKEN=""
 VM_NAME=""   # auto-set after arg parsing: <hostname>-<N>
 RUNNER_ARCH_LABEL="$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
