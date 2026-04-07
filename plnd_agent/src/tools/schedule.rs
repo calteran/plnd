@@ -25,6 +25,23 @@ fn validate_energy_level(level: &str, tool: &str) -> Result<(), ToolError> {
     }
 }
 
+// ── Valid duration range ──────────────────────────────────────────────────────
+
+const DURATION_MIN: i32 = 1;
+const DURATION_MAX: i32 = 480;
+
+fn validate_duration_minutes(value: i64, tool: &str) -> Result<i32, ToolError> {
+    if !(DURATION_MIN as i64..=DURATION_MAX as i64).contains(&value) {
+        return Err(ToolError::InvalidInput {
+            tool: tool.to_string(),
+            reason: format!(
+                "duration_minutes {value} is out of range; must be {DURATION_MIN}–{DURATION_MAX}"
+            ),
+        });
+    }
+    Ok(value as i32)
+}
+
 // ── Helper: map DatabaseError → ToolError ─────────────────────────────────────
 
 fn db_err(tool: &str, e: DatabaseError) -> ToolError {
@@ -62,7 +79,7 @@ impl Tool for FindScheduleSlotTool {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 5,
+                    "minimum": 1,
                     "maximum": 480,
                     "description": "How long the task will take, in minutes."
                 },
@@ -98,7 +115,8 @@ impl Tool for FindScheduleSlotTool {
             .ok_or_else(|| ToolError::InvalidInput {
                 tool: self.name().to_string(),
                 reason: "missing required field 'duration_minutes'".to_string(),
-            })? as i32;
+            })?;
+        let duration_minutes = validate_duration_minutes(duration_minutes, self.name())?;
 
         let after: DateTime<Utc> = match input.get("after").and_then(|v| v.as_str()) {
             Some(s) => s
@@ -161,7 +179,7 @@ impl Tool for CreateTaskTool {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 5,
+                    "minimum": 1,
                     "maximum": 480,
                     "description": "How long the task will take, in minutes."
                 },
@@ -232,7 +250,8 @@ impl Tool for CreateTaskTool {
             .ok_or_else(|| ToolError::InvalidInput {
                 tool: self.name().to_string(),
                 reason: "missing required field 'duration_minutes'".to_string(),
-            })? as i32;
+            })?;
+        let duration_minutes = validate_duration_minutes(duration_minutes, self.name())?;
 
         let confirmation = input
             .get("confirmation")
@@ -389,7 +408,7 @@ mod tests {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 5,
+                    "minimum": 1,
                     "maximum": 480,
                     "description": "How long the task will take, in minutes."
                 },
@@ -423,7 +442,7 @@ mod tests {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 5,
+                    "minimum": 1,
                     "maximum": 480,
                     "description": "How long the task will take, in minutes."
                 },
@@ -512,5 +531,33 @@ mod tests {
             assert_eq!(result["actions_taken"], serde_json::json!([]));
             assert_eq!(result["ui_signals"][0]["field"], "duration_minutes");
         });
+    }
+
+    #[test]
+    fn duration_minutes_valid_boundary() {
+        assert_eq!(validate_duration_minutes(1, "test").unwrap(), 1);
+        assert_eq!(validate_duration_minutes(480, "test").unwrap(), 480);
+        assert_eq!(validate_duration_minutes(30, "test").unwrap(), 30);
+    }
+
+    #[test]
+    fn duration_minutes_too_small() {
+        assert!(validate_duration_minutes(0, "test").is_err());
+        assert!(validate_duration_minutes(-1, "test").is_err());
+    }
+
+    #[test]
+    fn duration_minutes_too_large() {
+        assert!(validate_duration_minutes(481, "test").is_err());
+        assert!(validate_duration_minutes(i64::MAX, "test").is_err());
+    }
+
+    #[test]
+    fn duration_minutes_error_names_tool() {
+        let err = validate_duration_minutes(0, "find_schedule_slot").unwrap_err();
+        match err {
+            ToolError::InvalidInput { tool, .. } => assert_eq!(tool, "find_schedule_slot"),
+            _ => panic!("expected InvalidInput"),
+        }
     }
 }
