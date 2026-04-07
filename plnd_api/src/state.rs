@@ -21,6 +21,8 @@ pub struct AppState {
     /// Per-IP rate limiter for unauthenticated POST /api/client_error requests.
     /// Authenticated requests (valid JWT) bypass this limiter entirely.
     pub client_error_limiter: Arc<DefaultKeyedRateLimiter<String>>,
+    /// Per-user rate limiter for POST /agent/task. Keyed by authenticated user_id (UUID string).
+    pub agent_task_limiter: Arc<DefaultKeyedRateLimiter<String>>,
     /// Agent service for LLM-backed task and meal-plan generation.
     /// Stub in Phase 3.1 — fully implemented in Phase 3.2/3.3.
     pub agent: AgentService,

@@ -105,6 +105,12 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.llm.capable.api_key = key;
     }
 
+    if let Ok(v) = std::env::var("APP_AGENT__RATE_LIMIT_PER_MINUTE") {
+        if let Ok(limit) = v.parse::<u32>() {
+            app_config.agent.rate_limit_per_minute = limit;
+        }
+    }
+
     app_config
         .validate()
         .map_err(error::ConfigError::Validation)?;

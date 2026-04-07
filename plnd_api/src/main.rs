@@ -184,6 +184,12 @@ async fn main() {
     let client_error_quota = Quota::per_minute(NonZeroU32::new(20).unwrap());
     let client_error_limiter = Arc::new(RateLimiter::keyed(client_error_quota));
 
+    // Per-user rate limiter for POST /agent/task. Quota is env-driven via
+    // APP_AGENT__RATE_LIMIT_PER_MINUTE (default 10 req/min).
+    let agent_task_quota =
+        Quota::per_minute(NonZeroU32::new(config.agent.rate_limit_per_minute).unwrap());
+    let agent_task_limiter = Arc::new(RateLimiter::keyed(agent_task_quota));
+
     let agent = plnd_agent::AgentService::new(&config.llm, db_conn.clone());
 
     let state = Arc::new(AppState {
@@ -195,6 +201,7 @@ async fn main() {
         provider_search,
         briefing,
         client_error_limiter,
+        agent_task_limiter,
         agent,
     });
 

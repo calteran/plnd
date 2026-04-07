@@ -51,6 +51,7 @@ fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> Str
     responses(
         (status = 200, description = "Task created", body = TaskEntryResponse),
         (status = 401, description = "Unauthorized"),
+        (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
         (status = 500, description = "Internal server error — agent failure or unparseable output"),
     )
 )]
@@ -60,6 +61,10 @@ pub async fn post_task(
     Extension(claims): Extension<Claims>,
     Json(body): Json<TaskEntryRequest>,
 ) -> Result<Json<TaskEntryResponse>, StatusCode> {
+    if state.agent_task_limiter.check_key(&claims.sub).is_err() {
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let pool = state.db.get_pool().clone();
 
@@ -95,6 +100,7 @@ pub async fn post_task(
 }
 
 /// POST /agent/meal-plan — stub returning 501 until Phase 3.3 implements LLM-backed meal planning.
+/// TODO(phase-3.3): apply `state.agent_task_limiter` rate limit here before making any LLM calls.
 #[utoipa::path(
     post,
     path = "/agent/meal-plan",

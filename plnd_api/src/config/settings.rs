@@ -131,6 +131,25 @@ fn default_cache_ttl_hours() -> u64 {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct AgentConfig {
+    /// Max requests per minute per authenticated user for POST /agent/task.
+    #[serde(default = "default_agent_rate_limit")]
+    pub rate_limit_per_minute: u32,
+}
+
+fn default_agent_rate_limit() -> u32 {
+    10
+}
+
+impl Default for AgentConfig {
+    fn default() -> Self {
+        Self {
+            rate_limit_per_minute: default_agent_rate_limit(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub api: ApiConfig,
     pub database: DatabaseConfig,
@@ -142,6 +161,8 @@ pub struct AppConfig {
     pub external_providers: ExternalProvidersConfig,
     #[serde(default)]
     pub llm: plnd_agent::LlmConfig,
+    #[serde(default)]
+    pub agent: AgentConfig,
 }
 
 impl AppConfig {
@@ -168,6 +189,10 @@ impl AppConfig {
 
         if self.auth.jwt.refresh_token_expiration == 0 {
             return Err("Refresh token expiration must be greater than 0".to_string());
+        }
+
+        if self.agent.rate_limit_per_minute == 0 {
+            return Err("agent.rate_limit_per_minute must be greater than 0".to_string());
         }
 
         Ok(())
