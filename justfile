@@ -64,12 +64,17 @@ dev:
     doppler run -- docker compose up -d --wait --wait-timeout 120
     echo "→ Infrastructure healthy."
     LM_MODEL="${LM_STUDIO_MODEL:-google/gemma-4-26b-a4b}"
-    echo "→ Pre-loading LM Studio model: $LM_MODEL"
-    curl -s -X POST http://localhost:1234/api/v1/models/load \
-      -H "Content-Type: application/json" \
-      -d "{\"model\": \"$LM_MODEL\"}" \
-      -o /dev/null \
-      || echo "  ⚠  LM Studio not reachable — model will load on first inference request"
+    echo "→ Ensuring LM Studio model is loaded: $LM_MODEL"
+    loaded=$(curl -s http://localhost:1234/v1/models 2>/dev/null | grep -c "\"$LM_MODEL\"" || true)
+    if [ "$loaded" -gt 0 ]; then
+      echo "  ✓ Model already loaded"
+    else
+      curl -s -X POST http://localhost:1234/api/v1/models/load \
+        -H "Content-Type: application/json" \
+        -d "{\"model\": \"$LM_MODEL\"}" \
+        -o /dev/null \
+        || echo "  ⚠  LM Studio not reachable — model will load on first inference request"
+    fi
     echo "→ Starting API and client..."
     mprocs
 
