@@ -69,28 +69,7 @@ impl Tool for FindScheduleSlotTool {
     }
 
     fn schema(&self) -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "energy_level": {
-                    "type": "string",
-                    "enum": VALID_ENERGY_LEVELS,
-                    "description": "Energy level required for the task."
-                },
-                "duration_minutes": {
-                    "type": "integer",
-                    "minimum": DURATION_MIN,
-                    "maximum": DURATION_MAX,
-                    "description": "How long the task will take, in minutes."
-                },
-                "after": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "Search for slots after this ISO 8601 datetime. Defaults to now."
-                }
-            },
-            "required": ["energy_level", "duration_minutes"]
-        })
+        find_schedule_slot_schema()
     }
 
     async fn execute(
@@ -160,41 +139,7 @@ impl Tool for CreateTaskTool {
     }
 
     fn schema(&self) -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Title of the task."
-                },
-                "energy_level": {
-                    "type": "string",
-                    "enum": VALID_ENERGY_LEVELS,
-                    "description": "Energy level required for the task."
-                },
-                "scheduled_at": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "ISO 8601 datetime when the task is scheduled to start."
-                },
-                "duration_minutes": {
-                    "type": "integer",
-                    "minimum": DURATION_MIN,
-                    "maximum": DURATION_MAX,
-                    "description": "How long the task will take, in minutes."
-                },
-                "ui_signals": {
-                    "type": "array",
-                    "items": { "type": "object" },
-                    "description": "Frontend signals passed through unchanged to the API response."
-                },
-                "confirmation": {
-                    "type": "string",
-                    "description": "Human-readable summary of what was scheduled, shown to the user."
-                }
-            },
-            "required": ["title", "energy_level", "scheduled_at", "duration_minutes", "confirmation"]
-        })
+        create_task_schema()
     }
 
     fn is_terminal(&self) -> bool {
@@ -309,17 +254,7 @@ impl Tool for RequestClarificationTool {
     }
 
     fn schema(&self) -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "required": ["ui_signals"],
-            "properties": {
-                "ui_signals": {
-                    "type": "array",
-                    "items": { "type": "object" },
-                    "description": "UI hints for fields that need user input."
-                }
-            }
-        })
+        request_clarification_schema()
     }
 
     fn is_terminal(&self) -> bool {
@@ -364,15 +299,90 @@ pub fn register_schedule_tools(registry: &mut ToolRegistry, store: Arc<TaskStore
     registry.register(Arc::new(RequestClarificationTool));
 }
 
+// ── Schema constructors ───────────────────────────────────────────────────────
+
+fn find_schedule_slot_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "energy_level": {
+                "type": "string",
+                "enum": VALID_ENERGY_LEVELS,
+                "description": "Energy level required for the task."
+            },
+            "duration_minutes": {
+                "type": "integer",
+                "minimum": DURATION_MIN,
+                "maximum": DURATION_MAX,
+                "description": "How long the task will take, in minutes."
+            },
+            "after": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Search for slots after this ISO 8601 datetime. Defaults to now."
+            }
+        },
+        "required": ["energy_level", "duration_minutes"]
+    })
+}
+
+fn create_task_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "properties": {
+            "title": {
+                "type": "string",
+                "description": "Title of the task."
+            },
+            "energy_level": {
+                "type": "string",
+                "enum": VALID_ENERGY_LEVELS,
+                "description": "Energy level required for the task."
+            },
+            "scheduled_at": {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO 8601 datetime when the task is scheduled to start."
+            },
+            "duration_minutes": {
+                "type": "integer",
+                "minimum": DURATION_MIN,
+                "maximum": DURATION_MAX,
+                "description": "How long the task will take, in minutes."
+            },
+            "ui_signals": {
+                "type": "array",
+                "items": { "type": "object" },
+                "description": "Frontend signals passed through unchanged to the API response."
+            },
+            "confirmation": {
+                "type": "string",
+                "description": "Human-readable summary of what was scheduled, shown to the user."
+            }
+        },
+        "required": ["title", "energy_level", "scheduled_at", "duration_minutes", "confirmation"]
+    })
+}
+
+fn request_clarification_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "required": ["ui_signals"],
+        "properties": {
+            "ui_signals": {
+                "type": "array",
+                "items": { "type": "object" },
+                "description": "UI hints for fields that need user input."
+            }
+        }
+    })
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // TaskStore requires a live PgPool. Schema tests don't call execute(), so
-    // we test schemas by reproducing the exact JSON the tools return — this
-    // avoids a test-only DB dependency while still pinning the contract.
 
     fn has_user_id_property(schema: &serde_json::Value) -> bool {
         schema
@@ -397,72 +407,9 @@ mod tests {
             .unwrap_or(false)
     }
 
-    fn find_slot_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "energy_level": {
-                    "type": "string",
-                    "enum": VALID_ENERGY_LEVELS,
-                    "description": "Energy level required for the task."
-                },
-                "duration_minutes": {
-                    "type": "integer",
-                    "minimum": DURATION_MIN,
-                    "maximum": DURATION_MAX,
-                    "description": "How long the task will take, in minutes."
-                },
-                "after": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "Search for slots after this ISO 8601 datetime. Defaults to now."
-                }
-            },
-            "required": ["energy_level", "duration_minutes"]
-        })
-    }
-
-    fn create_task_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "title": {
-                    "type": "string",
-                    "description": "Title of the task."
-                },
-                "energy_level": {
-                    "type": "string",
-                    "enum": VALID_ENERGY_LEVELS,
-                    "description": "Energy level required for the task."
-                },
-                "scheduled_at": {
-                    "type": "string",
-                    "format": "date-time",
-                    "description": "ISO 8601 datetime when the task is scheduled to start."
-                },
-                "duration_minutes": {
-                    "type": "integer",
-                    "minimum": DURATION_MIN,
-                    "maximum": DURATION_MAX,
-                    "description": "How long the task will take, in minutes."
-                },
-                "ui_signals": {
-                    "type": "array",
-                    "items": { "type": "object" },
-                    "description": "Frontend signals passed through unchanged to the API response."
-                },
-                "confirmation": {
-                    "type": "string",
-                    "description": "Human-readable summary of what was scheduled, shown to the user."
-                }
-            },
-            "required": ["title", "energy_level", "scheduled_at", "duration_minutes", "confirmation"]
-        })
-    }
-
     #[test]
     fn find_slot_schema_has_no_user_id() {
-        let schema = find_slot_schema();
+        let schema = find_schedule_slot_schema();
         assert!(!has_user_id_property(&schema));
         assert!(!schema_requires_user_id(&schema));
     }
@@ -481,18 +428,19 @@ mod tests {
         assert!(schema_requires_field(&schema, "confirmation"));
     }
 
-    fn clarification_schema() -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "required": ["ui_signals"],
-            "properties": {
-                "ui_signals": {
-                    "type": "array",
-                    "items": { "type": "object" },
-                    "description": "UI hints for fields that need user input."
-                }
-            }
-        })
+    #[test]
+    fn find_slot_schema_requires_energy_level_and_duration() {
+        let schema = find_schedule_slot_schema();
+        assert!(schema_requires_field(&schema, "energy_level"));
+        assert!(schema_requires_field(&schema, "duration_minutes"));
+    }
+
+    #[test]
+    fn request_clarification_tool_schema_delegates_to_free_fn() {
+        // RequestClarificationTool is the only store-free struct; verify the
+        // delegation pattern works end-to-end for one tool.
+        let tool = RequestClarificationTool;
+        assert_eq!(tool.schema(), request_clarification_schema());
     }
 
     #[test]
@@ -503,14 +451,14 @@ mod tests {
 
     #[test]
     fn request_clarification_schema_has_no_user_id() {
-        let schema = clarification_schema();
+        let schema = request_clarification_schema();
         assert!(!has_user_id_property(&schema));
         assert!(!schema_requires_user_id(&schema));
     }
 
     #[test]
     fn request_clarification_schema_requires_ui_signals() {
-        let schema = clarification_schema();
+        let schema = request_clarification_schema();
         assert!(schema_requires_field(&schema, "ui_signals"));
     }
 
