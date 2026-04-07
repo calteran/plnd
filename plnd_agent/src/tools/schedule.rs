@@ -436,7 +436,7 @@ mod tests {
     }
 
     #[test]
-    fn find_slot_tool_schema_delegates_to_free_fn() {
+    fn request_clarification_tool_schema_delegates_to_free_fn() {
         // RequestClarificationTool is the only store-free struct; verify the
         // delegation pattern works end-to-end for one tool.
         let tool = RequestClarificationTool;
