@@ -79,8 +79,8 @@ impl Tool for FindScheduleSlotTool {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 480,
+                    "minimum": DURATION_MIN,
+                    "maximum": DURATION_MAX,
                     "description": "How long the task will take, in minutes."
                 },
                 "after": {
@@ -179,8 +179,8 @@ impl Tool for CreateTaskTool {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 480,
+                    "minimum": DURATION_MIN,
+                    "maximum": DURATION_MAX,
                     "description": "How long the task will take, in minutes."
                 },
                 "ui_signals": {
@@ -408,8 +408,8 @@ mod tests {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 480,
+                    "minimum": DURATION_MIN,
+                    "maximum": DURATION_MAX,
                     "description": "How long the task will take, in minutes."
                 },
                 "after": {
@@ -442,8 +442,8 @@ mod tests {
                 },
                 "duration_minutes": {
                     "type": "integer",
-                    "minimum": 1,
-                    "maximum": 480,
+                    "minimum": DURATION_MIN,
+                    "maximum": DURATION_MAX,
                     "description": "How long the task will take, in minutes."
                 },
                 "ui_signals": {
