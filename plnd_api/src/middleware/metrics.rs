@@ -14,6 +14,10 @@ use opentelemetry::{
     metrics::{Histogram, UpDownCounter},
     KeyValue,
 };
+use opentelemetry_semantic_conventions::{
+    attribute::{HTTP_REQUEST_METHOD, HTTP_RESPONSE_STATUS_CODE, HTTP_ROUTE},
+    metric::{HTTP_SERVER_ACTIVE_REQUESTS, HTTP_SERVER_REQUEST_DURATION},
+};
 use std::{
     future::Future,
     pin::Pin,
@@ -34,12 +38,12 @@ impl<S> Layer<S> for HttpMetricsLayer {
         HttpMetricsService {
             inner,
             request_duration: meter
-                .f64_histogram("http.server.request.duration")
+                .f64_histogram(HTTP_SERVER_REQUEST_DURATION)
                 .with_unit("ms")
                 .with_description("HTTP server request duration in milliseconds")
                 .build(),
             active_requests: meter
-                .i64_up_down_counter("http.server.active_requests")
+                .i64_up_down_counter(HTTP_SERVER_ACTIVE_REQUESTS)
                 .with_description("Number of HTTP requests currently being processed")
                 .build(),
         }
@@ -64,7 +68,9 @@ where
 {
     type Response = axum::http::Response<axum::body::Body>;
     type Error = S::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<axum::http::Response<axum::body::Body>, S::Error>> + Send>>;
+    type Future = Pin<
+        Box<dyn Future<Output = Result<axum::http::Response<axum::body::Body>, S::Error>> + Send>,
+    >;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -80,8 +86,8 @@ where
         active.add(
             1,
             &[
-                KeyValue::new("http.request.method", method.clone()),
-                KeyValue::new("http.route", route.clone()),
+                KeyValue::new(HTTP_REQUEST_METHOD, method.clone()),
+                KeyValue::new(HTTP_ROUTE, route.clone()),
             ],
         );
 
@@ -99,16 +105,16 @@ where
             duration.record(
                 elapsed_ms,
                 &[
-                    KeyValue::new("http.request.method", method.clone()),
-                    KeyValue::new("http.route", route.clone()),
-                    KeyValue::new("http.response.status_code", status_code),
+                    KeyValue::new(HTTP_REQUEST_METHOD, method.clone()),
+                    KeyValue::new(HTTP_ROUTE, route.clone()),
+                    KeyValue::new(HTTP_RESPONSE_STATUS_CODE, status_code),
                 ],
             );
             active.add(
                 -1,
                 &[
-                    KeyValue::new("http.request.method", method),
-                    KeyValue::new("http.route", route),
+                    KeyValue::new(HTTP_REQUEST_METHOD, method),
+                    KeyValue::new(HTTP_ROUTE, route),
                 ],
             );
 
@@ -135,7 +141,12 @@ mod tests {
             .layer(HttpMetricsLayer);
 
         let response = app
-            .oneshot(Request::builder().uri("/health").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
 
