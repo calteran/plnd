@@ -30,3 +30,6 @@ model = "google/gemma-4-26b-a4b"
 api_key = "lm-studio"
 max_tokens = 4096
 max_iterations = 10
+
+[otel]
+endpoint = "http://localhost:4317"
