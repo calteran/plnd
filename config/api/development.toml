@@ -7,7 +7,7 @@ timeout = 60000
 
 [logging]
 # More verbose logging for development
-level = "debug"
+level = "debug,h2=warn,hyper_util=warn,tonic=warn,tower=warn,opentelemetry_sdk=warn"
 pretty_print = true
 
 [llm.fast]
