@@ -30,6 +30,7 @@ utoipa-scalar = { version = "0.3", features = ["axum"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 governor = "0.10"
+tower = "0.5"
 opentelemetry                      = { version = "0.27", features = ["trace"] }
 opentelemetry_sdk                  = { version = "0.27", features = ["rt-tokio", "trace", "logs", "metrics"] }
 opentelemetry-otlp                 = { version = "0.27", features = ["grpc-tonic", "trace", "logs", "metrics"] }
