@@ -64,7 +64,7 @@ services:
       - loki_data:/loki
 
   tempo:
-    image: grafana/tempo:2.6.1
+    image: grafana/tempo:2.10.3
     ports:
       - "3200:3200"
     volumes:
