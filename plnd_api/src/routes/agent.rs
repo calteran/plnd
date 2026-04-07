@@ -1,10 +1,8 @@
+use std::sync::Arc;
+
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use chrono::Utc;
-use plnd_agent::{
-    register_memory_tools, register_schedule_tools, xml_escape, AgentContext, ToolRegistry, UseCase,
-};
-use plnd_data::db::{MemoryStore, TaskStore};
-use std::sync::Arc;
+use plnd_agent::{xml_escape, AgentContext, UseCase};
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
@@ -59,14 +57,6 @@ pub async fn post_task(
     }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool().clone();
-
-    let memory_store = Arc::new(MemoryStore::new(pool.clone()));
-    let task_store = Arc::new(TaskStore::new(pool));
-
-    let mut tools = ToolRegistry::new();
-    register_memory_tools(&mut tools, memory_store);
-    register_schedule_tools(&mut tools, task_store);
 
     let today = Utc::now().format("%Y-%m-%d");
     let context_str = build_context_str(body.context.as_deref());
@@ -79,7 +69,7 @@ pub async fn post_task(
         prior_context,
     };
 
-    let output = state.agent.run(&ctx, tools).await.map_err(|e| {
+    let output = state.agent.run(&ctx).await.map_err(|e| {
         tracing::error!(error = %e, "agent run failed");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;

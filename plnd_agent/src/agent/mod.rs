@@ -273,21 +273,18 @@ impl AgentService {
         }
     }
 
-    /// Run the agentic loop for the given context and tool registry.
+    /// Run the agentic loop for the given context.
     ///
     /// - `ctx.user_id` must come from the authenticated session — never from `ctx.input`.
-    /// - `tools` is the pre-populated tool registry for this use case.
+    /// - The tool registry is built internally based on `ctx.use_case` — the API layer
+    ///   does not decide which tools are available.
     /// - `ctx.input` is wrapped in `<user_input>` XML delimiters before being sent
     ///   to the LLM, per the security spec.
     /// - `ctx.prior_context`, if `Some`, is prepended *before* the `<user_input>` block
     ///   so the model treats it as trusted system data rather than untrusted user input.
     /// - `ctx.memory_context`, if present, is prepended to the system prompt as a
     ///   `<memory>` block so the LLM has relevant user context before any tool calls.
-    pub async fn run(
-        &self,
-        ctx: &AgentContext,
-        tools: ToolRegistry,
-    ) -> Result<AgentOutput, AgentError> {
+    pub async fn run(&self, ctx: &AgentContext) -> Result<AgentOutput, AgentError> {
         // Step 1: Load memories filtered by use case.
         let memory_entries = if let Some(ref db) = self.db {
             let memories = plnd_data::db::memories::get_memories(
@@ -317,16 +314,24 @@ impl AgentService {
             None
         };
 
-        // Step 2: Resolve system prompt.
+        // Step 2: Build the tool registry for this use case.
+        // When `db` is `None` (unit-test constructors that skip DB access), an empty
+        // registry is used — those tests do not exercise tool-execution paths.
+        let tools = match self.db {
+            Some(ref db) => crate::tools::build_tool_registry(&ctx.use_case, db),
+            None => ToolRegistry::new(),
+        };
+
+        // Step 3: Resolve system prompt.
         let base_system = ctx.use_case.system_prompt().to_string();
 
-        // Step 3: Inject memories into system prompt preamble if present.
+        // Step 4: Inject memories into system prompt preamble if present.
         let system = match memory_entries {
             Some(ref entries) => format!("<memory>\n{}\n</memory>\n\n{}", entries, base_system),
             None => base_system,
         };
 
-        // Step 4: Select provider tier.
+        // Step 5: Select provider tier.
         let tier = ctx.use_case.provider_tier();
         let (max_tokens, max_iterations) = match tier {
             ProviderTier::Fast => (self.config.fast.max_tokens, self.config.fast.max_iterations),
@@ -336,7 +341,7 @@ impl AgentService {
             ),
         };
 
-        // Step 5: Build the initial message and fire the loop.
+        // Step 6: Build the initial message and fire the loop.
         // prior_context (trusted system data) is emitted before the <user_input> wrapper so
         // the model does not treat it as untrusted user input per the security spec.
         let prior = ctx.prior_context.as_deref().unwrap_or("");
@@ -919,7 +924,7 @@ mod tests {
             prior_context: None,
         };
 
-        let result = service.run(&ctx, ToolRegistry::new()).await;
+        let result = service.run(&ctx).await;
         assert!(result.is_ok());
 
         let req = last_request.lock().unwrap();
@@ -967,7 +972,7 @@ mod tests {
             prior_context: None,
         };
 
-        let result = service.run(&ctx, ToolRegistry::new()).await;
+        let result = service.run(&ctx).await;
         assert!(result.is_ok());
 
         let req = last_request.lock().unwrap();
@@ -1020,7 +1025,7 @@ mod tests {
             prior_context: None,
         };
 
-        service.run(&ctx, ToolRegistry::new()).await.unwrap();
+        service.run(&ctx).await.unwrap();
 
         let req = last_request.lock().unwrap();
         let system = &req.as_ref().unwrap().system;
@@ -1075,7 +1080,7 @@ mod tests {
             prior_context: None,
         };
 
-        service.run(&ctx, ToolRegistry::new()).await.unwrap();
+        service.run(&ctx).await.unwrap();
 
         let req = last_request.lock().unwrap();
         let system = &req.as_ref().unwrap().system;
@@ -1115,7 +1120,7 @@ mod tests {
             prior_context: None,
         };
 
-        let result = service.run(&ctx, ToolRegistry::new()).await;
+        let result = service.run(&ctx).await;
         assert!(result.is_ok());
 
         let req = last_request.lock().unwrap();
@@ -1152,7 +1157,7 @@ mod tests {
             prior_context: Some(prior.clone()),
         };
 
-        let result = service.run(&ctx, ToolRegistry::new()).await;
+        let result = service.run(&ctx).await;
         assert!(result.is_ok());
 
         let req = last_request.lock().unwrap();
