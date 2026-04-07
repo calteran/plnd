@@ -33,8 +33,8 @@ export class DayViewPage {
   getAddButton() { return this.page.getByRole('button', { name: 'Add', exact: true }); }
   getContinueButton() { return this.page.getByRole('button', { name: 'Continue', exact: true }); }
   getCancelButton() { return this.page.getByRole('button', { name: 'Cancel', exact: true }); }
-  getLoadingIndicator() { return this.page.locator('.loading'); }
-  getAgentConfirmation() { return this.page.locator('.agent-confirmation'); }
+  getLoadingIndicator() { return this.page.locator('.input-spinner'); }
+  getAgentConfirmation() { return this.page.locator('.toast'); }
   getAgentError() { return this.page.locator('.agent-error'); }
 
   /** Click "Add something…" and wait for the text input to appear. */
