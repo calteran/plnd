@@ -55,14 +55,26 @@ worktree-new branch:
 # Start infrastructure in Docker, then run API and client natively with split-pane logs.
 # Press q or Ctrl-C to stop API and client — infra containers keep running.
 # Use `just stop` to also bring down the infrastructure.
-# Models default to phi3 (fast) and llama3.2 (capable); override via OLLAMA_FAST_MODEL / OLLAMA_CAPABLE_MODEL.
-# Requires: mprocs (brew install mprocs), doppler
+# LLM is served by LM Studio natively (localhost:1234). Override model via LM_STUDIO_MODEL env var.
+# Requires: mprocs (brew install mprocs), doppler, LM Studio running locally
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "→ Starting infrastructure (db, mock-oauth-server, ollama)..."
+    echo "→ Starting infrastructure (db, mock-oauth-server)..."
     doppler run -- docker compose up -d --wait --wait-timeout 120
-    echo "→ Infrastructure healthy. Starting API and client..."
+    echo "→ Infrastructure healthy."
+    LM_MODEL="${LM_STUDIO_MODEL:-google/gemma-4-26b-a4b}"
+    echo "→ Warming LM Studio model: $LM_MODEL"
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:1234/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d "{\"model\": \"$LM_MODEL\", \"messages\": [{\"role\": \"user\", \"content\": \"hi\"}], \"max_tokens\": 1}" \
+      2>/dev/null || true)
+    if [ "$http_code" = "200" ]; then
+      echo "  ✓ Model ready"
+    else
+      echo "  ⚠  LM Studio not reachable — model will load on first inference request"
+    fi
+    echo "→ Starting API and client..."
     mprocs
 
 # Run API service locally (requires PostgreSQL)
@@ -87,7 +99,7 @@ stop:
 
 alias down := stop
 
-# View infra container logs (db, mock-oauth-server, ollama).
+# View infra container logs (db, mock-oauth-server).
 # API and client logs appear in the mprocs TUI when using `just dev`.
 logs:
     docker compose logs -f
