@@ -77,10 +77,16 @@
   font-size: 13px;
   font-weight: 500;
   box-shadow: var(--shadow-dropdown);
-  white-space: nowrap;
+  max-width: min(420px, calc(100vw - 32px));
+  white-space: normal;
+  text-align: center;
   z-index: 100;
   pointer-events: none;
   animation: toast-in 0.2s ease-out;
+
+  @media (max-width: 767px) {
+    bottom: calc(56px + 16px);
+  }
 }
 
 @keyframes toast-in {
