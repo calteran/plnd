@@ -33,28 +33,5 @@ services:
       retries: 10
       start_period: 10s
 
-  ollama:
-    image: ollama/ollama:latest
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-      - ./scripts/ollama-entrypoint.sh:/entrypoint.sh:ro
-    environment:
-      - OLLAMA_FAST_MODEL=${OLLAMA_FAST_MODEL:-qwen2.5:3b}
-      - OLLAMA_CAPABLE_MODEL=${OLLAMA_CAPABLE_MODEL:-qwen2.5:14b}
-    entrypoint: ["/bin/bash", "/entrypoint.sh"]
-    healthcheck:
-      # `ollama list` queries the server API and is guaranteed to be in the image.
-      # It succeeds as soon as ollama serve starts — before model pulls complete.
-      # The api service depends_on this healthcheck, so the first inference
-      # request may be slow while a model pull is still in progress.
-      test: ["CMD", "ollama", "list"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 60s
-
 volumes:
   postgres_data:
-  ollama_data:

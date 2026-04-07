@@ -11,21 +11,22 @@ level = "debug"
 pretty_print = true
 
 [llm.fast]
-# Local Ollama instance (Docker) — qwen2.5:3b for low-latency tasks.
+# LM Studio (native, Apple Silicon / MLX) — Gemma 4 26B MoE for low-latency tasks.
+# MoE activates only ~4B params per forward pass; fast despite large total size.
 # Override model via APP_LLM__FAST__MODEL env var.
 provider = "openai"
-base_url = "http://localhost:11434/v1"
-model = "qwen2.5:3b"
-api_key = "ollama"
+base_url = "http://localhost:1234/v1"
+model = "google/gemma-4-26b-a4b"
+api_key = "lm-studio"
 max_tokens = 1024
 max_iterations = 10
 
 [llm.capable]
-# Local Ollama instance (Docker) — qwen2.5:14b for complex reasoning.
+# LM Studio (native, Apple Silicon / MLX) — Gemma 4 26B MoE for complex reasoning.
 # Override model via APP_LLM__CAPABLE__MODEL env var.
 provider = "openai"
-base_url = "http://localhost:11434/v1"
-model = "qwen2.5:14b"
-api_key = "ollama"
+base_url = "http://localhost:1234/v1"
+model = "google/gemma-4-26b-a4b"
+api_key = "lm-studio"
 max_tokens = 4096
 max_iterations = 10
