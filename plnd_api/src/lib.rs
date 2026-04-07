@@ -8,4 +8,5 @@ pub mod config;
 pub mod models;
 pub mod openapi;
 pub mod routes;
+pub mod middleware;
 pub mod state;
