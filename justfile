@@ -64,15 +64,13 @@ dev:
     doppler run -- docker compose up -d --wait --wait-timeout 120
     echo "→ Infrastructure healthy."
     LM_MODEL="${LM_STUDIO_MODEL:-google/gemma-4-26b-a4b}"
-    echo "→ Ensuring LM Studio model is loaded: $LM_MODEL"
-    load_response=$(curl -s -w "\n%{http_code}" -X POST http://localhost:1234/api/v1/models/load \
+    echo "→ Warming LM Studio model: $LM_MODEL"
+    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:1234/v1/chat/completions \
       -H "Content-Type: application/json" \
-      -d "{\"model\": \"$LM_MODEL\"}" 2>/dev/null || true)
-    http_code=$(echo "$load_response" | tail -1)
+      -d "{\"model\": \"$LM_MODEL\", \"messages\": [{\"role\": \"user\", \"content\": \"hi\"}], \"max_tokens\": 1}" \
+      2>/dev/null || true)
     if [ "$http_code" = "200" ]; then
-      echo "  ✓ Model loaded"
-    elif echo "$load_response" | grep -q "insufficient system resources"; then
-      echo "  ✓ Model already resident in memory"
+      echo "  ✓ Model ready"
     else
       echo "  ⚠  LM Studio not reachable — model will load on first inference request"
     fi
