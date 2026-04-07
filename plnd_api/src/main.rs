@@ -1,3 +1,5 @@
+mod telemetry;
+
 use axum::http::{HeaderName, HeaderValue, Method};
 use axum::{
     middleware,
