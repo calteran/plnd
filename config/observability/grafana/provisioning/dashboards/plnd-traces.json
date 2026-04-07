@@ -1,0 +1,71 @@
+{
+  "id": null,
+  "uid": "plnd-traces",
+  "title": "PLND Traces",
+  "tags": ["plnd"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Trace Explorer",
+      "type": "traces",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 12 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "dedupStrategy": "none",
+        "showBefore": 100
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{resource.service.name=\"plnd_api\"}",
+          "limit": 20
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Span Duration Distribution",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(tempo_spanmetrics_duration_seconds_bucket{service=\"plnd_api\"}[5m])) by (le, span_name))",
+          "legendFormat": "p95 {{span_name}}"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum(rate(tempo_spanmetrics_duration_seconds_bucket{service=\"plnd_api\"}[5m])) by (le, span_name))",
+          "legendFormat": "p50 {{span_name}}"
+        }
+      ]
+    }
+  ]
+}
