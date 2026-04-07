@@ -193,6 +193,7 @@ export class AddEntryComponent {
             this.confirmed.emit(res.confirmation);
             this.conversationHistory.set([]);
             this.pendingSignals.set([]);
+            this.signalAnswers.set({});
             if (this.addingMore()) {
               this._text.set('');
               this._conversationInput = '';
