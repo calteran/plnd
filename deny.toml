@@ -93,6 +93,7 @@ ignore = [
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
     "MIT",
+    "MIT-0",        # MIT No Attribution — used by borrow-or-share (transitive via jsonschema)
     "Apache-2.0",
     "BSD-3-Clause",
     "Zlib",

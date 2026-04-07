@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use chrono::Utc;
-use plnd_agent::{xml_escape, AgentContext, UseCase};
+use plnd_agent::{xml_escape, AgentContext, AgentError, UseCase};
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
@@ -41,8 +41,9 @@ fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> Str
     responses(
         (status = 200, description = "Task created", body = TaskEntryResponse),
         (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Agent response failed semantic schema validation"),
         (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
-        (status = 500, description = "Internal server error — agent failure or unparseable output"),
+        (status = 500, description = "LLM provider failure or infrastructure error"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -69,9 +70,13 @@ pub async fn post_task(
         prior_context,
     };
 
-    let output = state.agent.run(&ctx).await.map_err(|e| {
-        tracing::error!(error = %e, "agent run failed");
-        StatusCode::INTERNAL_SERVER_ERROR
+    let output = state.agent.run(&ctx).await.map_err(|e| match &e {
+        // SchemaValidation is already logged at warn level inside plnd_agent.
+        AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        _ => {
+            tracing::error!(error = %e, "agent run failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
     })?;
 
     let response: TaskEntryResponse = serde_json::from_str(&output.content).map_err(|e| {
@@ -171,7 +176,11 @@ mod tests {
     }
 
     #[test]
-    fn action_taken_allows_null_optional_fields() {
+    fn action_taken_serde_permits_null_fields_but_schema_rejects_task_created_with_nulls() {
+        // Serde itself still deserializes null into None — the semantic enforcement
+        // is handled by JSON schema validation in AgentService::run (plnd_agent),
+        // not here. A TaskEntryResponse containing this ActionTaken would be
+        // rejected by validate_agent_output before post_task ever deserializes it.
         let json = r#"{"type": "task_created", "task_id": null, "scheduled_at": null}"#;
         let action: ActionTaken = serde_json::from_str(json).unwrap();
         assert_eq!(action.r#type, "task_created");

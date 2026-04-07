@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use crate::provider::ProviderTier;
 
 // Prompts are embedded at compile time so changes are git-diffable and
@@ -5,6 +7,60 @@ use crate::provider::ProviderTier;
 const TASK_ENTRY_PROMPT: &str = include_str!("../prompts/task_entry.md");
 const MEAL_PLANNING_PROMPT: &str = include_str!("../prompts/meal_planning.md");
 const MEAL_REBALANCE_PROMPT: &str = include_str!("../prompts/meal_rebalance.md");
+
+// ── Response schemas ─────────────────────────────────────────────────────────
+
+/// JSON Schema (Draft 7) for the `TaskEntryResponse` type.
+///
+/// Enforces both structural and semantic constraints:
+/// - Top-level shape: `actions_taken`, `ui_signals`, `confirmation` (no extra fields)
+/// - When `actions_taken[i].type == "task_created"`, both `task_id` and
+///   `scheduled_at` must be present and non-null (the `if/then` conditional).
+const TASK_ENTRY_RESPONSE_SCHEMA: &str = r##"{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TaskEntryResponse",
+  "type": "object",
+  "required": ["actions_taken", "ui_signals", "confirmation"],
+  "additionalProperties": false,
+  "properties": {
+    "actions_taken": { "type": "array", "items": { "$ref": "#/definitions/ActionTaken" } },
+    "ui_signals":    { "type": "array", "items": {} },
+    "confirmation":  { "type": "string" }
+  },
+  "definitions": {
+    "ActionTaken": {
+      "type": "object",
+      "required": ["type"],
+      "additionalProperties": false,
+      "properties": {
+        "type":         { "type": "string" },
+        "task_id":      { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "scheduled_at": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
+      },
+      "if":   { "properties": { "type": { "const": "task_created" } }, "required": ["type"] },
+      "then": {
+        "required": ["task_id", "scheduled_at"],
+        "properties": {
+          "task_id":      { "type": "string", "format": "uuid" },
+          "scheduled_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}"##;
+
+/// Pre-compiled validator for [`TASK_ENTRY_RESPONSE_SCHEMA`].
+///
+/// Compiled once at first use and reused across all agent runs.
+static TASK_ENTRY_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
+    let schema: serde_json::Value = serde_json::from_str(TASK_ENTRY_RESPONSE_SCHEMA)
+        .expect("BUG: TASK_ENTRY_RESPONSE_SCHEMA is not valid JSON");
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft7)
+        .should_validate_formats(true)
+        .build(&schema)
+        .expect("BUG: failed to compile TASK_ENTRY_RESPONSE_SCHEMA")
+});
 
 /// Identifies the type of agentic interaction.
 ///
@@ -58,6 +114,21 @@ impl UseCase {
             UseCase::TaskEntry => ProviderTier::Capable,
             UseCase::MealPlanning => ProviderTier::Capable,
             UseCase::MealRebalance => ProviderTier::Capable,
+        }
+    }
+
+    /// Returns the compiled JSON Schema validator for this use case, if one is defined.
+    ///
+    /// The validator is compiled from a `&'static str` schema exactly once (via
+    /// [`LazyLock`]) and reused across all agent runs. `None` means no response
+    /// contract is enforced for this use case yet.
+    ///
+    /// Validation is called in [`crate::agent::AgentService::run`] after the
+    /// agent loop completes, before returning [`crate::agent::AgentOutput`].
+    pub fn response_validator(&self) -> Option<&'static jsonschema::Validator> {
+        match self {
+            UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
+            UseCase::MealPlanning | UseCase::MealRebalance => None,
         }
     }
 }
@@ -141,6 +212,30 @@ mod tests {
             !cats.contains(&"energy"),
             "MealPlanning must not include energy"
         );
+    }
+
+    #[test]
+    fn task_entry_has_response_validator() {
+        assert!(UseCase::TaskEntry.response_validator().is_some());
+    }
+
+    #[test]
+    fn meal_use_cases_have_no_response_validator_yet() {
+        assert!(UseCase::MealPlanning.response_validator().is_none());
+        assert!(UseCase::MealRebalance.response_validator().is_none());
+    }
+
+    #[test]
+    fn task_entry_validator_is_accessible() {
+        // Triggers LazyLock initialisation and confirms it doesn't panic.
+        let validator = UseCase::TaskEntry.response_validator().unwrap();
+        // A trivially correct response should pass.
+        let ok: serde_json::Value = serde_json::json!({
+            "actions_taken": [],
+            "ui_signals": [],
+            "confirmation": ""
+        });
+        assert!(validator.is_valid(&ok));
     }
 
     #[test]
