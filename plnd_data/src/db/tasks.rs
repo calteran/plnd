@@ -115,6 +115,22 @@ pub async fn create_user_task(
     .await
     .map_err(DatabaseError::from)?;
 
+    let scheduled_end = scheduled_at + Duration::minutes(duration_minutes as i64);
+    sqlx::query(
+        "INSERT INTO schedule_entries
+           (user_id, task_type, task_ref_id, title, date, scheduled_start, scheduled_end, status)
+         VALUES ($1, 'custom', $2, $3, $4, $5, $6, 'planned')",
+    )
+    .bind(user_id)
+    .bind(task.task_id)
+    .bind(title)
+    .bind(scheduled_at.date_naive())
+    .bind(scheduled_at)
+    .bind(scheduled_end)
+    .execute(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+
     tx.commit().await.map_err(DatabaseError::from)?;
 
     Ok(task)
