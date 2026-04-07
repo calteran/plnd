@@ -24,6 +24,28 @@ use std::{
 };
 use tower::{Layer, Service};
 
+/// RAII guard that decrements the active-requests counter when dropped.
+///
+/// Ensures the counter is always decremented even if the request future is
+/// cancelled (e.g. client disconnects) before the response is produced.
+struct ActiveRequestGuard {
+    counter: UpDownCounter<i64>,
+    method: String,
+    route: String,
+}
+
+impl Drop for ActiveRequestGuard {
+    fn drop(&mut self) {
+        self.counter.add(
+            -1,
+            &[
+                KeyValue::new(HTTP_REQUEST_METHOD, self.method.clone()),
+                KeyValue::new(HTTP_ROUTE, self.route.clone()),
+            ],
+        );
+    }
+}
+
 /// Tower layer that attaches HTTP metrics recording to every request.
 #[derive(Clone)]
 pub struct HttpMetricsLayer;
@@ -96,6 +118,13 @@ where
 
         let mut inner = self.inner.clone();
         Box::pin(async move {
+            // Guard lives inside the future so it drops on completion *or* cancellation.
+            let _guard = ActiveRequestGuard {
+                counter: active,
+                method: method.clone(),
+                route: route.clone(),
+            };
+
             let result = inner.call(req).await;
             let elapsed_ms = start.elapsed().as_millis() as f64;
 
@@ -111,13 +140,6 @@ where
                     KeyValue::new(HTTP_REQUEST_METHOD, method.clone()),
                     KeyValue::new(HTTP_ROUTE, route.clone()),
                     KeyValue::new(HTTP_RESPONSE_STATUS_CODE, status_code),
-                ],
-            );
-            active.add(
-                -1,
-                &[
-                    KeyValue::new(HTTP_REQUEST_METHOD, method),
-                    KeyValue::new(HTTP_ROUTE, route),
                 ],
             );
 
