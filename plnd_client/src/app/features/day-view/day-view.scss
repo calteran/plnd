@@ -62,3 +62,28 @@
   color: var(--color-text-muted);
   font-size: 13px;
 }
+
+// ── Toast notification ────────────────────────────────────────────────
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-toast-bg);
+  color: var(--color-toast-text);
+  border-radius: 10px;
+  padding: 11px 20px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: var(--shadow-dropdown);
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  animation: toast-in 0.2s ease-out;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
