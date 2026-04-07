@@ -149,6 +149,13 @@ impl Default for AgentConfig {
     }
 }
 
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct OtelConfig {
+    /// OTLP gRPC endpoint for traces, metrics, and logs.
+    /// `None` disables OTEL export (stdout-only mode — useful for CI and unit tests).
+    pub endpoint: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct AppConfig {
     pub api: ApiConfig,
@@ -163,6 +170,8 @@ pub struct AppConfig {
     pub llm: plnd_agent::LlmConfig,
     #[serde(default)]
     pub agent: AgentConfig,
+    #[serde(default)]
+    pub otel: OtelConfig,
 }
 
 impl AppConfig {
