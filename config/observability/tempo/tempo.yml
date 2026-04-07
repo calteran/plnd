@@ -1,9 +1,6 @@
 server:
   http_listen_port: 3200
 
-ingest_storage:
-  enabled: false
-
 distributor:
   receivers:
     otlp:
