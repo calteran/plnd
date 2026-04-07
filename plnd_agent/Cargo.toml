@@ -18,6 +18,8 @@ thiserror    = "2.0"
 uuid         = { version = "1", features = ["v4", "serde"] }
 reqwest      = { version = "0.13", default-features = false, features = ["json", "native-tls"] }
 async-openai = "0.28"
+jsonschema   = { version = "0.29", default-features = false } # disables HTTP $ref resolution; not needed for static schemas
+tracing      = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }

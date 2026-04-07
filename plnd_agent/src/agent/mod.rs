@@ -26,15 +26,19 @@ pub enum AgentError {
 
     #[error("Database error: {0}")]
     Database(#[from] plnd_data::db::error::DatabaseError),
+
+    #[error("agent response failed schema validation: {violations}")]
+    SchemaValidation { violations: String },
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────
 
 /// The result of a completed agentic run.
 ///
-/// For now this carries the raw final text from the LLM (or the terminal
-/// tool's JSON result). JSON schema validation against use-case-specific
-/// schemas is deferred to a later issue.
+/// Carries the validated JSON string produced by the agent (either the
+/// terminal tool's result or raw LLM text). If a use-case schema is defined,
+/// schema validation has already passed before this is returned from
+/// [`AgentService::run`].
 #[derive(Debug, Clone)]
 pub struct AgentOutput {
     pub content: String,
@@ -67,6 +71,39 @@ pub fn xml_escape(s: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
+}
+
+// ── Schema validation ─────────────────────────────────────────────────────────
+
+/// Validates `content` (a JSON string produced by the agent loop) against a
+/// pre-compiled JSON Schema validator.
+///
+/// Returns `Err(AgentError::SchemaValidation)` if the content is not valid
+/// JSON or if it violates the schema. The `violations` string is a
+/// semicolon-separated list of error messages suitable for logging.
+fn validate_agent_output(
+    content: &str,
+    validator: &jsonschema::Validator,
+) -> Result<(), AgentError> {
+    let instance: serde_json::Value =
+        serde_json::from_str(content).map_err(|e| AgentError::SchemaValidation {
+            violations: format!("output is not valid JSON: {e}"),
+        })?;
+
+    let violations: Vec<String> = validator
+        .iter_errors(&instance)
+        .map(|e| e.to_string())
+        .collect();
+
+    if !violations.is_empty() {
+        let message = violations.join("; ");
+        tracing::warn!(violations = %message, "agent output failed schema validation");
+        return Err(AgentError::SchemaValidation {
+            violations: message,
+        });
+    }
+
+    Ok(())
 }
 
 // ── AgentLoop ─────────────────────────────────────────────────────────────────
@@ -363,9 +400,16 @@ impl AgentService {
             max_tokens,
         };
 
-        agent_loop
+        let output = agent_loop
             .run(ctx.user_id, tier, system, initial_messages)
-            .await
+            .await?;
+
+        // Step 6: Validate output against the use-case schema before returning.
+        if let Some(validator) = ctx.use_case.response_validator() {
+            validate_agent_output(&output.content, validator)?;
+        }
+
+        Ok(output)
     }
 }
 
@@ -1117,9 +1161,12 @@ mod tests {
         // new_with_registry sets db = None, so memory loading is skipped.
         let service = AgentService::new_with_registry(make_registry(mock));
 
+        // MealPlanning has no response schema, so the mock's plain-text response
+        // is not rejected. This test is verifying message construction, not
+        // use-case-specific schema validation.
         let ctx = AgentContext {
             user_id: Uuid::nil(),
-            use_case: UseCase::TaskEntry,
+            use_case: UseCase::MealPlanning,
             input: "replace vacuum filter".to_string(),
             prior_context: None,
         };
@@ -1153,10 +1200,13 @@ mod tests {
 
         let service = AgentService::new_with_registry(make_registry(mock));
 
+        // MealPlanning has no response schema, so the mock's plain-text response
+        // is not rejected. This test is verifying message construction, not
+        // use-case-specific schema validation.
         let prior = "<prior_context>\n  <turn index=\"1\">\n    <signals>[]</signals>\n    <answers>{}</answers>\n  </turn>\n</prior_context>\n".to_string();
         let ctx = AgentContext {
             user_id: Uuid::nil(),
-            use_case: UseCase::TaskEntry,
+            use_case: UseCase::MealPlanning,
             input: "book dentist".to_string(),
             prior_context: Some(prior.clone()),
         };
@@ -1421,6 +1471,132 @@ mod tests {
         assert!(
             entry.contains("&lt;/entry&gt;&lt;/memory&gt;"),
             "injection characters must be escaped"
+        );
+    }
+}
+
+// ── Schema validation unit tests ─────────────────────────────────────────────
+
+#[cfg(test)]
+mod schema_validation_tests {
+    use super::*;
+    use crate::context::UseCase;
+
+    fn task_entry_validator() -> &'static jsonschema::Validator {
+        UseCase::TaskEntry.response_validator().unwrap()
+    }
+
+    #[test]
+    fn valid_task_created_passes() {
+        let json = r#"{
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "scheduled_at": "2026-04-05T20:00:00Z"
+            }],
+            "ui_signals": [],
+            "confirmation": "Scheduled 'Replace vacuum filter' for Sunday evening."
+        }"#;
+        assert!(validate_agent_output(json, task_entry_validator()).is_ok());
+    }
+
+    #[test]
+    fn task_created_null_task_id_fails() {
+        let json = r#"{
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": null,
+                "scheduled_at": "2026-04-05T20:00:00Z"
+            }],
+            "ui_signals": [],
+            "confirmation": "Task scheduled."
+        }"#;
+        let err = validate_agent_output(json, task_entry_validator()).unwrap_err();
+        assert!(
+            matches!(err, AgentError::SchemaValidation { .. }),
+            "null task_id on task_created must fail schema validation"
+        );
+    }
+
+    #[test]
+    fn task_created_null_scheduled_at_fails() {
+        let json = r#"{
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "scheduled_at": null
+            }],
+            "ui_signals": [],
+            "confirmation": "Task scheduled."
+        }"#;
+        let err = validate_agent_output(json, task_entry_validator()).unwrap_err();
+        assert!(
+            matches!(err, AgentError::SchemaValidation { .. }),
+            "null scheduled_at on task_created must fail schema validation"
+        );
+    }
+
+    #[test]
+    fn clarification_response_with_ui_signals_passes() {
+        // Clarification turn: no actions taken, ui_signals present, empty confirmation.
+        let json = r#"{
+            "actions_taken": [],
+            "ui_signals": [{"type": "show_select", "field": "duration_minutes", "options": [15, 30, 60]}],
+            "confirmation": ""
+        }"#;
+        assert!(validate_agent_output(json, task_entry_validator()).is_ok());
+    }
+
+    #[test]
+    fn extra_top_level_field_fails() {
+        let json = r#"{
+            "actions_taken": [],
+            "ui_signals": [],
+            "confirmation": "ok",
+            "hallucinated_field": "the LLM added this"
+        }"#;
+        let err = validate_agent_output(json, task_entry_validator()).unwrap_err();
+        assert!(
+            matches!(err, AgentError::SchemaValidation { .. }),
+            "additionalProperties: false must reject extra top-level fields"
+        );
+    }
+
+    #[test]
+    fn missing_confirmation_field_fails() {
+        let json = r#"{
+            "actions_taken": [],
+            "ui_signals": []
+        }"#;
+        let err = validate_agent_output(json, task_entry_validator()).unwrap_err();
+        assert!(
+            matches!(err, AgentError::SchemaValidation { .. }),
+            "missing required 'confirmation' must fail"
+        );
+    }
+
+    #[test]
+    fn non_json_output_fails() {
+        let err =
+            validate_agent_output("this is not json at all", task_entry_validator()).unwrap_err();
+        assert!(
+            matches!(&err, AgentError::SchemaValidation { violations } if violations.contains("not valid JSON")),
+            "non-JSON output must produce a SchemaValidation error mentioning 'not valid JSON'"
+        );
+    }
+
+    #[test]
+    fn non_task_created_type_permits_null_fields() {
+        // For unknown/future action types the if/then conditional does not fire,
+        // so task_id and scheduled_at may be absent entirely.
+        let json = r#"{
+            "actions_taken": [{"type": "task_deferred"}],
+            "ui_signals": [],
+            "confirmation": "Deferred until later."
+        }"#;
+        assert!(
+            validate_agent_output(json, task_entry_validator()).is_ok(),
+            "non-task_created action types must not require task_id/scheduled_at"
         );
     }
 }
