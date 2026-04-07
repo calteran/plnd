@@ -108,6 +108,7 @@ pub async fn report_client_error(
     }
 
     tracing::error!(
+        source = "plnd_client",
         message = %payload.message,
         stack = payload.stack.as_deref().unwrap_or(""),
         url = payload.url.as_deref().unwrap_or(""),

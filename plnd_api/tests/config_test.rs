@@ -10,7 +10,10 @@ fn test_load_config() {
         "postgres://plnd:plnd_dev@localhost/plnd_dev"
     );
     assert_eq!(config.database.max_connections, 10);
-    assert_eq!(config.logging.level, "debug"); // Should be overridden by development.toml
+    assert_eq!(
+        config.logging.level,
+        "debug,h2=warn,hyper_util=warn,tonic=warn,tower=warn,opentelemetry_sdk=warn"
+    ); // Should be overridden by development.toml
     assert!(config.logging.pretty_print);
 }
 

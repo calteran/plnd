@@ -1,10 +1,13 @@
+use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     logs::LoggerProvider,
     metrics::{PeriodicReader, SdkMeterProvider},
     runtime,
     trace::TracerProvider,
+    Resource,
 };
+use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 
 pub struct TelemetryProviders {
     pub tracer_provider: TracerProvider,
@@ -25,12 +28,15 @@ pub fn init_providers(
         Some(e) => e.to_owned(),
     };
 
+    let resource = Resource::new(vec![KeyValue::new(SERVICE_NAME, "plnd_api")]);
+
     // ── Traces ──────────────────────────────────────────────────────────────
     let trace_exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_tonic()
         .with_endpoint(&endpoint)
         .build()?;
     let tracer_provider = TracerProvider::builder()
+        .with_resource(resource.clone())
         .with_batch_exporter(trace_exporter, runtime::Tokio)
         .build();
 
@@ -40,6 +46,7 @@ pub fn init_providers(
         .with_endpoint(&endpoint)
         .build()?;
     let logger_provider = LoggerProvider::builder()
+        .with_resource(resource.clone())
         .with_batch_exporter(log_exporter, runtime::Tokio)
         .build();
 
@@ -49,6 +56,7 @@ pub fn init_providers(
         .with_endpoint(&endpoint)
         .build()?;
     let meter_provider = SdkMeterProvider::builder()
+        .with_resource(resource)
         .with_reader(PeriodicReader::builder(metric_exporter, runtime::Tokio).build())
         .build();
 
