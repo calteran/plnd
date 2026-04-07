@@ -965,9 +965,12 @@ mod tests {
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        // MealPlanning has no response schema, so the mock's plain-text response
+        // is not rejected. This test is verifying memory injection, not
+        // use-case-specific schema validation. Both use cases include "habits".
         let ctx = AgentContext {
             user_id,
-            use_case: UseCase::TaskEntry,
+            use_case: UseCase::MealPlanning,
             input: "add milk to grocery list".to_string(),
             prior_context: None,
         };
@@ -1013,9 +1016,12 @@ mod tests {
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        // MealPlanning has no response schema, so the mock's plain-text response
+        // is not rejected. This test is verifying that no <memory> block is
+        // injected when the user has no memories, not schema validation behavior.
         let ctx = AgentContext {
             user_id,
-            use_case: UseCase::TaskEntry,
+            use_case: UseCase::MealPlanning,
             input: "add milk to grocery list".to_string(),
             prior_context: None,
         };
@@ -1031,7 +1037,7 @@ mod tests {
         );
         assert_eq!(
             system.as_str(),
-            UseCase::TaskEntry.system_prompt(),
+            UseCase::MealPlanning.system_prompt(),
             "system prompt must be the raw use-case prompt"
         );
     }
@@ -1059,8 +1065,11 @@ mod tests {
 
         let mock = MockLlmProvider::new("test");
         let last_request = mock.last_request_handle();
+        // Must use TaskEntry (not MealPlanning) so we can assert category filtering:
+        // habits/schedule/energy in, food out. Provide a schema-conforming response
+        // so the new TaskEntry schema validator does not reject the mock output.
         mock.push_response(CompletionResponse {
-            content: Some("done".to_string()),
+            content: Some(r#"{"actions_taken":[],"ui_signals":[],"confirmation":""}"#.to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
         });
