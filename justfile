@@ -67,7 +67,7 @@ dev:
     echo "→ Pre-loading LM Studio model: $LM_MODEL"
     curl -s -X POST http://localhost:1234/api/v1/models/load \
       -H "Content-Type: application/json" \
-      -d "{\"identifier\": \"$LM_MODEL\"}" \
+      -d "{\"model\": \"$LM_MODEL\"}" \
       -o /dev/null \
       || echo "  ⚠  LM Studio not reachable — model will load on first inference request"
     echo "→ Starting API and client..."
