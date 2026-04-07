@@ -1,14 +1,15 @@
-pub mod memory;
-pub use memory::register_memory_tools;
+pub(crate) mod memory;
+pub(crate) use memory::register_memory_tools;
 
-pub mod schedule;
-pub use schedule::register_schedule_tools;
+pub(crate) mod schedule;
+pub(crate) use schedule::register_schedule_tools;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use uuid::Uuid;
 
+use crate::context::UseCase;
 use crate::provider::ToolDefinition;
 
 // ── Error ─────────────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ pub trait Tool: Send + Sync {
 /// Tools are stored as `Arc<dyn Tool>` so they can be shared across parallel
 /// `tokio::task::JoinSet` spawns without cloning the tool itself.
 #[derive(Default)]
-pub struct ToolRegistry {
+pub(crate) struct ToolRegistry {
     tools: HashMap<String, Arc<dyn Tool>>,
 }
 
@@ -124,4 +125,28 @@ impl ToolRegistry {
             .map(|t| t.is_terminal())
             .unwrap_or(false)
     }
+}
+
+// ── Registry factory ──────────────────────────────────────────────────────────
+
+/// Build the `ToolRegistry` for a given [`UseCase`], creating stores directly
+/// from the database pool.
+///
+/// Each use case registers only its own tool subset — task-entry tools are
+/// never exposed to meal-planning runs, and vice versa.
+pub(crate) fn build_tool_registry(
+    use_case: &UseCase,
+    db: &plnd_data::db::Database,
+) -> ToolRegistry {
+    let pool = db.get_pool().clone();
+    let memory_store = Arc::new(plnd_data::db::MemoryStore::new(pool.clone()));
+    let mut registry = ToolRegistry::new();
+    register_memory_tools(&mut registry, memory_store);
+    match use_case {
+        UseCase::TaskEntry => {
+            register_schedule_tools(&mut registry, Arc::new(plnd_data::db::TaskStore::new(pool)));
+        }
+        UseCase::MealPlanning | UseCase::MealRebalance => {}
+    }
+    registry
 }
