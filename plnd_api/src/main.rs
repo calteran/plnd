@@ -63,28 +63,28 @@ async fn main() {
 
     // Build layered tracing subscriber.
     // Each arm of the match produces a different concrete type — all are valid Subscriber impls.
-    let env_filter = tracing_subscriber::EnvFilter::new(&config.logging.level);
+    let env_filter = || tracing_subscriber::EnvFilter::new(&config.logging.level);
 
     match (config.logging.pretty_print, otel_providers.as_ref()) {
         (true, Some(p)) => tracing_subscriber::registry()
-            .with(env_filter)
+            .with(env_filter())
             .with(tracing_subscriber::fmt::layer().pretty().with_target(true))
             .with(tracing_opentelemetry::layer().with_tracer(p.tracer_provider.tracer("plnd_api")))
             .with(OpenTelemetryTracingBridge::new(&p.logger_provider))
             .init(),
         (false, Some(p)) => tracing_subscriber::registry()
-            .with(env_filter)
+            .with(env_filter())
             .with(tracing_subscriber::fmt::layer().json().with_target(true))
             .with(tracing_opentelemetry::layer().with_tracer(p.tracer_provider.tracer("plnd_api")))
             .with(OpenTelemetryTracingBridge::new(&p.logger_provider))
             .init(),
         (true, None) => tracing_subscriber::fmt()
-            .with_env_filter(env_filter)
+            .with_env_filter(env_filter())
             .with_target(true)
             .pretty()
             .init(),
         (false, None) => tracing_subscriber::fmt()
-            .with_env_filter(env_filter)
+            .with_env_filter(env_filter())
             .with_target(true)
             .json()
             .init(),
@@ -368,7 +368,7 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .layer(PropagateRequestIdLayer::new(x_request_id.clone()))
         .layer(SetRequestIdLayer::new(x_request_id, MakeRequestUuid))
-        .layer(HttpMetricsLayer)
+        .route_layer(HttpMetricsLayer)
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind(&config.api.base_url)

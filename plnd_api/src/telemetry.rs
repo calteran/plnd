@@ -63,6 +63,9 @@ pub fn init_providers(
     // Register as global providers so middleware can reach them via global::meter()
     opentelemetry::global::set_tracer_provider(tracer_provider.clone());
     opentelemetry::global::set_meter_provider(meter_provider.clone());
+    opentelemetry::global::set_text_map_propagator(
+        opentelemetry_sdk::propagation::TraceContextPropagator::new(),
+    );
 
     Ok(Some(TelemetryProviders {
         tracer_provider,
