@@ -77,7 +77,10 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
       }
 
       @if (toastMessage()) {
-        <div class="toast" role="status" aria-live="polite">{{ toastMessage() }}</div>
+        <div class="toast" role="status" aria-live="polite">
+          <span class="toast-message">{{ toastMessage() }}</span>
+          <button class="toast-close" type="button" (click)="closeToast()" aria-label="Dismiss">×</button>
+        </div>
       }
 
     </div>
@@ -127,6 +130,11 @@ export class DayViewComponent implements OnInit, OnDestroy {
   onTaskConfirmed(message: string): void {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastMessage.set(message);
-    this.toastTimer = setTimeout(() => this.toastMessage.set(null), 2500);
+    this.toastTimer = setTimeout(() => this.toastMessage.set(null), 5000);
+  }
+
+  closeToast(): void {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastMessage.set(null);
   }
 }

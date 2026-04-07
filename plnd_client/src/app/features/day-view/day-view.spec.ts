@@ -220,13 +220,13 @@ describe('DayViewComponent (toast)', () => {
     expect(toast.nativeElement.textContent).toContain('Walk added for after lunch');
   });
 
-  it('hides the toast after 2500ms', fakeAsync(async () => {
+  it('hides the toast after 5000ms', fakeAsync(async () => {
     const f = await setupToast();
     f.componentInstance.onTaskConfirmed('Walk added');
     f.detectChanges();
     expect(f.debugElement.query(By.css('.toast'))).toBeTruthy();
 
-    tick(2500);
+    tick(5000);
     f.detectChanges();
     expect(f.debugElement.query(By.css('.toast'))).toBeNull();
   }));
@@ -244,8 +244,22 @@ describe('DayViewComponent (toast)', () => {
     const toast = f.debugElement.query(By.css('.toast'));
     expect(toast.nativeElement.textContent).toContain('Second task added');
 
-    tick(2500); // second toast's full lifetime expires
+    tick(5000); // second toast's full lifetime expires
     f.detectChanges();
     expect(f.debugElement.query(By.css('.toast'))).toBeNull();
+  }));
+
+  it('hides the toast immediately when the close button is clicked', fakeAsync(async () => {
+    const f = await setupToast();
+    f.componentInstance.onTaskConfirmed('Walk added');
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('.toast'))).toBeTruthy();
+
+    f.debugElement.query(By.css('.toast-close')).nativeElement.click();
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('.toast'))).toBeNull();
+
+    // Timer should also be cleared — no pending macrotask
+    tick(5000);
   }));
 });
