@@ -404,7 +404,7 @@ impl AgentService {
             .run(ctx.user_id, tier, system, initial_messages)
             .await?;
 
-        // Step 6: Validate output against the use-case schema before returning.
+        // Step 7: Validate output against the use-case schema before returning.
         if let Some(validator) = ctx.use_case.response_validator() {
             validate_agent_output(&output.content, validator)?;
         }
