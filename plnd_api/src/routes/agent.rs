@@ -1,8 +1,7 @@
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use chrono::Utc;
 use plnd_agent::{
-    register_memory_tools, register_schedule_tools, xml_escape, AgentContext, ToolRegistry,
-    UseCase,
+    register_memory_tools, register_schedule_tools, xml_escape, AgentContext, ToolRegistry, UseCase,
 };
 use plnd_data::db::{MemoryStore, TaskStore};
 use std::sync::Arc;
