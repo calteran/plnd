@@ -93,21 +93,30 @@ describe('AddEntryComponent', () => {
     clickSubmit(f);
 
     expect(f.componentInstance.isLoading()).toBeTrue();
-    expect(f.debugElement.query(By.css('.loading'))).toBeTruthy();
+    // Spinner is rendered inside the input wrapper
+    expect(f.debugElement.query(By.css('.input-spinner'))).toBeTruthy();
+    // Input has .loading class (drives shimmer animation)
+    expect(f.debugElement.query(By.css('.entry-input.loading'))).toBeTruthy();
+    // No standalone loading div
+    expect(f.debugElement.query(By.css('.loading:not(.entry-input)'))).toBeNull();
   });
 
-  it('shows confirmation and clears loading after successful response with no signals', async () => {
+  it('emits confirmed and clears loading after successful response with no signals', async () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(
       of(makeResponse({ confirmation: 'Task added!', ui_signals: [] })),
     );
     openPanel(f);
     typeText(f, 'buy groceries');
+
+    let confirmedMsg: string | undefined;
+    f.componentInstance.confirmed.subscribe((msg: string) => (confirmedMsg = msg));
     clickSubmit(f);
 
-    expect(f.debugElement.query(By.css('.agent-confirmation'))).toBeTruthy();
-    expect(f.nativeElement.textContent).toContain('Task added!');
+    expect(confirmedMsg).toBe('Task added!');
     expect(f.componentInstance.isLoading()).toBeFalse();
+    // No inline confirmation text
+    expect(f.debugElement.query(By.css('.agent-confirmation'))).toBeNull();
   });
 
   it('renders a checkbox for a show_checkbox ui_signal', async () => {
@@ -298,5 +307,76 @@ describe('AddEntryComponent', () => {
     clickSubmit(f);
 
     expect(emitted?.id).toBe('server-id-123');
+  });
+
+  // ── addingMore / smart close ───────────────────────────────────────────────
+
+  it('addingMore defaults to false when the form opens', async () => {
+    const f = await setup();
+    openPanel(f);
+    const checkbox = f.debugElement.query(By.css('.toggle-adding-more input[type="checkbox"]'));
+    expect(checkbox).toBeTruthy();
+    expect((checkbox.nativeElement as HTMLInputElement).checked).toBeFalse();
+  });
+
+  it('closes the form after success when addingMore is false', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(
+      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
+    );
+    openPanel(f);
+    typeText(f, 'buy groceries');
+    // addingMore is false by default
+    clickSubmit(f);
+
+    expect(f.componentInstance.isOpen()).toBeFalse();
+    expect(f.debugElement.query(By.css('.entry-panel'))).toBeNull();
+  });
+
+  it('clears input and stays open after success when addingMore is true', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(
+      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
+    );
+    openPanel(f);
+    typeText(f, 'buy groceries');
+
+    // Check the "Adding more" checkbox
+    const checkbox = f.debugElement
+      .query(By.css('.toggle-adding-more input[type="checkbox"]'))
+      .nativeElement as HTMLInputElement;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change'));
+    f.detectChanges();
+
+    clickSubmit(f);
+
+    expect(f.componentInstance.isOpen()).toBeTrue();
+    expect(f.componentInstance['_text']()).toBe('');
+  });
+
+  it('resets addingMore to false when the form is closed and reopened', async () => {
+    const f = await setup();
+    openPanel(f);
+
+    // Set addingMore to true
+    const checkbox = f.debugElement
+      .query(By.css('.toggle-adding-more input[type="checkbox"]'))
+      .nativeElement as HTMLInputElement;
+    checkbox.checked = true;
+    checkbox.dispatchEvent(new Event('change'));
+    f.detectChanges();
+    expect(f.componentInstance['addingMore']()).toBeTrue();
+
+    // Close and reopen
+    f.debugElement.query(By.css('.btn-cancel')).nativeElement.click();
+    f.detectChanges();
+    f.debugElement.query(By.css('.add-row')).nativeElement.click();
+    f.detectChanges();
+
+    const reopenedCheckbox = f.debugElement
+      .query(By.css('.toggle-adding-more input[type="checkbox"]'))
+      .nativeElement as HTMLInputElement;
+    expect(reopenedCheckbox.checked).toBeFalse();
   });
 });
