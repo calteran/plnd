@@ -4,10 +4,8 @@
 //! - `http.server.request.duration` (histogram, ms) — by method, route, status code
 //! - `http.server.active_requests` (up-down counter) — in-flight requests
 //!
-//! **Route cardinality note:** This layer sits outside the Axum router. `MatchedPath`
-//! (e.g. `/users/:id`) is not available at this level, so the raw URI path is used.
-//! For routes with path parameters this means one metric series per unique ID.
-//! Acceptable for dev; move the layer inside the router if production cardinality matters.
+//! Apply via `.route_layer(HttpMetricsLayer)` so that `MatchedPath` (e.g. `/users/:id`)
+//! is populated in request extensions. Falls back to the raw URI path if unavailable.
 
 use opentelemetry::{
     global,
@@ -78,7 +76,12 @@ where
 
     fn call(&mut self, req: axum::http::Request<B>) -> Self::Future {
         let method = req.method().as_str().to_owned();
-        let route = req.uri().path().to_owned();
+        let route = req
+            .extensions()
+            .get::<axum::extract::MatchedPath>()
+            .map(|m| m.as_str())
+            .unwrap_or_else(|| req.uri().path())
+            .to_owned();
         let start = Instant::now();
         let duration = self.request_duration.clone();
         let active = self.active_requests.clone();
