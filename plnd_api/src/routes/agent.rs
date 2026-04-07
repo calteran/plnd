@@ -1,7 +1,7 @@
 use axum::{extract::State, http::StatusCode, Extension, Json};
 use chrono::Utc;
 use plnd_agent::{
-    register_memory_tools, register_schedule_tools, AgentContext, ToolRegistry, UseCase,
+    register_memory_tools, register_schedule_tools, xml_escape, AgentContext, ToolRegistry, UseCase,
 };
 use plnd_data::db::{MemoryStore, TaskStore};
 use std::sync::Arc;
@@ -10,14 +10,6 @@ use uuid::Uuid;
 use crate::auth::jwt::Claims;
 use crate::models::{TaskEntryRequest, TaskEntryResponse};
 use crate::state::AppState;
-
-fn xml_escape(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
 
 fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> String {
     match context {
