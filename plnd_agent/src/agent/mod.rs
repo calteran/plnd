@@ -61,7 +61,7 @@ fn json_to_string(v: serde_json::Value) -> String {
 /// Escape XML special characters to prevent injection via user-controlled data
 /// (e.g., memory content) that is embedded in the agent system prompt.
 /// `&` must be replaced first to avoid double-escaping subsequent substitutions.
-fn xml_escape(s: &str) -> String {
+pub fn xml_escape(s: &str) -> String {
     s.replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;")
