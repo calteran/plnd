@@ -1,4 +1,4 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ActivatedRoute } from '@angular/router';
@@ -193,4 +193,73 @@ describe('DayViewComponent (onItemAdded)', () => {
       jasmine.objectContaining({ id: 'srv-1', label: 'call mum', type: 'task', status: 'pending' }),
     );
   });
+});
+
+describe('DayViewComponent (toast)', () => {
+  async function setupToast() {
+    const svc = makeScheduleServiceMock();
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent, RouterTestingModule],
+      providers: [
+        { provide: ScheduleService,  useValue: svc },
+        { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        { provide: ActivatedRoute,   useValue: mockActivatedRoute },
+      ],
+    }).compileComponents();
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+    return f;
+  }
+
+  it('shows a toast when onTaskConfirmed is called', async () => {
+    const f = await setupToast();
+    f.componentInstance.onTaskConfirmed('Walk added for after lunch');
+    f.detectChanges();
+    const toast = f.debugElement.query(By.css('.toast'));
+    expect(toast).toBeTruthy();
+    expect(toast.nativeElement.textContent).toContain('Walk added for after lunch');
+  });
+
+  it('hides the toast after 5000ms', fakeAsync(async () => {
+    const f = await setupToast();
+    f.componentInstance.onTaskConfirmed('Walk added');
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('.toast'))).toBeTruthy();
+
+    tick(5000);
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('.toast'))).toBeNull();
+  }));
+
+  it('replaces an in-flight toast when a second confirmation arrives', fakeAsync(async () => {
+    const f = await setupToast();
+    const inst = f.componentInstance;
+    inst.onTaskConfirmed('First task added');
+    f.detectChanges();
+
+    tick(1000); // 1s into first toast's lifetime
+    inst.onTaskConfirmed('Second task added');
+    f.detectChanges();
+
+    const toast = f.debugElement.query(By.css('.toast'));
+    expect(toast.nativeElement.textContent).toContain('Second task added');
+
+    tick(5000); // second toast's full lifetime expires
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('.toast'))).toBeNull();
+  }));
+
+  it('hides the toast immediately when the close button is clicked', fakeAsync(async () => {
+    const f = await setupToast();
+    f.componentInstance.onTaskConfirmed('Walk added');
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('.toast'))).toBeTruthy();
+
+    f.debugElement.query(By.css('.toast-close')).nativeElement.click();
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('.toast'))).toBeNull();
+
+    // Timer should also be cleared — no pending macrotask
+    tick(5000);
+  }));
 });

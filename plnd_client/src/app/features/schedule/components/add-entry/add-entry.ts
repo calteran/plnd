@@ -31,20 +31,23 @@ function toItemType(actionType: string | undefined): ItemType {
       </div>
     } @else {
       <div class="entry-panel">
-        <input
-          #entryInput
-          class="entry-input"
-          [value]="_text()"
-          (input)="_text.set($any($event.target).value)"
-          placeholder="e.g. vitamins with breakfast, walk after lunch, dentist 2pm…"
-          (keydown.escape)="close()"
-          (keydown.enter)="submit()"
-          aria-label="Add something to your day"
-        />
-
-        @if (isLoading()) {
-          <div class="loading" aria-live="polite" aria-label="Loading">…</div>
-        }
+        <div class="input-wrapper">
+          <input
+            #entryInput
+            class="entry-input"
+            [class.loading]="isLoading()"
+            [value]="_text()"
+            (input)="_text.set($any($event.target).value)"
+            placeholder="e.g. vitamins with breakfast, walk after lunch, dentist 2pm…"
+            (keydown.escape)="close()"
+            (keydown.enter)="submit()"
+            [attr.readonly]="isLoading() ? '' : null"
+            aria-label="Add something to your day"
+          />
+          @if (isLoading()) {
+            <div class="input-spinner" aria-hidden="true"></div>
+          }
+        </div>
 
         @if (pendingSignals().length > 0) {
           <div class="signal-form">
@@ -78,15 +81,19 @@ function toItemType(actionType: string | undefined): ItemType {
           </div>
         }
 
-        @if (confirmation()) {
-          <p class="agent-confirmation">{{ confirmation() }}</p>
-        }
-
         @if (errorMessage()) {
           <p class="agent-error">{{ errorMessage() }}</p>
         }
 
         <div class="entry-actions">
+          <label class="toggle-adding-more">
+            <input
+              type="checkbox"
+              [checked]="addingMore()"
+              (change)="addingMore.set($any($event.target).checked)"
+            />
+            Adding more
+          </label>
           <button class="btn-cancel" type="button" (click)="close()">Cancel</button>
           @if (pendingSignals().length > 0) {
             <button class="btn-continue" type="button" (click)="continueWithAnswers()">Continue</button>
@@ -107,17 +114,19 @@ export class AddEntryComponent {
   private _conversationInput = '';
 
   readonly added              = output<AddedEntry>();
+  readonly confirmed          = output<string>();
   readonly isOpen             = signal(false);
   protected readonly _text    = signal('');
   readonly isLoading                      = signal(false);
+  protected readonly addingMore           = signal(false);
   protected readonly pendingSignals       = signal<UiSignal[]>([]);
   protected readonly signalAnswers        = signal<Record<string, unknown>>({});
   protected readonly conversationHistory  = signal<ConversationTurn[]>([]);
-  protected readonly confirmation         = signal<string | null>(null);
   protected readonly errorMessage         = signal<string | null>(null);
 
   open(): void {
     this.isOpen.set(true);
+    this.addingMore.set(false);
     setTimeout(() => this.entryInput?.nativeElement.focus(), 0);
   }
 
@@ -125,10 +134,10 @@ export class AddEntryComponent {
     this.isOpen.set(false);
     this._text.set('');
     this.isLoading.set(false);
+    this.addingMore.set(false);
     this.pendingSignals.set([]);
     this.signalAnswers.set({});
     this.conversationHistory.set([]);
-    this.confirmation.set(null);
     this.errorMessage.set(null);
     this._conversationInput = '';
   }
@@ -170,7 +179,6 @@ export class AddEntryComponent {
 
     this.isLoading.set(true);
     this.errorMessage.set(null);
-    this.confirmation.set(null);
 
     this.agentService
       .createTask({ input, context: this.conversationHistory() })
@@ -180,11 +188,19 @@ export class AddEntryComponent {
           if (res.ui_signals.length > 0) {
             this.pendingSignals.set(res.ui_signals);
           } else {
-            this.confirmation.set(res.confirmation);
             const action = res.actions_taken[0];
             this.added.emit({ label: input, type: toItemType(action?.type), id: action?.task_id });
+            this.confirmed.emit(res.confirmation);
             this.conversationHistory.set([]);
             this.pendingSignals.set([]);
+            this.signalAnswers.set({});
+            if (this.addingMore()) {
+              this._text.set('');
+              this._conversationInput = '';
+              setTimeout(() => this.entryInput?.nativeElement.focus(), 0);
+            } else {
+              this.close();
+            }
           }
         },
         error: () => {

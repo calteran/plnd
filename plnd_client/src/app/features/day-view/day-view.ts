@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ScheduleService, todayIso } from '../../core/services/schedule.service';
@@ -69,18 +69,25 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
             }
           </div>
         }
-        <app-add-entry (added)="onItemAdded($event)" />
+        <app-add-entry (added)="onItemAdded($event)" (confirmed)="onTaskConfirmed($event)" />
       }
 
       @if (isToday()) {
         <app-yesterday-snapshot />
       }
 
+      @if (toastMessage()) {
+        <div class="toast" role="status" aria-live="polite">
+          <span class="toast-message">{{ toastMessage() }}</span>
+          <button class="toast-close" type="button" (click)="closeToast()" aria-label="Dismiss">×</button>
+        </div>
+      }
+
     </div>
   `,
   styleUrl: './day-view.scss',
 })
-export class DayViewComponent implements OnInit {
+export class DayViewComponent implements OnInit, OnDestroy {
   protected readonly scheduleService = inject(ScheduleService);
   protected readonly briefingService = inject(BriefingService);
   protected readonly isMealAnchor    = isMealAnchor;
@@ -89,6 +96,9 @@ export class DayViewComponent implements OnInit {
   private  readonly destroyRef       = inject(DestroyRef);
 
   readonly isToday = computed(() => this.scheduleService.date() === todayIso());
+
+  protected readonly toastMessage = signal<string | null>(null);
+  private toastTimer?: ReturnType<typeof setTimeout>;
 
   ngOnInit(): void {
     this.route.params
@@ -111,5 +121,20 @@ export class DayViewComponent implements OnInit {
       label:  entry.label,
       status: 'pending',
     });
+  }
+
+  ngOnDestroy(): void {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+  }
+
+  onTaskConfirmed(message: string): void {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastMessage.set(message);
+    this.toastTimer = setTimeout(() => this.toastMessage.set(null), 5000);
+  }
+
+  closeToast(): void {
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastMessage.set(null);
   }
 }
