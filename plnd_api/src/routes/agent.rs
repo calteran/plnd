@@ -62,6 +62,7 @@ pub async fn post_task(
     Json(body): Json<TaskEntryRequest>,
 ) -> Result<Json<TaskEntryResponse>, StatusCode> {
     if state.agent_task_limiter.check_key(&claims.sub).is_err() {
+        tracing::warn!(user_id = %claims.sub, "agent task rate limit exceeded");
         return Err(StatusCode::TOO_MANY_REQUESTS);
     }
 
