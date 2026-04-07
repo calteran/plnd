@@ -184,8 +184,8 @@ impl AppConfig {
             return Err("Database max_connections must be greater than 0".to_string());
         }
 
-        if !["debug", "info", "warn", "error"].contains(&self.logging.level.as_str()) {
-            return Err(format!("Invalid log level: {}", self.logging.level));
+        if tracing_subscriber::EnvFilter::try_new(&self.logging.level).is_err() {
+            return Err(format!("Invalid log level/filter: {}", self.logging.level));
         }
 
         if self.auth.jwt.secret.is_empty() {
