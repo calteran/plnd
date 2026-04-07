@@ -7,14 +7,18 @@ use axum::{
     Router,
 };
 use governor::{Quota, RateLimiter};
+use opentelemetry::trace::TracerProvider;
+use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use std::num::NonZeroU32;
 use tower_http::cors::CorsLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_scalar::{Scalar, Servable};
 use utoipa_swagger_ui::SwaggerUi;
+
+use plnd_api::middleware::metrics::HttpMetricsLayer;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -48,25 +52,48 @@ async fn main() {
         }
     };
 
-    // Initialize structured logging subscriber immediately after config loads.
-    // All tracing events after this point are captured and formatted.
-    if config.logging.pretty_print {
-        tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::new(&config.logging.level))
+    // Initialize OTEL providers before the subscriber (tracer needed for subscriber layer).
+    let otel_providers = match telemetry::init_providers(config.otel.endpoint.as_deref()) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("Failed to initialize OTEL providers: {e}");
+            std::process::exit(1);
+        }
+    };
+
+    // Build layered tracing subscriber.
+    // Each arm of the match produces a different concrete type — all are valid Subscriber impls.
+    let env_filter = tracing_subscriber::EnvFilter::new(&config.logging.level);
+
+    match (config.logging.pretty_print, otel_providers.as_ref()) {
+        (true, Some(p)) => tracing_subscriber::registry()
+            .with(env_filter)
+            .with(tracing_subscriber::fmt::layer().pretty().with_target(true))
+            .with(tracing_opentelemetry::layer().with_tracer(p.tracer_provider.tracer("plnd_api")))
+            .with(OpenTelemetryTracingBridge::new(&p.logger_provider))
+            .init(),
+        (false, Some(p)) => tracing_subscriber::registry()
+            .with(env_filter)
+            .with(tracing_subscriber::fmt::layer().json().with_target(true))
+            .with(tracing_opentelemetry::layer().with_tracer(p.tracer_provider.tracer("plnd_api")))
+            .with(OpenTelemetryTracingBridge::new(&p.logger_provider))
+            .init(),
+        (true, None) => tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
             .with_target(true)
             .pretty()
-            .init();
-    } else {
-        tracing_subscriber::fmt()
-            .with_env_filter(EnvFilter::new(&config.logging.level))
+            .init(),
+        (false, None) => tracing_subscriber::fmt()
+            .with_env_filter(env_filter)
             .with_target(true)
             .json()
-            .init();
+            .init(),
     }
 
     tracing::info!(
         api_base_url = %config.api.base_url,
         log_level = %config.logging.level,
+        otel_enabled = config.otel.endpoint.is_some(),
         "configuration loaded"
     );
 
@@ -341,6 +368,7 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .layer(PropagateRequestIdLayer::new(x_request_id.clone()))
         .layer(SetRequestIdLayer::new(x_request_id, MakeRequestUuid))
+        .layer(HttpMetricsLayer)
         .layer(cors);
 
     let listener = tokio::net::TcpListener::bind(&config.api.base_url)
@@ -353,4 +381,9 @@ async fn main() {
     )
     .await
     .unwrap();
+
+    // Flush all OTEL providers before exit to prevent dropped spans/logs/metrics.
+    if let Some(providers) = otel_providers {
+        telemetry::shutdown_providers(providers);
+    }
 }
