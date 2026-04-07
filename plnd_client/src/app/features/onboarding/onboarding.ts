@@ -19,7 +19,6 @@ const TOTAL_STEPS = 3;
   selector: 'app-onboarding',
   standalone: true,
   imports: [ReactiveFormsModule, TitleCasePipe],
-  styleUrl: './onboarding.scss',
   template: `
     <div class="onboarding-shell">
       <div class="onboarding-card">
@@ -156,7 +155,8 @@ const TOTAL_STEPS = 3;
         }
       </div>
     </div>
-  `
+  `,
+  styleUrl: './onboarding.scss',
 })
 export class OnboardingComponent implements OnInit {
   private readonly userService = inject(UserService);
