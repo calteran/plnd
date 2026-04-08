@@ -375,7 +375,7 @@ pub struct ScheduleEntryResponse {
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
     pub date: NaiveDate,
-    pub scheduled_start: DateTime<Utc>,
+    pub scheduled_start: Option<DateTime<Utc>>,
     pub scheduled_end: Option<DateTime<Utc>>,
     pub status: String,
     pub actual_start: Option<DateTime<Utc>>,

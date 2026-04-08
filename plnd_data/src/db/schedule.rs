@@ -131,11 +131,13 @@ pub async fn commit_plan(
     let mut task_ref_types: Vec<Option<String>> = Vec::new();
     let mut titles: Vec<Option<String>> = Vec::new();
     let mut dates: Vec<NaiveDate> = Vec::new();
-    let mut scheduled_starts: Vec<DateTime<Utc>> = Vec::new();
+    let mut scheduled_starts: Vec<Option<DateTime<Utc>>> = Vec::new();
     let mut after_mileposts: Vec<Option<String>> = Vec::new();
 
     for entry in &req.entries {
-        let scheduled_start = entry.date.and_time(entry.scheduled_start).and_utc();
+        let scheduled_start = entry
+            .scheduled_start
+            .map(|t| entry.date.and_time(t).and_utc());
         task_types.push(entry.task_type.clone());
         task_ref_ids.push(entry.task_ref_id);
         task_ref_types.push(entry.task_ref_type.clone());
@@ -275,7 +277,7 @@ mod tests {
             task_ref_id: None,
             task_ref_type: None,
             title: Some("Test task".to_string()),
-            scheduled_start: NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+            scheduled_start: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
             after_milepost: None,
         }
     }
@@ -426,17 +428,18 @@ mod tests {
         };
         commit_plan(&pool, uid, &req).await.unwrap();
 
-        let (date_a, status_a, sched_a): (NaiveDate, String, DateTime<Utc>) = sqlx::query_as(
-            "SELECT date, status, scheduled_start FROM schedule_entries WHERE entry_id = $1",
-        )
-        .bind(id_accept)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
+        let (date_a, status_a, sched_a): (NaiveDate, String, Option<DateTime<Utc>>) =
+            sqlx::query_as(
+                "SELECT date, status, scheduled_start FROM schedule_entries WHERE entry_id = $1",
+            )
+            .bind(id_accept)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
         assert_eq!(date_a, plan_start, "Accept should reschedule to plan_start");
         assert_eq!(status_a, "planned");
         assert_eq!(
-            sched_a.time(),
+            sched_a.unwrap().time(),
             NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
             "Time must be preserved"
         );
@@ -485,7 +488,7 @@ mod tests {
             task_ref_id: None,
             task_ref_type: None,
             title: None,
-            scheduled_start: NaiveTime::from_hms_opt(10, 0, 0).unwrap(),
+            scheduled_start: Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
             after_milepost: None,
         };
         let bad_req = CommitPlanInput {
@@ -517,6 +520,47 @@ mod tests {
         assert_eq!(
             task_2_status, "planned",
             "planning task status must also be rolled back"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_supports_bucket_task_with_null_scheduled_start(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let bucket_entry = PlanEntryInput {
+            date: start,
+            task_type: "work".to_string(),
+            task_ref_id: None,
+            task_ref_type: None,
+            title: Some("Bucket task".to_string()),
+            scheduled_start: None,
+            after_milepost: Some("lunch".to_string()),
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![bucket_entry],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+        };
+
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let period = get_period(&pool, uid, start, end).await.unwrap();
+        assert_eq!(period.entries.len(), 1);
+        assert!(
+            period.entries[0].scheduled_start.is_none(),
+            "bucket task should have no scheduled_start"
+        );
+        assert_eq!(
+            period.entries[0].after_milepost,
+            Some("lunch".to_string()),
+            "after_milepost must be preserved"
         );
     }
 }

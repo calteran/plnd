@@ -472,7 +472,7 @@ pub struct ScheduleEntry {
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
     pub date: NaiveDate,
-    pub scheduled_start: DateTime<Utc>,
+    pub scheduled_start: Option<DateTime<Utc>>,
     pub scheduled_end: Option<DateTime<Utc>>,
     pub status: String,
     pub actual_start: Option<DateTime<Utc>>,
@@ -519,6 +519,6 @@ pub struct PlanEntryInput {
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
-    pub scheduled_start: NaiveTime,
+    pub scheduled_start: Option<NaiveTime>,
     pub after_milepost: Option<String>,
 }

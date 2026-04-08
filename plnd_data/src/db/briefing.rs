@@ -107,7 +107,7 @@ mod tests {
                     task_ref_id: None,
                     task_ref_type: None,
                     title: Some("Morning work".to_string()),
-                    scheduled_start: nine,
+                    scheduled_start: Some(nine),
                     after_milepost: None,
                 },
                 PlanEntryInput {
@@ -116,7 +116,7 @@ mod tests {
                     task_ref_id: None,
                     task_ref_type: None,
                     title: Some("Afternoon work".to_string()),
-                    scheduled_start: ten,
+                    scheduled_start: Some(ten),
                     after_milepost: None,
                 },
                 PlanEntryInput {
@@ -125,7 +125,7 @@ mod tests {
                     task_ref_id: None,
                     task_ref_type: None,
                     title: Some("Lunch".to_string()),
-                    scheduled_start: noon,
+                    scheduled_start: Some(noon),
                     after_milepost: None,
                 },
             ],
