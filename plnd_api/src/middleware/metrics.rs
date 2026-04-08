@@ -108,17 +108,17 @@ where
         let duration = self.request_duration.clone();
         let active = self.active_requests.clone();
 
-        active.add(
-            1,
-            &[
-                KeyValue::new(HTTP_REQUEST_METHOD, method.clone()),
-                KeyValue::new(HTTP_ROUTE, route.clone()),
-            ],
-        );
-
         let mut inner = self.inner.clone();
         Box::pin(async move {
-            // Guard lives inside the future so it drops on completion *or* cancellation.
+            // Increment and guard both live inside the future so a future dropped
+            // before its first poll causes neither an increment nor a missing decrement.
+            active.add(
+                1,
+                &[
+                    KeyValue::new(HTTP_REQUEST_METHOD, method.clone()),
+                    KeyValue::new(HTTP_ROUTE, route.clone()),
+                ],
+            );
             let _guard = ActiveRequestGuard {
                 counter: active,
                 method: method.clone(),
