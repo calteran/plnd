@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use plnd_data::db::error::DatabaseError;
 use plnd_data::db::TaskStore;
 
@@ -48,76 +48,6 @@ fn db_err(tool: &str, e: DatabaseError) -> ToolError {
     ToolError::Execution {
         tool: tool.to_string(),
         reason: e.to_string(),
-    }
-}
-
-// ── FindScheduleSlotTool ──────────────────────────────────────────────────────
-
-pub struct FindScheduleSlotTool(Arc<TaskStore>);
-
-#[async_trait::async_trait]
-impl Tool for FindScheduleSlotTool {
-    fn name(&self) -> &str {
-        "find_schedule_slot"
-    }
-
-    fn description(&self) -> &str {
-        "Find the next available time slot for a task. Given the user's energy \
-         level and how long the task will take, returns the earliest free \
-         start and end time. Optionally pass 'after' (ISO 8601) to search \
-         from a specific point in time; defaults to now."
-    }
-
-    fn schema(&self) -> serde_json::Value {
-        find_schedule_slot_schema()
-    }
-
-    async fn execute(
-        &self,
-        ctx: &ToolContext,
-        input: serde_json::Value,
-    ) -> Result<serde_json::Value, ToolError> {
-        let energy_level = input
-            .get("energy_level")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidInput {
-                tool: self.name().to_string(),
-                reason: "missing required field 'energy_level'".to_string(),
-            })?
-            .to_string();
-
-        validate_energy_level(&energy_level, self.name())?;
-
-        let duration_minutes = input
-            .get("duration_minutes")
-            .and_then(|v| v.as_i64())
-            .ok_or_else(|| ToolError::InvalidInput {
-                tool: self.name().to_string(),
-                reason: "missing required field 'duration_minutes'".to_string(),
-            })?;
-        let duration_minutes = validate_duration_minutes(duration_minutes, self.name())?;
-
-        let after: DateTime<Utc> = match input.get("after").and_then(|v| v.as_str()) {
-            Some(s) => s
-                .parse::<DateTime<Utc>>()
-                .map_err(|_| ToolError::InvalidInput {
-                    tool: self.name().to_string(),
-                    reason: format!("'after' is not a valid ISO 8601 datetime: {s}"),
-                })?,
-            None => Utc::now(),
-        };
-
-        let (slot_start, slot_end) = self
-            .0
-            .find_free_slot(ctx.user_id, &energy_level, duration_minutes, after)
-            .await
-            .map_err(|e| db_err(self.name(), e))?;
-
-        Ok(serde_json::json!({
-            "start": slot_start,
-            "end": slot_end,
-            "date": slot_start.format("%Y-%m-%d").to_string()
-        }))
     }
 }
 
@@ -171,23 +101,40 @@ impl Tool for CreateTaskTool {
 
         validate_energy_level(&energy_level, self.name())?;
 
-        let scheduled_at_str = input
-            .get("scheduled_at")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidInput {
+        let date_str =
+            input
+                .get("date")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| ToolError::InvalidInput {
+                    tool: self.name().to_string(),
+                    reason: "missing required field 'date'".to_string(),
+                })?;
+
+        let date = date_str
+            .parse::<NaiveDate>()
+            .map_err(|_| ToolError::InvalidInput {
                 tool: self.name().to_string(),
-                reason: "missing required field 'scheduled_at'".to_string(),
+                reason: format!("'date' is not a valid ISO 8601 date (YYYY-MM-DD): {date_str}"),
             })?;
 
-        let scheduled_at =
-            scheduled_at_str
-                .parse::<DateTime<Utc>>()
-                .map_err(|_| ToolError::InvalidInput {
-                    tool: self.name().to_string(),
-                    reason: format!(
-                        "'scheduled_at' is not a valid ISO 8601 datetime: {scheduled_at_str}"
-                    ),
-                })?;
+        let scheduled_at: Option<DateTime<Utc>> = match input
+            .get("scheduled_at")
+            .and_then(|v| v.as_str())
+        {
+            Some(s) => Some(
+                s.parse::<DateTime<Utc>>()
+                    .map_err(|_| ToolError::InvalidInput {
+                        tool: self.name().to_string(),
+                        reason: format!("'scheduled_at' is not a valid ISO 8601 datetime: {s}"),
+                    })?,
+            ),
+            None => None,
+        };
+
+        let after_milepost = input
+            .get("after_milepost")
+            .and_then(|v| v.as_str())
+            .map(str::to_string);
 
         let duration_minutes = input
             .get("duration_minutes")
@@ -218,8 +165,10 @@ impl Tool for CreateTaskTool {
                 ctx.user_id,
                 &title,
                 &energy_level,
+                date,
                 scheduled_at,
                 duration_minutes,
+                after_milepost.as_deref(),
             )
             .await
             .map_err(|e| db_err(self.name(), e))?;
@@ -228,6 +177,7 @@ impl Tool for CreateTaskTool {
             "actions_taken": [{
                 "type": "task_created",
                 "task_id": task.task_id,
+                "date": date.to_string(),
                 "scheduled_at": scheduled_at
             }],
             "ui_signals": ui_signals,
@@ -285,7 +235,7 @@ impl Tool for RequestClarificationTool {
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
-/// Register both schedule tools into `registry`.
+/// Register schedule tools into `registry`.
 ///
 /// # Example
 ///
@@ -294,37 +244,11 @@ impl Tool for RequestClarificationTool {
 /// register_schedule_tools(&mut registry, store);
 /// ```
 pub fn register_schedule_tools(registry: &mut ToolRegistry, store: Arc<TaskStore>) {
-    registry.register(Arc::new(FindScheduleSlotTool(store.clone())));
     registry.register(Arc::new(CreateTaskTool(store)));
     registry.register(Arc::new(RequestClarificationTool));
 }
 
 // ── Schema constructors ───────────────────────────────────────────────────────
-
-fn find_schedule_slot_schema() -> serde_json::Value {
-    serde_json::json!({
-        "type": "object",
-        "properties": {
-            "energy_level": {
-                "type": "string",
-                "enum": VALID_ENERGY_LEVELS,
-                "description": "Energy level required for the task."
-            },
-            "duration_minutes": {
-                "type": "integer",
-                "minimum": DURATION_MIN,
-                "maximum": DURATION_MAX,
-                "description": "How long the task will take, in minutes."
-            },
-            "after": {
-                "type": "string",
-                "format": "date-time",
-                "description": "Search for slots after this ISO 8601 datetime. Defaults to now."
-            }
-        },
-        "required": ["energy_level", "duration_minutes"]
-    })
-}
 
 fn create_task_schema() -> serde_json::Value {
     serde_json::json!({
@@ -339,10 +263,20 @@ fn create_task_schema() -> serde_json::Value {
                 "enum": VALID_ENERGY_LEVELS,
                 "description": "Energy level required for the task."
             },
+            "date": {
+                "type": "string",
+                "format": "date",
+                "description": "Calendar date for the task (YYYY-MM-DD)."
+            },
             "scheduled_at": {
                 "type": "string",
                 "format": "date-time",
-                "description": "ISO 8601 datetime when the task is scheduled to start."
+                "description": "ISO 8601 datetime when the task starts. Omit for bucket-based placement."
+            },
+            "after_milepost": {
+                "type": "string",
+                "enum": ["breakfast", "lunch", "dinner"],
+                "description": "Schedule this task after a meal anchor. Use when scheduled_at is omitted."
             },
             "duration_minutes": {
                 "type": "integer",
@@ -360,7 +294,7 @@ fn create_task_schema() -> serde_json::Value {
                 "description": "Human-readable summary of what was scheduled, shown to the user."
             }
         },
-        "required": ["title", "energy_level", "scheduled_at", "duration_minutes", "confirmation"]
+        "required": ["title", "energy_level", "date", "duration_minutes", "confirmation"]
     })
 }
 
@@ -408,13 +342,6 @@ mod tests {
     }
 
     #[test]
-    fn find_slot_schema_has_no_user_id() {
-        let schema = find_schedule_slot_schema();
-        assert!(!has_user_id_property(&schema));
-        assert!(!schema_requires_user_id(&schema));
-    }
-
-    #[test]
     fn create_task_schema_has_no_user_id() {
         let schema = create_task_schema();
         assert!(!has_user_id_property(&schema));
@@ -422,17 +349,17 @@ mod tests {
     }
 
     #[test]
-    fn create_task_schema_requires_title_and_confirmation() {
+    fn create_task_schema_requires_title_date_and_confirmation() {
         let schema = create_task_schema();
         assert!(schema_requires_field(&schema, "title"));
+        assert!(schema_requires_field(&schema, "date"));
         assert!(schema_requires_field(&schema, "confirmation"));
     }
 
     #[test]
-    fn find_slot_schema_requires_energy_level_and_duration() {
-        let schema = find_schedule_slot_schema();
-        assert!(schema_requires_field(&schema, "energy_level"));
-        assert!(schema_requires_field(&schema, "duration_minutes"));
+    fn create_task_schema_does_not_require_scheduled_at() {
+        let schema = create_task_schema();
+        assert!(!schema_requires_field(&schema, "scheduled_at"));
     }
 
     #[test]
@@ -502,9 +429,9 @@ mod tests {
 
     #[test]
     fn duration_minutes_error_names_tool() {
-        let err = validate_duration_minutes(0, "find_schedule_slot").unwrap_err();
+        let err = validate_duration_minutes(0, "create_task").unwrap_err();
         match err {
-            ToolError::InvalidInput { tool, .. } => assert_eq!(tool, "find_schedule_slot"),
+            ToolError::InvalidInput { tool, .. } => assert_eq!(tool, "create_task"),
             _ => panic!("expected InvalidInput"),
         }
     }
