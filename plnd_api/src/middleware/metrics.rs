@@ -126,7 +126,7 @@ where
             };
 
             let result = inner.call(req).await;
-            let elapsed_ms = start.elapsed().as_millis() as f64;
+            let elapsed_ms = start.elapsed().as_secs_f64() * 1000.0;
 
             let status_code = result
                 .as_ref()
@@ -137,8 +137,8 @@ where
             duration.record(
                 elapsed_ms,
                 &[
-                    KeyValue::new(HTTP_REQUEST_METHOD, method.clone()),
-                    KeyValue::new(HTTP_ROUTE, route.clone()),
+                    KeyValue::new(HTTP_REQUEST_METHOD, method),
+                    KeyValue::new(HTTP_ROUTE, route),
                     KeyValue::new(HTTP_RESPONSE_STATUS_CODE, status_code),
                 ],
             );

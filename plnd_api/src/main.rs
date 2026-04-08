@@ -19,6 +19,7 @@ use utoipa_scalar::{Scalar, Servable};
 use utoipa_swagger_ui::SwaggerUi;
 
 use plnd_api::middleware::metrics::HttpMetricsLayer;
+use plnd_api::middleware::trace_propagation::extract_trace_context;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -365,6 +366,7 @@ async fn main() {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .merge(Scalar::with_url("/scalar", ApiDoc::openapi()))
         .with_state(state)
+        .layer(middleware::from_fn(extract_trace_context))
         .layer(TraceLayer::new_for_http())
         .layer(PropagateRequestIdLayer::new(x_request_id.clone()))
         .layer(SetRequestIdLayer::new(x_request_id, MakeRequestUuid))
