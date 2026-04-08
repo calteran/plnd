@@ -28,7 +28,10 @@ pub fn init_providers(
         Some(e) => e.to_owned(),
     };
 
-    let resource = Resource::new(vec![KeyValue::new(SERVICE_NAME, "plnd_api")]);
+    let resource = Resource::default().merge(&Resource::new(vec![KeyValue::new(
+        SERVICE_NAME,
+        "plnd_api",
+    )]));
 
     // ── Traces ──────────────────────────────────────────────────────────────
     let trace_exporter = opentelemetry_otlp::SpanExporter::builder()
