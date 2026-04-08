@@ -111,6 +111,10 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         }
     }
 
+    if let Ok(v) = std::env::var("APP_OTEL__ENDPOINT") {
+        app_config.otel.endpoint = if v.is_empty() { None } else { Some(v) };
+    }
+
     app_config
         .validate()
         .map_err(error::ConfigError::Validation)?;
