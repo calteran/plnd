@@ -111,7 +111,7 @@ mod tests {
             content: None,
             tool_calls: vec![ToolCall {
                 id: "tc_1".to_string(),
-                name: "find_schedule_slot".to_string(),
+                name: "create_task".to_string(),
                 arguments: serde_json::json!({"energy_level": "high"}),
             }],
             stop_reason: StopReason::ToolUse,
@@ -121,7 +121,7 @@ mod tests {
 
         assert_eq!(result.content, None);
         assert_eq!(result.tool_calls.len(), 1);
-        assert_eq!(result.tool_calls[0].name, "find_schedule_slot");
+        assert_eq!(result.tool_calls[0].name, "create_task");
         assert_eq!(
             result.tool_calls[0].arguments,
             serde_json::json!({"energy_level": "high"})

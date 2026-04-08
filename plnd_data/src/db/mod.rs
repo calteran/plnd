@@ -22,4 +22,5 @@ pub mod users;
 pub use connection::run_migrations;
 pub use connection::Database;
 pub use memories::MemoryStore;
+pub use schedule::ScheduleStore;
 pub use tasks::TaskStore;
