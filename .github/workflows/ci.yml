@@ -64,12 +64,11 @@ jobs:
         env:
           DATABASE_URL: postgres://plnd:plnd_dev@localhost/plnd_dev
 
-      - name: Upload API binary
-        uses: actions/upload-artifact@v7
+      - name: Cache API binary for e2e job
+        uses: actions/cache/save@v4
         with:
-          name: plnd-api-binary
           path: target/debug/plnd_api
-          retention-days: 1
+          key: plnd-api-binary-${{ github.run_id }}
 
   # ── Job 2: Angular lint + unit tests ───────────────────────────────────────
   client:
@@ -167,11 +166,12 @@ jobs:
         if: steps.cache-playwright.outputs.cache-hit != 'true'
         run: cd plnd_client && npx playwright install chromium --with-deps
 
-      - name: Download API binary
-        uses: actions/download-artifact@v8
+      - name: Restore API binary from cache
+        uses: actions/cache/restore@v4
         with:
-          name: plnd-api-binary
-          path: target/debug/
+          path: target/debug/plnd_api
+          key: plnd-api-binary-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - name: Make API binary executable
         run: chmod +x target/debug/plnd_api
