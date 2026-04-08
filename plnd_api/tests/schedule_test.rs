@@ -20,7 +20,7 @@ fn test_plan_entry_request_serde() {
     assert_eq!(req.task_type, "meal");
     assert_eq!(
         req.scheduled_start,
-        NaiveTime::from_hms_opt(8, 0, 0).unwrap()
+        Some(NaiveTime::from_hms_opt(8, 0, 0).unwrap())
     );
     assert_eq!(req.after_milepost, Some("breakfast".to_string()));
     assert!(req.title.is_none());

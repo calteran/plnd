@@ -18,16 +18,6 @@ pub struct ReadyStatus {
 // Preferences
 // ---------------------------------------------------------------------------
 
-fn deserialize_hhmm<'de, D>(deserializer: D) -> Result<NaiveTime, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    NaiveTime::parse_from_str(&s, "%H:%M")
-        .or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S"))
-        .map_err(serde::de::Error::custom)
-}
-
 fn deserialize_opt_hhmm<'de, D>(deserializer: D) -> Result<Option<NaiveTime>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -62,9 +52,9 @@ pub struct PlanEntryRequest {
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
-    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"
-    #[serde(deserialize_with = "deserialize_hhmm")]
-    pub scheduled_start: NaiveTime,
+    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"; omit for bucket tasks (after_milepost)
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub scheduled_start: Option<NaiveTime>,
     pub after_milepost: Option<String>,
 }
 
