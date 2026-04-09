@@ -1,5 +1,6 @@
 import { Component, ElementRef, ViewChild, inject, output, signal } from '@angular/core';
 import { AgentService } from '../../../../core/services/agent.service';
+import { ScheduleService } from '../../../../core/services/schedule.service';
 import { ConversationTurn, UiSignal } from '../../../../core/models/agent';
 import { ItemType } from '../../../../core/models/schedule';
 
@@ -109,7 +110,8 @@ function toItemType(actionType: string | undefined): ItemType {
 export class AddEntryComponent {
   @ViewChild('entryInput') private entryInput?: ElementRef<HTMLInputElement>;
 
-  private readonly agentService = inject(AgentService);
+  private readonly agentService    = inject(AgentService);
+  private readonly scheduleService = inject(ScheduleService);
   /** Anchors the input text that opened the current conversation thread. */
   private _conversationInput = '';
 
@@ -181,7 +183,7 @@ export class AddEntryComponent {
     this.errorMessage.set(null);
 
     this.agentService
-      .createTask({ input, context: this.conversationHistory() })
+      .createTask({ input, date: this.scheduleService.date(), context: this.conversationHistory() })
       .subscribe({
         next: res => {
           this.isLoading.set(false);
