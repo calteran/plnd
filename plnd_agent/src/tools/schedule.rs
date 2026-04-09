@@ -285,7 +285,7 @@ impl Tool for CreateTaskTool {
                 "task_id": task.task_id,
                 "date": date.to_string(),
                 "after_milepost": after_milepost,
-                "scheduled_start": scheduled_start
+                "scheduled_at": scheduled_start
             }],
             "ui_signals": ui_signals,
             "confirmation": confirmation
