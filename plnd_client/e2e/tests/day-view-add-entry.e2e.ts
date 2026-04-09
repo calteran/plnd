@@ -75,7 +75,7 @@ test.describe('Day View — Add Entry', () => {
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task added!' }),
+          body: JSON.stringify({ actions_taken: [{ type: 'task_created', task_id: 'e2e-task-1' }], ui_signals: [], confirmation: 'Task added!' }),
         });
       });
 
@@ -90,7 +90,7 @@ test.describe('Day View — Add Entry', () => {
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task scheduled!' }),
+          body: JSON.stringify({ actions_taken: [{ type: 'task_created', task_id: 'e2e-task-2' }], ui_signals: [], confirmation: 'Task scheduled!' }),
         }),
       );
 
