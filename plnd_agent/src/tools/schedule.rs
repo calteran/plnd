@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use plnd_data::db::error::DatabaseError;
-use plnd_data::db::TaskStore;
+use plnd_data::db::{ScheduleStore, TaskStore};
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
@@ -48,6 +48,104 @@ fn db_err(tool: &str, e: DatabaseError) -> ToolError {
     ToolError::Execution {
         tool: tool.to_string(),
         reason: e.to_string(),
+    }
+}
+
+// ── GetDayScheduleTool ────────────────────────────────────────────────────────
+
+pub struct GetDayScheduleTool(Arc<ScheduleStore>);
+
+#[async_trait::async_trait]
+impl Tool for GetDayScheduleTool {
+    fn name(&self) -> &str {
+        "get_day_schedule"
+    }
+
+    fn description(&self) -> &str {
+        "Retrieve the schedule for a given date including meals, tasks, and appointments. \
+         Use this to understand task density before placing a new task."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        get_day_schedule_schema()
+    }
+
+    fn is_terminal(&self) -> bool {
+        false
+    }
+
+    async fn execute(
+        &self,
+        ctx: &ToolContext,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        let date_str =
+            input
+                .get("date")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| ToolError::InvalidInput {
+                    tool: self.name().to_string(),
+                    reason: "missing required field 'date'".to_string(),
+                })?;
+
+        let date = date_str
+            .parse::<NaiveDate>()
+            .map_err(|_| ToolError::InvalidInput {
+                tool: self.name().to_string(),
+                reason: format!("'date' is not a valid ISO 8601 date (YYYY-MM-DD): {date_str}"),
+            })?;
+
+        let entries = self
+            .0
+            .get_day_entries(ctx.user_id, date)
+            .await
+            .map_err(|e| db_err(self.name(), e))?;
+
+        let task_count = entries.iter().filter(|e| e.task_type != "meal").count();
+        let total = entries.len();
+        let summary = format!("{total} entries, {task_count} tasks between meals");
+
+        let entry_values: Vec<serde_json::Value> = entries
+            .into_iter()
+            .map(|e| {
+                let mut obj = serde_json::Map::new();
+                obj.insert(
+                    "title".to_string(),
+                    serde_json::Value::String(e.title.unwrap_or_default()),
+                );
+                obj.insert(
+                    "type".to_string(),
+                    serde_json::Value::String(e.task_type.clone()),
+                );
+                obj.insert(
+                    "is_milepost".to_string(),
+                    serde_json::Value::Bool(e.task_type == "meal"),
+                );
+                if let Some(start) = e.scheduled_start {
+                    obj.insert(
+                        "time".to_string(),
+                        serde_json::Value::String(start.format("%H:%M").to_string()),
+                    );
+                }
+                if let Some(bucket) = e.after_milepost {
+                    obj.insert("bucket".to_string(), serde_json::Value::String(bucket));
+                }
+                if let (Some(start), Some(end)) = (e.scheduled_start, e.scheduled_end) {
+                    let mins = (end - start).num_minutes();
+                    obj.insert(
+                        "duration".to_string(),
+                        serde_json::Value::Number(mins.into()),
+                    );
+                }
+                serde_json::Value::Object(obj)
+            })
+            .collect();
+
+        Ok(serde_json::json!({
+            "date": date.to_string(),
+            "entries": entry_values,
+            "summary": summary
+        }))
     }
 }
 
@@ -117,15 +215,15 @@ impl Tool for CreateTaskTool {
                 reason: format!("'date' is not a valid ISO 8601 date (YYYY-MM-DD): {date_str}"),
             })?;
 
-        let scheduled_at: Option<DateTime<Utc>> = match input
-            .get("scheduled_at")
+        let scheduled_start: Option<DateTime<Utc>> = match input
+            .get("scheduled_start")
             .and_then(|v| v.as_str())
         {
             Some(s) => Some(
                 s.parse::<DateTime<Utc>>()
                     .map_err(|_| ToolError::InvalidInput {
                         tool: self.name().to_string(),
-                        reason: format!("'scheduled_at' is not a valid ISO 8601 datetime: {s}"),
+                        reason: format!("'scheduled_start' is not a valid ISO 8601 datetime: {s}"),
                     })?,
             ),
             None => None,
@@ -135,6 +233,14 @@ impl Tool for CreateTaskTool {
             .get("after_milepost")
             .and_then(|v| v.as_str())
             .map(str::to_string);
+
+        if scheduled_start.is_none() && after_milepost.is_none() {
+            return Err(ToolError::InvalidInput {
+                tool: self.name().to_string(),
+                reason: "at least one of 'after_milepost' or 'scheduled_start' must be provided"
+                    .to_string(),
+            });
+        }
 
         let duration_minutes = input
             .get("duration_minutes")
@@ -166,7 +272,7 @@ impl Tool for CreateTaskTool {
                 &title,
                 &energy_level,
                 date,
-                scheduled_at,
+                scheduled_start,
                 duration_minutes,
                 after_milepost.as_deref(),
             )
@@ -178,7 +284,8 @@ impl Tool for CreateTaskTool {
                 "type": "task_created",
                 "task_id": task.task_id,
                 "date": date.to_string(),
-                "scheduled_at": scheduled_at
+                "after_milepost": after_milepost,
+                "scheduled_start": scheduled_start
             }],
             "ui_signals": ui_signals,
             "confirmation": confirmation
@@ -240,15 +347,34 @@ impl Tool for RequestClarificationTool {
 /// # Example
 ///
 /// ```ignore
-/// let store = Arc::new(TaskStore::new(pool));
-/// register_schedule_tools(&mut registry, store);
+/// let task_store = Arc::new(TaskStore::new(pool.clone()));
+/// let schedule_store = Arc::new(ScheduleStore::new(pool));
+/// register_schedule_tools(&mut registry, task_store, schedule_store);
 /// ```
-pub fn register_schedule_tools(registry: &mut ToolRegistry, store: Arc<TaskStore>) {
-    registry.register(Arc::new(CreateTaskTool(store)));
+pub fn register_schedule_tools(
+    registry: &mut ToolRegistry,
+    task_store: Arc<TaskStore>,
+    schedule_store: Arc<ScheduleStore>,
+) {
+    registry.register(Arc::new(GetDayScheduleTool(schedule_store)));
+    registry.register(Arc::new(CreateTaskTool(task_store)));
     registry.register(Arc::new(RequestClarificationTool));
 }
 
 // ── Schema constructors ───────────────────────────────────────────────────────
+
+fn get_day_schedule_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "required": ["date"],
+        "properties": {
+            "date": {
+                "type": "string",
+                "description": "Calendar date to retrieve the schedule for (YYYY-MM-DD)."
+            }
+        }
+    })
+}
 
 fn create_task_schema() -> serde_json::Value {
     serde_json::json!({
@@ -268,7 +394,7 @@ fn create_task_schema() -> serde_json::Value {
                 "format": "date",
                 "description": "Calendar date for the task (YYYY-MM-DD)."
             },
-            "scheduled_at": {
+            "scheduled_start": {
                 "type": "string",
                 "format": "date-time",
                 "description": "ISO 8601 datetime when the task starts. Omit for bucket-based placement."
@@ -276,7 +402,7 @@ fn create_task_schema() -> serde_json::Value {
             "after_milepost": {
                 "type": "string",
                 "enum": ["breakfast", "lunch", "dinner"],
-                "description": "Schedule this task after a meal anchor. Use when scheduled_at is omitted."
+                "description": "Schedule this task after a meal anchor. Use when scheduled_start is omitted."
             },
             "duration_minutes": {
                 "type": "integer",
@@ -357,9 +483,17 @@ mod tests {
     }
 
     #[test]
-    fn create_task_schema_does_not_require_scheduled_at() {
+    fn create_task_schema_does_not_require_scheduled_start() {
         let schema = create_task_schema();
-        assert!(!schema_requires_field(&schema, "scheduled_at"));
+        assert!(!schema_requires_field(&schema, "scheduled_start"));
+    }
+
+    #[test]
+    fn create_task_schema_has_scheduled_start_not_scheduled_at() {
+        let schema = create_task_schema();
+        let props = schema.get("properties").unwrap();
+        assert!(props.get("scheduled_start").is_some());
+        assert!(props.get("scheduled_at").is_none());
     }
 
     #[test]
@@ -434,5 +568,31 @@ mod tests {
             ToolError::InvalidInput { tool, .. } => assert_eq!(tool, "create_task"),
             _ => panic!("expected InvalidInput"),
         }
+    }
+
+    #[test]
+    fn get_day_schedule_schema_requires_date() {
+        let schema = get_day_schedule_schema();
+        assert!(schema_requires_field(&schema, "date"));
+    }
+
+    #[test]
+    fn get_day_schedule_schema_has_no_user_id() {
+        let schema = get_day_schedule_schema();
+        assert!(!has_user_id_property(&schema));
+        assert!(!schema_requires_user_id(&schema));
+    }
+
+    #[test]
+    fn get_day_schedule_schema_is_consistent() {
+        // Verify the schema free fn is self-consistent without needing a real pool.
+        let schema = get_day_schedule_schema();
+        assert!(schema_requires_field(&schema, "date"));
+        assert!(!schema_requires_user_id(&schema));
+        // date property should exist
+        assert!(schema
+            .get("properties")
+            .and_then(|p| p.get("date"))
+            .is_some());
     }
 }
