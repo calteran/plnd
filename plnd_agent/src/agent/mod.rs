@@ -1499,14 +1499,32 @@ mod schema_validation_tests {
 
     #[test]
     fn valid_task_created_passes() {
+        // Timed task: task_id + date + scheduled_at all present.
         let json = r#"{
             "actions_taken": [{
                 "type": "task_created",
                 "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "date": "2026-04-05",
                 "scheduled_at": "2026-04-05T20:00:00Z"
             }],
             "ui_signals": [],
             "confirmation": "Scheduled 'Replace vacuum filter' for Sunday evening."
+        }"#;
+        assert!(validate_agent_output(json, task_entry_validator()).is_ok());
+    }
+
+    #[test]
+    fn valid_bucket_task_created_passes() {
+        // Bucket task: task_id + date + after_milepost, no scheduled_at.
+        let json = r#"{
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "date": "2026-04-05",
+                "after_milepost": "after_lunch"
+            }],
+            "ui_signals": [],
+            "confirmation": "Scheduled after lunch on Sunday."
         }"#;
         assert!(validate_agent_output(json, task_entry_validator()).is_ok());
     }
@@ -1517,6 +1535,7 @@ mod schema_validation_tests {
             "actions_taken": [{
                 "type": "task_created",
                 "task_id": null,
+                "date": "2026-04-05",
                 "scheduled_at": "2026-04-05T20:00:00Z"
             }],
             "ui_signals": [],
@@ -1530,12 +1549,13 @@ mod schema_validation_tests {
     }
 
     #[test]
-    fn task_created_null_scheduled_at_fails() {
+    fn task_created_missing_date_fails() {
+        // date is required for task_created; scheduled_at alone is not sufficient.
         let json = r#"{
             "actions_taken": [{
                 "type": "task_created",
                 "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-                "scheduled_at": null
+                "scheduled_at": "2026-04-05T20:00:00Z"
             }],
             "ui_signals": [],
             "confirmation": "Task scheduled."
@@ -1543,8 +1563,24 @@ mod schema_validation_tests {
         let err = validate_agent_output(json, task_entry_validator()).unwrap_err();
         assert!(
             matches!(err, AgentError::SchemaValidation { .. }),
-            "null scheduled_at on task_created must fail schema validation"
+            "missing date on task_created must fail schema validation"
         );
+    }
+
+    #[test]
+    fn task_created_null_scheduled_at_is_allowed() {
+        // scheduled_at is now optional; null is valid as long as task_id and date are present.
+        let json = r#"{
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "date": "2026-04-05",
+                "scheduled_at": null
+            }],
+            "ui_signals": [],
+            "confirmation": "Task scheduled."
+        }"#;
+        assert!(validate_agent_output(json, task_entry_validator()).is_ok());
     }
 
     #[test]
