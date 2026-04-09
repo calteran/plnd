@@ -170,28 +170,25 @@ describe('DayViewComponent (isToday wiring)', () => {
 });
 
 describe('DayViewComponent (onItemAdded)', () => {
-  it('calls scheduleService.addItem with a ScheduleTask built from the AddedEntry', async () => {
-    const items: ScheduleItem[] = [
-      { id: 't1', type: 'task', label: 'Existing', status: 'pending' }
-    ];
-    const svc = makeScheduleServiceMock({ scheduleItems: items });
+  it('calls scheduleService.loadDay to reload after a task is added', async () => {
+    const svc = makeScheduleServiceMock({ date: '2026-03-20' });
     await TestBed.configureTestingModule({
       imports: [DayViewComponent, RouterTestingModule],
       providers: [
-        { provide: ScheduleService, useValue: svc },
-        { provide: BriefingService, useValue: makeBriefingServiceMock() },
-        { provide: ActivatedRoute, useValue: mockActivatedRoute },
+        { provide: ScheduleService,  useValue: svc },
+        { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        { provide: ActivatedRoute,   useValue: mockActivatedRoute },
       ],
     }).compileComponents();
 
     const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
+    svc.loadDay.calls.reset(); // clear the init call
 
     f.componentInstance.onItemAdded({ label: 'call mum', type: 'task', id: 'srv-1' });
 
-    expect(svc.addItem).toHaveBeenCalledWith(
-      jasmine.objectContaining({ id: 'srv-1', label: 'call mum', type: 'task', status: 'pending' }),
-    );
+    expect(svc.loadDay).toHaveBeenCalledOnceWith('2026-03-20');
+    expect(svc.addItem).not.toHaveBeenCalled();
   });
 });
 

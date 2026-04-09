@@ -114,13 +114,8 @@ export class DayViewComponent implements OnInit, OnDestroy {
   onDateChange(date: string): void { this.router.navigate(['/day', date]); }
   retry(): void { this.scheduleService.loadDay(this.scheduleService.date()); }
   onPlanMeal(_mealId: string): void { /* TODO: open meal planning panel */ }
-  onItemAdded(entry: AddedEntry): void {
-    this.scheduleService.addItem({
-      id:     entry.id ?? crypto.randomUUID(),
-      type:   entry.type,
-      label:  entry.label,
-      status: 'pending',
-    });
+  onItemAdded(_entry: AddedEntry): void {
+    this.scheduleService.loadDay(this.scheduleService.date());
   }
 
   ngOnDestroy(): void {
