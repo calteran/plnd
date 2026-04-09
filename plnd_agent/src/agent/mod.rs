@@ -96,10 +96,8 @@ fn validate_agent_output(
         .collect();
 
     if !violations.is_empty() {
-        let message = violations.join("; ");
-        tracing::warn!(violations = %message, "agent output failed schema validation");
         return Err(AgentError::SchemaValidation {
-            violations: message,
+            violations: violations.join("; "),
         });
     }
 
@@ -406,7 +404,18 @@ impl AgentService {
 
         // Step 7: Validate output against the use-case schema before returning.
         if let Some(validator) = ctx.use_case.response_validator() {
-            validate_agent_output(&output.content, validator)?;
+            if let Err(e) = validate_agent_output(&output.content, validator) {
+                let snippet: String = output.content.chars().take(1000).collect();
+                let truncated = output.content.len() > 1000;
+                tracing::error!(
+                    use_case = ?ctx.use_case,
+                    violations = %e,
+                    content = %snippet,
+                    content_truncated = truncated,
+                    "agent output failed schema validation"
+                );
+                return Err(e);
+            }
         }
 
         Ok(output)

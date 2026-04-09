@@ -75,7 +75,8 @@ pub async fn post_task(
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
-        // SchemaValidation is already logged at warn level inside plnd_agent.
+        // SchemaValidation is logged at error level in AgentService::run() with
+        // use_case, violation details, and a content snippet.
         AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
         _ => {
             tracing::error!(error = %e, "agent run failed");
