@@ -1,8 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Subject, of, throwError } from 'rxjs';
+import { signal } from '@angular/core';
 import { AddEntryComponent, AddedEntry } from './add-entry';
 import { AgentService } from '../../../../core/services/agent.service';
+import { ScheduleService } from '../../../../core/services/schedule.service';
 import { TaskEntryResponse } from '../../../../core/models/agent';
 
 function makeResponse(overrides: Partial<TaskEntryResponse> = {}): TaskEntryResponse {
@@ -14,16 +16,24 @@ function makeResponse(overrides: Partial<TaskEntryResponse> = {}): TaskEntryResp
   };
 }
 
+function makeScheduleServiceMock(date = '2026-01-15') {
+  const d = signal(date);
+  return { date: d.asReadonly() };
+}
+
 describe('AddEntryComponent', () => {
   let agentSpy: jasmine.SpyObj<AgentService>;
 
-  async function setup() {
+  async function setup(date = '2026-01-15') {
     agentSpy = jasmine.createSpyObj<AgentService>('AgentService', ['createTask']);
     agentSpy.createTask.and.returnValue(of(makeResponse({ confirmation: 'Task added!' })));
 
     await TestBed.configureTestingModule({
       imports: [AddEntryComponent],
-      providers: [{ provide: AgentService, useValue: agentSpy }],
+      providers: [
+        { provide: AgentService,    useValue: agentSpy },
+        { provide: ScheduleService, useValue: makeScheduleServiceMock(date) },
+      ],
     }).compileComponents();
 
     const f = TestBed.createComponent(AddEntryComponent);
@@ -81,7 +91,7 @@ describe('AddEntryComponent', () => {
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f);
-    expect(agentSpy.createTask).toHaveBeenCalledOnceWith({ input: 'buy groceries', context: [] });
+    expect(agentSpy.createTask).toHaveBeenCalledOnceWith({ input: 'buy groceries', date: '2026-01-15', context: [] });
   });
 
   it('shows loading state while the request is in flight', async () => {
