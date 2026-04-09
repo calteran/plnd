@@ -208,7 +208,10 @@ mod tests {
         use chrono::NaiveDate;
         let json = r#"{"input": "dentist appointment", "date": "2026-04-10"}"#;
         let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.date, Some(NaiveDate::from_ymd_opt(2026, 4, 10).unwrap()));
+        assert_eq!(
+            req.date,
+            Some(NaiveDate::from_ymd_opt(2026, 4, 10).unwrap())
+        );
     }
 
     #[test]
