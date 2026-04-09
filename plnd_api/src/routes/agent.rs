@@ -60,7 +60,8 @@ pub async fn post_task(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let today = Utc::now().format("%Y-%m-%d").to_string();
-    let target_date = body.date.clone().unwrap_or_else(|| today.clone());
+    let target_date_str = body.date.map(|d| d.format("%Y-%m-%d").to_string());
+    let target_date = target_date_str.as_deref().unwrap_or(&today);
     let context_str = build_context_str(body.context.as_deref());
     let prior_context = Some(format!(
         "{context_str}[Today: {today}]\n[Target date: {target_date}]\n"
@@ -204,19 +205,20 @@ mod tests {
 
     #[test]
     fn task_entry_request_accepts_date_field() {
+        use chrono::NaiveDate;
         let json = r#"{"input": "dentist appointment", "date": "2026-04-10"}"#;
         let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.date.as_deref(), Some("2026-04-10"));
+        assert_eq!(req.date, Some(NaiveDate::from_ymd_opt(2026, 4, 10).unwrap()));
     }
 
     #[test]
     fn target_date_falls_back_to_today_when_omitted() {
         use chrono::Utc;
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today_date = Utc::now().date_naive();
         let json = r#"{"input": "take out trash"}"#;
         let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
-        let target_date = req.date.clone().unwrap_or_else(|| today.clone());
-        assert_eq!(target_date, today);
+        let target_date = req.date.unwrap_or(today_date);
+        assert_eq!(target_date, today_date);
     }
 
     #[test]
