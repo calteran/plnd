@@ -1,10 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Subject, of, throwError } from 'rxjs';
-import { signal } from '@angular/core';
 import { AddEntryComponent, AddedEntry } from './add-entry';
 import { AgentService } from '../../../../core/services/agent.service';
-import { ScheduleService } from '../../../../core/services/schedule.service';
 import { TaskEntryResponse } from '../../../../core/models/agent';
 
 function makeResponse(overrides: Partial<TaskEntryResponse> = {}): TaskEntryResponse {
@@ -16,11 +14,6 @@ function makeResponse(overrides: Partial<TaskEntryResponse> = {}): TaskEntryResp
   };
 }
 
-function makeScheduleServiceMock(date = '2026-01-15') {
-  const d = signal(date);
-  return { date: d.asReadonly() };
-}
-
 describe('AddEntryComponent', () => {
   let agentSpy: jasmine.SpyObj<AgentService>;
 
@@ -30,13 +23,11 @@ describe('AddEntryComponent', () => {
 
     await TestBed.configureTestingModule({
       imports: [AddEntryComponent],
-      providers: [
-        { provide: AgentService,    useValue: agentSpy },
-        { provide: ScheduleService, useValue: makeScheduleServiceMock(date) },
-      ],
+      providers: [{ provide: AgentService, useValue: agentSpy }],
     }).compileComponents();
 
     const f = TestBed.createComponent(AddEntryComponent);
+    f.componentRef.setInput('date', date);
     f.detectChanges();
     return f;
   }

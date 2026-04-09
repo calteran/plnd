@@ -69,8 +69,12 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
             }
           </div>
         }
-        <app-add-entry (added)="onItemAdded($event)" (confirmed)="onTaskConfirmed($event)" />
       }
+      <app-add-entry
+        [date]="scheduleService.date()"
+        (added)="onItemAdded($event)"
+        (confirmed)="onTaskConfirmed($event)"
+      />
 
       @if (isToday()) {
         <app-yesterday-snapshot />
