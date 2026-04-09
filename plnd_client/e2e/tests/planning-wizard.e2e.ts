@@ -324,7 +324,7 @@ test.describe('Planning Wizard', () => {
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task added!' }),
+          body: JSON.stringify({ actions_taken: [{ type: 'task_created', task_id: 'e2e-task-3' }], ui_signals: [], confirmation: 'Task added!' }),
         }),
       );
 
@@ -365,7 +365,7 @@ test.describe('Planning Wizard', () => {
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ actions_taken: [], ui_signals: [], confirmation: 'Task added!' }),
+          body: JSON.stringify({ actions_taken: [{ type: 'task_created', task_id: 'e2e-task-4' }], ui_signals: [], confirmation: 'Task added!' }),
         }),
       );
 
