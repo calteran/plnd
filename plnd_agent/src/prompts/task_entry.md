@@ -139,7 +139,7 @@ The terminal tools (`create_task` and `request_clarification`) produce the final
 ```json
 {
   "actions_taken": [
-    { "type": "task_created", "task_id": "<DB-generated UUID>", "date": "YYYY-MM-DD", "scheduled_start": "<ISO 8601 or null>" }
+    { "type": "task_created", "task_id": "<DB-generated UUID>", "date": "YYYY-MM-DD", "after_milepost": "<breakfast | lunch | dinner | null>", "scheduled_start": "<ISO 8601 or null>" }
   ],
   "ui_signals": [],
   "confirmation": "..."
