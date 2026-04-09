@@ -15,7 +15,9 @@ const MEAL_REBALANCE_PROMPT: &str = include_str!("../prompts/meal_rebalance.md")
 /// Enforces both structural and semantic constraints:
 /// - Top-level shape: `actions_taken`, `ui_signals`, `confirmation` (no extra fields)
 /// - When `actions_taken[i].type == "task_created"`, both `task_id` and
-///   `scheduled_at` must be present and non-null (the `if/then` conditional).
+///   `date` must be present and non-null (the `if/then` conditional).
+/// - `scheduled_at` is optional for all action types (used for timed tasks).
+/// - `after_milepost` is optional (used for bucket-scheduled tasks).
 const TASK_ENTRY_RESPONSE_SCHEMA: &str = r##"{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "TaskEntryResponse",
@@ -33,16 +35,18 @@ const TASK_ENTRY_RESPONSE_SCHEMA: &str = r##"{
       "required": ["type"],
       "additionalProperties": false,
       "properties": {
-        "type":         { "type": "string" },
-        "task_id":      { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
-        "scheduled_at": { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
+        "type":           { "type": "string" },
+        "task_id":        { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
+        "date":           { "oneOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
+        "after_milepost": { "oneOf": [{ "type": "string" }, { "type": "null" }] },
+        "scheduled_at":   { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
       },
       "if":   { "properties": { "type": { "const": "task_created" } }, "required": ["type"] },
       "then": {
-        "required": ["task_id", "scheduled_at"],
+        "required": ["task_id", "date"],
         "properties": {
-          "task_id":      { "type": "string", "format": "uuid" },
-          "scheduled_at": { "type": "string", "format": "date-time" }
+          "task_id": { "type": "string", "format": "uuid" },
+          "date":    { "type": "string", "format": "date" }
         }
       }
     }
@@ -236,6 +240,54 @@ mod tests {
             "confirmation": ""
         });
         assert!(validator.is_valid(&ok));
+    }
+
+    #[test]
+    fn task_entry_validator_accepts_bucket_task_created() {
+        let validator = UseCase::TaskEntry.response_validator().unwrap();
+        let ok: serde_json::Value = serde_json::json!({
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "date": "2026-04-10",
+                "after_milepost": "after_lunch"
+            }],
+            "ui_signals": [],
+            "confirmation": "Scheduled after lunch on Thursday."
+        });
+        assert!(validator.is_valid(&ok));
+    }
+
+    #[test]
+    fn task_entry_validator_accepts_timed_task_created() {
+        let validator = UseCase::TaskEntry.response_validator().unwrap();
+        let ok: serde_json::Value = serde_json::json!({
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "date": "2026-04-10",
+                "scheduled_at": "2026-04-10T14:00:00Z"
+            }],
+            "ui_signals": [],
+            "confirmation": "Scheduled for 2:00 PM Thursday."
+        });
+        assert!(validator.is_valid(&ok));
+    }
+
+    #[test]
+    fn task_entry_validator_rejects_task_created_without_date() {
+        let validator = UseCase::TaskEntry.response_validator().unwrap();
+        // task_created requires both task_id and date — missing date must fail
+        let bad: serde_json::Value = serde_json::json!({
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "scheduled_at": "2026-04-10T14:00:00Z"
+            }],
+            "ui_signals": [],
+            "confirmation": "Scheduled."
+        });
+        assert!(!validator.is_valid(&bad));
     }
 
     #[test]

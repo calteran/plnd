@@ -59,9 +59,12 @@ pub async fn post_task(
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    let today = Utc::now().format("%Y-%m-%d");
+    let today = Utc::now().format("%Y-%m-%d").to_string();
+    let target_date = body.date.clone().unwrap_or_else(|| today.clone());
     let context_str = build_context_str(body.context.as_deref());
-    let prior_context = Some(format!("{context_str}[Today: {today}]\n"));
+    let prior_context = Some(format!(
+        "{context_str}[Today: {today}]\n[Target date: {target_date}]\n"
+    ));
 
     let ctx = AgentContext {
         user_id,
@@ -181,10 +184,12 @@ mod tests {
         // is handled by JSON schema validation in AgentService::run (plnd_agent),
         // not here. A TaskEntryResponse containing this ActionTaken would be
         // rejected by validate_agent_output before post_task ever deserializes it.
-        let json = r#"{"type": "task_created", "task_id": null, "scheduled_at": null}"#;
+        // The schema requires task_id and date (not null) for task_created actions.
+        let json = r#"{"type": "task_created", "task_id": null, "date": null}"#;
         let action: ActionTaken = serde_json::from_str(json).unwrap();
         assert_eq!(action.r#type, "task_created");
         assert!(action.task_id.is_none());
+        assert!(action.date.is_none());
         assert!(action.scheduled_at.is_none());
     }
 
@@ -195,6 +200,23 @@ mod tests {
         let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.input, "take out trash");
         assert!(req.context.is_none());
+    }
+
+    #[test]
+    fn task_entry_request_accepts_date_field() {
+        let json = r#"{"input": "dentist appointment", "date": "2026-04-10"}"#;
+        let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.date.as_deref(), Some("2026-04-10"));
+    }
+
+    #[test]
+    fn target_date_falls_back_to_today_when_omitted() {
+        use chrono::Utc;
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let json = r#"{"input": "take out trash"}"#;
+        let req: TaskEntryRequest = serde_json::from_str(json).unwrap();
+        let target_date = req.date.clone().unwrap_or_else(|| today.clone());
+        assert_eq!(target_date, today);
     }
 
     #[test]
