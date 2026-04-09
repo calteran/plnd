@@ -188,9 +188,8 @@ export class AddEntryComponent {
       .subscribe({
         next: res => {
           this.isLoading.set(false);
-          if (res.ui_signals.length > 0) {
-            this.pendingSignals.set(res.ui_signals);
-          } else {
+          if (res.actions_taken.length > 0) {
+            // Task was created — complete the flow regardless of any informational ui_signals.
             const action = res.actions_taken[0];
             this.added.emit({ label: input, type: toItemType(action?.type), id: action?.task_id });
             this.confirmed.emit(res.confirmation);
@@ -204,6 +203,9 @@ export class AddEntryComponent {
             } else {
               this.close();
             }
+          } else if (res.ui_signals.length > 0) {
+            // No task created yet — show clarification signals.
+            this.pendingSignals.set(res.ui_signals);
           }
         },
         error: () => {

@@ -63,7 +63,11 @@ Energy level does **not** determine which bucket to use. Bucket placement is dri
 
 ## Recurrence detection
 
-When the input sounds like a habit or repeating task ("every day", "each morning", "weekly", "take vitamins", "daily walk"), surface the possibility via `ui_signals`:
+When the input sounds like a habit or repeating task ("every day", "each morning", "weekly", "take vitamins", "daily walk"):
+
+**Always call `create_task` immediately — never call `request_clarification` for recurrence alone.**
+
+Pass the recurrence hints in `create_task`'s `ui_signals` parameter so the frontend can ask about recurrence *after* the task is saved:
 
 ```json
 [
@@ -72,7 +76,7 @@ When the input sounds like a habit or repeating task ("every day", "each morning
 ]
 ```
 
-Always create the single instance immediately via `create_task` — do not block on recurrence confirmation. Pass the `ui_signals` alongside `create_task` so the frontend can ask about recurrence after the task is saved.
+If prior context contains answers for `recurring` or `frequency`, they are informational — do not re-surface them and do not call `request_clarification`. Proceed directly to `create_task`.
 
 ## Guidelines
 

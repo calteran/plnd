@@ -14,12 +14,17 @@ function makeResponse(overrides: Partial<TaskEntryResponse> = {}): TaskEntryResp
   };
 }
 
+/** Convenience helper for the happy-path: task created, no pending signals. */
+function makeSuccessResponse(confirmation = 'Task added!'): TaskEntryResponse {
+  return makeResponse({ actions_taken: [{ type: 'task_created', task_id: 'test-task-id' }], confirmation });
+}
+
 describe('AddEntryComponent', () => {
   let agentSpy: jasmine.SpyObj<AgentService>;
 
   async function setup(date = '2026-01-15') {
     agentSpy = jasmine.createSpyObj<AgentService>('AgentService', ['createTask']);
-    agentSpy.createTask.and.returnValue(of(makeResponse({ confirmation: 'Task added!' })));
+    agentSpy.createTask.and.returnValue(of(makeSuccessResponse()));
 
     await TestBed.configureTestingModule({
       imports: [AddEntryComponent],
@@ -104,9 +109,7 @@ describe('AddEntryComponent', () => {
 
   it('emits confirmed and clears loading after successful response with no signals', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
-      of(makeResponse({ confirmation: 'Task added!', ui_signals: [] })),
-    );
+    agentSpy.createTask.and.returnValue(of(makeSuccessResponse('Task added!')));
     openPanel(f);
     typeText(f, 'buy groceries');
 
@@ -171,7 +174,7 @@ describe('AddEntryComponent', () => {
     const f = await setup();
     agentSpy.createTask.and.returnValues(
       of(makeResponse({ ui_signals: [checkboxSignal] })),
-      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
+      of(makeSuccessResponse('Done!')),
     );
     openPanel(f);
     typeText(f, 'buy groceries');
@@ -212,7 +215,7 @@ describe('AddEntryComponent', () => {
     const f = await setup();
     agentSpy.createTask.and.returnValues(
       of(makeResponse({ ui_signals: firstSignals })),
-      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
+      of(makeSuccessResponse('Done!')),
     );
     openPanel(f);
     typeText(f, 'buy groceries');
@@ -277,10 +280,10 @@ describe('AddEntryComponent', () => {
     expect(emitted?.type).toBe('appointment');
   });
 
-  it('emits type "task" when actions_taken is empty', async () => {
+  it('emits type "task" as fallback for an unrecognised action type', async () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(
-      of(makeResponse({ actions_taken: [], confirmation: 'Task added!' })),
+      of(makeResponse({ actions_taken: [{ type: 'future_thing', task_id: 'id-1' }], confirmation: 'Done!' })),
     );
     openPanel(f);
     typeText(f, 'buy groceries');
@@ -290,6 +293,22 @@ describe('AddEntryComponent', () => {
     clickSubmit(f);
 
     expect(emitted?.type).toBe('task');
+  });
+
+  it('does not emit added when actions_taken is empty and ui_signals is empty', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(
+      of(makeResponse({ actions_taken: [], confirmation: '', ui_signals: [] })),
+    );
+    openPanel(f);
+    typeText(f, 'buy groceries');
+
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => (emitted = e));
+    clickSubmit(f);
+
+    expect(emitted).toBeUndefined();
+    expect(f.componentInstance.isOpen()).toBeTrue(); // stays open
   });
 
   it('emits the task_id from actions_taken[0] as id', async () => {
@@ -322,9 +341,7 @@ describe('AddEntryComponent', () => {
 
   it('closes the form after success when addingMore is false', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
-      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
-    );
+    agentSpy.createTask.and.returnValue(of(makeSuccessResponse('Done!')));
     openPanel(f);
     typeText(f, 'buy groceries');
     // addingMore is false by default
@@ -336,9 +353,7 @@ describe('AddEntryComponent', () => {
 
   it('clears input and stays open after success when addingMore is true', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
-      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
-    );
+    agentSpy.createTask.and.returnValue(of(makeSuccessResponse('Done!')));
     openPanel(f);
     typeText(f, 'buy groceries');
 
