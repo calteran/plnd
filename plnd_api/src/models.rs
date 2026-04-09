@@ -85,7 +85,7 @@ pub struct PostSchedulePlanRequest {
 pub struct ActionTaken {
     pub r#type: String,
     pub task_id: Option<Uuid>,
-    pub date: Option<String>,
+    pub date: Option<NaiveDate>,
     pub after_milepost: Option<String>,
     pub scheduled_at: Option<DateTime<Utc>>,
 }
@@ -99,7 +99,7 @@ pub struct ConversationTurn {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct TaskEntryRequest {
     pub input: String,
-    pub date: Option<String>,
+    pub date: Option<NaiveDate>,
     pub context: Option<Vec<ConversationTurn>>,
 }
 
