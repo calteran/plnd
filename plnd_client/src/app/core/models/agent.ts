@@ -2,6 +2,8 @@ export interface ActionTaken {
   type: string;
   task_id?: string;
   scheduled_at?: string;
+  date?: string;            // date the task was scheduled to (YYYY-MM-DD)
+  after_milepost?: string;  // meal-bucket anchor, e.g. "breakfast"
 }
 
 export interface ShowCheckboxSignal {
@@ -28,6 +30,7 @@ export interface ConversationTurn {
 
 export interface TaskEntryRequest {
   input: string;
+  date?: string;            // YYYY-MM-DD — the day the user is currently viewing
   context?: ConversationTurn[];
 }
 
