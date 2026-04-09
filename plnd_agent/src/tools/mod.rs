@@ -144,7 +144,9 @@ pub(crate) fn build_tool_registry(
     register_memory_tools(&mut registry, memory_store);
     match use_case {
         UseCase::TaskEntry => {
-            register_schedule_tools(&mut registry, Arc::new(plnd_data::db::TaskStore::new(pool)));
+            let task_store = Arc::new(plnd_data::db::TaskStore::new(pool.clone()));
+            let schedule_store = Arc::new(plnd_data::db::ScheduleStore::new(pool));
+            register_schedule_tools(&mut registry, task_store, schedule_store);
         }
         UseCase::MealPlanning | UseCase::MealRebalance => {}
     }
