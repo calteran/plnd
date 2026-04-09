@@ -275,6 +275,25 @@ mod tests {
     }
 
     #[test]
+    fn task_entry_validator_rejects_scheduled_start_field_name() {
+        let validator = UseCase::TaskEntry.response_validator().unwrap();
+        // The tool previously emitted "scheduled_start" — this must be rejected
+        // because ActionTaken has additionalProperties: false and only defines
+        // "scheduled_at".
+        let bad: serde_json::Value = serde_json::json!({
+            "actions_taken": [{
+                "type": "task_created",
+                "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "date": "2026-04-09",
+                "scheduled_start": "2026-04-09T09:00:00Z"
+            }],
+            "ui_signals": [],
+            "confirmation": "Scheduled."
+        });
+        assert!(!validator.is_valid(&bad));
+    }
+
+    #[test]
     fn task_entry_validator_rejects_task_created_without_date() {
         let validator = UseCase::TaskEntry.response_validator().unwrap();
         // task_created requires both task_id and date — missing date must fail
