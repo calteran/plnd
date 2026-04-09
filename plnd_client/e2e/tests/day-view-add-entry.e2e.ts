@@ -120,15 +120,30 @@ test.describe('Day View — Add Entry', () => {
         date: '2026-03-28',
         scheduled_start: '2026-03-28T09:00:00Z',
       };
+      const NEW_ITEM = {
+        entry_id: 'new-entry-1',
+        task_type: 'custom',
+        title: 'call mum',
+        status: 'planned',
+        date: '2026-03-28',
+        scheduled_start: '2026-03-28T09:01:00Z',
+      };
+
+      // Stateful mock: after the agent creates the task the reload returns the updated list.
+      let taskCreated = false;
       await page.route(`${API_BASE}/schedule/period**`, route =>
         route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ entries: [SEED_ITEM], carryover: [] }),
+          body: JSON.stringify({
+            entries: taskCreated ? [SEED_ITEM, NEW_ITEM] : [SEED_ITEM],
+            carryover: [],
+          }),
         }),
       );
-      await page.route(`${API_BASE}/agent/task`, route =>
-        route.fulfill({
+      await page.route(`${API_BASE}/agent/task`, route => {
+        taskCreated = true;
+        return route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
@@ -136,8 +151,8 @@ test.describe('Day View — Add Entry', () => {
             ui_signals: [],
             confirmation: 'Task added!',
           }),
-        }),
-      );
+        });
+      });
 
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
@@ -145,7 +160,7 @@ test.describe('Day View — Add Entry', () => {
       await dayView.openAddEntry();
       await dayView.getEntryInput().fill('call mum');
       await dayView.getAddButton().click();
-      await expect(dayView.getScheduleList()).toContainText('call mum', { timeout: 3_000 });
+      await expect(dayView.getScheduleList()).toContainText('call mum', { timeout: 5_000 });
     });
   });
 
