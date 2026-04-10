@@ -21,8 +21,7 @@ pub struct LlmModelConfig {
     pub max_iterations: u32,
     /// Maximum number of times the agent will retry after a schema validation
     /// failure before returning a 422. Each retry adds a full LLM round-trip;
-    /// keep this low. Capped at [`crate::agent::MAX_SCHEMA_RETRIES`] regardless
-    /// of what is set here.
+    /// keep this low. Capped at 3 regardless of what is set here.
     #[serde(default = "default_max_schema_retries")]
     pub max_schema_retries: u32,
     #[serde(default)]

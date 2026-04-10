@@ -39,9 +39,15 @@ pub enum AgentError {
 /// terminal tool's result or raw LLM text). If a use-case schema is defined,
 /// schema validation has already passed before this is returned from
 /// [`AgentService::run`].
+///
+/// `messages` is the full conversation history (user turns, assistant turns,
+/// and tool-result turns) from the run. It is exposed so that callers — e.g.
+/// the schema-validation retry loop in [`AgentService::run`] — can extend the
+/// history and re-run the agent with complete context.
 #[derive(Debug, Clone)]
 pub struct AgentOutput {
     pub content: String,
+    pub messages: Vec<Message>,
 }
 
 // ── Internal result type used during parallel tool execution ─────────────────
@@ -78,7 +84,7 @@ pub fn xml_escape(s: &str) -> String {
 /// Hard cap on `LlmModelConfig::max_schema_retries` regardless of config value.
 /// Each retry adds a full LLM round-trip; the default of 1 retry doubles
 /// worst-case latency on validation failure, so keep this small.
-pub const MAX_SCHEMA_RETRIES: u32 = 3;
+pub(crate) const MAX_SCHEMA_RETRIES: u32 = 3;
 
 /// Validates `content` (a JSON string produced by the agent loop) against a
 /// pre-compiled JSON Schema validator.
@@ -221,6 +227,7 @@ impl AgentLoop<'_> {
         // whatever content was last captured (possibly empty string).
         Ok(AgentOutput {
             content: last_content.unwrap_or_default(),
+            messages,
         })
     }
 
@@ -412,7 +419,7 @@ impl AgentService {
         };
 
         let mut output = agent_loop
-            .run(ctx.user_id, tier, system.clone(), initial_messages.clone())
+            .run(ctx.user_id, tier, system.clone(), initial_messages)
             .await?;
 
         // Step 7: Validate output against the use-case schema, retrying with a
@@ -450,26 +457,21 @@ impl AgentService {
                              {violations}\n\n\
                              Please respond again with a valid JSON object matching the required schema."
                         );
-                        let retry_messages = [
-                            initial_messages.clone(),
-                            vec![
-                                Message {
-                                    role: MessageRole::Assistant,
-                                    content: MessageContent::Text(output.content.clone()),
-                                    tool_calls: vec![],
-                                },
-                                Message {
-                                    role: MessageRole::User,
-                                    content: MessageContent::Text(correction),
-                                    tool_calls: vec![],
-                                },
-                            ],
-                        ]
-                        .concat();
+                        // Use the full conversation history from the completed run
+                        // (including any intermediate tool-call turns) so the LLM
+                        // has complete context when correcting its output.
+                        let mut retry_messages = output.messages;
+                        retry_messages.push(Message {
+                            role: MessageRole::User,
+                            content: MessageContent::Text(correction),
+                            tool_calls: vec![],
+                        });
                         output = agent_loop
                             .run(ctx.user_id, tier, system.clone(), retry_messages)
                             .await?;
                     }
+                    // validate_agent_output only ever returns AgentError::SchemaValidation;
+                    // this arm exists for exhaustiveness.
                     Err(e) => return Err(e),
                 }
             }
@@ -1520,6 +1522,43 @@ mod tests {
         assert_eq!(
             result.unwrap().content,
             r#"{"actions_taken":[],"ui_signals":[],"confirmation":"done"}"#
+        );
+    }
+
+    /// When `max_schema_retries = 0`, the first validation failure must
+    /// immediately return `AgentError::SchemaValidation` — no retry at all.
+    #[tokio::test]
+    async fn test_schema_retry_zero_retries_fails_immediately() {
+        let mock = MockLlmProvider::new("test");
+        let call_count = mock.call_count_handle();
+
+        mock.push_response(CompletionResponse {
+            content: Some("not valid json".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+        });
+
+        // Build a service with max_schema_retries explicitly set to 0.
+        let mut service = AgentService::new_with_registry(make_registry(mock));
+        service.config.fast.max_schema_retries = 0;
+        service.config.capable.max_schema_retries = 0;
+
+        let ctx = AgentContext {
+            user_id: Uuid::nil(),
+            use_case: UseCase::TaskEntry,
+            input: "add task".to_string(),
+            prior_context: None,
+        };
+
+        let result = service.run(&ctx).await;
+        assert!(
+            matches!(result, Err(AgentError::SchemaValidation { .. })),
+            "max_schema_retries=0 must fail immediately without any retry"
+        );
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            1,
+            "LLM must be called exactly once when max_schema_retries=0"
         );
     }
 
