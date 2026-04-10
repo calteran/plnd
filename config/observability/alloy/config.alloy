@@ -54,3 +54,36 @@ loki.source.docker "containers" {
   targets    = discovery.docker.containers.targets
   forward_to = [loki.write.local.receiver]
 }
+
+// ── LM Studio server logs → Loki ────────────────────────────────────────────
+local.file_match "lmstudio" {
+  path_targets = [{
+    "__path__"     = "/var/log/lmstudio/**/*.log",
+    "service_name" = "lmstudio",
+  }]
+}
+
+loki.source.file "lmstudio" {
+  targets    = local.file_match.lmstudio.targets
+  forward_to = [loki.process.lmstudio.receiver]
+}
+
+loki.process "lmstudio" {
+  // Parse: [2026-04-10 13:03:32][INFO][google/gemma-4-26b-a4b] message
+  stage.regex {
+    expression = `^\[(?P<ts>[^\]]+)\]\[(?P<level>[^\]]+)\](?:\[(?P<component>[^\]]+)\])? (?P<message>.*)`
+  }
+  // Use the log's own timestamp (not ingestion time), preserving backfill on restart
+  stage.timestamp {
+    source = "ts"
+    format = "2006-01-02 15:04:05"
+  }
+  // Index level + component as Loki labels for fast filtering
+  stage.labels {
+    values = {
+      level     = "level",
+      component = "component",
+    }
+  }
+  forward_to = [loki.write.local.receiver]
+}

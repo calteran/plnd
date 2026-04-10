@@ -42,6 +42,7 @@ services:
     volumes:
       - ./config/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock
+      - ${HOME}/.lmstudio/server-logs:/var/log/lmstudio:ro
     command: run /etc/alloy/config.alloy
 
   prometheus:
