@@ -194,10 +194,10 @@ impl LlmProvider for OpenAiCompatibleProvider {
             .tool_calls
             .unwrap_or_default()
             .into_iter()
-            .filter_map(|tc| {
-                if let ChatCompletionMessageToolCalls::Function(f) = tc {
-                    Some(f)
-                } else {
+            .filter_map(|tc| match tc {
+                ChatCompletionMessageToolCalls::Function(f) => Some(f),
+                other => {
+                    tracing::warn!("dropping unsupported tool call variant: {:?}", other);
                     None
                 }
             })
