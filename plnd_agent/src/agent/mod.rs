@@ -434,7 +434,7 @@ impl AgentService {
                     Err(AgentError::SchemaValidation { violations }) => {
                         if retries >= max_schema_retries {
                             let snippet: String = output.content.chars().take(1000).collect();
-                            let truncated = output.content.len() > 1000;
+                            let truncated = output.content.chars().count() > 1000;
                             tracing::error!(
                                 use_case = ?ctx.use_case,
                                 violations = %violations,
