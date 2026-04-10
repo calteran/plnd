@@ -43,6 +43,7 @@ services:
       - ./config/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - ${HOME}/.lmstudio/server-logs:/var/log/lmstudio:ro
+      - alloy_data:/var/lib/alloy/data
     command: run /etc/alloy/config.alloy
 
   prometheus:
@@ -98,3 +99,4 @@ volumes:
   loki_data:
   tempo_data:
   grafana_data:
+  alloy_data:
