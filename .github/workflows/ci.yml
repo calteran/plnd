@@ -65,7 +65,7 @@ jobs:
           DATABASE_URL: postgres://plnd:plnd_dev@localhost/plnd_dev
 
       - name: Cache API binary for e2e job
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: target/debug/plnd_api
           key: plnd-api-binary-${{ github.run_id }}
@@ -167,7 +167,7 @@ jobs:
         run: cd plnd_client && npx playwright install chromium --with-deps
 
       - name: Restore API binary from cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: target/debug/plnd_api
           key: plnd-api-binary-${{ github.run_id }}
