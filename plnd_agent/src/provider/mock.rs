@@ -67,6 +67,10 @@ impl LlmProvider for MockLlmProvider {
     fn name(&self) -> &str {
         &self.name
     }
+
+    fn model(&self) -> &str {
+        "mock"
+    }
 }
 
 // ── Unit tests ────────────────────────────────────────────────────────────────
@@ -95,6 +99,7 @@ mod tests {
             content: Some("hello world".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let result = provider.complete(minimal_request()).await.unwrap();
@@ -115,6 +120,7 @@ mod tests {
                 arguments: serde_json::json!({"energy_level": "high"}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         });
 
         let result = provider.complete(minimal_request()).await.unwrap();
@@ -136,6 +142,7 @@ mod tests {
             content: Some("truncated...".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::MaxTokens,
+            usage: None,
         });
 
         let result = provider.complete(minimal_request()).await.unwrap();
@@ -150,11 +157,13 @@ mod tests {
             content: Some("a".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
         provider.push_response(CompletionResponse {
             content: Some("b".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         assert_eq!(provider.call_count(), 0);

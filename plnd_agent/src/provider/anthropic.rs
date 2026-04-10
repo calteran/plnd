@@ -96,10 +96,17 @@ struct AnthropicToolDef<'a> {
     input_schema: &'a serde_json::Value,
 }
 
+#[derive(Debug, Deserialize)]
+struct AnthropicUsage {
+    input_tokens: u32,
+    output_tokens: u32,
+}
+
 #[derive(Deserialize)]
 struct AnthropicResponse {
     stop_reason: String,
     content: Vec<AnthropicContentBlock>,
+    usage: AnthropicUsage,
 }
 
 #[derive(Deserialize)]
@@ -266,10 +273,22 @@ impl LlmProvider for AnthropicProvider {
             content,
             tool_calls,
             stop_reason,
+            usage: Some(super::TokenUsage {
+                prompt_tokens: parsed.usage.input_tokens,
+                completion_tokens: parsed.usage.output_tokens,
+                // Anthropic does not return a pre-summed total; we compute it here.
+                // Note: if prompt caching is ever enabled, cache_read_input_tokens and
+                // cache_creation_input_tokens would need to be included. See #351.
+                total_tokens: parsed.usage.input_tokens + parsed.usage.output_tokens,
+            }),
         })
     }
 
     fn name(&self) -> &str {
         "anthropic"
+    }
+
+    fn model(&self) -> &str {
+        &self.model
     }
 }

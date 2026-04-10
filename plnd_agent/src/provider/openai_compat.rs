@@ -170,6 +170,12 @@ impl LlmProvider for OpenAiCompatibleProvider {
                 other => LlmError::Http(other.to_string()),
             })?;
 
+        let usage = response.usage.map(|u| super::TokenUsage {
+            prompt_tokens: u.prompt_tokens,
+            completion_tokens: u.completion_tokens,
+            total_tokens: u.total_tokens,
+        });
+
         let choice = response
             .choices
             .into_iter()
@@ -217,10 +223,15 @@ impl LlmProvider for OpenAiCompatibleProvider {
             content,
             tool_calls,
             stop_reason,
+            usage,
         })
     }
 
     fn name(&self) -> &str {
         "openai_compatible"
+    }
+
+    fn model(&self) -> &str {
+        &self.model
     }
 }
