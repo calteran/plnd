@@ -1,11 +1,11 @@
 use async_openai::{
     config::OpenAIConfig,
-    types::{
-        ChatCompletionMessageToolCall, ChatCompletionRequestAssistantMessageArgs,
-        ChatCompletionRequestMessage, ChatCompletionRequestSystemMessageArgs,
-        ChatCompletionRequestToolMessageArgs, ChatCompletionRequestUserMessageArgs,
-        ChatCompletionTool, ChatCompletionToolType, CreateChatCompletionRequestArgs, FunctionCall,
-        FunctionObject,
+    types::chat::{
+        ChatCompletionMessageToolCall, ChatCompletionMessageToolCalls,
+        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
+        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestToolMessageArgs,
+        ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionTools,
+        CreateChatCompletionRequestArgs, FunctionCall, FunctionObject,
     },
     Client,
 };
@@ -82,16 +82,19 @@ impl LlmProvider for OpenAiCompatibleProvider {
                     if !msg.tool_calls.is_empty() {
                         // OpenAI requires the assistant's tool calls to be echoed back
                         // so that the following tool-result messages are understood.
-                        let oai_calls: Vec<ChatCompletionMessageToolCall> = msg
+                        let oai_calls: Vec<ChatCompletionMessageToolCalls> = msg
                             .tool_calls
                             .into_iter()
-                            .map(|tc| ChatCompletionMessageToolCall {
-                                id: tc.id,
-                                r#type: ChatCompletionToolType::Function,
-                                function: FunctionCall {
-                                    name: tc.name,
-                                    arguments: tc.arguments.to_string(),
-                                },
+                            .map(|tc| {
+                                ChatCompletionMessageToolCalls::Function(
+                                    ChatCompletionMessageToolCall {
+                                        id: tc.id,
+                                        function: FunctionCall {
+                                            name: tc.name,
+                                            arguments: tc.arguments.to_string(),
+                                        },
+                                    },
+                                )
                             })
                             .collect();
                         builder.tool_calls(oai_calls);
@@ -124,17 +127,18 @@ impl LlmProvider for OpenAiCompatibleProvider {
         }
 
         // Build tool definitions.
-        let tools: Vec<ChatCompletionTool> = request
+        let tools: Vec<ChatCompletionTools> = request
             .tools
             .into_iter()
-            .map(|t| ChatCompletionTool {
-                r#type: ChatCompletionToolType::Function,
-                function: FunctionObject {
-                    name: t.name,
-                    description: Some(t.description),
-                    parameters: Some(t.schema),
-                    strict: None,
-                },
+            .map(|t| {
+                ChatCompletionTools::Function(ChatCompletionTool {
+                    function: FunctionObject {
+                        name: t.name,
+                        description: Some(t.description),
+                        parameters: Some(t.schema),
+                        strict: None,
+                    },
+                })
             })
             .collect();
 
@@ -176,9 +180,9 @@ impl LlmProvider for OpenAiCompatibleProvider {
             })?;
 
         let stop_reason = match choice.finish_reason {
-            Some(async_openai::types::FinishReason::Stop) => StopReason::EndTurn,
-            Some(async_openai::types::FinishReason::ToolCalls) => StopReason::ToolUse,
-            Some(async_openai::types::FinishReason::Length) => StopReason::MaxTokens,
+            Some(async_openai::types::chat::FinishReason::Stop) => StopReason::EndTurn,
+            Some(async_openai::types::chat::FinishReason::ToolCalls) => StopReason::ToolUse,
+            Some(async_openai::types::chat::FinishReason::Length) => StopReason::MaxTokens,
             Some(other) => StopReason::Other(format!("{other:?}")),
             None => StopReason::Other("none".to_string()),
         };
@@ -190,6 +194,13 @@ impl LlmProvider for OpenAiCompatibleProvider {
             .tool_calls
             .unwrap_or_default()
             .into_iter()
+            .filter_map(|tc| match tc {
+                ChatCompletionMessageToolCalls::Function(f) => Some(f),
+                other => {
+                    tracing::warn!("dropping unsupported tool call variant: {:?}", other);
+                    None
+                }
+            })
             .map(|tc| {
                 let arguments = serde_json::from_str(&tc.function.arguments).map_err(|e| {
                     LlmError::ToolCallParsing(format!("tool '{}': {}", tc.function.name, e))
