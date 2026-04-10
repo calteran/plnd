@@ -29,6 +29,6 @@ pub async fn extract_trace_context(req: Request, next: Next) -> Response {
     let parent_cx = opentelemetry::global::get_text_map_propagator(|propagator| {
         propagator.extract(&HeaderExtractor(req.headers()))
     });
-    tracing::Span::current().set_parent(parent_cx);
+    let _ = tracing::Span::current().set_parent(parent_cx);
     next.run(req).await
 }

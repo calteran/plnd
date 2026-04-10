@@ -1,17 +1,16 @@
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
-    logs::LoggerProvider,
+    logs::SdkLoggerProvider,
     metrics::{PeriodicReader, SdkMeterProvider},
-    runtime,
-    trace::TracerProvider,
+    trace::SdkTracerProvider,
     Resource,
 };
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 
 pub struct TelemetryProviders {
-    pub tracer_provider: TracerProvider,
-    pub logger_provider: LoggerProvider,
+    pub tracer_provider: SdkTracerProvider,
+    pub logger_provider: SdkLoggerProvider,
     pub meter_provider: SdkMeterProvider,
 }
 
@@ -28,19 +27,18 @@ pub fn init_providers(
         Some(e) => e.to_owned(),
     };
 
-    let resource = Resource::default().merge(&Resource::new(vec![KeyValue::new(
-        SERVICE_NAME,
-        "plnd_api",
-    )]));
+    let resource = Resource::builder()
+        .with_attribute(KeyValue::new(SERVICE_NAME, "plnd_api"))
+        .build();
 
     // ── Traces ──────────────────────────────────────────────────────────────
     let trace_exporter = opentelemetry_otlp::SpanExporter::builder()
         .with_tonic()
         .with_endpoint(&endpoint)
         .build()?;
-    let tracer_provider = TracerProvider::builder()
+    let tracer_provider = SdkTracerProvider::builder()
         .with_resource(resource.clone())
-        .with_batch_exporter(trace_exporter, runtime::Tokio)
+        .with_batch_exporter(trace_exporter)
         .build();
 
     // ── Logs ────────────────────────────────────────────────────────────────
@@ -48,9 +46,9 @@ pub fn init_providers(
         .with_tonic()
         .with_endpoint(&endpoint)
         .build()?;
-    let logger_provider = LoggerProvider::builder()
+    let logger_provider = SdkLoggerProvider::builder()
         .with_resource(resource.clone())
-        .with_batch_exporter(log_exporter, runtime::Tokio)
+        .with_batch_exporter(log_exporter)
         .build();
 
     // ── Metrics ─────────────────────────────────────────────────────────────
@@ -60,7 +58,7 @@ pub fn init_providers(
         .build()?;
     let meter_provider = SdkMeterProvider::builder()
         .with_resource(resource)
-        .with_reader(PeriodicReader::builder(metric_exporter, runtime::Tokio).build())
+        .with_reader(PeriodicReader::builder(metric_exporter).build())
         .build();
 
     // Register as global providers so middleware can reach them via global::meter()
