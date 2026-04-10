@@ -96,6 +96,7 @@ allow = [
     "MIT-0",        # MIT No Attribution — used by borrow-or-share (transitive via jsonschema)
     "Apache-2.0",
     "BSD-3-Clause",
+    "CC0-1.0",      # Creative Commons Zero — public domain; used by tiny-keccak (transitive via config→rust-ini→ordered-multimap→dlv-list→const-random)
     "Zlib",
     "Unicode-3.0",
     "ISC",
