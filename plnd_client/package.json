@@ -68,7 +68,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.2.0",
     "license-checker-rseidelsohn": "^4.4.2",
-    "npm-check-updates": "^20.0.0",
+    "npm-check-updates": "^20.0.1",
     "typescript": "^5.9.3"
   }
 }
