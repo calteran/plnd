@@ -69,6 +69,14 @@ loki.source.file "lmstudio" {
 }
 
 loki.process "lmstudio" {
+  // Merge multiline entries (JSON response dumps etc.) into a single Loki record.
+  // A new logical entry starts when a line begins with '[' (the LMStudio timestamp bracket).
+  // Continuation lines (JSON fragments, blank lines) are appended to the previous entry.
+  stage.multiline {
+    firstline     = `^\[`
+    max_wait_time = "3s"
+  }
+
   // Parse: [2026-04-10 13:03:32][INFO][google/gemma-4-26b-a4b] message
   // Note: we intentionally do not use stage.timestamp here. LMStudio logs are
   // in local time; Docker containers run UTC, so parsing the timestamp would
