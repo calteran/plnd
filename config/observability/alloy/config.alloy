@@ -54,3 +54,43 @@ loki.source.docker "containers" {
   targets    = discovery.docker.containers.targets
   forward_to = [loki.write.local.receiver]
 }
+
+// ── LM Studio server logs → Loki ────────────────────────────────────────────
+local.file_match "lmstudio" {
+  path_targets = [{
+    "__path__"     = "/var/log/lmstudio/**/*.log",
+    "service_name" = "lmstudio",
+  }]
+}
+
+loki.source.file "lmstudio" {
+  targets    = local.file_match.lmstudio.targets
+  forward_to = [loki.process.lmstudio.receiver]
+}
+
+loki.process "lmstudio" {
+  // Merge multiline entries (JSON response dumps etc.) into a single Loki record.
+  // A new logical entry starts when a line begins with '[' (the LMStudio timestamp bracket).
+  // Continuation lines (JSON fragments, blank lines) are appended to the previous entry.
+  stage.multiline {
+    firstline     = `^\[`
+    max_wait_time = "3s"
+  }
+
+  // Parse: [2026-04-10 13:03:32][INFO][google/gemma-4-26b-a4b] message
+  // Note: we intentionally do not use stage.timestamp here. LMStudio logs are
+  // in local time; Docker containers run UTC, so parsing the timestamp would
+  // make entries appear future-dated and cause Loki to reject them. Loki uses
+  // ingestion time instead, which is correct for real-time dev session monitoring.
+  stage.regex {
+    expression = `^\[(?P<ts>[^\]]+)\]\[(?P<level>[^\]]+)\](?:\[(?P<component>[^\]]+)\])? (?P<message>.*)`
+  }
+  // Index level + component as Loki labels for fast filtering
+  stage.labels {
+    values = {
+      level     = "level",
+      component = "component",
+    }
+  }
+  forward_to = [loki.write.local.receiver]
+}

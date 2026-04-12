@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use tracing::Instrument as _;
 use uuid::Uuid;
 
 use crate::config::LlmConfig;
@@ -152,7 +153,41 @@ impl AgentLoop<'_> {
                 max_tokens: self.max_tokens,
             };
 
-            let response = provider.complete(request).await?;
+            // Span attribute names use underscores so that Loki's `| json` parser
+            // (which does not convert dots to underscores) and Prometheus
+            // span_metrics (which normalises dots to underscores) agree on
+            // the same identifier across Tempo, Loki, and Grafana queries.
+            let llm_span = tracing::info_span!(
+                "llm.complete",
+                llm_provider = provider.name(),
+                llm_model = provider.model(),
+                llm_prompt_tokens = tracing::field::Empty,
+                llm_completion_tokens = tracing::field::Empty,
+                llm_total_tokens = tracing::field::Empty,
+                otel.status_code = tracing::field::Empty,
+                otel.status_message = tracing::field::Empty,
+            );
+            let response = provider
+                .complete(request)
+                .instrument(llm_span.clone())
+                .await
+                .inspect_err(|e| {
+                    llm_span.record("otel.status_code", "ERROR");
+                    llm_span.record("otel.status_message", tracing::field::display(e));
+                })?;
+            if let Some(ref usage) = response.usage {
+                llm_span.record("llm_prompt_tokens", usage.prompt_tokens);
+                llm_span.record("llm_completion_tokens", usage.completion_tokens);
+                llm_span.record("llm_total_tokens", usage.total_tokens);
+                tracing::info!(
+                    llm_provider = provider.name(),
+                    llm_model = provider.model(),
+                    llm_prompt_tokens = usage.prompt_tokens,
+                    llm_completion_tokens = usage.completion_tokens,
+                    llm_total_tokens = usage.total_tokens,
+                    "llm call complete"
+                );
+            }
 
             // Capture any text the LLM produced alongside (or instead of) tool calls.
             if let Some(ref text) = response.content {
@@ -331,6 +366,7 @@ impl AgentService {
     ///   so the model treats it as trusted system data rather than untrusted user input.
     /// - `ctx.memory_context`, if present, is prepended to the system prompt as a
     ///   `<memory>` block so the LLM has relevant user context before any tool calls.
+    #[tracing::instrument(skip(self), fields(use_case = ?ctx.use_case, user_id = %ctx.user_id), err)]
     pub async fn run(&self, ctx: &AgentContext) -> Result<AgentOutput, AgentError> {
         // Step 1: Load memories filtered by use case.
         let memory_entries = if let Some(ref db) = self.db {
@@ -760,6 +796,7 @@ mod tests {
                     arguments: serde_json::json!({}),
                 }],
                 stop_reason: StopReason::ToolUse,
+                usage: None,
             });
         }
 
@@ -817,12 +854,14 @@ mod tests {
                 },
             ],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         });
         // Second response: end the loop.
         mock.push_response(CompletionResponse {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let registry = make_registry(mock);
@@ -921,12 +960,14 @@ mod tests {
                 },
             ],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         });
         // If the loop incorrectly continues, this response would be consumed.
         mock.push_response(CompletionResponse {
             content: Some("unexpected second call".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let registry = make_registry(mock);
@@ -1030,6 +1071,7 @@ mod tests {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
@@ -1081,6 +1123,7 @@ mod tests {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
@@ -1140,6 +1183,7 @@ mod tests {
             content: Some(r#"{"actions_taken":[],"ui_signals":[],"confirmation":""}"#.to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
@@ -1195,6 +1239,7 @@ mod tests {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
@@ -1233,6 +1278,7 @@ mod tests {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         // new_with_registry sets db = None, so memory loading is skipped.
@@ -1273,6 +1319,7 @@ mod tests {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let service = AgentService::new_with_registry(make_registry(mock));
@@ -1350,12 +1397,14 @@ mod tests {
                 arguments: serde_json::json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         });
         // Second response: LLM acknowledges and ends turn.
         mock.push_response(CompletionResponse {
             content: Some("recovered".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let registry = make_registry(mock);
@@ -1410,12 +1459,14 @@ mod tests {
                 arguments: serde_json::json!({}),
             }],
             stop_reason: StopReason::ToolUse,
+            usage: None,
         });
         // Second response: LLM ends turn after receiving the error.
         mock.push_response(CompletionResponse {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let registry = make_registry(mock);
@@ -1491,6 +1542,7 @@ mod tests {
             content: Some("not valid json".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
         // Second response: valid schema-conforming JSON.
         mock.push_response(CompletionResponse {
@@ -1499,6 +1551,7 @@ mod tests {
             ),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let service = AgentService::new_with_registry(make_registry(mock));
@@ -1536,6 +1589,7 @@ mod tests {
             content: Some("not valid json".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         // Build a service with max_schema_retries explicitly set to 0.
@@ -1575,6 +1629,7 @@ mod tests {
                 content: Some("not valid json".to_string()),
                 tool_calls: vec![],
                 stop_reason: StopReason::EndTurn,
+                usage: None,
             });
         }
 
@@ -1610,6 +1665,7 @@ mod tests {
             content: Some("not valid json".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
         mock.push_response(CompletionResponse {
             content: Some(
@@ -1617,6 +1673,7 @@ mod tests {
             ),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
 
         let service = AgentService::new_with_registry(make_registry(mock));
@@ -1678,6 +1735,7 @@ mod tests {
             content: Some("done".to_string()),
             tool_calls: vec![],
             stop_reason: StopReason::EndTurn,
+            usage: None,
         });
         let service = AgentService::new_with_registry(make_registry(mock));
         let ctx = AgentContext {

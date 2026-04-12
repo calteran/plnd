@@ -133,11 +133,19 @@ pub struct CompletionRequest {
     pub max_tokens: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TokenUsage {
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub total_tokens: u32,
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletionResponse {
     pub content: Option<String>,
     pub tool_calls: Vec<ToolCall>,
     pub stop_reason: StopReason,
+    pub usage: Option<TokenUsage>,
 }
 
 // ── Trait ────────────────────────────────────────────────────────────────────
@@ -147,6 +155,8 @@ pub trait LlmProvider: Send + Sync {
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError>;
 
     fn name(&self) -> &str;
+
+    fn model(&self) -> &str;
 }
 
 // ── Provider registry ────────────────────────────────────────────────────────

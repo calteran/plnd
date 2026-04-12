@@ -1,0 +1,156 @@
+{
+  "id": null,
+  "uid": "plnd-llm",
+  "title": "PLND — LLM Observability",
+  "tags": ["plnd", "llm"],
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "templating": { "list": [] },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "LLM Call Duration (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (le, llm_model) (rate(traces_spanmetrics_duration_milliseconds_bucket{span_name=\"llm.complete\"}[$__rate_interval])))",
+          "legendFormat": "p50 {{llm_model}}",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, llm_model) (rate(traces_spanmetrics_duration_milliseconds_bucket{span_name=\"llm.complete\"}[$__rate_interval])))",
+          "legendFormat": "p95 {{llm_model}}",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum by (le, llm_model) (rate(traces_spanmetrics_duration_milliseconds_bucket{span_name=\"llm.complete\"}[$__rate_interval])))",
+          "legendFormat": "p99 {{llm_model}}",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "LLM Call Rate by Provider",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (llm_provider) (rate(traces_spanmetrics_calls_total{span_name=\"llm.complete\"}[$__rate_interval]))",
+          "legendFormat": "{{llm_provider}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "LLM Error Rate by Provider",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "color": { "mode": "palette-classic" },
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (llm_provider) (rate(traces_spanmetrics_calls_total{span_name=\"llm.complete\", status_code=\"STATUS_CODE_ERROR\"}[$__rate_interval])) / sum by (llm_provider) (rate(traces_spanmetrics_calls_total{span_name=\"llm.complete\"}[$__rate_interval]))",
+          "legendFormat": "error rate — {{llm_provider}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Token Usage over Time",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "loki" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "desc" },
+        "legend": { "displayMode": "list", "placement": "bottom" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({service_name=\"plnd_api\"} |= \"llm call complete\" | json | llm_prompt_tokens != `` | unwrap llm_prompt_tokens [$__interval]))",
+          "legendFormat": "prompt tokens/s",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "loki" },
+          "expr": "sum(rate({service_name=\"plnd_api\"} |= \"llm call complete\" | json | llm_completion_tokens != `` | unwrap llm_completion_tokens [$__interval]))",
+          "legendFormat": "completion tokens/s",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "LLM Trace Explorer",
+      "type": "traces",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 10 },
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "options": {},
+      "targets": [
+        {
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{name=\"llm.complete\"}",
+          "limit": 20,
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}
