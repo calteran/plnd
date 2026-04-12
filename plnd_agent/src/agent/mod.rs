@@ -153,28 +153,38 @@ impl AgentLoop<'_> {
                 max_tokens: self.max_tokens,
             };
 
+            // Span attribute names use underscores so that Loki's `| json` parser
+            // (which does not convert dots to underscores) and Prometheus
+            // span_metrics (which normalises dots to underscores) agree on
+            // the same identifier across Tempo, Loki, and Grafana queries.
             let llm_span = tracing::info_span!(
                 "llm.complete",
-                llm.provider = provider.name(),
-                llm.model = provider.model(),
-                llm.prompt_tokens = tracing::field::Empty,
-                llm.completion_tokens = tracing::field::Empty,
-                llm.total_tokens = tracing::field::Empty,
+                llm_provider = provider.name(),
+                llm_model = provider.model(),
+                llm_prompt_tokens = tracing::field::Empty,
+                llm_completion_tokens = tracing::field::Empty,
+                llm_total_tokens = tracing::field::Empty,
+                otel.status_code = tracing::field::Empty,
+                otel.status_message = tracing::field::Empty,
             );
             let response = provider
                 .complete(request)
                 .instrument(llm_span.clone())
-                .await?;
+                .await
+                .inspect_err(|e| {
+                    llm_span.record("otel.status_code", "ERROR");
+                    llm_span.record("otel.status_message", tracing::field::display(e));
+                })?;
             if let Some(ref usage) = response.usage {
-                llm_span.record("llm.prompt_tokens", usage.prompt_tokens);
-                llm_span.record("llm.completion_tokens", usage.completion_tokens);
-                llm_span.record("llm.total_tokens", usage.total_tokens);
+                llm_span.record("llm_prompt_tokens", usage.prompt_tokens);
+                llm_span.record("llm_completion_tokens", usage.completion_tokens);
+                llm_span.record("llm_total_tokens", usage.total_tokens);
                 tracing::info!(
-                    llm.provider = provider.name(),
-                    llm.model = provider.model(),
-                    llm.prompt_tokens = usage.prompt_tokens,
-                    llm.completion_tokens = usage.completion_tokens,
-                    llm.total_tokens = usage.total_tokens,
+                    llm_provider = provider.name(),
+                    llm_model = provider.model(),
+                    llm_prompt_tokens = usage.prompt_tokens,
+                    llm_completion_tokens = usage.completion_tokens,
+                    llm_total_tokens = usage.total_tokens,
                     "llm call complete"
                 );
             }
@@ -356,7 +366,7 @@ impl AgentService {
     ///   so the model treats it as trusted system data rather than untrusted user input.
     /// - `ctx.memory_context`, if present, is prepended to the system prompt as a
     ///   `<memory>` block so the LLM has relevant user context before any tool calls.
-    #[tracing::instrument(skip(self), fields(use_case = ?ctx.use_case, user_id = %ctx.user_id))]
+    #[tracing::instrument(skip(self), fields(use_case = ?ctx.use_case, user_id = %ctx.user_id), err)]
     pub async fn run(&self, ctx: &AgentContext) -> Result<AgentOutput, AgentError> {
         // Step 1: Load memories filtered by use case.
         let memory_entries = if let Some(ref db) = self.db {

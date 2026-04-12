@@ -278,7 +278,7 @@ impl LlmProvider for AnthropicProvider {
                 completion_tokens: parsed.usage.output_tokens,
                 // Anthropic does not return a pre-summed total; we compute it here.
                 // Note: if prompt caching is ever enabled, cache_read_input_tokens and
-                // cache_creation_input_tokens would need to be included. See #351.
+                // cache_creation_input_tokens would need to be included. See #388.
                 total_tokens: parsed.usage.input_tokens + parsed.usage.output_tokens,
             }),
         })

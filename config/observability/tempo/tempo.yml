@@ -30,7 +30,7 @@ metrics_generator:
     service_graphs:
       dimensions: ['http.route']
     span_metrics:
-      dimensions: ['http.route', 'http.request.method', 'http.response.status_code', 'llm.provider', 'llm.model']
+      dimensions: ['http.route', 'http.request.method', 'http.response.status_code', 'llm_provider', 'llm_model']
 
 storage:
   trace:
