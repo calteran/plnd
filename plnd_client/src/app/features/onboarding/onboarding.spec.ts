@@ -152,6 +152,41 @@ describe('OnboardingComponent', () => {
     expect(component.step()).toBe('restrictions');
   });
 
+  it('Enter key in profile form prevents native submission and advances step', () => {
+    const { fixture, component } = setup();
+    component.advanceFromWelcome();
+    fixture.detectChanges();
+
+    component.profileForm.controls.display_name.setValue('Alice');
+    fixture.detectChanges();
+
+    const form = (fixture.nativeElement as HTMLElement).querySelector('form.step-form') as HTMLFormElement;
+    expect(form).toBeTruthy();
+    const event = new Event('submit', { cancelable: true, bubbles: true });
+    form.dispatchEvent(event);
+    expect(event.defaultPrevented).toBeTrue();
+
+    const req = httpMock.expectOne(r => r.url.endsWith('/users/me') && r.method === 'PATCH');
+    req.flush({ ...MOCK_USER, display_name: 'Alice' });
+    fixture.detectChanges();
+
+    expect(component.step()).toBe('restrictions');
+  });
+
+  it('Enter key with blank name prevents navigation and advances step', () => {
+    const { fixture, component } = setup();
+    component.advanceFromWelcome();
+    fixture.detectChanges();
+
+    const form = (fixture.nativeElement as HTMLElement).querySelector('form.step-form') as HTMLFormElement;
+    const event = new Event('submit', { cancelable: true, bubbles: true });
+    form.dispatchEvent(event);
+    expect(event.defaultPrevented).toBeTrue();
+
+    httpMock.expectNone(r => r.url.endsWith('/users/me') && r.method === 'PATCH');
+    expect(component.step()).toBe('restrictions');
+  });
+
   it('saveProfile() no-ops when pending is true', () => {
     const { component } = setup();
     component.advanceFromWelcome();

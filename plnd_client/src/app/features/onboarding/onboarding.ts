@@ -53,7 +53,7 @@ const TOTAL_STEPS = 3;
               <h1 class="step-title">Your Profile</h1>
               <p class="step-desc">How should we address you?</p>
 
-              <form class="step-form" (ngSubmit)="saveProfile()">
+              <form class="step-form" (submit)="$event.preventDefault(); saveProfile()">
                 <div class="form-field">
                   <label for="display-name">Display name (optional)</label>
                   <input
