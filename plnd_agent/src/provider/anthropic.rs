@@ -103,13 +103,13 @@ struct AnthropicUsage {
     #[serde(default)]
     cache_read_input_tokens: u32,
     #[serde(default)]
+    #[allow(dead_code)] // present in API response for completeness; not used in token mapping
     cache_creation_input_tokens: u32,
 }
 
 impl AnthropicUsage {
     fn to_token_usage(&self) -> super::TokenUsage {
-        let prompt_tokens =
-            self.input_tokens + self.cache_read_input_tokens + self.cache_creation_input_tokens;
+        let prompt_tokens = self.input_tokens + self.cache_read_input_tokens;
         super::TokenUsage {
             prompt_tokens,
             completion_tokens: self.output_tokens,
@@ -319,9 +319,10 @@ mod tests {
     fn prompt_tokens_includes_cache_tokens() {
         let usage = make_usage(100, 50, 30, 20);
         let token_usage = usage.to_token_usage();
-        assert_eq!(token_usage.prompt_tokens, 150);
+        // input_tokens (100) already includes cache_creation (20); only cache_read (30) is additive
+        assert_eq!(token_usage.prompt_tokens, 130);
         assert_eq!(token_usage.completion_tokens, 50);
-        assert_eq!(token_usage.total_tokens, 200);
+        assert_eq!(token_usage.total_tokens, 180);
         assert_eq!(
             token_usage.prompt_tokens + token_usage.completion_tokens,
             token_usage.total_tokens
