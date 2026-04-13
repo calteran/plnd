@@ -106,6 +106,19 @@ struct AnthropicUsage {
     cache_creation_input_tokens: u32,
 }
 
+impl AnthropicUsage {
+    fn to_token_usage(&self) -> super::TokenUsage {
+        let prompt_tokens = self.input_tokens
+            + self.cache_read_input_tokens
+            + self.cache_creation_input_tokens;
+        super::TokenUsage {
+            prompt_tokens,
+            completion_tokens: self.output_tokens,
+            total_tokens: prompt_tokens + self.output_tokens,
+        }
+    }
+}
+
 #[derive(Deserialize)]
 struct AnthropicResponse {
     stop_reason: String,
@@ -277,14 +290,7 @@ impl LlmProvider for AnthropicProvider {
             content,
             tool_calls,
             stop_reason,
-            usage: Some(super::TokenUsage {
-                prompt_tokens: parsed.usage.input_tokens,
-                completion_tokens: parsed.usage.output_tokens,
-                total_tokens: parsed.usage.input_tokens
-                    + parsed.usage.output_tokens
-                    + parsed.usage.cache_read_input_tokens
-                    + parsed.usage.cache_creation_input_tokens,
-            }),
+            usage: Some(parsed.usage.to_token_usage()),
         })
     }
 
@@ -294,5 +300,50 @@ impl LlmProvider for AnthropicProvider {
 
     fn model(&self) -> &str {
         &self.model
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_usage(
+        input: u32,
+        output: u32,
+        cache_read: u32,
+        cache_creation: u32,
+    ) -> AnthropicUsage {
+        AnthropicUsage {
+            input_tokens: input,
+            output_tokens: output,
+            cache_read_input_tokens: cache_read,
+            cache_creation_input_tokens: cache_creation,
+        }
+    }
+
+    #[test]
+    fn prompt_tokens_includes_cache_tokens() {
+        let usage = make_usage(100, 50, 30, 20);
+        let token_usage = usage.to_token_usage();
+        assert_eq!(token_usage.prompt_tokens, 150);
+        assert_eq!(token_usage.completion_tokens, 50);
+        assert_eq!(token_usage.total_tokens, 200);
+        assert_eq!(
+            token_usage.prompt_tokens + token_usage.completion_tokens,
+            token_usage.total_tokens
+        );
+    }
+
+    #[test]
+    fn prompt_tokens_no_cache_unchanged() {
+        let usage = make_usage(100, 50, 0, 0);
+        let token_usage = usage.to_token_usage();
+        assert_eq!(token_usage.prompt_tokens, 100);
+        assert_eq!(token_usage.completion_tokens, 50);
+        assert_eq!(token_usage.total_tokens, 150);
+        assert_eq!(
+            token_usage.prompt_tokens + token_usage.completion_tokens,
+            token_usage.total_tokens
+        );
     }
 }
