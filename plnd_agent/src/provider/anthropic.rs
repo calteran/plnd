@@ -108,9 +108,8 @@ struct AnthropicUsage {
 
 impl AnthropicUsage {
     fn to_token_usage(&self) -> super::TokenUsage {
-        let prompt_tokens = self.input_tokens
-            + self.cache_read_input_tokens
-            + self.cache_creation_input_tokens;
+        let prompt_tokens =
+            self.input_tokens + self.cache_read_input_tokens + self.cache_creation_input_tokens;
         super::TokenUsage {
             prompt_tokens,
             completion_tokens: self.output_tokens,
@@ -307,12 +306,7 @@ impl LlmProvider for AnthropicProvider {
 mod tests {
     use super::*;
 
-    fn make_usage(
-        input: u32,
-        output: u32,
-        cache_read: u32,
-        cache_creation: u32,
-    ) -> AnthropicUsage {
+    fn make_usage(input: u32, output: u32, cache_read: u32, cache_creation: u32) -> AnthropicUsage {
         AnthropicUsage {
             input_tokens: input,
             output_tokens: output,
