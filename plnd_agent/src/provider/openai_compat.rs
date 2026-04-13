@@ -188,6 +188,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
         let stop_reason = match choice.finish_reason {
             Some(async_openai::types::chat::FinishReason::Stop) => StopReason::EndTurn,
             Some(async_openai::types::chat::FinishReason::ToolCalls) => StopReason::ToolUse,
+            Some(async_openai::types::chat::FinishReason::FunctionCall) => StopReason::ToolUse,
             Some(async_openai::types::chat::FinishReason::Length) => StopReason::MaxTokens,
             Some(other) => StopReason::Other(format!("{other:?}")),
             None => StopReason::Other("none".to_string()),
