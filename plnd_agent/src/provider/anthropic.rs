@@ -100,6 +100,10 @@ struct AnthropicToolDef<'a> {
 struct AnthropicUsage {
     input_tokens: u32,
     output_tokens: u32,
+    #[serde(default)]
+    cache_read_input_tokens: u32,
+    #[serde(default)]
+    cache_creation_input_tokens: u32,
 }
 
 #[derive(Deserialize)]
@@ -276,10 +280,10 @@ impl LlmProvider for AnthropicProvider {
             usage: Some(super::TokenUsage {
                 prompt_tokens: parsed.usage.input_tokens,
                 completion_tokens: parsed.usage.output_tokens,
-                // Anthropic does not return a pre-summed total; we compute it here.
-                // Note: if prompt caching is ever enabled, cache_read_input_tokens and
-                // cache_creation_input_tokens would need to be included. See #388.
-                total_tokens: parsed.usage.input_tokens + parsed.usage.output_tokens,
+                total_tokens: parsed.usage.input_tokens
+                    + parsed.usage.output_tokens
+                    + parsed.usage.cache_read_input_tokens
+                    + parsed.usage.cache_creation_input_tokens,
             }),
         })
     }
