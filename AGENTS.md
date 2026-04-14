@@ -15,7 +15,7 @@ See [PLANNING.md](PLANNING.md) for the current roadmap and [CLAUDE.md](CLAUDE.md
 - **DO NOT** run `just test` (interactive processes do not terminate).
 - **DO NOT** commit directly to `main` — always work on a feature or fix branch and open a PR.
 - **Server Startup**: Use `just test-run-server` (auto-kills after 15s) or `just verify-build`.
-- **Testing**: Use `just test-ci` for full suite or `just test-ng-headless` for Angular only.
+- **Testing**: Use `just verify` for full suite or `just test-ng-headless` for Angular only.
 
 ## Domain-Specific Rules
 
