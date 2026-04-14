@@ -128,7 +128,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 COMPLETED | Phase 3.0 COMPLETED
+### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 COMPLETED | Phase 3.0 COMPLETED | Phase 3.1 COMPLETED | Phase 3.2 COMPLETED
 
 ### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
@@ -273,13 +273,13 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] Memory injection into agent context filtered by use case
   - [x] Memory tools: get, save, update, forget
 
-- [ ] **Phase 3.2 — Task Entry**
+- [x] **Phase 3.2 — Task Entry**
   - [x] DB: `schedule_entries.scheduled_start` nullable; `ScheduleStore`; `create_user_task` accepts date + bucket; `find_free_slot` removed (#332: #359, #360)
   - [x] Agent tools: `GetDayScheduleTool` (replaces `FindScheduleSlotTool`); `CreateTaskTool` accepts `date` + `after_milepost` (#332: #361)
   - [x] API: `TaskEntryRequest.date`, `ActionTaken` bucket fields, schema validator updated (#332: #362)
   - [x] `task_entry.md` prompt rewritten for bucket-based reasoning (#332: #363)
   - [x] Angular: viewed date passed to task entry API; schedule reloads after creation (#332: #364)
-  - [ ] *(remaining Phase 3.2 work tracked in #289)*
+  - [x] *(remaining Phase 3.2 work tracked in #289)*
 
 - [ ] **Phase 3.3 — Meal Planning Wizard**
   - [ ] Meal planning tools: preferences, catalog search, nutrition, schedule, propose plan
@@ -289,7 +289,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 **Deliverables:**
 - [x] Platform-independent LLM abstraction (`plnd_agent` crate)
-- [ ] Intent-driven task entry with autonomous scheduling and UI signals
+- [x] Intent-driven task entry with autonomous scheduling and UI signals
 - [ ] AI-powered weekly meal planning with iterative rebalancing
 - [x] User memory system
 
