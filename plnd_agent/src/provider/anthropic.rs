@@ -341,4 +341,33 @@ mod tests {
             token_usage.total_tokens
         );
     }
+
+    #[test]
+    fn usage_deserializes_standard_response() {
+        let json = r#"{"input_tokens":100,"output_tokens":50}"#;
+        let usage: AnthropicUsage = serde_json::from_str(json).unwrap();
+        let t = usage.to_token_usage();
+        assert_eq!(t.prompt_tokens, 100);
+        assert_eq!(t.completion_tokens, 50);
+        assert_eq!(t.total_tokens, 150);
+    }
+
+    #[test]
+    fn usage_deserializes_with_cache_tokens() {
+        let json = r#"{"input_tokens":100,"output_tokens":50,"cache_read_input_tokens":30,"cache_creation_input_tokens":20}"#;
+        let usage: AnthropicUsage = serde_json::from_str(json).unwrap();
+        let t = usage.to_token_usage();
+        assert_eq!(t.prompt_tokens, 130); // input_tokens (100) + cache_read (30)
+        assert_eq!(t.completion_tokens, 50);
+        assert_eq!(t.total_tokens, 180);
+        assert_eq!(t.prompt_tokens + t.completion_tokens, t.total_tokens);
+    }
+
+    #[test]
+    fn usage_missing_cache_fields_default_to_zero() {
+        let json = r#"{"input_tokens":10,"output_tokens":5}"#;
+        let usage: AnthropicUsage = serde_json::from_str(json).unwrap();
+        assert_eq!(usage.cache_read_input_tokens, 0);
+        assert_eq!(usage.cache_creation_input_tokens, 0);
+    }
 }
