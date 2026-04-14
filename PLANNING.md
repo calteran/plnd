@@ -279,7 +279,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] API: `TaskEntryRequest.date`, `ActionTaken` bucket fields, schema validator updated (#332: #362)
   - [x] `task_entry.md` prompt rewritten for bucket-based reasoning (#332: #363)
   - [x] Angular: viewed date passed to task entry API; schedule reloads after creation (#332: #364)
-  - [ ] *(remaining Phase 3.2 work tracked in #289)*
+  - [x] *(remaining Phase 3.2 work tracked in #289)*
 
 - [ ] **Phase 3.3 — Meal Planning Wizard**
   - [ ] Meal planning tools: preferences, catalog search, nutrition, schedule, propose plan
