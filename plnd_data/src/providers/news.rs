@@ -148,7 +148,7 @@ impl NewsProvider for RssFeedProvider {
             ));
         }
 
-        all_entries.sort_unstable_by(|a, b| b.0.cmp(&a.0));
+        all_entries.sort_unstable_by_key(|b| std::cmp::Reverse(b.0));
 
         Ok(all_entries
             .into_iter()
