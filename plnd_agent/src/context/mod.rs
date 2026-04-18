@@ -68,6 +68,77 @@ static TASK_ENTRY_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| 
         .expect("BUG: failed to compile TASK_ENTRY_RESPONSE_SCHEMA")
 });
 
+/// JSON Schema (Draft 7) for the `MealPlanResponse` type.
+///
+/// Validates the full-week proposal returned by `propose_meal_plan`.
+/// `estimated_nutrition` and `nutrition_summary` are optional — the agent
+/// may omit them when no nutrition data is available.
+const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MealPlanResponse",
+  "type": "object",
+  "required": ["week", "meals"],
+  "additionalProperties": false,
+  "properties": {
+    "week":              { "type": "string", "format": "date" },
+    "meals":             { "type": "array", "items": { "$ref": "#/definitions/MealEntry" } },
+    "nutrition_summary": { "$ref": "#/definitions/NutritionSummary" }
+  },
+  "definitions": {
+    "MealEntry": {
+      "type": "object",
+      "required": ["date", "occasion", "meal_ref"],
+      "additionalProperties": false,
+      "properties": {
+        "date":                 { "type": "string", "format": "date" },
+        "occasion":             { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+        "meal_ref":             { "$ref": "#/definitions/MealRef" },
+        "estimated_nutrition":  { "$ref": "#/definitions/Nutrition" }
+      }
+    },
+    "MealRef": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["catalog", "user"] },
+        "id":   { "type": "string", "format": "uuid" }
+      }
+    },
+    "Nutrition": {
+      "type": "object",
+      "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+      "additionalProperties": false,
+      "properties": {
+        "kcal":      { "type": "number" },
+        "protein_g": { "type": "number" },
+        "carbs_g":   { "type": "number" },
+        "fat_g":     { "type": "number" }
+      }
+    },
+    "NutritionSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "avg_kcal":    { "type": "number" },
+        "avg_protein": { "type": "number" },
+        "flags":       { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}"##;
+
+/// Pre-compiled validator for [`MEAL_PLAN_RESPONSE_SCHEMA`].
+static MEAL_PLAN_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
+    let schema: serde_json::Value = serde_json::from_str(MEAL_PLAN_RESPONSE_SCHEMA)
+        .expect("BUG: MEAL_PLAN_RESPONSE_SCHEMA is not valid JSON");
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft7)
+        .should_validate_formats(true)
+        .build(&schema)
+        .expect("BUG: failed to compile MEAL_PLAN_RESPONSE_SCHEMA")
+});
+
 /// Identifies the type of agentic interaction.
 ///
 /// Each variant maps to a system prompt and a [`ProviderTier`]. The tool
@@ -145,8 +216,8 @@ impl UseCase {
     pub fn response_validator(&self) -> Option<&'static jsonschema::Validator> {
         match self {
             UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
-            UseCase::MealPlanning
-            | UseCase::MealRebalance
+            UseCase::MealPlanning => Some(&MEAL_PLAN_VALIDATOR),
+            UseCase::MealRebalance
             | UseCase::MealSuggestSlot
             | UseCase::MealAdhocResolve => None,
         }
@@ -244,9 +315,83 @@ mod tests {
     }
 
     #[test]
-    fn meal_use_cases_have_no_response_validator_yet() {
-        assert!(UseCase::MealPlanning.response_validator().is_none());
+    fn non_meal_planning_meal_use_cases_have_no_response_validator_yet() {
         assert!(UseCase::MealRebalance.response_validator().is_none());
+        assert!(UseCase::MealSuggestSlot.response_validator().is_none());
+        assert!(UseCase::MealAdhocResolve.response_validator().is_none());
+    }
+
+    #[test]
+    fn meal_planning_has_response_validator() {
+        assert!(UseCase::MealPlanning.response_validator().is_some());
+    }
+
+    #[test]
+    fn meal_plan_validator_accepts_minimal_valid_plan() {
+        let validator = UseCase::MealPlanning.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "week": "2026-04-21",
+            "meals": [
+                {
+                    "date": "2026-04-21",
+                    "occasion": "breakfast",
+                    "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+                }
+            ]
+        });
+        assert!(validator.is_valid(&ok), "minimal valid plan must pass");
+    }
+
+    #[test]
+    fn meal_plan_validator_accepts_plan_with_nutrition() {
+        let validator = UseCase::MealPlanning.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "week": "2026-04-21",
+            "meals": [
+                {
+                    "date": "2026-04-21",
+                    "occasion": "lunch",
+                    "meal_ref": { "type": "user", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
+                    "estimated_nutrition": { "kcal": 420.0, "protein_g": 18.0, "carbs_g": 55.0, "fat_g": 12.0 }
+                }
+            ],
+            "nutrition_summary": { "avg_kcal": 420.0, "avg_protein": 18.0, "flags": [] }
+        });
+        assert!(validator.is_valid(&ok), "plan with optional nutrition must pass");
+    }
+
+    #[test]
+    fn meal_plan_validator_rejects_missing_week() {
+        let validator = UseCase::MealPlanning.response_validator().unwrap();
+        let bad = serde_json::json!({ "meals": [] });
+        assert!(!validator.is_valid(&bad));
+    }
+
+    #[test]
+    fn meal_plan_validator_rejects_invalid_occasion() {
+        let validator = UseCase::MealPlanning.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "week": "2026-04-21",
+            "meals": [
+                {
+                    "date": "2026-04-21",
+                    "occasion": "brunch",
+                    "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+                }
+            ]
+        });
+        assert!(!validator.is_valid(&bad), "unknown occasion must be rejected");
+    }
+
+    #[test]
+    fn meal_plan_validator_rejects_extra_properties() {
+        let validator = UseCase::MealPlanning.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "week": "2026-04-21",
+            "meals": [],
+            "unexpected_field": "boom"
+        });
+        assert!(!validator.is_valid(&bad));
     }
 
     #[test]
