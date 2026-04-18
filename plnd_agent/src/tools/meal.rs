@@ -295,4 +295,97 @@ mod tests {
         assert_eq!(get_user_meal_library_schema()["type"], "object");
         assert_eq!(get_user_meal_preferences_schema()["type"], "object");
     }
+
+    mod integration {
+        use super::*;
+        use sqlx::PgPool;
+        use uuid::Uuid;
+
+        async fn seed_user(pool: &PgPool) -> Uuid {
+            plnd_data::db::users::create(
+                pool,
+                &format!("{}@test.invalid", Uuid::new_v4()),
+                None,
+                None,
+            )
+            .await
+            .expect("failed to create test user")
+            .user_id
+        }
+
+        #[sqlx::test(migrations = "../plnd_data/migrations")]
+        async fn search_meal_catalog_tool_returns_seeded_meal(pool: PgPool) {
+            let user_id = seed_user(&pool).await;
+            sqlx::query(
+                "INSERT INTO catalog_meals \
+                 (name, description, servings, allergens, occasion_tags, tags) \
+                 VALUES ('Test Oatmeal', 'hearty oats', 1.0, '{}', '{\"breakfast\"}', '{}')",
+            )
+            .execute(&pool)
+            .await
+            .unwrap();
+
+            let tool = SearchMealCatalogTool(pool.clone());
+            let ctx = ToolContext { user_id };
+            let result = tool
+                .execute(&ctx, serde_json::json!({ "q": "oatmeal" }))
+                .await
+                .unwrap();
+
+            let meals = result["meals"].as_array().unwrap();
+            assert!(!meals.is_empty());
+            assert_eq!(meals[0]["name"], "Test Oatmeal");
+        }
+
+        #[sqlx::test(migrations = "../plnd_data/migrations")]
+        async fn get_user_meal_library_tool_returns_created_meal(pool: PgPool) {
+            let user_id = seed_user(&pool).await;
+            plnd_data::db::user_meal_prefs::create_from_scratch(
+                &pool,
+                user_id,
+                "My Pasta",
+                Some("homemade pasta"),
+            )
+            .await
+            .unwrap();
+
+            let tool = GetUserMealLibraryTool(pool.clone());
+            let ctx = ToolContext { user_id };
+            let result = tool
+                .execute(&ctx, serde_json::json!({}))
+                .await
+                .unwrap();
+
+            let meals = result["meals"].as_array().unwrap();
+            assert_eq!(meals.len(), 1);
+            assert_eq!(meals[0]["name"], "My Pasta");
+        }
+
+        #[sqlx::test(migrations = "../plnd_data/migrations")]
+        async fn get_user_meal_preferences_tool_returns_bundle(pool: PgPool) {
+            let user_id = seed_user(&pool).await;
+            plnd_data::db::dietary_restrictions::create(
+                &pool,
+                user_id,
+                "allergen",
+                "peanuts",
+                None,
+            )
+            .await
+            .unwrap();
+
+            let tool = GetUserMealPreferencesTool(pool.clone());
+            let ctx = ToolContext { user_id };
+            let result = tool
+                .execute(&ctx, serde_json::json!({}))
+                .await
+                .unwrap();
+
+            let restrictions = result["dietary_restrictions"].as_array().unwrap();
+            assert_eq!(restrictions.len(), 1);
+            assert_eq!(restrictions[0]["name"], "peanuts");
+            assert!(result["blocked_ingredient_ids"].is_array());
+            assert!(result["top_rated_meals"].is_array());
+        }
+    }
 }
