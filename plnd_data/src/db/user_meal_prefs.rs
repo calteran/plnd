@@ -684,4 +684,76 @@ mod tests {
         let deleted = delete(&pool, uid_b, pref.user_meal_pref_id).await.unwrap();
         assert!(!deleted);
     }
+
+    // -----------------------------------------------------------------------
+    // create_from_description
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_from_description_persists_nutrition_and_flag(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let nutrition = serde_json::json!({
+            "kcal": 450,
+            "protein_g": 30.0,
+            "fat_g": 15.0,
+            "carbs_g": 55.0
+        });
+        let tags = vec!["lunch".to_string(), "quick".to_string()];
+
+        let pref = create_from_description(
+            &pool,
+            uid,
+            "Agent Bowl",
+            &tags,
+            Some(nutrition.clone()),
+            true,
+        )
+        .await
+        .expect("create_from_description failed");
+
+        assert_eq!(pref.user_id, uid);
+        assert_eq!(pref.name, "Agent Bowl");
+        assert_eq!(pref.source, "personal");
+        assert!(pref.has_personal_recipe);
+        assert!(pref.user_meal_id.is_some());
+
+        // Verify the flag and nutrition round-trip via direct SELECT
+        let (nutrition_stored, nutrition_estimated, occasion_tags): (
+            Option<serde_json::Value>,
+            bool,
+            Vec<String>,
+        ) = sqlx::query_as(
+            "SELECT nutrition, nutrition_estimated, occasion_tags \
+             FROM user_meals WHERE user_meal_id = $1",
+        )
+        .bind(pref.user_meal_id.unwrap())
+        .fetch_one(&pool)
+        .await
+        .expect("user_meal row not found");
+
+        assert!(nutrition_estimated, "nutrition_estimated should be TRUE");
+        assert_eq!(
+            nutrition_stored.as_ref().unwrap()["kcal"],
+            serde_json::json!(450)
+        );
+        assert_eq!(occasion_tags, tags);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_from_description_estimated_false_by_default(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        let pref = create_from_description(&pool, uid, "Known Meal", &[], None, false)
+            .await
+            .expect("create failed");
+
+        let (nutrition_estimated,): (bool,) =
+            sqlx::query_as("SELECT nutrition_estimated FROM user_meals WHERE user_meal_id = $1")
+                .bind(pref.user_meal_id.unwrap())
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+
+        assert!(!nutrition_estimated, "nutrition_estimated should be FALSE");
+    }
 }
