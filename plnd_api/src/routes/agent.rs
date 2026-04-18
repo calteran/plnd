@@ -6,7 +6,7 @@ use plnd_agent::{xml_escape, AgentContext, AgentError, UseCase};
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::models::{TaskEntryRequest, TaskEntryResponse};
+use crate::models::{MealPlanRequest, MealPlanResponse, TaskEntryRequest, TaskEntryResponse};
 use crate::state::AppState;
 
 fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> String {
@@ -72,6 +72,7 @@ pub async fn post_task(
         use_case: UseCase::TaskEntry,
         input: body.input.clone(),
         prior_context,
+        extra: None,
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
@@ -92,29 +93,87 @@ pub async fn post_task(
     Ok(Json(response))
 }
 
-/// POST /agent/meal-plan — stub returning 501 until Phase 3.3 implements LLM-backed meal planning.
-/// TODO(phase-3.3): apply `state.agent_task_limiter` rate limit here before making any LLM calls.
+/// POST /agent/meal-plan — generate a full-week meal plan proposal via the AI agent.
+///
+/// The client POSTs the current wizard state (approved/skipped/custom slots for the week).
+/// The agent preserves those slots and fills the open ones. Returns a full week envelope;
+/// the Angular wizard commits it via `WeekPlanService.commitPlan()` — no DB writes here.
 #[utoipa::path(
     post,
     path = "/agent/meal-plan",
     tag = "Agent",
     security(("bearer_auth" = [])),
+    request_body = MealPlanRequest,
     responses(
-        (status = 501, description = "Not yet implemented — available in Phase 3.3"),
+        (status = 200, description = "Week plan proposal", body = MealPlanResponse),
         (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Agent response failed schema validation"),
+        (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
+        (status = 500, description = "LLM provider failure or infrastructure error"),
     )
 )]
-#[tracing::instrument(skip(_state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn post_meal_plan(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-) -> StatusCode {
-    StatusCode::NOT_IMPLEMENTED
+    Json(body): Json<MealPlanRequest>,
+) -> Result<Json<MealPlanResponse>, StatusCode> {
+    if state.agent_task_limiter.check_key(&claims.sub).is_err() {
+        tracing::warn!(user_id = %claims.sub, "agent meal-plan rate limit exceeded");
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let week = body.week_start.format("%Y-%m-%d").to_string();
+    let current_state_json = serde_json::to_value(&body.current_state).map_err(|e| {
+        tracing::error!(error = %e, "failed to serialize current_state");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let ctx = AgentContext {
+        user_id,
+        use_case: UseCase::MealPlanning,
+        input: format!("Plan meals for the week beginning {week}."),
+        prior_context: Some(format!("[Week: {week}]\n")),
+        extra: Some(current_state_json),
+    };
+
+    let output = state.agent.run(&ctx).await.map_err(|e| match &e {
+        AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        _ => {
+            tracing::error!(error = %e, "agent meal-plan run failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+
+    let response: MealPlanResponse = serde_json::from_str(&output.content).map_err(|e| {
+        tracing::error!(error = %e, content = %output.content, "failed to parse meal plan output");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(response))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
+
+    #[test]
+    fn meal_plan_request_state_deserializes_with_skipped() {
+        use crate::models::MealPlanRequest;
+        let json = r#"{
+            "week_start": "2026-04-21",
+            "current_state": {
+                "approved": [],
+                "skipped": [{"date": "2026-04-21", "occasion": "breakfast"}],
+                "custom": []
+            }
+        }"#;
+        let req: MealPlanRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.current_state.skipped.len(), 1);
+        assert_eq!(req.current_state.skipped[0].occasion, "breakfast");
+    }
 
     #[test]
     fn task_entry_request_deserializes() {

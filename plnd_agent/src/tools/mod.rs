@@ -1,4 +1,5 @@
 pub(crate) mod meal;
+pub(crate) use meal::register_meal_planning_tools;
 pub(crate) use meal::register_meal_read_tools;
 
 pub(crate) mod memory;
@@ -140,6 +141,7 @@ impl ToolRegistry {
 pub(crate) fn build_tool_registry(
     use_case: &UseCase,
     db: &plnd_data::db::Database,
+    extra: Option<serde_json::Value>,
 ) -> ToolRegistry {
     let pool = db.get_pool().clone();
     let memory_store = Arc::new(plnd_data::db::MemoryStore::new(pool.clone()));
@@ -151,10 +153,12 @@ pub(crate) fn build_tool_registry(
             let schedule_store = Arc::new(plnd_data::db::ScheduleStore::new(pool));
             register_schedule_tools(&mut registry, task_store, schedule_store);
         }
-        UseCase::MealPlanning
-        | UseCase::MealRebalance
-        | UseCase::MealSuggestSlot
-        | UseCase::MealAdhocResolve => {
+        UseCase::MealPlanning => {
+            register_meal_read_tools(&mut registry, db);
+            let week_state = extra.unwrap_or_default();
+            register_meal_planning_tools(&mut registry, week_state);
+        }
+        UseCase::MealRebalance | UseCase::MealSuggestSlot | UseCase::MealAdhocResolve => {
             register_meal_read_tools(&mut registry, db);
         }
     }

@@ -406,6 +406,138 @@ impl Tool for GetMealNutritionTool {
     }
 }
 
+// ── GetWeekScheduleTool ───────────────────────────────────────────────────────
+
+/// Echoes the client-provided week schedule state back into the agent context.
+///
+/// The route handler stashes `MealPlanRequest.current_state` in
+/// `AgentContext.extra` as JSON. At registry construction time, this value
+/// is baked into the tool so the LLM can explicitly retrieve it.
+///
+/// The DB is NOT consulted — the request payload is authoritative for which
+/// slots are already approved, skipped, or custom.
+pub struct GetWeekScheduleTool(pub serde_json::Value);
+
+#[async_trait::async_trait]
+impl Tool for GetWeekScheduleTool {
+    fn name(&self) -> &str {
+        "get_week_schedule"
+    }
+
+    fn description(&self) -> &str {
+        "Return the current week schedule state: which meal slots are approved, \
+         skipped, or have a custom meal. Call this before proposing a plan so you \
+         know which slots you must preserve exactly as given."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {}
+        })
+    }
+
+    async fn execute(
+        &self,
+        _ctx: &ToolContext,
+        _input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        Ok(self.0.clone())
+    }
+}
+
+// ── ProposeMealPlanTool ───────────────────────────────────────────────────────
+
+/// Terminal tool: the LLM calls this with the full week plan it has assembled.
+///
+/// The input is returned verbatim as the agent's final output. Schema validation
+/// in `AgentService::run` enforces `MEAL_PLAN_RESPONSE_SCHEMA` before the API
+/// layer ever sees the data. No DB writes here.
+pub struct ProposeMealPlanTool;
+
+#[async_trait::async_trait]
+impl Tool for ProposeMealPlanTool {
+    fn name(&self) -> &str {
+        "propose_meal_plan"
+    }
+
+    fn description(&self) -> &str {
+        "Submit the completed weekly meal plan. Call this as your final action \
+         once all open slots are filled. Pass the full week envelope including \
+         every meal (approved slots preserved as-is, open slots filled by you)."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["week", "meals"],
+            "additionalProperties": false,
+            "properties": {
+                "week": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "ISO date of the Monday starting this plan week"
+                },
+                "meals": {
+                    "type": "array",
+                    "description": "All meal slots for the week",
+                    "items": {
+                        "type": "object",
+                        "required": ["date", "occasion", "meal_ref"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "date":     { "type": "string", "format": "date" },
+                            "occasion": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+                            "meal_ref": {
+                                "type": "object",
+                                "required": ["type", "id"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "type": { "type": "string", "enum": ["catalog", "user"] },
+                                    "id":   { "type": "string", "format": "uuid" }
+                                }
+                            },
+                            "estimated_nutrition": {
+                                "type": "object",
+                                "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "kcal":      { "type": "number" },
+                                    "protein_g": { "type": "number" },
+                                    "carbs_g":   { "type": "number" },
+                                    "fat_g":     { "type": "number" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "nutrition_summary": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "avg_kcal":    { "type": "number" },
+                        "avg_protein": { "type": "number" },
+                        "flags":       { "type": "array", "items": { "type": "string" } }
+                    }
+                }
+            }
+        })
+    }
+
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
+    async fn execute(
+        &self,
+        _ctx: &ToolContext,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        Ok(input)
+    }
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db::Database) {
@@ -415,6 +547,15 @@ pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db:
     registry.register(Arc::new(GetUserMealPreferencesTool(pool.clone())));
     registry.register(Arc::new(GetMealNutritionTool(pool.clone())));
     registry.register(Arc::new(EstimateNutritionFromDescriptionTool(pool)));
+}
+
+/// Registers the terminal tools for the `MealPlanning` use case.
+///
+/// `week_state` is the client-provided `MealPlanState` JSON, baked into
+/// `GetWeekScheduleTool` at construction so the LLM can explicitly retrieve it.
+pub fn register_meal_planning_tools(registry: &mut ToolRegistry, week_state: serde_json::Value) {
+    registry.register(Arc::new(GetWeekScheduleTool(week_state)));
+    registry.register(Arc::new(ProposeMealPlanTool));
 }
 
 // ── Schema constructors ───────────────────────────────────────────────────────
@@ -621,6 +762,62 @@ mod tests {
     #[test]
     fn get_meal_nutrition_schema_has_no_user_id() {
         assert!(!has_user_id_property(&get_meal_nutrition_schema()));
+    }
+
+    #[test]
+    fn get_week_schedule_tool_schema_is_valid() {
+        let tool = GetWeekScheduleTool(serde_json::json!({}));
+        let schema = tool.schema();
+        assert_eq!(schema["type"], "object");
+    }
+
+    #[test]
+    fn get_week_schedule_tool_is_not_terminal() {
+        let tool = GetWeekScheduleTool(serde_json::json!({}));
+        assert!(!tool.is_terminal());
+    }
+
+    #[test]
+    fn propose_meal_plan_tool_is_terminal() {
+        assert!(ProposeMealPlanTool.is_terminal());
+    }
+
+    #[tokio::test]
+    async fn get_week_schedule_echoes_stored_state() {
+        let state = serde_json::json!({
+            "approved": [],
+            "skipped": [{ "date": "2026-04-21", "occasion": "breakfast" }],
+            "custom": []
+        });
+        let tool = GetWeekScheduleTool(state.clone());
+        let ctx = crate::tools::ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
+        let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
+        assert_eq!(result["skipped"][0]["occasion"], "breakfast");
+    }
+
+    #[tokio::test]
+    async fn propose_meal_plan_returns_input_verbatim() {
+        let input = serde_json::json!({
+            "week": "2026-04-21",
+            "meals": [
+                {
+                    "date": "2026-04-21",
+                    "occasion": "breakfast",
+                    "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+                }
+            ]
+        });
+        let ctx = crate::tools::ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
+        let result = ProposeMealPlanTool
+            .execute(&ctx, input.clone())
+            .await
+            .unwrap();
+        assert_eq!(result["week"], "2026-04-21");
+        assert_eq!(result["meals"].as_array().unwrap().len(), 1);
     }
 
     mod integration {

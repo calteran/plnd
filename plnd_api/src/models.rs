@@ -109,3 +109,112 @@ pub struct TaskEntryResponse {
     pub ui_signals: Vec<serde_json::Value>,
     pub confirmation: String,
 }
+
+// ---------------------------------------------------------------------------
+// Agent — Meal Planning
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MealRef {
+    #[serde(rename = "type")]
+    pub meal_type: String,
+    pub id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct Nutrition {
+    pub kcal: f64,
+    pub protein_g: f64,
+    pub carbs_g: f64,
+    pub fat_g: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MealEntry {
+    pub date: NaiveDate,
+    pub occasion: String,
+    pub meal_ref: MealRef,
+    pub estimated_nutrition: Option<Nutrition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct SlotRef {
+    pub date: NaiveDate,
+    pub occasion: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MealPlanState {
+    pub approved: Vec<MealEntry>,
+    pub skipped: Vec<SlotRef>,
+    pub custom: Vec<MealEntry>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct MealPlanRequest {
+    pub week_start: NaiveDate,
+    pub current_state: MealPlanState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct NutritionSummary {
+    pub avg_kcal: Option<f64>,
+    pub avg_protein: Option<f64>,
+    pub flags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MealPlanResponse {
+    pub week: NaiveDate,
+    pub meals: Vec<MealEntry>,
+    pub nutrition_summary: Option<NutritionSummary>,
+}
+
+#[cfg(test)]
+mod meal_plan_tests {
+    use super::*;
+
+    #[test]
+    fn meal_plan_request_deserializes_minimal() {
+        let json = r#"{
+            "week_start": "2026-04-21",
+            "current_state": { "approved": [], "skipped": [], "custom": [] }
+        }"#;
+        let req: MealPlanRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.week_start.to_string(), "2026-04-21");
+        assert!(req.current_state.approved.is_empty());
+    }
+
+    #[test]
+    fn meal_plan_request_rejects_missing_week_start() {
+        let json = r#"{ "current_state": { "approved": [], "skipped": [], "custom": [] } }"#;
+        let result: Result<MealPlanRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn meal_plan_response_serializes_week_as_date() {
+        let resp = MealPlanResponse {
+            week: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
+            meals: vec![],
+            nutrition_summary: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"week\":\"2026-04-21\""));
+    }
+
+    #[test]
+    fn meal_plan_request_state_has_skipped_slots() {
+        let json = r#"{
+            "week_start": "2026-04-21",
+            "current_state": {
+                "approved": [],
+                "skipped": [{"date": "2026-04-21", "occasion": "breakfast"}],
+                "custom": []
+            }
+        }"#;
+        let req: MealPlanRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.current_state.skipped.len(), 1);
+        assert_eq!(req.current_state.skipped[0].occasion, "breakfast");
+    }
+}

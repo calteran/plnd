@@ -9,8 +9,9 @@ use crate::api_response::{
     UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
-    CarryoverDecision, ConversationTurn, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus,
-    TaskEntryRequest, TaskEntryResponse,
+    CarryoverDecision, ConversationTurn, MealEntry, MealPlanRequest, MealPlanResponse,
+    MealPlanState, MealRef, Nutrition, NutritionSummary, PlanEntryRequest, PostSchedulePlanRequest,
+    ReadyStatus, SlotRef, TaskEntryRequest, TaskEntryResponse,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
@@ -165,6 +166,15 @@ impl Modify for BearerSecurityAddon {
         ConversationTurn,
         TaskEntryRequest,
         TaskEntryResponse,
+        // Meal Planning
+        MealRef,
+        Nutrition,
+        MealEntry,
+        SlotRef,
+        MealPlanState,
+        MealPlanRequest,
+        NutritionSummary,
+        MealPlanResponse,
     )),
     modifiers(&BearerSecurityAddon),
     tags(
