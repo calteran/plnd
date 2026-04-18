@@ -1075,12 +1075,12 @@ mod tests {
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
-        // MealPlanning has no response schema, so the mock's plain-text response
-        // is not rejected. This test is verifying memory injection, not
-        // use-case-specific schema validation. Both use cases include "habits".
+        // MealRebalance has no response validator, so a plain-text mock
+        // response is sufficient to exercise this test.
+        // Both use cases include "habits".
         let ctx = AgentContext {
             user_id,
-            use_case: UseCase::MealPlanning,
+            use_case: UseCase::MealRebalance,
             input: "add milk to grocery list".to_string(),
             prior_context: None,
         };
@@ -1127,12 +1127,11 @@ mod tests {
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
-        // MealPlanning has no response schema, so the mock's plain-text response
-        // is not rejected. This test is verifying that no <memory> block is
-        // injected when the user has no memories, not schema validation behavior.
+        // MealRebalance has no response validator, so a plain-text mock
+        // response is sufficient to exercise this test.
         let ctx = AgentContext {
             user_id,
-            use_case: UseCase::MealPlanning,
+            use_case: UseCase::MealRebalance,
             input: "add milk to grocery list".to_string(),
             prior_context: None,
         };
@@ -1148,7 +1147,7 @@ mod tests {
         );
         assert_eq!(
             system.as_str(),
-            UseCase::MealPlanning.system_prompt(),
+            UseCase::MealRebalance.system_prompt(),
             "system prompt must be the raw use-case prompt"
         );
     }
@@ -1243,9 +1242,11 @@ mod tests {
         });
 
         let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        // MealRebalance has no response validator, so a plain-text mock
+        // response is sufficient to exercise this test.
         let ctx = AgentContext {
             user_id,
-            use_case: UseCase::MealPlanning,
+            use_case: UseCase::MealRebalance,
             input: "plan my meals".to_string(),
             prior_context: None,
         };
@@ -1264,7 +1265,7 @@ mod tests {
         );
         assert!(
             !system.contains("productive in the mornings"),
-            "schedule memory must not appear in MealPlanning run"
+            "schedule memory must not appear in MealRebalance run"
         );
     }
 
