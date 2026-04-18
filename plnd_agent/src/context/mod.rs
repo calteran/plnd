@@ -7,6 +7,8 @@ use crate::provider::ProviderTier;
 const TASK_ENTRY_PROMPT: &str = include_str!("../prompts/task_entry.md");
 const MEAL_PLANNING_PROMPT: &str = include_str!("../prompts/meal_planning.md");
 const MEAL_REBALANCE_PROMPT: &str = include_str!("../prompts/meal_rebalance.md");
+const MEAL_SUGGEST_SLOT_PROMPT: &str = include_str!("../prompts/meal_suggest_slot.md");
+const MEAL_ADHOC_RESOLVE_PROMPT: &str = include_str!("../prompts/meal_adhoc_resolve.md");
 
 // ── Response schemas ─────────────────────────────────────────────────────────
 
@@ -84,6 +86,11 @@ pub enum UseCase {
     /// User pinned or unpinned a meal slot; agent rebalances remaining open slots.
     /// Agent calls `rebalance_meal_plan` as its terminal action.
     MealRebalance,
+
+    /// Agent suggests a meal for a specific open slot (user triggered or auto).
+    MealSuggestSlot,
+    /// Agent resolves an ad-hoc meal the user described (not in their plan).
+    MealAdhocResolve,
 }
 
 impl UseCase {
@@ -93,6 +100,8 @@ impl UseCase {
             UseCase::TaskEntry => TASK_ENTRY_PROMPT,
             UseCase::MealPlanning => MEAL_PLANNING_PROMPT,
             UseCase::MealRebalance => MEAL_REBALANCE_PROMPT,
+            UseCase::MealSuggestSlot => MEAL_SUGGEST_SLOT_PROMPT,
+            UseCase::MealAdhocResolve => MEAL_ADHOC_RESOLVE_PROMPT,
         }
     }
 
@@ -103,8 +112,10 @@ impl UseCase {
     pub fn memory_categories(&self) -> &'static [&'static str] {
         match self {
             UseCase::TaskEntry => &["habits", "schedule", "energy"],
-            UseCase::MealPlanning => &["food", "habits"],
-            UseCase::MealRebalance => &["food", "habits"],
+            UseCase::MealPlanning
+            | UseCase::MealRebalance
+            | UseCase::MealSuggestSlot
+            | UseCase::MealAdhocResolve => &["food", "habits"],
         }
     }
 
@@ -115,9 +126,11 @@ impl UseCase {
     /// the Fast tier.
     pub fn provider_tier(&self) -> ProviderTier {
         match self {
-            UseCase::TaskEntry => ProviderTier::Capable,
-            UseCase::MealPlanning => ProviderTier::Capable,
-            UseCase::MealRebalance => ProviderTier::Capable,
+            UseCase::TaskEntry
+            | UseCase::MealPlanning
+            | UseCase::MealRebalance
+            | UseCase::MealSuggestSlot
+            | UseCase::MealAdhocResolve => ProviderTier::Capable,
         }
     }
 
@@ -132,7 +145,10 @@ impl UseCase {
     pub fn response_validator(&self) -> Option<&'static jsonschema::Validator> {
         match self {
             UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
-            UseCase::MealPlanning | UseCase::MealRebalance => None,
+            UseCase::MealPlanning
+            | UseCase::MealRebalance
+            | UseCase::MealSuggestSlot
+            | UseCase::MealAdhocResolve => None,
         }
     }
 }
@@ -164,6 +180,8 @@ mod tests {
             UseCase::TaskEntry,
             UseCase::MealPlanning,
             UseCase::MealRebalance,
+            UseCase::MealSuggestSlot,
+            UseCase::MealAdhocResolve,
         ] {
             assert!(
                 !case.system_prompt().is_empty(),
@@ -178,6 +196,8 @@ mod tests {
             UseCase::TaskEntry,
             UseCase::MealPlanning,
             UseCase::MealRebalance,
+            UseCase::MealSuggestSlot,
+            UseCase::MealAdhocResolve,
         ] {
             assert!(
                 case.system_prompt().contains("<user_input>"),
@@ -315,6 +335,8 @@ mod tests {
             UseCase::TaskEntry,
             UseCase::MealPlanning,
             UseCase::MealRebalance,
+            UseCase::MealSuggestSlot,
+            UseCase::MealAdhocResolve,
         ] {
             assert_eq!(
                 case.provider_tier(),

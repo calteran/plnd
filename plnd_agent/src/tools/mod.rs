@@ -1,3 +1,6 @@
+pub(crate) mod meal;
+pub(crate) use meal::register_meal_read_tools;
+
 pub(crate) mod memory;
 pub(crate) use memory::register_memory_tools;
 
@@ -148,7 +151,12 @@ pub(crate) fn build_tool_registry(
             let schedule_store = Arc::new(plnd_data::db::ScheduleStore::new(pool));
             register_schedule_tools(&mut registry, task_store, schedule_store);
         }
-        UseCase::MealPlanning | UseCase::MealRebalance => {}
+        UseCase::MealPlanning
+        | UseCase::MealRebalance
+        | UseCase::MealSuggestSlot
+        | UseCase::MealAdhocResolve => {
+            register_meal_read_tools(&mut registry, db);
+        }
     }
     registry
 }
