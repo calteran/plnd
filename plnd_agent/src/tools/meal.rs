@@ -267,11 +267,14 @@ impl Tool for GetMealNutritionTool {
 
                 match row {
                     None => Ok(serde_json::json!({ "found": false })),
-                    Some((nutrition,)) => Ok(serde_json::json!({
-                        "found": true,
-                        "estimated": false,
-                        "nutrition": nutrition,
-                    })),
+                    Some((nutrition,)) => {
+                        // estimated = false: catalog meals are from authoritative sources (not AI-estimated)
+                        Ok(serde_json::json!({
+                            "found": true,
+                            "estimated": false,
+                            "nutrition": nutrition,
+                        }))
+                    }
                 }
             }
             "user" => {
