@@ -312,6 +312,7 @@ fn test_user_meal_serde_round_trip() {
     let meal: UserMeal = serde_json::from_str(json).expect("deserialize failed");
     assert!(meal.catalog_meal_id.is_some());
     assert_eq!(meal.occasion_tags, vec!["breakfast-friendly"]);
+    assert!(!meal.nutrition_estimated);
 }
 
 #[test]
