@@ -217,9 +217,7 @@ impl UseCase {
         match self {
             UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
             UseCase::MealPlanning => Some(&MEAL_PLAN_VALIDATOR),
-            UseCase::MealRebalance
-            | UseCase::MealSuggestSlot
-            | UseCase::MealAdhocResolve => None,
+            UseCase::MealRebalance | UseCase::MealSuggestSlot | UseCase::MealAdhocResolve => None,
         }
     }
 }
@@ -361,7 +359,10 @@ mod tests {
             ],
             "nutrition_summary": { "avg_kcal": 420.0, "avg_protein": 18.0, "flags": [] }
         });
-        assert!(validator.is_valid(&ok), "plan with optional nutrition must pass");
+        assert!(
+            validator.is_valid(&ok),
+            "plan with optional nutrition must pass"
+        );
     }
 
     #[test]
@@ -384,7 +385,10 @@ mod tests {
                 }
             ]
         });
-        assert!(!validator.is_valid(&bad), "unknown occasion must be rejected");
+        assert!(
+            !validator.is_valid(&bad),
+            "unknown occasion must be rejected"
+        );
     }
 
     #[test]

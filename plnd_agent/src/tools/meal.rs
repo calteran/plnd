@@ -553,10 +553,7 @@ pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db:
 ///
 /// `week_state` is the client-provided `MealPlanState` JSON, baked into
 /// `GetWeekScheduleTool` at construction so the LLM can explicitly retrieve it.
-pub fn register_meal_planning_tools(
-    registry: &mut ToolRegistry,
-    week_state: serde_json::Value,
-) {
+pub fn register_meal_planning_tools(registry: &mut ToolRegistry, week_state: serde_json::Value) {
     registry.register(Arc::new(GetWeekScheduleTool(week_state)));
     registry.register(Arc::new(ProposeMealPlanTool));
 }
@@ -793,7 +790,9 @@ mod tests {
             "custom": []
         });
         let tool = GetWeekScheduleTool(state.clone());
-        let ctx = crate::tools::ToolContext { user_id: uuid::Uuid::new_v4() };
+        let ctx = crate::tools::ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
         let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
         assert_eq!(result["skipped"][0]["occasion"], "breakfast");
     }
@@ -810,8 +809,13 @@ mod tests {
                 }
             ]
         });
-        let ctx = crate::tools::ToolContext { user_id: uuid::Uuid::new_v4() };
-        let result = ProposeMealPlanTool.execute(&ctx, input.clone()).await.unwrap();
+        let ctx = crate::tools::ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
+        let result = ProposeMealPlanTool
+            .execute(&ctx, input.clone())
+            .await
+            .unwrap();
         assert_eq!(result["week"], "2026-04-21");
         assert_eq!(result["meals"].as_array().unwrap().len(), 1);
     }
