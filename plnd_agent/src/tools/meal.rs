@@ -496,7 +496,7 @@ fn estimate_nutrition_from_description_schema() -> serde_json::Value {
                         },
                         "grams": {
                             "type": "number",
-                            "minimum": 0,
+                            "exclusiveMinimum": 0,
                             "description": "Estimated portion size in grams."
                         }
                     }
