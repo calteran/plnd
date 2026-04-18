@@ -783,7 +783,7 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn create_from_description_estimated_false_by_default(pool: PgPool) {
+    async fn create_from_description_stores_estimated_false_with_nutrition(pool: PgPool) {
         let uid = new_user(&pool).await;
         let nutrition = serde_json::json!({ "kcal": 600, "protein_g": 40.0 });
 
