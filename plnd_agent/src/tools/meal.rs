@@ -201,7 +201,6 @@ impl Tool for GetUserMealPreferencesTool {
 // ── EstimateNutritionFromDescriptionTool ─────────────────────────────────────
 
 #[derive(Debug, Default, serde::Serialize)]
-#[allow(dead_code)]
 struct NutritionTotals {
     calories_kcal: f64,
     protein_g: f64,
@@ -209,7 +208,6 @@ struct NutritionTotals {
     fat_g: f64,
 }
 
-#[allow(dead_code)]
 impl NutritionTotals {
     fn add_scaled(&mut self, nutrition: &serde_json::Value, factor: f64) {
         let get = |key: &str| -> f64 { nutrition.get(key).and_then(|v| v.as_f64()).unwrap_or(0.0) };
@@ -220,8 +218,6 @@ impl NutritionTotals {
     }
 }
 
-// Registration is deferred to Task 4 — suppress dead_code lint until then.
-#[allow(dead_code)]
 pub struct EstimateNutritionFromDescriptionTool(pub PgPool);
 
 #[async_trait::async_trait]
@@ -310,8 +306,6 @@ impl Tool for EstimateNutritionFromDescriptionTool {
 
 // ── GetMealNutritionTool ──────────────────────────────────────────────────────
 
-// Registration is deferred to Task 4 — suppress dead_code lint until then.
-#[allow(dead_code)]
 pub struct GetMealNutritionTool(pub PgPool);
 
 #[async_trait::async_trait]
@@ -425,7 +419,9 @@ pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db:
     let pool = db.get_pool().clone();
     registry.register(Arc::new(SearchMealCatalogTool(pool.clone())));
     registry.register(Arc::new(GetUserMealLibraryTool(pool.clone())));
-    registry.register(Arc::new(GetUserMealPreferencesTool(pool)));
+    registry.register(Arc::new(GetUserMealPreferencesTool(pool.clone())));
+    registry.register(Arc::new(GetMealNutritionTool(pool.clone())));
+    registry.register(Arc::new(EstimateNutritionFromDescriptionTool(pool)));
 }
 
 // ── Schema constructors ───────────────────────────────────────────────────────
@@ -476,8 +472,6 @@ fn get_user_meal_preferences_schema() -> serde_json::Value {
     })
 }
 
-// Called from EstimateNutritionFromDescriptionTool::schema — registration deferred to Task 4.
-#[allow(dead_code)]
 fn estimate_nutrition_from_description_schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
@@ -512,8 +506,6 @@ fn estimate_nutrition_from_description_schema() -> serde_json::Value {
     })
 }
 
-// Called from GetMealNutritionTool::schema — registration deferred to Task 4.
-#[allow(dead_code)]
 fn get_meal_nutrition_schema() -> serde_json::Value {
     serde_json::json!({
         "type": "object",
