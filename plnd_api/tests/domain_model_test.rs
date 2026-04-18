@@ -305,6 +305,7 @@ fn test_user_meal_serde_round_trip() {
         "tags": [],
         "nutrition": null,
         "nutrition_overridden": false,
+        "nutrition_estimated": false,
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
