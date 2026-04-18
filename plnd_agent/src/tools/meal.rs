@@ -64,7 +64,7 @@ impl Tool for SearchMealCatalogTool {
             .map_err(|e| db_err(self.name(), e))?;
         let allergens: Vec<String> = restrictions
             .iter()
-            .filter(|r| r.restriction_type == "allergy")
+            .filter(|r| r.restriction_type == "allergy" || r.restriction_type == "intolerance")
             .map(|r| r.name.clone())
             .collect();
 
@@ -158,11 +158,31 @@ impl Tool for GetUserMealPreferencesTool {
         )
         .map_err(|e| db_err(self.name(), e))?;
 
-        let blocked_ingredient_ids: Vec<String> = ingredient_prefs
+        let blocked_ids: Vec<uuid::Uuid> = ingredient_prefs
             .iter()
             .filter(|p| p.is_blocked)
-            .map(|p| p.catalog_ingredient_id.to_string())
+            .map(|p| p.catalog_ingredient_id)
             .collect();
+
+        // Fetch names for blocked ingredients so the LLM can reason about them
+        let blocked_ingredients: Vec<serde_json::Value> = if blocked_ids.is_empty() {
+            vec![]
+        } else {
+            sqlx::query_as::<_, (uuid::Uuid, String)>(
+                "SELECT ingredient_id, name FROM catalog_ingredients \
+                 WHERE ingredient_id = ANY($1::uuid[])",
+            )
+            .bind(&blocked_ids)
+            .fetch_all(&self.0)
+            .await
+            .map_err(|e| ToolError::Execution {
+                tool: self.name().to_string(),
+                reason: e.to_string(),
+            })?
+            .into_iter()
+            .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
+            .collect()
+        };
 
         let top_rated: Vec<_> = meal_prefs
             .iter()
@@ -171,7 +191,7 @@ impl Tool for GetUserMealPreferencesTool {
 
         Ok(serde_json::json!({
             "dietary_restrictions": restrictions,
-            "blocked_ingredient_ids": blocked_ingredient_ids,
+            "blocked_ingredients": blocked_ingredients,
             "top_rated_meals": top_rated,
         }))
     }
@@ -371,7 +391,7 @@ mod tests {
             let restrictions = result["dietary_restrictions"].as_array().unwrap();
             assert_eq!(restrictions.len(), 1);
             assert_eq!(restrictions[0]["name"], "peanuts");
-            assert!(result["blocked_ingredient_ids"].is_array());
+            assert!(result["blocked_ingredients"].is_array());
             assert!(result["top_rated_meals"].is_array());
         }
     }
