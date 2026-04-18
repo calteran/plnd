@@ -59,10 +59,9 @@ impl Tool for SearchMealCatalogTool {
             .and_then(|v| v.as_str())
             .map(str::to_string);
 
-        let restrictions =
-            plnd_data::db::dietary_restrictions::list(&self.0, ctx.user_id)
-                .await
-                .map_err(|e| db_err(self.name(), e))?;
+        let restrictions = plnd_data::db::dietary_restrictions::list(&self.0, ctx.user_id)
+            .await
+            .map_err(|e| db_err(self.name(), e))?;
         let allergens: Vec<String> = restrictions
             .iter()
             .filter(|r| r.restriction_type == "allergen")
@@ -351,10 +350,7 @@ mod tests {
 
             let tool = GetUserMealLibraryTool(pool.clone());
             let ctx = ToolContext { user_id };
-            let result = tool
-                .execute(&ctx, serde_json::json!({}))
-                .await
-                .unwrap();
+            let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
 
             let meals = result["meals"].as_array().unwrap();
             assert_eq!(meals.len(), 1);
@@ -365,21 +361,14 @@ mod tests {
         async fn get_user_meal_preferences_tool_returns_bundle(pool: PgPool) {
             let user_id = seed_user(&pool).await;
             plnd_data::db::dietary_restrictions::create(
-                &pool,
-                user_id,
-                "allergen",
-                "peanuts",
-                None,
+                &pool, user_id, "allergen", "peanuts", None,
             )
             .await
             .unwrap();
 
             let tool = GetUserMealPreferencesTool(pool.clone());
             let ctx = ToolContext { user_id };
-            let result = tool
-                .execute(&ctx, serde_json::json!({}))
-                .await
-                .unwrap();
+            let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
 
             let restrictions = result["dietary_restrictions"].as_array().unwrap();
             assert_eq!(restrictions.len(), 1);
