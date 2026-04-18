@@ -158,9 +158,7 @@ pub(crate) fn build_tool_registry(
             let week_state = extra.unwrap_or_default();
             register_meal_planning_tools(&mut registry, week_state);
         }
-        UseCase::MealRebalance
-        | UseCase::MealSuggestSlot
-        | UseCase::MealAdhocResolve => {
+        UseCase::MealRebalance | UseCase::MealSuggestSlot | UseCase::MealAdhocResolve => {
             register_meal_read_tools(&mut registry, db);
         }
     }
