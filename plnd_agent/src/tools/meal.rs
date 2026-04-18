@@ -360,11 +360,9 @@ mod tests {
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn get_user_meal_preferences_tool_returns_bundle(pool: PgPool) {
             let user_id = seed_user(&pool).await;
-            plnd_data::db::dietary_restrictions::create(
-                &pool, user_id, "allergy", "peanuts", None,
-            )
-            .await
-            .unwrap();
+            plnd_data::db::dietary_restrictions::create(&pool, user_id, "allergy", "peanuts", None)
+                .await
+                .unwrap();
 
             let tool = GetUserMealPreferencesTool(pool.clone());
             let ctx = ToolContext { user_id };
