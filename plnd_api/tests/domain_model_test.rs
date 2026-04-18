@@ -305,12 +305,14 @@ fn test_user_meal_serde_round_trip() {
         "tags": [],
         "nutrition": null,
         "nutrition_overridden": false,
+        "nutrition_estimated": false,
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
     let meal: UserMeal = serde_json::from_str(json).expect("deserialize failed");
     assert!(meal.catalog_meal_id.is_some());
     assert_eq!(meal.occasion_tags, vec!["breakfast-friendly"]);
+    assert!(!meal.nutrition_estimated);
 }
 
 #[test]

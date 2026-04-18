@@ -197,6 +197,7 @@ pub struct UserMeal {
     pub tags: Vec<String>,
     pub nutrition: Option<Value>,
     pub nutrition_overridden: bool,
+    pub nutrition_estimated: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
