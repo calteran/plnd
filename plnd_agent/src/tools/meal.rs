@@ -64,7 +64,7 @@ impl Tool for SearchMealCatalogTool {
             .map_err(|e| db_err(self.name(), e))?;
         let allergens: Vec<String> = restrictions
             .iter()
-            .filter(|r| r.restriction_type == "allergen")
+            .filter(|r| r.restriction_type == "allergy")
             .map(|r| r.name.clone())
             .collect();
 
@@ -361,7 +361,7 @@ mod tests {
         async fn get_user_meal_preferences_tool_returns_bundle(pool: PgPool) {
             let user_id = seed_user(&pool).await;
             plnd_data::db::dietary_restrictions::create(
-                &pool, user_id, "allergen", "peanuts", None,
+                &pool, user_id, "allergy", "peanuts", None,
             )
             .await
             .unwrap();
