@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use plnd_data::db::error::DatabaseError;
+use rust_decimal::prelude::ToPrimitive;
 use sqlx::PgPool;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -269,7 +270,11 @@ impl Tool for EstimateNutritionFromDescriptionTool {
             let ing_name = item
                 .get("name")
                 .and_then(|v| v.as_str())
-                .unwrap_or_default();
+                .filter(|s| !s.is_empty())
+                .ok_or_else(|| ToolError::InvalidInput {
+                    tool: self.name().to_string(),
+                    reason: "each inferred_ingredient must have a non-empty 'name'".to_string(),
+                })?;
             let grams = item.get("grams").and_then(|v| v.as_f64()).unwrap_or(100.0);
 
             let hits = plnd_data::db::search::search_ingredient_nutrition(&self.0, ing_name, 1)
@@ -283,7 +288,7 @@ impl Tool for EstimateNutritionFromDescriptionTool {
                         // serving_size_g defaults to 100 g when absent (USDA FDC standard reference)
                         let serving_g = ingredient
                             .serving_size_g
-                            .and_then(|d| d.to_string().parse::<f64>().ok())
+                            .and_then(|d| d.to_f64())
                             .unwrap_or(100.0);
                         let factor = grams / serving_g;
                         totals.add_scaled(nutrition, factor);
