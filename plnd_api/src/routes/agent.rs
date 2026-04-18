@@ -72,6 +72,7 @@ pub async fn post_task(
         use_case: UseCase::TaskEntry,
         input: body.input.clone(),
         prior_context,
+        extra: None,
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {

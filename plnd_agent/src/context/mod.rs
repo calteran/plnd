@@ -228,7 +228,7 @@ impl UseCase {
 ///
 /// Constructed by the caller before invoking [`AgentService::run`]. The
 /// `user_id` comes from the authenticated session — never from the LLM.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct AgentContext {
     /// Authenticated user making the request.
     pub user_id: uuid::Uuid,
@@ -239,6 +239,10 @@ pub struct AgentContext {
     /// Trusted system context (e.g. prior conversation turns). Prepended *before* the
     /// `<user_input>` wrapper so the model treats it as trusted system data, not user input.
     pub prior_context: Option<String>,
+    /// Structured extra data for tools that need request-scoped state.
+    /// Passed to `build_tool_registry` so tools can be constructed with it.
+    /// Only `UseCase::MealPlanning` currently uses this (week schedule state).
+    pub extra: Option<serde_json::Value>,
 }
 
 #[cfg(test)]

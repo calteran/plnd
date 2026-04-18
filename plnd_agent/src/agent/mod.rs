@@ -401,7 +401,7 @@ impl AgentService {
         // When `db` is `None` (unit-test constructors that skip DB access), an empty
         // registry is used — those tests do not exercise tool-execution paths.
         let tools = match self.db {
-            Some(ref db) => crate::tools::build_tool_registry(&ctx.use_case, db),
+            Some(ref db) => crate::tools::build_tool_registry(&ctx.use_case, db, ctx.extra.clone()),
             None => ToolRegistry::new(),
         };
 
@@ -1083,6 +1083,7 @@ mod tests {
             use_case: UseCase::MealRebalance,
             input: "add milk to grocery list".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         let result = service.run(&ctx).await;
@@ -1134,6 +1135,7 @@ mod tests {
             use_case: UseCase::MealRebalance,
             input: "add milk to grocery list".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         let result = service.run(&ctx).await;
@@ -1191,6 +1193,7 @@ mod tests {
             use_case: UseCase::TaskEntry,
             input: "add task".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         service.run(&ctx).await.unwrap();
@@ -1249,6 +1252,7 @@ mod tests {
             use_case: UseCase::MealRebalance,
             input: "plan my meals".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         service.run(&ctx).await.unwrap();
@@ -1293,6 +1297,7 @@ mod tests {
             use_case: UseCase::MealRebalance,
             input: "replace vacuum filter".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         let result = service.run(&ctx).await;
@@ -1334,6 +1339,7 @@ mod tests {
             use_case: UseCase::MealRebalance,
             input: "book dentist".to_string(),
             prior_context: Some(prior.clone()),
+            extra: None,
         };
 
         let result = service.run(&ctx).await;
@@ -1561,6 +1567,7 @@ mod tests {
             use_case: UseCase::TaskEntry,
             input: "add task".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         let result = service.run(&ctx).await;
@@ -1603,6 +1610,7 @@ mod tests {
             use_case: UseCase::TaskEntry,
             input: "add task".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         let result = service.run(&ctx).await;
@@ -1640,6 +1648,7 @@ mod tests {
             use_case: UseCase::TaskEntry,
             input: "add task".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         let result = service.run(&ctx).await;
@@ -1683,6 +1692,7 @@ mod tests {
             use_case: UseCase::TaskEntry,
             input: "add task".to_string(),
             prior_context: None,
+            extra: None,
         };
 
         service.run(&ctx).await.unwrap();
@@ -1744,6 +1754,7 @@ mod tests {
             use_case: UseCase::MealRebalance,
             input: injection.to_string(),
             prior_context: None,
+            extra: None,
         };
         service.run(&ctx).await.unwrap();
 

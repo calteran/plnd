@@ -140,6 +140,7 @@ impl ToolRegistry {
 pub(crate) fn build_tool_registry(
     use_case: &UseCase,
     db: &plnd_data::db::Database,
+    _extra: Option<serde_json::Value>,
 ) -> ToolRegistry {
     let pool = db.get_pool().clone();
     let memory_store = Arc::new(plnd_data::db::MemoryStore::new(pool.clone()));
@@ -151,8 +152,11 @@ pub(crate) fn build_tool_registry(
             let schedule_store = Arc::new(plnd_data::db::ScheduleStore::new(pool));
             register_schedule_tools(&mut registry, task_store, schedule_store);
         }
-        UseCase::MealPlanning
-        | UseCase::MealRebalance
+        UseCase::MealPlanning => {
+            register_meal_read_tools(&mut registry, db);
+            // Terminal tools (GetWeekScheduleTool, ProposeMealPlanTool) registered in Task 3
+        }
+        UseCase::MealRebalance
         | UseCase::MealSuggestSlot
         | UseCase::MealAdhocResolve => {
             register_meal_read_tools(&mut registry, db);
