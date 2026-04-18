@@ -810,4 +810,24 @@ mod tests {
         assert!(!nutrition_estimated, "nutrition_estimated should be FALSE");
         assert_eq!(nutrition_stored.unwrap(), nutrition);
     }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_from_description_accepts_no_nutrition(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        let pref = create_from_description(&pool, uid, "Nutrition-Free Meal", &[], None, false)
+            .await
+            .expect("create failed");
+
+        let (nutrition, nutrition_estimated): (Option<serde_json::Value>, bool) = sqlx::query_as(
+            "SELECT nutrition, nutrition_estimated FROM user_meals WHERE user_meal_id = $1",
+        )
+        .bind(pref.user_meal_id.unwrap())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        assert!(nutrition.is_none());
+        assert!(!nutrition_estimated);
+    }
 }
