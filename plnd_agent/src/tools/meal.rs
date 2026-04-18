@@ -197,6 +197,114 @@ impl Tool for GetUserMealPreferencesTool {
     }
 }
 
+// ── GetMealNutritionTool ──────────────────────────────────────────────────────
+
+// Registration is deferred to Task 4 — suppress dead_code lint until then.
+#[allow(dead_code)]
+pub struct GetMealNutritionTool(pub PgPool);
+
+#[async_trait::async_trait]
+impl Tool for GetMealNutritionTool {
+    fn name(&self) -> &str {
+        "get_meal_nutrition"
+    }
+
+    fn description(&self) -> &str {
+        "Return the stored nutrition macros (kcal, protein_g, carbs_g, fat_g) for a known \
+         meal reference. Also returns `estimated: true` when the nutrition was estimated \
+         rather than measured. Call this to show nutrition context before proposing swaps."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        get_meal_nutrition_schema()
+    }
+
+    async fn execute(
+        &self,
+        ctx: &ToolContext,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        let meal_ref = input
+            .get("meal_ref")
+            .ok_or_else(|| ToolError::InvalidInput {
+                tool: self.name().to_string(),
+                reason: "missing required field 'meal_ref'".to_string(),
+            })?;
+
+        let meal_type = meal_ref
+            .get("type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| ToolError::InvalidInput {
+                tool: self.name().to_string(),
+                reason: "meal_ref.type must be 'catalog' or 'user'".to_string(),
+            })?;
+
+        let id_str =
+            meal_ref
+                .get("id")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| ToolError::InvalidInput {
+                    tool: self.name().to_string(),
+                    reason: "meal_ref.id is required".to_string(),
+                })?;
+
+        let id: uuid::Uuid = id_str.parse().map_err(|_| ToolError::InvalidInput {
+            tool: self.name().to_string(),
+            reason: format!("meal_ref.id is not a valid UUID: {id_str}"),
+        })?;
+
+        match meal_type {
+            "catalog" => {
+                let row: Option<(Option<serde_json::Value>,)> =
+                    sqlx::query_as("SELECT nutrition FROM catalog_meals WHERE meal_id = $1")
+                        .bind(id)
+                        .fetch_optional(&self.0)
+                        .await
+                        .map_err(|e| ToolError::Execution {
+                            tool: self.name().to_string(),
+                            reason: e.to_string(),
+                        })?;
+
+                match row {
+                    None => Ok(serde_json::json!({ "found": false })),
+                    Some((nutrition,)) => Ok(serde_json::json!({
+                        "found": true,
+                        "estimated": false,
+                        "nutrition": nutrition,
+                    })),
+                }
+            }
+            "user" => {
+                let row: Option<(Option<serde_json::Value>, bool)> = sqlx::query_as(
+                    "SELECT nutrition, nutrition_estimated \
+                     FROM user_meals WHERE user_meal_id = $1 AND user_id = $2",
+                )
+                .bind(id)
+                .bind(ctx.user_id)
+                .fetch_optional(&self.0)
+                .await
+                .map_err(|e| ToolError::Execution {
+                    tool: self.name().to_string(),
+                    reason: e.to_string(),
+                })?;
+
+                match row {
+                    None => Ok(serde_json::json!({ "found": false })),
+                    Some((nutrition, estimated)) => Ok(serde_json::json!({
+                        "found": true,
+                        "estimated": estimated,
+                        "nutrition": nutrition,
+                    })),
+                }
+            }
+            other => Err(ToolError::InvalidInput {
+                tool: self.name().to_string(),
+                reason: format!("unknown meal_ref.type: {other}"),
+            }),
+        }
+    }
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db::Database) {
@@ -251,6 +359,35 @@ fn get_user_meal_preferences_schema() -> serde_json::Value {
         "type": "object",
         "additionalProperties": false,
         "properties": {}
+    })
+}
+
+// Called from GetMealNutritionTool::schema — registration deferred to Task 4.
+#[allow(dead_code)]
+fn get_meal_nutrition_schema() -> serde_json::Value {
+    serde_json::json!({
+        "type": "object",
+        "required": ["meal_ref"],
+        "additionalProperties": false,
+        "properties": {
+            "meal_ref": {
+                "type": "object",
+                "required": ["type", "id"],
+                "additionalProperties": false,
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": ["catalog", "user"],
+                        "description": "Whether this is a catalog meal or a user personal meal."
+                    },
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "UUID of the meal."
+                    }
+                }
+            }
+        }
     })
 }
 
@@ -313,6 +450,21 @@ mod tests {
         assert_eq!(search_meal_catalog_schema()["type"], "object");
         assert_eq!(get_user_meal_library_schema()["type"], "object");
         assert_eq!(get_user_meal_preferences_schema()["type"], "object");
+        assert_eq!(get_meal_nutrition_schema()["type"], "object");
+    }
+
+    #[test]
+    fn get_meal_nutrition_schema_requires_meal_ref() {
+        let schema = get_meal_nutrition_schema();
+        assert_eq!(schema["type"], "object");
+        let required = schema["required"].as_array().unwrap();
+        assert!(required.iter().any(|v| v.as_str() == Some("meal_ref")));
+        assert!(schema["properties"]["meal_ref"].is_object());
+    }
+
+    #[test]
+    fn get_meal_nutrition_schema_has_no_user_id() {
+        assert!(!has_user_id_property(&get_meal_nutrition_schema()));
     }
 
     mod integration {
@@ -393,6 +545,95 @@ mod tests {
             assert_eq!(restrictions[0]["name"], "peanuts");
             assert!(result["blocked_ingredients"].is_array());
             assert!(result["top_rated_meals"].is_array());
+        }
+
+        #[sqlx::test(migrations = "../plnd_data/migrations")]
+        async fn get_meal_nutrition_catalog_returns_stored_nutrition(pool: PgPool) {
+            let meal_id: uuid::Uuid = sqlx::query_scalar(
+                "INSERT INTO catalog_meals \
+                 (name, servings, allergens, occasion_tags, tags, \
+                  nutrition, nutrition_overridden) \
+                 VALUES ('Test Soup', 1.0, '{}', '{\"lunch\"}', '{}', \
+                   '{\"calories_kcal\": 200, \"protein_g\": 10}'::jsonb, false) \
+                 RETURNING meal_id",
+            )
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+            let user_id = seed_user(&pool).await;
+            let tool = GetMealNutritionTool(pool.clone());
+            let ctx = ToolContext { user_id };
+            let result = tool
+                .execute(
+                    &ctx,
+                    serde_json::json!({ "meal_ref": { "type": "catalog", "id": meal_id.to_string() } }),
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(result["found"], true);
+            assert_eq!(result["estimated"], false);
+            assert_eq!(result["nutrition"]["calories_kcal"], 200.0);
+        }
+
+        #[sqlx::test(migrations = "../plnd_data/migrations")]
+        async fn get_meal_nutrition_user_returns_estimated_flag(pool: PgPool) {
+            let user_id = seed_user(&pool).await;
+            let pref = plnd_data::db::user_meal_prefs::create_from_description(
+                &pool,
+                user_id,
+                "Custom Stew",
+                &["dinner".to_string()],
+                Some(serde_json::json!({ "calories_kcal": 350, "protein_g": 20 })),
+                true,
+            )
+            .await
+            .unwrap();
+            let meal_id = pref.user_meal_id.unwrap();
+
+            let tool = GetMealNutritionTool(pool.clone());
+            let ctx = ToolContext { user_id };
+            let result = tool
+                .execute(
+                    &ctx,
+                    serde_json::json!({ "meal_ref": { "type": "user", "id": meal_id.to_string() } }),
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(result["found"], true);
+            assert_eq!(result["estimated"], true);
+            assert_eq!(result["nutrition"]["calories_kcal"], 350.0);
+        }
+
+        #[sqlx::test(migrations = "../plnd_data/migrations")]
+        async fn get_meal_nutrition_returns_not_found_for_wrong_user(pool: PgPool) {
+            let owner = seed_user(&pool).await;
+            let other = seed_user(&pool).await;
+            let pref = plnd_data::db::user_meal_prefs::create_from_description(
+                &pool,
+                owner,
+                "Private Meal",
+                &[],
+                None,
+                false,
+            )
+            .await
+            .unwrap();
+            let meal_id = pref.user_meal_id.unwrap();
+
+            let tool = GetMealNutritionTool(pool.clone());
+            let ctx = ToolContext { user_id: other };
+            let result = tool
+                .execute(
+                    &ctx,
+                    serde_json::json!({ "meal_ref": { "type": "user", "id": meal_id.to_string() } }),
+                )
+                .await
+                .unwrap();
+
+            assert_eq!(result["found"], false, "should not see another user's meal");
         }
     }
 }
