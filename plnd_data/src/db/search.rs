@@ -138,6 +138,49 @@ pub async fn search_user_dishes(
 }
 
 #[tracing::instrument(
+    skip(pool, exclude_allergens),
+    fields(table = "catalog_meals", op = "search_catalog_meals")
+)]
+pub async fn search_catalog_meals(
+    pool: &PgPool,
+    q: &str,
+    limit: i64,
+    occasion: Option<&str>,
+    exclude_allergens: &[String],
+    user_id: Option<uuid::Uuid>,
+) -> Result<Vec<super::models::CatalogMeal>, DatabaseError> {
+    sqlx::query_as::<_, super::models::CatalogMeal>(
+        r#"
+        SELECT meal_id, name, description, servings, allergens, allergens_overridden,
+               occasion_tags, tags, nutrition, nutrition_overridden,
+               external_id, external_source, contributed_by_user_id, created_at, updated_at
+        FROM catalog_meals
+        WHERE to_tsvector('english', name || ' ' || COALESCE(description, ''))
+              @@ plainto_tsquery('english', $1)
+          AND ($3::text IS NULL OR $3 = ANY(occasion_tags))
+          AND ($4::text[] = '{}' OR NOT (allergens && $4::text[]))
+          AND ($5::uuid IS NULL OR meal_id NOT IN (
+              SELECT catalog_meal_id FROM user_meal_prefs
+              WHERE user_id = $5 AND is_blocked AND catalog_meal_id IS NOT NULL
+          ))
+        ORDER BY ts_rank(
+            to_tsvector('english', name || ' ' || COALESCE(description, '')),
+            plainto_tsquery('english', $1)
+        ) DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(q)
+    .bind(limit)
+    .bind(occasion)
+    .bind(exclude_allergens)
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
+#[tracing::instrument(
     skip(pool),
     fields(table = "catalog_exercises", op = "search_exercises")
 )]
@@ -166,4 +209,28 @@ pub async fn search_exercises(
     .fetch_all(pool)
     .await
     .map_err(DatabaseError::from)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sqlx::PgPool;
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn search_catalog_meals_returns_match(pool: PgPool) {
+        sqlx::query(
+            "INSERT INTO catalog_meals (name, description, servings, allergens, occasion_tags, tags)
+             VALUES ('Avocado Toast', 'toasted bread with avocado', 1.0, '{}', '{\"breakfast\"}', '{}')"
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let results = search_catalog_meals(&pool, "avocado", 5, None, &[], None)
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "Avocado Toast");
+    }
 }
