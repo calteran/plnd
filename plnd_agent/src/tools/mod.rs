@@ -1,3 +1,5 @@
+pub(crate) mod meal;
+
 pub(crate) mod memory;
 pub(crate) use memory::register_memory_tools;
 
