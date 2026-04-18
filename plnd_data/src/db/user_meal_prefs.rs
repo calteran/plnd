@@ -716,6 +716,7 @@ mod tests {
         assert_eq!(pref.source, "personal");
         assert!(pref.has_personal_recipe);
         assert!(pref.user_meal_id.is_some());
+        assert!(pref.catalog_meal_id.is_none());
 
         // Verify the flag and nutrition round-trip via direct SELECT
         let (nutrition_stored, nutrition_estimated, occasion_tags): (
@@ -732,28 +733,35 @@ mod tests {
         .expect("user_meal row not found");
 
         assert!(nutrition_estimated, "nutrition_estimated should be TRUE");
-        assert_eq!(
-            nutrition_stored.as_ref().unwrap()["kcal"],
-            serde_json::json!(450)
-        );
-        assert_eq!(occasion_tags, tags);
+        assert_eq!(nutrition_stored.unwrap(), nutrition);
+        let mut stored_tags = occasion_tags;
+        let mut expected_tags = tags.clone();
+        stored_tags.sort();
+        expected_tags.sort();
+        assert_eq!(stored_tags, expected_tags);
     }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn create_from_description_estimated_false_by_default(pool: PgPool) {
         let uid = new_user(&pool).await;
+        let nutrition = serde_json::json!({ "kcal": 600, "protein_g": 40.0 });
 
-        let pref = create_from_description(&pool, uid, "Known Meal", &[], None, false)
+        let pref = create_from_description(&pool, uid, "Known Meal", &[], Some(nutrition.clone()), false)
             .await
             .expect("create failed");
 
-        let (nutrition_estimated,): (bool,) =
-            sqlx::query_as("SELECT nutrition_estimated FROM user_meals WHERE user_meal_id = $1")
-                .bind(pref.user_meal_id.unwrap())
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let (nutrition_stored, nutrition_estimated): (
+            Option<serde_json::Value>,
+            bool,
+        ) = sqlx::query_as(
+            "SELECT nutrition, nutrition_estimated FROM user_meals WHERE user_meal_id = $1",
+        )
+        .bind(pref.user_meal_id.unwrap())
+        .fetch_one(&pool)
+        .await
+        .unwrap();
 
         assert!(!nutrition_estimated, "nutrition_estimated should be FALSE");
+        assert_eq!(nutrition_stored.unwrap(), nutrition);
     }
 }
