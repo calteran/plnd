@@ -121,6 +121,47 @@ pub async fn create_from_scratch(
         .map(|opt| opt.expect("just inserted"))
 }
 
+#[tracing::instrument(
+    skip(pool, nutrition),
+    fields(table = "user_meal_prefs", op = "create_from_description")
+)]
+pub async fn create_from_description(
+    pool: &PgPool,
+    user_id: Uuid,
+    name: &str,
+    occasion_tags: &[String],
+    nutrition: Option<serde_json::Value>,
+    estimated: bool,
+) -> Result<UserMealPrefDetail, DatabaseError> {
+    let mut tx = pool.begin().await?;
+
+    let (user_meal_id,) = sqlx::query_as::<_, (Uuid,)>(
+        "INSERT INTO user_meals (user_id, name, occasion_tags, nutrition, nutrition_estimated) \
+         VALUES ($1, $2, $3, $4, $5) RETURNING user_meal_id",
+    )
+    .bind(user_id)
+    .bind(name)
+    .bind(occasion_tags)
+    .bind(&nutrition)
+    .bind(estimated)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let (pref_id,) = sqlx::query_as::<_, (Uuid,)>(
+        "INSERT INTO user_meal_prefs (user_id, user_meal_id) VALUES ($1, $2) RETURNING user_meal_pref_id",
+    )
+    .bind(user_id)
+    .bind(user_meal_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+
+    get(pool, user_id, pref_id)
+        .await
+        .map(|opt| opt.expect("just inserted"))
+}
+
 #[tracing::instrument(skip(pool), fields(table = "user_meal_prefs", op = "update_metadata"))]
 pub async fn update_metadata(
     pool: &PgPool,
@@ -746,20 +787,25 @@ mod tests {
         let uid = new_user(&pool).await;
         let nutrition = serde_json::json!({ "kcal": 600, "protein_g": 40.0 });
 
-        let pref = create_from_description(&pool, uid, "Known Meal", &[], Some(nutrition.clone()), false)
-            .await
-            .expect("create failed");
-
-        let (nutrition_stored, nutrition_estimated): (
-            Option<serde_json::Value>,
-            bool,
-        ) = sqlx::query_as(
-            "SELECT nutrition, nutrition_estimated FROM user_meals WHERE user_meal_id = $1",
+        let pref = create_from_description(
+            &pool,
+            uid,
+            "Known Meal",
+            &[],
+            Some(nutrition.clone()),
+            false,
         )
-        .bind(pref.user_meal_id.unwrap())
-        .fetch_one(&pool)
         .await
-        .unwrap();
+        .expect("create failed");
+
+        let (nutrition_stored, nutrition_estimated): (Option<serde_json::Value>, bool) =
+            sqlx::query_as(
+                "SELECT nutrition, nutrition_estimated FROM user_meals WHERE user_meal_id = $1",
+            )
+            .bind(pref.user_meal_id.unwrap())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
 
         assert!(!nutrition_estimated, "nutrition_estimated should be FALSE");
         assert_eq!(nutrition_stored.unwrap(), nutrition);
