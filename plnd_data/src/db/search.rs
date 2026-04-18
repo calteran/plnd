@@ -137,6 +137,41 @@ pub async fn search_user_dishes(
     .map_err(DatabaseError::from)
 }
 
+/// FTS search over `catalog_ingredients`, returning only rows that have a
+/// stored `nutrition` JSONB value (i.e., were sourced from USDA FDC or
+/// Open Food Facts). Used by `EstimateNutritionFromDescriptionTool`.
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "catalog_ingredients", op = "search_ingredient_nutrition")
+)]
+pub async fn search_ingredient_nutrition(
+    pool: &PgPool,
+    q: &str,
+    limit: i64,
+) -> Result<Vec<super::models::CatalogIngredient>, DatabaseError> {
+    sqlx::query_as::<_, super::models::CatalogIngredient>(
+        r#"
+        SELECT ingredient_id, name, description, serving_size_g, nutrition,
+               allergens, occasion_tags, external_id, external_source,
+               contributed_by_user_id, created_at, updated_at
+        FROM catalog_ingredients
+        WHERE to_tsvector('english', name || ' ' || COALESCE(description, ''))
+              @@ plainto_tsquery('english', $1)
+          AND nutrition IS NOT NULL
+        ORDER BY ts_rank(
+            to_tsvector('english', name || ' ' || COALESCE(description, '')),
+            plainto_tsquery('english', $1)
+        ) DESC
+        LIMIT $2
+        "#,
+    )
+    .bind(q)
+    .bind(limit)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 #[tracing::instrument(
     skip(pool, exclude_allergens),
     fields(table = "catalog_meals", op = "search_catalog_meals")
@@ -232,5 +267,48 @@ mod tests {
 
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].name, "Avocado Toast");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn search_ingredient_nutrition_returns_seeded_row(pool: PgPool) {
+        sqlx::query(
+            "INSERT INTO catalog_ingredients \
+             (name, serving_size_g, nutrition, allergens, occasion_tags) \
+             VALUES ('chicken breast', 100.0, \
+               '{\"calories_kcal\": 165, \"protein_g\": 31, \"carbohydrates_g\": 0, \"fat_g\": 3.6}'::jsonb, \
+               '{}', '{}')"
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let results = search_ingredient_nutrition(&pool, "chicken", 1)
+            .await
+            .expect("query ok");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "chicken breast");
+        assert!(results[0].nutrition.is_some());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn search_ingredient_nutrition_excludes_no_nutrition_rows(pool: PgPool) {
+        sqlx::query(
+            "INSERT INTO catalog_ingredients \
+             (name, allergens, occasion_tags) \
+             VALUES ('mystery food', '{}', '{}')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let results = search_ingredient_nutrition(&pool, "mystery food", 5)
+            .await
+            .expect("query ok");
+
+        assert!(
+            results.is_empty(),
+            "should exclude rows with null nutrition"
+        );
     }
 }
