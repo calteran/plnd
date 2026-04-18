@@ -280,17 +280,16 @@ impl Tool for EstimateNutritionFromDescriptionTool {
             match hits.into_iter().next() {
                 None => missing.push(ing_name.to_string()),
                 Some(ingredient) => {
-                    if let Some(nutrition) = &ingredient.nutrition {
-                        // serving_size_g defaults to 100 g when absent (USDA FDC standard reference)
-                        let serving_g = ingredient
-                            .serving_size_g
-                            .and_then(|d| d.to_f64())
-                            .unwrap_or(100.0);
-                        let factor = grams / serving_g;
-                        totals.add_scaled(nutrition, factor);
-                    } else {
-                        missing.push(ing_name.to_string());
-                    }
+                    // search_ingredient_nutrition guarantees nutrition IS NOT NULL
+                    let nutrition = ingredient.nutrition.as_ref().unwrap();
+                    // serving_size_g defaults to 100 g when absent or zero (USDA FDC standard reference)
+                    let serving_g = ingredient
+                        .serving_size_g
+                        .and_then(|d| d.to_f64())
+                        .filter(|&d| d > 0.0)
+                        .unwrap_or(100.0);
+                    let factor = grams / serving_g;
+                    totals.add_scaled(nutrition, factor);
                 }
             }
         }
@@ -365,10 +364,7 @@ impl Tool for GetMealNutritionTool {
                         .bind(id)
                         .fetch_optional(&self.0)
                         .await
-                        .map_err(|e| ToolError::Execution {
-                            tool: self.name().to_string(),
-                            reason: e.to_string(),
-                        })?;
+                        .map_err(|e| db_err(self.name(), DatabaseError::from(e)))?;
 
                 match row {
                     None => Ok(serde_json::json!({ "found": false })),
@@ -391,10 +387,7 @@ impl Tool for GetMealNutritionTool {
                 .bind(ctx.user_id)
                 .fetch_optional(&self.0)
                 .await
-                .map_err(|e| ToolError::Execution {
-                    tool: self.name().to_string(),
-                    reason: e.to_string(),
-                })?;
+                .map_err(|e| db_err(self.name(), DatabaseError::from(e)))?;
 
                 match row {
                     None => Ok(serde_json::json!({ "found": false })),
