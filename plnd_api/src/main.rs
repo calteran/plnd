@@ -350,6 +350,10 @@ async fn main() {
         .route("/auth/logout", post(auth::logout))
         .route("/agent/task", post(agent::post_task))
         .route("/agent/meal-plan", post(agent::post_meal_plan))
+        .route(
+            "/agent/meal-plan/rebalance",
+            post(agent::post_meal_plan_rebalance),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

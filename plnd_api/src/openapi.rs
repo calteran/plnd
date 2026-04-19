@@ -112,6 +112,7 @@ impl Modify for BearerSecurityAddon {
         // Agent
         crate::routes::agent::post_task,
         crate::routes::agent::post_meal_plan,
+        crate::routes::agent::post_meal_plan_rebalance,
     ),
     components(schemas(
         // Existing
