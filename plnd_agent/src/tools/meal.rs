@@ -538,6 +538,98 @@ impl Tool for ProposeMealPlanTool {
     }
 }
 
+// ── RebalanceMealPlanTool ─────────────────────────────────────────────────────
+
+/// Terminal tool: the LLM calls this with the full rebalanced week plan.
+///
+/// The input is returned verbatim as the agent's final output. Approved,
+/// custom, and skipped slots must be reproduced exactly as received from
+/// `get_week_schedule`; only unapproved/open slots may be changed.
+pub struct RebalanceMealPlanTool;
+
+#[async_trait::async_trait]
+impl Tool for RebalanceMealPlanTool {
+    fn name(&self) -> &str {
+        "rebalance_meal_plan"
+    }
+
+    fn description(&self) -> &str {
+        "Submit the rebalanced weekly meal plan. Call this as your final action \
+         once all open slots are filled. Pass the full week envelope — approved, \
+         custom, and skipped slots must be reproduced exactly as received from \
+         get_week_schedule; only unapproved/open slots may be changed."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["week", "meals"],
+            "additionalProperties": false,
+            "properties": {
+                "week": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "ISO date of the Monday starting this plan week"
+                },
+                "meals": {
+                    "type": "array",
+                    "description": "All meal slots for the week",
+                    "items": {
+                        "type": "object",
+                        "required": ["date", "occasion", "meal_ref"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "date":     { "type": "string", "format": "date" },
+                            "occasion": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+                            "meal_ref": {
+                                "type": "object",
+                                "required": ["type", "id"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "type": { "type": "string", "enum": ["catalog", "user"] },
+                                    "id":   { "type": "string", "format": "uuid" }
+                                }
+                            },
+                            "estimated_nutrition": {
+                                "type": "object",
+                                "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+                                "additionalProperties": false,
+                                "properties": {
+                                    "kcal":      { "type": "number" },
+                                    "protein_g": { "type": "number" },
+                                    "carbs_g":   { "type": "number" },
+                                    "fat_g":     { "type": "number" }
+                                }
+                            }
+                        }
+                    }
+                },
+                "nutrition_summary": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                        "avg_kcal":    { "type": "number" },
+                        "avg_protein": { "type": "number" },
+                        "flags":       { "type": "array", "items": { "type": "string" } }
+                    }
+                }
+            }
+        })
+    }
+
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
+    async fn execute(
+        &self,
+        _ctx: &ToolContext,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        Ok(input)
+    }
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db::Database) {
@@ -556,6 +648,16 @@ pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db:
 pub fn register_meal_planning_tools(registry: &mut ToolRegistry, week_state: serde_json::Value) {
     registry.register(Arc::new(GetWeekScheduleTool(week_state)));
     registry.register(Arc::new(ProposeMealPlanTool));
+}
+
+/// Registers the terminal tools for the `MealRebalance` use case.
+///
+/// `week_state` is the client-provided `MealPlanState` JSON (the existing
+/// week schedule), baked into `GetWeekScheduleTool` at construction so the
+/// LLM can explicitly retrieve it.
+pub fn register_meal_rebalance_tools(registry: &mut ToolRegistry, week_state: serde_json::Value) {
+    registry.register(Arc::new(GetWeekScheduleTool(week_state)));
+    registry.register(Arc::new(RebalanceMealPlanTool));
 }
 
 // ── Schema constructors ───────────────────────────────────────────────────────
@@ -795,6 +897,36 @@ mod tests {
         };
         let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
         assert_eq!(result["skipped"][0]["occasion"], "breakfast");
+    }
+
+    #[tokio::test]
+    async fn rebalance_meal_plan_tool_preserves_approved_entries() {
+        let tool = RebalanceMealPlanTool;
+        assert!(tool.is_terminal());
+        assert_eq!(tool.name(), "rebalance_meal_plan");
+
+        let input = serde_json::json!({
+            "week": "2026-04-21",
+            "meals": [
+                {
+                    "date": "2026-04-21",
+                    "occasion": "breakfast",
+                    "meal_ref": { "type": "catalog", "id": "00000000-0000-0000-0000-000000000001" }
+                },
+                {
+                    "date": "2026-04-21",
+                    "occasion": "lunch",
+                    "meal_ref": { "type": "user", "id": "00000000-0000-0000-0000-000000000002" }
+                }
+            ]
+        });
+
+        let ctx = ToolContext { user_id: uuid::Uuid::nil() };
+        let output = tool.execute(&ctx, input.clone()).await.unwrap();
+
+        assert_eq!(output["week"], "2026-04-21");
+        assert_eq!(output["meals"][0]["meal_ref"]["id"], "00000000-0000-0000-0000-000000000001");
+        assert_eq!(output["meals"][1]["meal_ref"]["id"], "00000000-0000-0000-0000-000000000002");
     }
 
     #[tokio::test]
