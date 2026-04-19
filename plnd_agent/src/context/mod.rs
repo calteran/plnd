@@ -216,8 +216,8 @@ impl UseCase {
     pub fn response_validator(&self) -> Option<&'static jsonschema::Validator> {
         match self {
             UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
-            UseCase::MealPlanning => Some(&MEAL_PLAN_VALIDATOR),
-            UseCase::MealRebalance | UseCase::MealSuggestSlot | UseCase::MealAdhocResolve => None,
+            UseCase::MealPlanning | UseCase::MealRebalance => Some(&MEAL_PLAN_VALIDATOR),
+            UseCase::MealSuggestSlot | UseCase::MealAdhocResolve => None,
         }
     }
 }
@@ -317,8 +317,12 @@ mod tests {
     }
 
     #[test]
+    fn meal_rebalance_has_response_validator() {
+        assert!(UseCase::MealRebalance.response_validator().is_some());
+    }
+
+    #[test]
     fn non_meal_planning_meal_use_cases_have_no_response_validator_yet() {
-        assert!(UseCase::MealRebalance.response_validator().is_none());
         assert!(UseCase::MealSuggestSlot.response_validator().is_none());
         assert!(UseCase::MealAdhocResolve.response_validator().is_none());
     }
