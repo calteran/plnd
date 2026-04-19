@@ -555,9 +555,10 @@ impl Tool for RebalanceMealPlanTool {
 
     fn description(&self) -> &str {
         "Submit the rebalanced weekly meal plan. Call this as your final action \
-         once all open slots are filled. Pass the full week envelope — approved, \
-         custom, and skipped slots must be reproduced exactly as received from \
-         get_week_schedule; only unapproved/open slots may be changed."
+         once all open slots are filled. Pass the full week envelope — approved \
+         and custom slots must be reproduced exactly as received from \
+         get_week_schedule; skipped slots are excluded from the output; \
+         only open slots may be changed."
     }
 
     fn schema(&self) -> serde_json::Value {
