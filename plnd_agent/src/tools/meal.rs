@@ -921,12 +921,20 @@ mod tests {
             ]
         });
 
-        let ctx = ToolContext { user_id: uuid::Uuid::nil() };
+        let ctx = ToolContext {
+            user_id: uuid::Uuid::nil(),
+        };
         let output = tool.execute(&ctx, input.clone()).await.unwrap();
 
         assert_eq!(output["week"], "2026-04-21");
-        assert_eq!(output["meals"][0]["meal_ref"]["id"], "00000000-0000-0000-0000-000000000001");
-        assert_eq!(output["meals"][1]["meal_ref"]["id"], "00000000-0000-0000-0000-000000000002");
+        assert_eq!(
+            output["meals"][0]["meal_ref"]["id"],
+            "00000000-0000-0000-0000-000000000001"
+        );
+        assert_eq!(
+            output["meals"][1]["meal_ref"]["id"],
+            "00000000-0000-0000-0000-000000000002"
+        );
     }
 
     #[tokio::test]
