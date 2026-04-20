@@ -260,7 +260,7 @@ pub async fn post_meal_plan_suggest(
         .filter(|refs| !refs.is_empty())
         .map(|refs| {
             serde_json::to_string(refs)
-                .map(|json| format!("[Avoid these meals: {json}]\n"))
+                .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
                 .unwrap_or_default()
         })
         .unwrap_or_default();
@@ -294,31 +294,6 @@ pub async fn post_meal_plan_suggest(
 #[cfg(test)]
 mod tests {
     use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
-
-    #[test]
-    fn meal_suggest_request_deserializes_minimal_in_routes() {
-        use crate::models::MealSuggestRequest;
-        let json = r#"{"date": "2026-04-21", "occasion": "lunch"}"#;
-        let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.date.to_string(), "2026-04-21");
-        assert_eq!(req.occasion, "lunch");
-        assert!(req.avoid_meal_refs.is_none());
-    }
-
-    #[test]
-    fn meal_suggest_request_with_avoid_refs_in_routes() {
-        use crate::models::MealSuggestRequest;
-        let json = r#"{
-            "date": "2026-04-22",
-            "occasion": "dinner",
-            "avoid_meal_refs": [
-                {"type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
-            ]
-        }"#;
-        let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
-        let refs = req.avoid_meal_refs.unwrap();
-        assert_eq!(refs.len(), 1);
-    }
 
     #[test]
     fn meal_plan_request_state_deserializes_with_skipped() {

@@ -962,6 +962,16 @@ mod tests {
         assert!(ProposeMealPlanTool.is_terminal());
     }
 
+    #[test]
+    fn suggest_slot_meal_tool_is_terminal() {
+        assert!(SuggestSlotMealTool.is_terminal());
+    }
+
+    #[test]
+    fn suggest_slot_meal_tool_name() {
+        assert_eq!(SuggestSlotMealTool.name(), "suggest_slot_meal");
+    }
+
     #[tokio::test]
     async fn get_week_schedule_echoes_stored_state() {
         let state = serde_json::json!({
@@ -1255,16 +1265,6 @@ mod tests {
             let missing = result["missing"].as_array().unwrap();
             assert_eq!(missing.len(), 1);
             assert_eq!(missing[0], "unicorn meat");
-        }
-
-        #[test]
-        fn suggest_slot_meal_tool_is_terminal() {
-            assert!(SuggestSlotMealTool.is_terminal());
-        }
-
-        #[test]
-        fn suggest_slot_meal_tool_name() {
-            assert_eq!(SuggestSlotMealTool.name(), "suggest_slot_meal");
         }
 
         #[tokio::test]
