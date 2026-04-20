@@ -710,8 +710,8 @@ impl Tool for SuggestSlotMealTool {
 /// Three branches:
 /// - `kind = "catalog"`: returns the catalog meal_ref verbatim (no DB write)
 /// - `kind = "user"`:    returns the user meal_ref verbatim (no DB write)
-/// - `kind = "new"`:     inserts a new `user_meals` row via `create_from_description`
-///                       with `nutrition_estimated = true`, returns the new meal_ref
+/// - `kind = "new"`: inserts a new `user_meals` row via `create_from_description`
+///   with `nutrition_estimated = true`, returns the new meal_ref
 pub struct ResolveMealDescriptionTool(pub PgPool);
 
 #[async_trait::async_trait]
