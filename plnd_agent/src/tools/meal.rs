@@ -826,9 +826,11 @@ impl Tool for ResolveMealDescriptionTool {
                     tool: self.name().to_string(),
                     reason: "kind='new' requires name".to_string(),
                 })?;
+                static EMPTY: &[serde_json::Value] = &[];
                 let occasion_tags: Vec<String> = input["occasion_tags"]
                     .as_array()
-                    .unwrap_or(&vec![])
+                    .map(|v| v.as_slice())
+                    .unwrap_or(EMPTY)
                     .iter()
                     .filter_map(|v| v.as_str().map(String::from))
                     .collect();
@@ -843,7 +845,7 @@ impl Tool for ResolveMealDescriptionTool {
                     ctx.user_id,
                     name,
                     &occasion_tags,
-                    nutrition_json,
+                    nutrition_json.clone(),
                     true,
                 )
                 .await
@@ -858,8 +860,8 @@ impl Tool for ResolveMealDescriptionTool {
                     "meal_ref": { "type": "user", "id": meal_id.to_string() },
                     "confirmation": confirmation
                 });
-                if input["estimated_nutrition"].is_object() {
-                    response["estimated_nutrition"] = input["estimated_nutrition"].clone();
+                if let Some(ref n) = nutrition_json {
+                    response["estimated_nutrition"] = n.clone();
                 }
                 Ok(response)
             }
@@ -1565,6 +1567,25 @@ mod tests {
             .await
             .unwrap();
             assert!(estimated, "nutrition_estimated must be true for new custom meals");
+        }
+
+        #[sqlx::test(migrations = "../plnd_data/migrations")]
+        async fn resolve_meal_description_new_branch_without_nutrition(pool: PgPool) {
+            let user_id = seed_user(&pool).await;
+            let tool = ResolveMealDescriptionTool(pool.clone());
+            let ctx = ToolContext { user_id };
+            let input = serde_json::json!({
+                "kind": "new",
+                "name": "Plain Toast",
+                "occasion_tags": ["breakfast"],
+                "confirmation": "Added plain toast with no nutrition data."
+            });
+            let result = tool.execute(&ctx, input).await.unwrap();
+
+            assert_eq!(result["meal_ref"]["type"], "user");
+            assert!(result["meal_ref"]["id"].as_str().is_some());
+            assert!(result.get("estimated_nutrition").is_none(), "no nutrition key when field absent");
+            assert_eq!(result["confirmation"], "Added plain toast with no nutrition data.");
         }
 
         #[sqlx::test(migrations = "../plnd_data/migrations")]
