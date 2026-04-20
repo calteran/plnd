@@ -16,6 +16,11 @@ async function seedWizard(page: Page): Promise<void> {
       json: { carryover: [], entries: [] },
     })
   );
+  // Step 3 (Meals) auto-generates via the agent when no meals are stored.
+  // Return an empty meals list so the skeleton resolves immediately without stalling navigation.
+  await page.route(`${API_BASE}/agent/meal-plan`, route =>
+    route.fulfill({ status: 200, json: { week: '2026-03-30', meals: [] } })
+  );
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -262,7 +267,7 @@ test.describe('Planning Wizard', () => {
       await page.clock.setFixedTime('2026-03-28T00:00:00');
       await page.addInitScript((tasks) => {
         localStorage.setItem('plnd:plan-draft', JSON.stringify({
-          schemaVersion: 1,
+          schemaVersion: 2,
           planStart: '2026-03-30',
           planEnd: '2026-04-05',
           currentStep: 2,

@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { SKIP_SENTINEL, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
+import { STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
 import { formatWeekDate } from '../../utils/date-format.utils';
 
 @Component({
@@ -118,7 +118,7 @@ export class PlanConfirmStepComponent {
       const daySlots = meals[d] ?? {};
       return acc + STANDARD_MEAL_SLOTS.filter(s => {
         const entry = daySlots[s];
-        return !entry || entry.title !== SKIP_SENTINEL;
+        return !entry || entry.approvalState !== 'skipped';
       }).length;
     }, 0);
     return Math.round((covered / (days.length * STANDARD_MEAL_SLOTS.length)) * 100);

@@ -1,35 +1,57 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { Subject } from 'rxjs';
 import { PlanMealsStepComponent } from './plan-meals-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealSuggestionsService } from '../../../../core/services/meal-suggestions.service';
+import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
+import { MealEntry, MealPlanResponse } from '../../../../core/models/week-plan';
 
-const MOCK_SUGGESTIONS = [
-  { id: 'id-1', name: 'Oatmeal',         suggestion_type: 'meal' },
-  { id: 'id-2', name: 'Scrambled Eggs',  suggestion_type: 'dish' },
-  { id: 'id-3', name: 'Yogurt & Fruit',  suggestion_type: 'meal' },
-];
+function makeMockPlanResponse(days: string[]): MealPlanResponse {
+  const meals: MealEntry[] = days.flatMap(date =>
+    (['breakfast', 'lunch', 'dinner'] as const).map(occasion => ({
+      date,
+      occasion,
+      meal_ref: null,
+      title: `${occasion} for ${date}`,
+    }))
+  );
+  return { week: days[0], meals };
+}
 
 describe('PlanMealsStepComponent', () => {
   let fixture: ComponentFixture<PlanMealsStepComponent>;
   let service: WeekPlanService;
   let component: PlanMealsStepComponent;
-  let suggestionsSpy: jasmine.SpyObj<MealSuggestionsService>;
+  let agentSpy: jasmine.SpyObj<MealPlannerAgentService>;
+  let generateWeek$: Subject<MealPlanResponse>;
+  let suggestSlot$: Subject<MealEntry>;
 
   beforeEach(async () => {
-    suggestionsSpy = jasmine.createSpyObj('MealSuggestionsService', ['load', 'suggestions']);
-    // Default: return mock suggestions for any (date, slot)
-    suggestionsSpy.suggestions.and.returnValue(MOCK_SUGGESTIONS);
+    generateWeek$ = new Subject();
+    suggestSlot$  = new Subject();
+    agentSpy = jasmine.createSpyObj('MealPlannerAgentService', [
+      'generateWeek', 'rebalance', 'suggestSlot', 'resolveText',
+    ]);
+    agentSpy.generateWeek.and.returnValue(generateWeek$);
+    agentSpy.rebalance.and.returnValue(generateWeek$);
+    agentSpy.suggestSlot.and.returnValue(suggestSlot$);
 
     await TestBed.configureTestingModule({
       imports: [PlanMealsStepComponent, HttpClientTestingModule],
       providers: [
-        { provide: MealSuggestionsService, useValue: suggestionsSpy },
+        { provide: MealPlannerAgentService, useValue: agentSpy },
       ],
     }).compileComponents();
 
     service = TestBed.inject(WeekPlanService);
     service.initSession('2026-03-23', '2026-03-27');
+    // Pre-seed meals so ngOnInit sees existing meals and does NOT auto-generate.
+    // This keeps structural tests independent of the agent flow.
+    (['2026-03-23', '2026-03-24', '2026-03-25', '2026-03-26', '2026-03-27'] as const).forEach(date => {
+      (['breakfast', 'lunch', 'dinner'] as const).forEach(slot => {
+        service.setMeal(date, slot, { approvalState: 'proposed', mealRef: null, title: `${slot}` });
+      });
+    });
     fixture = TestBed.createComponent(PlanMealsStepComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
@@ -50,26 +72,27 @@ describe('PlanMealsStepComponent', () => {
   it('should render a slot row label for each slot', () => {
     const labels = fixture.nativeElement.querySelectorAll('.slot-lbl');
     expect(labels.length).toBe(3);
-    const text = Array.from(labels).map((l) => (l as HTMLElement).textContent!.trim().toLowerCase());
+    const text = Array.from(labels).map(l => (l as HTMLElement).textContent!.trim().toLowerCase());
     expect(text).toContain('breakfast');
     expect(text).toContain('lunch');
     expect(text).toContain('dinner');
   });
 
-  it('should display a suggestion text in a pending cell', () => {
+  it('should display meal title text in a proposed cell', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     const text = firstCell.querySelector('.gc-text');
     expect(text).toBeTruthy();
     expect(text!.textContent!.trim().length).toBeGreaterThan(0);
   });
 
-  it('should display ✏️ Pick and 🔀 Suggest buttons in a pending cell', () => {
+  it('should display ✓ approve, ✏️ pick, and 🔀 suggest buttons in a proposed cell', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+    expect(firstCell.querySelector('.gc-approve')).toBeTruthy();
     expect(firstCell.querySelector('.gc-pick')).toBeTruthy();
     expect(firstCell.querySelector('.gc-suggest')).toBeTruthy();
   });
 
-  it('should display the × skip button in a pending cell', () => {
+  it('should display the × skip button in a proposed cell', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     expect(firstCell.querySelector('.gc-x')).toBeTruthy();
   });
@@ -83,7 +106,7 @@ describe('PlanMealsStepComponent', () => {
     expect(firstCell.querySelector('.gc-undo')).toBeTruthy();
   });
 
-  it('should restore pending state when undo is clicked on a skipped cell', () => {
+  it('should restore proposed state when undo is clicked on a skipped cell', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     (firstCell.querySelector('.gc-x') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -102,23 +125,9 @@ describe('PlanMealsStepComponent', () => {
     expect(firstCell.querySelector('.input-hint')).toBeTruthy();
   });
 
-  it('should call setMeal with user_meal on Enter key and exit editing', () => {
+  it('should not save on Escape key and should exit editing', () => {
     spyOn(service, 'setMeal');
-    const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
-    (firstCell.querySelector('.gc-pick') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const input = firstCell.querySelector('.mock-input') as HTMLInputElement;
-    input.value = 'Greek yogurt';
-    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    fixture.detectChanges();
-    expect(service.setMeal).toHaveBeenCalledWith(
-      '2026-03-23', 'breakfast', { type: 'user_meal', title: 'Greek yogurt' },
-    );
-    expect(firstCell.classList.contains('gc-editing')).toBeFalse();
-  });
-
-  it('should not call setMeal and should exit editing on Escape key', () => {
-    spyOn(service, 'setMeal');
+    spyOn(service, 'setMealRef');
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     (firstCell.querySelector('.gc-pick') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -126,58 +135,155 @@ describe('PlanMealsStepComponent', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     fixture.detectChanges();
     expect(service.setMeal).not.toHaveBeenCalled();
+    expect(service.setMealRef).not.toHaveBeenCalled();
     expect(firstCell.querySelector('.gc-pick')).toBeTruthy();
   });
 
-  it('should show .custom-g state when a user_meal is already set', () => {
-    service.setMeal('2026-03-23', 'breakfast', { type: 'user_meal', title: 'Greek yogurt' });
-    fixture.detectChanges();
+  it('should call resolveText and then setMealRef on Enter key', () => {
+    const resolve$ = new Subject<{ meal_ref: null; confirmation: string }>();
+    agentSpy.resolveText = jasmine.createSpy('resolveText').and.returnValue(resolve$);
+    spyOn(service, 'setMealRef');
+
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
-    expect(firstCell.classList.contains('custom-g')).toBeTrue();
-    const customText = firstCell.querySelector('.gc-text.custom-t');
-    expect(customText).toBeTruthy();
-    expect(customText!.textContent!.trim()).toBe('Greek yogurt');
+    (firstCell.querySelector('.gc-pick') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const input = firstCell.querySelector('.mock-input') as HTMLInputElement;
+    input.value = 'Greek yogurt';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    fixture.detectChanges();
+
+    // resolveText should have been called; editing should end
+    expect(agentSpy.resolveText).toHaveBeenCalledWith('Greek yogurt', 'breakfast', '2026-03-23');
+    expect(firstCell.classList.contains('gc-editing')).toBeFalse();
+
+    // When the observable emits, setMealRef is called
+    resolve$.next({ meal_ref: null, confirmation: 'Added Greek yogurt' });
+    expect(service.setMealRef).toHaveBeenCalledWith(
+      '2026-03-23', 'breakfast', null, 'Greek yogurt', undefined,
+    );
+  });
+
+  it('should apply .approved-g state when ✓ approve is clicked on a proposed cell', () => {
+    const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+    (firstCell.querySelector('.gc-approve') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(firstCell.classList.contains('approved-g')).toBeTrue();
+    expect(firstCell.querySelector('.gc-text.approved-t')).toBeTruthy();
     expect(firstCell.querySelector('.gc-edit-custom')).toBeTruthy();
   });
 
-  it('should change suggestion text when 🔀 Suggest is clicked', () => {
-    const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
-    const before = firstCell.querySelector('.gc-text')!.textContent!.trim();
-    (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const after = firstCell.querySelector('.gc-text')!.textContent!.trim();
-    // Must have cycled to a different suggestion
-    expect(after).not.toBe(before);
-    // And the new value must be from the mock list
-    expect(MOCK_SUGGESTIONS.map(s => s.name)).toContain(after);
-  });
-
-  it('should persist the cycled suggestion to the service when 🔀 Suggest is clicked', () => {
+  it('should call suggestSlot when 🔀 Suggest is clicked, passing existing mealRef as avoid', () => {
+    // The cell has a proposed meal with no mealRef (mealRef: null), so avoid should be []
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const stored = service.scheduledMeals()['2026-03-23']?.['breakfast'];
-    expect(stored).toBeTruthy();
-    expect(stored!.type).toBe('mock');
+    expect(agentSpy.suggestSlot).toHaveBeenCalledWith('2026-03-23', 'breakfast', []);
   });
 
-  it('should pre-fill edit input with existing custom meal title', () => {
-    service.setMeal('2026-03-23', 'breakfast', { type: 'user_meal', title: 'Overnight oats' });
+  it('should pass existing mealRef in avoid when refreshing an approved cell with a ref', () => {
+    service.setMealRef('2026-03-23', 'breakfast', { type: 'user', id: 'u1' }, 'Egg toast');
     fixture.detectChanges();
-    const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
-    (firstCell.querySelector('.gc-edit-custom') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    const input = firstCell.querySelector('.mock-input') as HTMLInputElement;
-    expect(input.value).toBe('Overnight oats');
+    component.refreshSlot('2026-03-23', 'breakfast');
+    expect(agentSpy.suggestSlot).toHaveBeenCalledWith('2026-03-23', 'breakfast', [{ type: 'user', id: 'u1' }]);
   });
 
-  it('should clear custom meal back to pending when × is clicked in custom state', () => {
-    spyOn(service, 'clearMeal');
-    service.setMeal('2026-03-23', 'breakfast', { type: 'user_meal', title: 'Overnight oats' });
-    fixture.detectChanges();
+  it('should apply the suggestSlot result to the cell', () => {
+    spyOn(service, 'setMealRef');
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
-    (firstCell.querySelector('.gc-x') as HTMLButtonElement).click();
-    fixture.detectChanges();
-    expect(service.clearMeal).toHaveBeenCalledWith('2026-03-23', 'breakfast');
+    (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
+
+    suggestSlot$.next({ date: '2026-03-23', occasion: 'breakfast', meal_ref: null, title: 'Avocado toast' });
+    expect(service.setMealRef).toHaveBeenCalledWith('2026-03-23', 'breakfast', null, 'Avocado toast', undefined, undefined);
+  });
+
+  it('should NOT auto-generate when meals already exist on init', () => {
+    // meals were pre-seeded in beforeEach; generateWeek should not have been called
+    expect(agentSpy.generateWeek).not.toHaveBeenCalled();
+  });
+
+  describe('auto-generate on first entry', () => {
+    beforeEach(async () => {
+      // Fresh component with empty meals
+      service.clear();
+      service.initSession('2026-03-23', '2026-03-27');
+      generateWeek$ = new Subject();
+      agentSpy.generateWeek.and.returnValue(generateWeek$);
+      fixture = TestBed.createComponent(PlanMealsStepComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+    });
+
+    it('should call generateWeek when no meals exist', () => {
+      expect(agentSpy.generateWeek).toHaveBeenCalledOnceWith('2026-03-23', jasmine.any(Object));
+    });
+
+    it('should set isGenerating while generating', () => {
+      expect(service.isGenerating()).toBeTrue();
+    });
+
+    it('should populate cells when generateWeek emits', () => {
+      const days = ['2026-03-23', '2026-03-24', '2026-03-25', '2026-03-26', '2026-03-27'];
+      generateWeek$.next(makeMockPlanResponse(days));
+      generateWeek$.complete();
+      fixture.detectChanges();
+      expect(service.isGenerating()).toBeFalse();
+      expect(service.scheduledMeals()['2026-03-23']?.['breakfast']?.title).toBe('breakfast for 2026-03-23');
+    });
+  });
+
+  describe('Refresh modal', () => {
+    it('should show the Refresh button when there are unapproved meals', () => {
+      expect(fixture.nativeElement.querySelector('.btn-refresh-all')).toBeTruthy();
+    });
+
+    it('should show the unapproved count badge', () => {
+      const badge = fixture.nativeElement.querySelector('.badge');
+      expect(badge).toBeTruthy();
+      expect(Number(badge.textContent.trim())).toBe(component.unapprovedCount());
+    });
+
+    it('should open the modal on Refresh button click', () => {
+      (fixture.nativeElement.querySelector('.btn-refresh-all') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.modal-overlay')).toBeTruthy();
+    });
+
+    it('should close modal on Cancel click', () => {
+      (fixture.nativeElement.querySelector('.btn-refresh-all') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('.btn-cancel') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.modal-overlay')).toBeNull();
+    });
+
+    it('should call rebalance and preserve approved meals on confirm', () => {
+      // Approve first cell
+      service.setMeal('2026-03-23', 'breakfast', { approvalState: 'approved', mealRef: null, title: 'Approved meal' });
+      fixture.detectChanges();
+
+      (fixture.nativeElement.querySelector('.btn-refresh-all') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      (fixture.nativeElement.querySelector('.btn-confirm') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      expect(agentSpy.rebalance).toHaveBeenCalled();
+
+      // Emit response with a new meal for breakfast (should be ignored — already approved)
+      const days = ['2026-03-23', '2026-03-24', '2026-03-25', '2026-03-26', '2026-03-27'];
+      generateWeek$.next(makeMockPlanResponse(days));
+      generateWeek$.complete();
+      fixture.detectChanges();
+
+      // Approved meal must be unchanged
+      expect(service.scheduledMeals()['2026-03-23']?.['breakfast']?.title).toBe('Approved meal');
+      expect(service.scheduledMeals()['2026-03-23']?.['breakfast']?.approvalState).toBe('approved');
+    });
+
+    it('unapprovedCount should reflect approved meals being excluded', () => {
+      const total = component.unapprovedCount();
+      service.approveMeal('2026-03-23', 'breakfast');
+      fixture.detectChanges();
+      expect(component.unapprovedCount()).toBe(total - 1);
+    });
   });
 });

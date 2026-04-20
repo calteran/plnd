@@ -18,12 +18,17 @@ async function seedWizard(page: Page): Promise<void> {
   await page.route(`${API_BASE}/schedule/period**`, route =>
     route.fulfill({ status: 200, json: { carryover: [], entries: [] } })
   );
+  // Step 3 auto-generates via agent on first entry when no meals are stored.
+  // Return empty meals list so skeleton resolves immediately without stalling navigation.
+  await page.route(`${API_BASE}/agent/meal-plan`, route =>
+    route.fulfill({ status: 200, json: { week: '2026-03-30', meals: [] } })
+  );
 }
 
 async function seedStep4(page: Page): Promise<void> {
   await page.addInitScript((tasks) => {
     localStorage.setItem('plnd:plan-draft', JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planStart: '2026-03-30',
       planEnd: '2026-04-05',
       currentStep: 4,
@@ -40,7 +45,7 @@ async function seedStep4(page: Page): Promise<void> {
 async function seedStep5(page: Page): Promise<void> {
   await page.addInitScript((tasks) => {
     localStorage.setItem('plnd:plan-draft', JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planStart: '2026-03-30',
       planEnd: '2026-04-05',
       currentStep: 5,

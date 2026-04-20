@@ -1,50 +1,50 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, forkJoin, noop, of, switchMap, tap, throwError } from 'rxjs';
+import { Observable, catchError, noop, of, switchMap, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
-import { MealSuggestionsService } from './meal-suggestions.service';
 import {
-  CarryoverDecision, MealSlot, PlanDraftShape,
-  PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
+  CarryoverDecision, MealEntry, MealNutrition, MealPlanState, MealRef, MealSlot,
+  PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, SchedulePeriodResponse,
-  SKIP_SENTINEL, STANDARD_MEAL_SLOTS,
+  STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
 
 @Injectable({ providedIn: 'root' })
 export class WeekPlanService {
-  private readonly http                   = inject(HttpClient);
-  private readonly apiBase                = inject(ConfigService).getConfig().api.baseUrl;
-  private readonly mealSuggestionsService = inject(MealSuggestionsService);
+  private readonly http    = inject(HttpClient);
+  private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
 
   private readonly DRAFT_KEY = 'plnd:plan-draft';
-  private readonly SCHEMA_VERSION = 1;
+  private readonly SCHEMA_VERSION = 2;
 
-  private readonly planStartSignal = signal<string>('');
-  private readonly planEndSignal = signal<string>('');
-  private readonly currentStepSignal = signal<number>(1);
-  private readonly carryoverItemsSignal = signal<SchedulePeriodResponse['carryover']>([]);
-  private readonly scheduledTasksSignal = signal<PlannedTask[]>([]);
-  private readonly scheduledMealsSignal = signal<Record<string, Partial<Record<MealSlot, PlannedMeal>>>>({});
-  private readonly carryoverDecisionsSignal = signal<Record<string, CarryoverDecision>>({});
-  private readonly hasUnplannedHorizonSignal = signal<boolean>(false);
-  private readonly isSubmittingSignal = signal<boolean>(false);
-  private readonly planningTaskIdSignal = signal<string>('');
-  private readonly floatingTasksSignal = signal<FloatingTask[]>([]);
+  private readonly planStartSignal            = signal<string>('');
+  private readonly planEndSignal              = signal<string>('');
+  private readonly currentStepSignal          = signal<number>(1);
+  private readonly carryoverItemsSignal       = signal<SchedulePeriodResponse['carryover']>([]);
+  private readonly scheduledTasksSignal       = signal<PlannedTask[]>([]);
+  private readonly scheduledMealsSignal       = signal<Record<string, Partial<Record<MealSlot, PlannedMeal>>>>({});
+  private readonly carryoverDecisionsSignal   = signal<Record<string, CarryoverDecision>>({});
+  private readonly hasUnplannedHorizonSignal  = signal<boolean>(false);
+  private readonly isSubmittingSignal         = signal<boolean>(false);
+  private readonly planningTaskIdSignal       = signal<string>('');
+  private readonly floatingTasksSignal        = signal<FloatingTask[]>([]);
+  private readonly isGeneratingSignal         = signal<boolean>(false);
 
-  readonly planStart = this.planStartSignal.asReadonly();
-  readonly planEnd = this.planEndSignal.asReadonly();
-  readonly currentStep = this.currentStepSignal.asReadonly();
-  readonly carryoverItems = this.carryoverItemsSignal.asReadonly();
-  readonly scheduledTasks = this.scheduledTasksSignal.asReadonly();
-  readonly scheduledMeals = this.scheduledMealsSignal.asReadonly();
-  readonly carryoverDecisions = this.carryoverDecisionsSignal.asReadonly();
-  readonly hasUnplannedHorizon = this.hasUnplannedHorizonSignal.asReadonly();
-  readonly isSubmitting = this.isSubmittingSignal.asReadonly();
-  readonly planningTaskId = this.planningTaskIdSignal.asReadonly();
-  readonly floatingTasks = this.floatingTasksSignal.asReadonly();
+  readonly planStart            = this.planStartSignal.asReadonly();
+  readonly planEnd              = this.planEndSignal.asReadonly();
+  readonly currentStep          = this.currentStepSignal.asReadonly();
+  readonly carryoverItems       = this.carryoverItemsSignal.asReadonly();
+  readonly scheduledTasks       = this.scheduledTasksSignal.asReadonly();
+  readonly scheduledMeals       = this.scheduledMealsSignal.asReadonly();
+  readonly carryoverDecisions   = this.carryoverDecisionsSignal.asReadonly();
+  readonly hasUnplannedHorizon  = this.hasUnplannedHorizonSignal.asReadonly();
+  readonly isSubmitting         = this.isSubmittingSignal.asReadonly();
+  readonly planningTaskId       = this.planningTaskIdSignal.asReadonly();
+  readonly floatingTasks        = this.floatingTasksSignal.asReadonly();
+  readonly isGenerating         = this.isGeneratingSignal.asReadonly();
 
   initSession(start: string, end: string): void {
     this.planStartSignal.set(start);
@@ -72,7 +72,7 @@ export class WeekPlanService {
 
   saveDraft(): void {
     const draft: PlanDraftShape = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       planStart: this.planStartSignal(),
       planEnd: this.planEndSignal(),
       currentStep: this.currentStepSignal(),
@@ -107,8 +107,7 @@ export class WeekPlanService {
       .pipe(tap(resp => {
         this.carryoverItemsSignal.set(resp.carryover);
         // Populate plan state from server entries when no local draft is loaded.
-        // This supports re-plan mode (spec §298): existing entries pre-fill the wizard
-        // so the user edits the current plan rather than starting from scratch.
+        // This supports re-plan mode: existing entries pre-fill the wizard.
         if (
           this.scheduledTasksSignal().length === 0 &&
           Object.keys(this.scheduledMealsSignal()).length === 0
@@ -120,8 +119,10 @@ export class WeekPlanService {
               const slot = entry.after_milepost as MealSlot;
               meals[entry.date] ??= {};
               meals[entry.date][slot] = {
-                type: entry.task_ref_type === 'user_meal' ? 'user_meal' : 'mock',
-                id: entry.task_ref_id,
+                approvalState: 'approved',
+                mealRef: entry.task_ref_id
+                  ? { type: (entry.task_ref_type ?? 'user') as 'catalog' | 'user', id: entry.task_ref_id }
+                  : null,
                 title: entry.title ?? slot,
               };
             } else {
@@ -153,19 +154,7 @@ export class WeekPlanService {
 
   commitPlan(taskId: string, replace = false): Observable<PostSchedulePlanResponse> {
     this.isSubmittingSignal.set(true);
-
-    // Ensure meal suggestions are loaded for every standard slot that has no explicit
-    // meal set before building the request payload. This guards against the race where
-    // the wizard's suggestion component hasn't finished loading yet (issue #204).
-    const meals = this.scheduledMealsSignal();
-    const loads = this.horizonDays().flatMap(date =>
-      STANDARD_MEAL_SLOTS
-        .filter(slot => meals[date]?.[slot] === undefined)
-        .map(slot => this.mealSuggestionsService.ensureLoaded(date, slot))
-    );
-    const preload$: Observable<unknown> = loads.length ? forkJoin(loads) : of(null);
-
-    return preload$.pipe(
+    return of(null).pipe(
       switchMap(() => {
         const req = this.buildCommitRequest(taskId, replace);
         return this.http.post<PostSchedulePlanResponse>(`${this.apiBase}/schedule/plan`, req);
@@ -208,6 +197,99 @@ export class WeekPlanService {
     });
   }
 
+  approveMeal(date: string, slot: MealSlot): void {
+    this.scheduledMealsSignal.update(m => {
+      const existing = m[date]?.[slot];
+      if (!existing) return m;
+      return {
+        ...m,
+        [date]: { ...(m[date] ?? {}), [slot]: { ...existing, approvalState: 'approved' } },
+      };
+    });
+  }
+
+  skipMeal(date: string, slot: MealSlot): void {
+    const existing = this.scheduledMealsSignal()[date]?.[slot];
+    this.setMeal(date, slot, {
+      approvalState: 'skipped',
+      mealRef: existing?.mealRef ?? null,
+      title: existing?.title ?? '',
+    });
+  }
+
+  undoSkip(date: string, slot: MealSlot): void {
+    this.scheduledMealsSignal.update(m => {
+      const existing = m[date]?.[slot];
+      if (!existing || existing.approvalState !== 'skipped') return m;
+      return {
+        ...m,
+        [date]: { ...(m[date] ?? {}), [slot]: { ...existing, approvalState: 'proposed' } },
+      };
+    });
+  }
+
+  setMealRef(
+    date: string,
+    slot: MealSlot,
+    ref: MealRef | null,
+    title: string,
+    nutrition?: MealNutrition,
+    estimated?: boolean,
+  ): void {
+    this.setMeal(date, slot, {
+      approvalState: 'approved',
+      mealRef: ref,
+      title,
+      nutrition,
+      estimated,
+    });
+  }
+
+  /** Serialises current scheduledMeals into the shape the agent API expects. */
+  currentState(): MealPlanState {
+    const meals = this.scheduledMealsSignal();
+    const entries = this.horizonDays().flatMap(date =>
+      STANDARD_MEAL_SLOTS.map(slot => {
+        const meal = meals[date]?.[slot];
+        return {
+          date,
+          occasion: slot,
+          meal_ref: meal?.mealRef ?? null,
+          title: meal?.title,
+          approved: meal?.approvalState === 'approved',
+          skipped: meal?.approvalState === 'skipped',
+        };
+      })
+    );
+    return { week_start: this.planStartSignal(), meals: entries };
+  }
+
+  /** Merges agent-returned meals into scheduledMeals in a single update, preserving approved/skipped cells. */
+  applyAgentMeals(agentMeals: MealEntry[]): void {
+    this.isGeneratingSignal.set(false);
+    this.scheduledMealsSignal.update(current => {
+      const next = { ...current };
+      for (const entry of agentMeals) {
+        const slot     = entry.occasion as MealSlot;
+        const existing = current[entry.date]?.[slot];
+        if (!existing || existing.approvalState === 'proposed') {
+          next[entry.date] = { ...(next[entry.date] ?? {}), [slot]: {
+            approvalState: 'proposed',
+            mealRef: entry.meal_ref,
+            title: entry.title,
+            nutrition: entry.estimated_nutrition,
+            estimated: entry.estimated,
+          } };
+        }
+      }
+      return next;
+    });
+  }
+
+  setGenerating(value: boolean): void {
+    this.isGeneratingSignal.set(value);
+  }
+
   addTask(task: PlannedTask): void {
     this.scheduledTasksSignal.update(t => [...t, task]);
   }
@@ -227,10 +309,10 @@ export class WeekPlanService {
   /** Days in the horizon as ISO date strings (inclusive). Reactive: re-evaluates when planStart/planEnd change. */
   readonly horizonDays = computed(() => {
     const start = this.planStartSignal();
-    const end = this.planEndSignal();
+    const end   = this.planEndSignal();
     if (!start || !end) return [];
     // Parse as local-noon to avoid UTC-offset day rollback
-    const cur = new Date(`${start}T12:00:00`);
+    const cur     = new Date(`${start}T12:00:00`);
     const endDate = new Date(`${end}T12:00:00`);
     const days: string[] = [];
     while (cur <= endDate) {
@@ -255,30 +337,30 @@ export class WeekPlanService {
     this.isSubmittingSignal.set(false);
     this.planningTaskIdSignal.set('');
     this.floatingTasksSignal.set([]);
+    this.isGeneratingSignal.set(false);
     this.clearDraft();
   }
 
   private buildCommitRequest(taskId: string, replace: boolean): PostSchedulePlanRequest {
-    const meals = this.scheduledMealsSignal();
-    const tasks = this.scheduledTasksSignal();
+    const meals   = this.scheduledMealsSignal();
+    const tasks   = this.scheduledTasksSignal();
     const entries: PlanEntryRequest[] = [];
 
-    // Resolve all horizon day × standard slot combinations.
-    // Pending (no entry) → implicit acceptance via the first meal suggestion from MealSuggestionsService.
-    // __skipped__ sentinel → omit from request.
-    // Non-standard slots (e.g. snack) are never auto-filled; include them only if explicitly set.
     for (const date of this.horizonDays()) {
       for (const slot of STANDARD_MEAL_SLOTS) {
         const meal = meals[date]?.[slot];
-        if (meal?.title === SKIP_SENTINEL) continue;
-        const fallbackTitle = this.mealSuggestionsService.suggestions(date, slot)[0]?.name ?? `(${slot})`;
-        const resolved: PlannedMeal = meal ?? { type: 'mock', title: fallbackTitle };
+        if (meal?.approvalState === 'skipped') continue;
+        const resolved: PlannedMeal = meal ?? {
+          approvalState: 'proposed',
+          mealRef: null,
+          title: `(${slot})`,
+        };
         entries.push({
           date,
           task_type: 'meal',
-          task_ref_id: resolved.type === 'user_meal' ? resolved.id : undefined,
-          task_ref_type: resolved.type === 'user_meal' ? 'user_meal' : undefined,
-          title: resolved.type === 'mock' || !resolved.id ? resolved.title : undefined,
+          task_ref_id: resolved.mealRef?.id,
+          task_ref_type: resolved.mealRef?.type,
+          title: resolved.mealRef ? undefined : resolved.title,
           scheduled_start: slotDefaultTime(slot),
           after_milepost: slot,
         });
@@ -286,13 +368,13 @@ export class WeekPlanService {
       // Explicit non-standard slots (snack, etc.) — include only what was explicitly set.
       for (const [slotKey, meal] of Object.entries(meals[date] ?? {})) {
         const slot = slotKey as MealSlot;
-        if (STANDARD_MEAL_SLOTS.includes(slot) || !meal || meal.title === SKIP_SENTINEL) continue;
+        if (STANDARD_MEAL_SLOTS.includes(slot) || !meal || meal.approvalState === 'skipped') continue;
         entries.push({
           date,
           task_type: 'meal',
-          task_ref_id: meal.type === 'user_meal' ? meal.id : undefined,
-          task_ref_type: meal.type === 'user_meal' ? 'user_meal' : undefined,
-          title: meal.type === 'mock' || !meal.id ? meal.title : undefined,
+          task_ref_id: meal.mealRef?.id,
+          task_ref_type: meal.mealRef?.type,
+          title: meal.mealRef ? undefined : meal.title,
           scheduled_start: slotDefaultTime(slot),
           after_milepost: slot,
         });

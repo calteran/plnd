@@ -1,6 +1,7 @@
 export type CarryoverDecision = 'defer' | 'dismiss' | 'accept';
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type EnergyLevel = 'low' | 'medium' | 'high';
+export type ApprovalState = 'proposed' | 'approved' | 'skipped';
 
 export interface CarryoverItem {
   entry_id: string;
@@ -10,25 +11,67 @@ export interface CarryoverItem {
   status: string;
 }
 
+export interface MealRef {
+  type: 'catalog' | 'user';
+  id: string;
+}
+
+export interface MealNutrition {
+  calories?: number;
+  protein_g?: number;
+  carbs_g?: number;
+  fat_g?: number;
+}
+
 export interface PlannedMeal {
-  type: 'user_meal' | 'mock';
-  id?: string;
+  approvalState: ApprovalState;
+  mealRef: MealRef | null;
   title: string;
+  nutrition?: MealNutrition;
+  estimated?: boolean;
 }
 
-/** Sentinel value stored as PlannedMeal.title when the user has explicitly skipped a slot. */
-export const SKIP_SENTINEL = '__skipped__';
-
-/** A meal or dish returned by GET /my/meal-suggestions. */
-export interface MealSuggestion {
-  id:              string;
-  name:            string;
-  /** "meal" or "dish" */
-  suggestion_type: string;
-}
-
-/** The three standard meal slots that are auto-filled with suggestions. Snack is excluded — it is only included when explicitly set via setMeal. */
+/** The three standard meal slots that are auto-filled. Snack is excluded — it is only included when explicitly set via setMeal. */
 export const STANDARD_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
+
+// ── Agent API types ─────────────────────────────────────────────────────────
+
+export interface MealPlanStateEntry {
+  date: string;
+  occasion: MealSlot;
+  meal_ref?: MealRef | null;
+  title?: string;
+  approved: boolean;
+  skipped: boolean;
+}
+
+export interface MealPlanState {
+  week_start: string;
+  meals: MealPlanStateEntry[];
+}
+
+export interface MealEntry {
+  date: string;
+  occasion: MealSlot;
+  meal_ref: MealRef | null;
+  title: string;
+  estimated_nutrition?: MealNutrition;
+  estimated?: boolean;
+}
+
+export interface MealPlanResponse {
+  week: string;
+  meals: MealEntry[];
+  nutrition_summary?: { daily_avg_calories?: number };
+}
+
+export interface ResolveResponse {
+  meal_ref: MealRef | null;
+  estimated_nutrition?: MealNutrition;
+  confirmation: string;
+}
+
+// ── Planning types ──────────────────────────────────────────────────────────
 
 export interface PlannedTask {
   date: string;
@@ -44,7 +87,7 @@ export interface PlannedTask {
 export type FloatingTask = Omit<PlannedTask, 'date'>;
 
 export interface PlanDraftShape {
-  schemaVersion: 1;
+  schemaVersion: 2;
   planStart: string;
   planEnd: string;
   currentStep: number;
@@ -101,4 +144,3 @@ export interface PostSchedulePlanResponse {
   committed: number;
   planning_task_status: string;
 }
-
