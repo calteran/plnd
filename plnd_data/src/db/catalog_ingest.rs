@@ -119,7 +119,7 @@ mod tests {
         .await
         .unwrap();
 
-        let found = super::catalog_details::get_meal_nutrition(&pool, meal_id)
+        let found = super::super::catalog_details::get_meal_nutrition(&pool, meal_id)
             .await
             .unwrap()
             .is_some();
@@ -150,5 +150,4 @@ mod tests {
             .unwrap();
         assert_eq!(result, Some(Some(nutrition)));
     }
-
 }
