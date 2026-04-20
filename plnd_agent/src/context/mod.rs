@@ -139,6 +139,54 @@ static MEAL_PLAN_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
         .expect("BUG: failed to compile MEAL_PLAN_RESPONSE_SCHEMA")
 });
 
+/// JSON Schema (Draft 7) for the `MealSuggestSlot` response — a single meal envelope.
+const SUGGEST_SLOT_RESPONSE_SCHEMA: &str = r##"{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MealSuggestSlotResponse",
+  "type": "object",
+  "required": ["date", "occasion", "meal_ref"],
+  "additionalProperties": false,
+  "properties": {
+    "date":                { "type": "string", "format": "date" },
+    "occasion":            { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+    "meal_ref":            { "$ref": "#/definitions/MealRef" },
+    "estimated_nutrition": { "$ref": "#/definitions/Nutrition" }
+  },
+  "definitions": {
+    "MealRef": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["catalog", "user"] },
+        "id":   { "type": "string", "format": "uuid" }
+      }
+    },
+    "Nutrition": {
+      "type": "object",
+      "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+      "additionalProperties": false,
+      "properties": {
+        "kcal":      { "type": "number" },
+        "protein_g": { "type": "number" },
+        "carbs_g":   { "type": "number" },
+        "fat_g":     { "type": "number" }
+      }
+    }
+  }
+}"##;
+
+/// Pre-compiled validator for [`SUGGEST_SLOT_RESPONSE_SCHEMA`].
+static SUGGEST_SLOT_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
+    let schema: serde_json::Value = serde_json::from_str(SUGGEST_SLOT_RESPONSE_SCHEMA)
+        .expect("BUG: SUGGEST_SLOT_RESPONSE_SCHEMA is not valid JSON");
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft7)
+        .should_validate_formats(true)
+        .build(&schema)
+        .expect("BUG: failed to compile SUGGEST_SLOT_RESPONSE_SCHEMA")
+});
+
 /// Identifies the type of agentic interaction.
 ///
 /// Each variant maps to a system prompt and a [`ProviderTier`]. The tool
@@ -217,7 +265,8 @@ impl UseCase {
         match self {
             UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
             UseCase::MealPlanning | UseCase::MealRebalance => Some(&MEAL_PLAN_VALIDATOR),
-            UseCase::MealSuggestSlot | UseCase::MealAdhocResolve => None,
+            UseCase::MealSuggestSlot => Some(&SUGGEST_SLOT_VALIDATOR),
+            UseCase::MealAdhocResolve => None,
         }
     }
 }
@@ -322,9 +371,54 @@ mod tests {
     }
 
     #[test]
-    fn non_meal_planning_meal_use_cases_have_no_response_validator_yet() {
-        assert!(UseCase::MealSuggestSlot.response_validator().is_none());
+    fn meal_adhoc_resolve_has_no_response_validator_yet() {
         assert!(UseCase::MealAdhocResolve.response_validator().is_none());
+    }
+
+    #[test]
+    fn suggest_slot_has_response_validator() {
+        assert!(UseCase::MealSuggestSlot.response_validator().is_some());
+    }
+
+    #[test]
+    fn suggest_slot_validator_accepts_minimal_valid_envelope() {
+        let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "date": "2026-04-21",
+            "occasion": "lunch",
+            "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+        });
+        assert!(validator.is_valid(&ok), "minimal valid envelope must pass");
+    }
+
+    #[test]
+    fn suggest_slot_validator_accepts_envelope_with_nutrition() {
+        let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "date": "2026-04-21",
+            "occasion": "dinner",
+            "meal_ref": { "type": "user", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
+            "estimated_nutrition": { "kcal": 520.0, "protein_g": 28.0, "carbs_g": 45.0, "fat_g": 18.0 }
+        });
+        assert!(validator.is_valid(&ok));
+    }
+
+    #[test]
+    fn suggest_slot_validator_rejects_missing_meal_ref() {
+        let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
+        let bad = serde_json::json!({ "date": "2026-04-21", "occasion": "lunch" });
+        assert!(!validator.is_valid(&bad));
+    }
+
+    #[test]
+    fn suggest_slot_validator_rejects_invalid_occasion() {
+        let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "date": "2026-04-21",
+            "occasion": "brunch",
+            "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+        });
+        assert!(!validator.is_valid(&bad));
     }
 
     #[test]
