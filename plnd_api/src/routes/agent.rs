@@ -349,7 +349,7 @@ pub async fn post_meal_plan_resolve(
 
     let response: MealAdhocResolveResponse =
         serde_json::from_str(&output.content).map_err(|e| {
-            tracing::error!(error = %e, content = %output.content, "failed to parse resolve output");
+            tracing::error!(error = %e, content = %output.content, "failed to parse adhoc-resolve output");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
