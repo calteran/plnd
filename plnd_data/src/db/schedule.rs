@@ -79,6 +79,33 @@ pub async fn get_plan_status(
 }
 
 #[tracing::instrument(
+    skip(pool),
+    fields(table = "schedule_entries", op = "update_entry_status")
+)]
+pub async fn update_entry_status(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    status: &str,
+) -> Result<(), DatabaseError> {
+    let result = sqlx::query(
+        "UPDATE schedule_entries SET status = $1, updated_at = NOW()
+         WHERE entry_id = $2 AND user_id = $3",
+    )
+    .bind(status)
+    .bind(entry_id)
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    if result.rows_affected() == 0 {
+        return Err(DatabaseError::NotFound);
+    }
+    Ok(())
+}
+
+#[tracing::instrument(
     skip(pool, req),
     fields(table = "schedule_entries", op = "commit_plan")
 )]

@@ -71,6 +71,17 @@ export class ScheduleService {
     );
   }
 
+  skipMeal(id: string): void {
+    this._items.update(items =>
+      items.map(item =>
+        isMealAnchor(item) && item.id === id ? { ...item, status: 'skipped' as const } : item,
+      ),
+    );
+    this.http
+      .patch(`${this.apiBase}/schedule/entries/${id}/status`, { status: 'skipped' })
+      .subscribe({ error: () => this.loadDay(this._date()) });
+  }
+
   addItem(task: ScheduleTask): void {
     this._items.update(items => [...items, task]);
   }
@@ -121,6 +132,7 @@ function mapEntry(e: ScheduleEntryDto): ScheduleItem {
       description: e.title ?? undefined,
       status: e.status === 'completed' ? 'done'
             : e.status === 'planned'   ? 'planned'
+            : e.status === 'skipped'   ? 'skipped'
             : 'unplanned',
       duringMealTasks: [],
     } satisfies MealAnchor;
