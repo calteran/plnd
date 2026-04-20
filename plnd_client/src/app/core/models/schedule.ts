@@ -1,3 +1,5 @@
+import { MealNutrition } from './week-plan';
+
 export type ItemStatus = 'pending' | 'done';
 export type ItemType   = 'task' | 'exercise' | 'appointment';
 
@@ -16,6 +18,8 @@ export interface MealAnchor {
   description?: string;   // dish name, e.g. 'Avocado toast + eggs'
   status: 'done' | 'planned' | 'unplanned';
   duringMealTasks: ScheduleTask[];
+  nutrition?: MealNutrition;
+  estimated?: boolean;
 }
 
 export type ScheduleItem = ScheduleTask | MealAnchor;
