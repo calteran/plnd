@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use plnd_data::db::error::DatabaseError;
+use plnd_data::PgPool;
 use rust_decimal::prelude::ToPrimitive;
-use sqlx::PgPool;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
@@ -166,24 +166,13 @@ impl Tool for GetUserMealPreferencesTool {
             .collect();
 
         // Fetch names for blocked ingredients so the LLM can reason about them
-        let blocked_ingredients: Vec<serde_json::Value> = if blocked_ids.is_empty() {
-            vec![]
-        } else {
-            sqlx::query_as::<_, (uuid::Uuid, String)>(
-                "SELECT ingredient_id, name FROM catalog_ingredients \
-                 WHERE ingredient_id = ANY($1::uuid[])",
-            )
-            .bind(&blocked_ids)
-            .fetch_all(&self.0)
-            .await
-            .map_err(|e| ToolError::Execution {
-                tool: self.name().to_string(),
-                reason: e.to_string(),
-            })?
-            .into_iter()
-            .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
-            .collect()
-        };
+        let blocked_ingredients: Vec<serde_json::Value> =
+            plnd_data::db::catalog_details::get_ingredient_names_by_ids(&self.0, &blocked_ids)
+                .await
+                .map_err(|e| db_err(self.name(), e))?
+                .into_iter()
+                .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
+                .collect();
 
         let top_rated: Vec<_> = meal_prefs
             .iter()
@@ -359,16 +348,13 @@ impl Tool for GetMealNutritionTool {
 
         match meal_type {
             "catalog" => {
-                let row: Option<(Option<serde_json::Value>,)> =
-                    sqlx::query_as("SELECT nutrition FROM catalog_meals WHERE meal_id = $1")
-                        .bind(id)
-                        .fetch_optional(&self.0)
-                        .await
-                        .map_err(|e| db_err(self.name(), DatabaseError::from(e)))?;
+                let row = plnd_data::db::catalog_details::get_meal_nutrition(&self.0, id)
+                    .await
+                    .map_err(|e| db_err(self.name(), e))?;
 
                 match row {
                     None => Ok(serde_json::json!({ "found": false })),
-                    Some((nutrition,)) => {
+                    Some(nutrition) => {
                         // estimated = false: catalog meals are from authoritative sources (not AI-estimated)
                         Ok(serde_json::json!({
                             "found": true,
@@ -379,15 +365,9 @@ impl Tool for GetMealNutritionTool {
                 }
             }
             "user" => {
-                let row: Option<(Option<serde_json::Value>, bool)> = sqlx::query_as(
-                    "SELECT nutrition, nutrition_estimated \
-                     FROM user_meals WHERE user_meal_id = $1 AND user_id = $2",
-                )
-                .bind(id)
-                .bind(ctx.user_id)
-                .fetch_optional(&self.0)
-                .await
-                .map_err(|e| db_err(self.name(), DatabaseError::from(e)))?;
+                let row = plnd_data::db::user_meals::get_nutrition(&self.0, id, ctx.user_id)
+                    .await
+                    .map_err(|e| db_err(self.name(), e))?;
 
                 match row {
                     None => Ok(serde_json::json!({ "found": false })),
@@ -1213,13 +1193,13 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_tool_is_terminal() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
         assert!(ResolveMealDescriptionTool(pool).is_terminal());
     }
 
     #[tokio::test]
     async fn resolve_meal_description_tool_name() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
         assert_eq!(
             ResolveMealDescriptionTool(pool).name(),
             "resolve_meal_description"
@@ -1228,7 +1208,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_schema_requires_kind_and_confirmation() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
         let schema = ResolveMealDescriptionTool(pool).schema();
         let required = schema["required"].as_array().unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("kind")));
@@ -1237,7 +1217,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_schema_has_no_user_id() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
         assert!(!has_user_id_property(
             &ResolveMealDescriptionTool(pool).schema()
         ));
@@ -1245,7 +1225,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_catalog_branch_echoes_ref() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
         let tool = ResolveMealDescriptionTool(pool);
         let ctx = crate::tools::ToolContext {
             user_id: uuid::Uuid::new_v4(),
@@ -1267,7 +1247,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_user_branch_echoes_ref() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
         let tool = ResolveMealDescriptionTool(pool);
         let ctx = crate::tools::ToolContext {
             user_id: uuid::Uuid::new_v4(),
@@ -1288,7 +1268,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_invalid_kind_returns_error() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
+        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
         let tool = ResolveMealDescriptionTool(pool);
         let ctx = crate::tools::ToolContext {
             user_id: uuid::Uuid::new_v4(),
@@ -1326,7 +1306,6 @@ mod tests {
 
     mod integration {
         use super::*;
-        use sqlx::PgPool;
         use uuid::Uuid;
 
         async fn seed_user(pool: &PgPool) -> Uuid {
@@ -1344,12 +1323,18 @@ mod tests {
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn search_meal_catalog_tool_returns_seeded_meal(pool: PgPool) {
             let user_id = seed_user(&pool).await;
-            sqlx::query(
-                "INSERT INTO catalog_meals \
-                 (name, description, servings, allergens, occasion_tags, tags) \
-                 VALUES ('Test Oatmeal', 'hearty oats', 1.0, '{}', '{\"breakfast\"}', '{}')",
+            plnd_data::db::catalog_ingest::ingest_meal(
+                &pool,
+                plnd_data::db::catalog_ingest::IngestMealParams {
+                    name: "Test Oatmeal",
+                    description: Some("hearty oats"),
+                    servings: rust_decimal::Decimal::from(1),
+                    allergens: &[],
+                    occasion_tags: &["breakfast".to_string()],
+                    tags: &[],
+                    nutrition: None,
+                },
             )
-            .execute(&pool)
             .await
             .unwrap();
 
@@ -1406,15 +1391,18 @@ mod tests {
 
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn get_meal_nutrition_catalog_returns_stored_nutrition(pool: PgPool) {
-            let meal_id: uuid::Uuid = sqlx::query_scalar(
-                "INSERT INTO catalog_meals \
-                 (name, servings, allergens, occasion_tags, tags, \
-                  nutrition, nutrition_overridden) \
-                 VALUES ('Test Soup', 1.0, '{}', '{\"lunch\"}', '{}', \
-                   '{\"calories_kcal\": 200, \"protein_g\": 10}'::jsonb, false) \
-                 RETURNING meal_id",
+            let meal_id = plnd_data::db::catalog_ingest::ingest_meal(
+                &pool,
+                plnd_data::db::catalog_ingest::IngestMealParams {
+                    name: "Test Soup",
+                    description: None,
+                    servings: rust_decimal::Decimal::from(1),
+                    allergens: &[],
+                    occasion_tags: &["lunch".to_string()],
+                    tags: &[],
+                    nutrition: Some(serde_json::json!({"calories_kcal": 200, "protein_g": 10})),
+                },
             )
-            .fetch_one(&pool)
             .await
             .unwrap();
 
@@ -1466,20 +1454,32 @@ mod tests {
 
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn estimate_nutrition_aggregates_known_ingredients(pool: PgPool) {
-            sqlx::query(
-                "INSERT INTO catalog_ingredients \
-                 (name, serving_size_g, nutrition, allergens, occasion_tags) \
-                 VALUES \
-                   ('test pasta', 100.0, \
-                    '{\"calories_kcal\": 157, \"protein_g\": 5.8, \"carbohydrates_g\": 30.9, \"fat_g\": 0.9}'::jsonb, \
-                    '{}', '{}'), \
-                   ('test sauce', 100.0, \
-                    '{\"calories_kcal\": 50, \"protein_g\": 1.5, \"carbohydrates_g\": 8.0, \"fat_g\": 1.5}'::jsonb, \
-                    '{}', '{}')",
-            )
-            .execute(&pool)
-            .await
-            .unwrap();
+            for (name, nutrition) in [
+                (
+                    "test pasta",
+                    serde_json::json!({"calories_kcal": 157, "protein_g": 5.8, "carbohydrates_g": 30.9, "fat_g": 0.9}),
+                ),
+                (
+                    "test sauce",
+                    serde_json::json!({"calories_kcal": 50, "protein_g": 1.5, "carbohydrates_g": 8.0, "fat_g": 1.5}),
+                ),
+            ] {
+                plnd_data::db::catalog_ingest::ingest_ingredient(
+                    &pool,
+                    plnd_data::db::catalog_ingest::IngestIngredientParams {
+                        external_source: "test",
+                        external_id: name,
+                        name,
+                        description: None,
+                        serving_size_g: Some(rust_decimal::Decimal::from(100)),
+                        nutrition: Some(nutrition),
+                        allergens: &[],
+                        occasion_tags: &[],
+                    },
+                )
+                .await
+                .unwrap();
+            }
 
             let user_id = seed_user(&pool).await;
             let tool = EstimateNutritionFromDescriptionTool(pool.clone());
@@ -1589,15 +1589,12 @@ mod tests {
 
             // Confirm DB row has nutrition_estimated = true
             let meal_id: uuid::Uuid = result["meal_ref"]["id"].as_str().unwrap().parse().unwrap();
-            let (estimated,): (bool,) = sqlx::query_as(
-                "SELECT nutrition_estimated FROM user_meals WHERE user_meal_id = $1",
-            )
-            .bind(meal_id)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+            let row = plnd_data::db::user_meals::get_nutrition(&pool, meal_id, user_id)
+                .await
+                .unwrap()
+                .expect("meal must exist");
             assert!(
-                estimated,
+                row.1,
                 "nutrition_estimated must be true for new custom meals"
             );
         }

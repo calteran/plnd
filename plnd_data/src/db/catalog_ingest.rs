@@ -56,3 +56,99 @@ pub async fn ingest_ingredient(
     .map_err(DatabaseError::from)
     .map(|(id,)| id)
 }
+
+pub struct IngestMealParams<'a> {
+    pub name: &'a str,
+    pub description: Option<&'a str>,
+    pub servings: Decimal,
+    pub allergens: &'a [String],
+    pub occasion_tags: &'a [String],
+    pub tags: &'a [String],
+    pub nutrition: Option<Value>,
+}
+
+#[tracing::instrument(
+    skip(pool, params),
+    fields(table = "catalog_meals", op = "ingest_meal")
+)]
+pub async fn ingest_meal(
+    pool: &PgPool,
+    params: IngestMealParams<'_>,
+) -> Result<Uuid, DatabaseError> {
+    sqlx::query_as::<_, (Uuid,)>(
+        "INSERT INTO catalog_meals \
+         (name, description, servings, allergens, occasion_tags, tags, nutrition) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7) \
+         RETURNING meal_id",
+    )
+    .bind(params.name)
+    .bind(params.description)
+    .bind(params.servings)
+    .bind(params.allergens)
+    .bind(params.occasion_tags)
+    .bind(params.tags)
+    .bind(params.nutrition)
+    .fetch_one(pool)
+    .await
+    .map_err(DatabaseError::from)
+    .map(|(id,)| id)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn ingest_meal_returns_meal_id(pool: PgPool) {
+        let meal_id = ingest_meal(
+            &pool,
+            IngestMealParams {
+                name: "Test Oatmeal",
+                description: None,
+                servings: Decimal::from(1),
+                allergens: &[],
+                occasion_tags: &["breakfast".to_string()],
+                tags: &[],
+                nutrition: None,
+            },
+        )
+        .await
+        .unwrap();
+
+        let found = super::catalog_details::get_meal_nutrition(&pool, meal_id)
+            .await
+            .unwrap()
+            .is_some();
+        assert!(found, "meal should exist after ingest");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn ingest_meal_stores_nutrition(pool: PgPool) {
+        let nutrition = serde_json::json!({"calories_kcal": 200, "protein_g": 10});
+        let meal_id = ingest_meal(
+            &pool,
+            IngestMealParams {
+                name: "Test Soup",
+                description: None,
+                servings: Decimal::from(1),
+                allergens: &[],
+                occasion_tags: &["lunch".to_string()],
+                tags: &[],
+                nutrition: Some(nutrition.clone()),
+            },
+        )
+        .await
+        .unwrap();
+
+        // Verify nutrition was stored using the new db layer function
+        let result = super::super::catalog_details::get_meal_nutrition(&pool, meal_id)
+            .await
+            .unwrap();
+        assert_eq!(result, Some(Some(nutrition)));
+    }
+
+}

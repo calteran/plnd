@@ -10,7 +10,6 @@ test-utils = []
 [dependencies]
 plnd_data    = { path = "../plnd_data" }
 rust_decimal = { version = "1" }
-sqlx         = { version = "0.8", features = ["postgres", "runtime-tokio"] }
 async-trait  = "0.1"
 chrono       = { version = "0.4", features = ["serde"] }
 serde        = { version = "1.0", features = ["derive"] }
