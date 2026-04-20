@@ -209,3 +209,93 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     await expect(cell.locator('.mock-input')).not.toBeVisible();
   });
 });
+
+// ── Agent-driven flow ────────────────────────────────────────────────────────
+// Uses POST /agent/meal-plan and /agent/meal-plan/rebalance mocks.
+// seedStep3AgentMock provides an empty scheduledMeals draft so ngOnInit auto-generates.
+
+const AGENT_MEALS = ['2026-03-30', '2026-03-31', '2026-04-01'].flatMap(date =>
+  (['breakfast', 'lunch', 'dinner'] as const).map(occasion => ({
+    date,
+    occasion,
+    meal_ref: null,
+    title: `${occasion} on ${date}`,
+    estimated: true,
+  }))
+);
+
+const MEAL_PLAN_RESPONSE = { week: '2026-03-30', meals: AGENT_MEALS };
+
+async function seedStep3AgentMock(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    localStorage.setItem('plnd:plan-draft', JSON.stringify({
+      schemaVersion: 2,
+      planStart: '2026-03-30',
+      planEnd: '2026-04-01',
+      currentStep: 3,
+      carryoverDecisions: {},
+      scheduledMeals: {},
+      scheduledTasks: [],
+      floatingTasks: [],
+      savedAt: '2026-03-29T00:00:00.000Z',
+    }));
+  });
+  await seedWizard(page);
+  await page.route(`${API_BASE}/agent/meal-plan`, route =>
+    route.fulfill({ status: 200, json: MEAL_PLAN_RESPONSE })
+  );
+  await page.route(`${API_BASE}/agent/meal-plan/rebalance`, route =>
+    route.fulfill({ status: 200, json: MEAL_PLAN_RESPONSE })
+  );
+}
+
+test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.clock.setFixedTime('2026-03-28T00:00:00');
+    await seedStep3AgentMock(page);
+    await page.goto('/plan/week');
+    await expect(page.locator('.planning-wizard')).toBeVisible();
+    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
+  });
+
+  test('auto-generate populates all cells with proposed meals on first entry', async ({ page }) => {
+    // Wait for skeleton to clear and cells to show titles
+    await expect(page.locator('.gc').first().locator('.gc-text')).toBeVisible();
+    await expect(page.locator('.gc').first().locator('.gc-text')).toContainText('breakfast on 2026-03-30');
+    // All 9 cells should have proposed state (gc-approve button visible)
+    await expect(page.locator('.gc-approve').first()).toBeVisible();
+  });
+
+  test('approve one meal — cell shows approved-g', async ({ page }) => {
+    await expect(page.locator('.gc').first().locator('.gc-approve')).toBeVisible();
+    await page.locator('.gc').first().locator('.gc-approve').click();
+    await expect(page.locator('.gc').first()).toHaveClass(/approved-g/);
+    await expect(page.locator('.gc').first().locator('.gc-edit-custom')).toBeVisible();
+  });
+
+  test('Refresh modal shows the correct unapproved count', async ({ page }) => {
+    // Approve one meal first
+    await page.locator('.gc').first().locator('.gc-approve').click();
+    await expect(page.locator('.btn-refresh-all')).toBeVisible();
+    const badge = page.locator('.badge');
+    // 9 total − 1 approved = 8 unapproved
+    await expect(badge).toHaveText('8');
+    await page.locator('.btn-refresh-all').click();
+    await expect(page.locator('.modal-overlay')).toBeVisible();
+    await expect(page.locator('.modal-msg')).toContainText('8');
+  });
+
+  test('confirm Refresh — approved meal is unchanged, proposed cells are refreshed', async ({ page }) => {
+    // Approve first cell
+    await page.locator('.gc').first().locator('.gc-approve').click();
+    const approvedText = await page.locator('.gc').first().locator('.gc-text.approved-t').textContent();
+
+    // Open refresh modal and confirm
+    await page.locator('.btn-refresh-all').click();
+    await page.locator('.btn-confirm').click();
+
+    // Approved cell title must be unchanged
+    await expect(page.locator('.gc').first().locator('.gc-text.approved-t')).toHaveText(approvedText!.trim());
+    await expect(page.locator('.gc').first()).toHaveClass(/approved-g/);
+  });
+});

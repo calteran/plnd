@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
-import { PostSchedulePlanRequest, SKIP_SENTINEL } from '../models/week-plan';
+import { PostSchedulePlanRequest } from '../models/week-plan';
 
 describe('WeekPlanService', () => {
   let service: WeekPlanService;
@@ -29,7 +29,7 @@ describe('WeekPlanService', () => {
 
   it('should restore step from valid draft', () => {
     const draft = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       planStart: '2026-03-24',
       planEnd: '2026-03-30',
       currentStep: 3,
@@ -43,9 +43,25 @@ describe('WeekPlanService', () => {
     expect(service.currentStep()).toBe(3);
   });
 
-  it('should not restore draft when plan_start does not match', () => {
+  it('should NOT restore a v1 draft (schema version mismatch)', () => {
     const draft = {
       schemaVersion: 1,
+      planStart: '2026-03-24',
+      planEnd: '2026-03-30',
+      currentStep: 3,
+      carryoverDecisions: {},
+      scheduledMeals: {},
+      scheduledTasks: [],
+      savedAt: '2026-03-23T12:00:00Z',
+    };
+    localStorage.setItem('plnd:plan-draft', JSON.stringify(draft));
+    service.initSession('2026-03-24', '2026-03-30');
+    expect(service.currentStep()).toBe(1);
+  });
+
+  it('should not restore draft when plan_start does not match', () => {
+    const draft = {
+      schemaVersion: 2,
       planStart: '2026-03-17',
       planEnd: '2026-03-23',
       currentStep: 3,
@@ -65,6 +81,7 @@ describe('WeekPlanService', () => {
     const loaded = service.loadDraft();
     expect(loaded?.currentStep).toBe(2);
     expect(loaded?.planStart).toBe('2026-03-24');
+    expect(loaded?.schemaVersion).toBe(2);
   });
 
   it('clearDraft should remove localStorage entry', () => {
@@ -83,8 +100,32 @@ describe('WeekPlanService', () => {
 
   it('setMeal updates scheduledMeals signal', () => {
     service.initSession('2026-03-24', '2026-03-30');
-    service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: 'Oatmeal' });
+    service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Oatmeal' });
     expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('Oatmeal');
+  });
+
+  it('approveMeal transitions approvalState to approved', () => {
+    service.initSession('2026-03-24', '2026-03-30');
+    service.setMeal('2026-03-24', 'lunch', { approvalState: 'proposed', mealRef: null, title: 'Salad' });
+    service.approveMeal('2026-03-24', 'lunch');
+    expect(service.scheduledMeals()['2026-03-24']?.['lunch']?.approvalState).toBe('approved');
+    expect(service.scheduledMeals()['2026-03-24']?.['lunch']?.title).toBe('Salad');
+  });
+
+  it('skipMeal transitions approvalState to skipped', () => {
+    service.initSession('2026-03-24', '2026-03-30');
+    service.setMeal('2026-03-24', 'dinner', { approvalState: 'proposed', mealRef: null, title: 'Pasta' });
+    service.skipMeal('2026-03-24', 'dinner');
+    expect(service.scheduledMeals()['2026-03-24']?.['dinner']?.approvalState).toBe('skipped');
+  });
+
+  it('setMealRef sets approvalState to approved and stores ref', () => {
+    service.initSession('2026-03-24', '2026-03-30');
+    service.setMealRef('2026-03-24', 'breakfast', { type: 'user', id: 'u1' }, 'Egg toast');
+    const meal = service.scheduledMeals()['2026-03-24']?.['breakfast'];
+    expect(meal?.approvalState).toBe('approved');
+    expect(meal?.mealRef?.id).toBe('u1');
+    expect(meal?.title).toBe('Egg toast');
   });
 
   it('addTask and removeTask update scheduledTasks signal', () => {
@@ -137,7 +178,7 @@ describe('WeekPlanService', () => {
 
     it('should restore floatingTasks from draft on initSession', () => {
       const draft = {
-        schemaVersion: 1 as const,
+        schemaVersion: 2 as const,
         planStart: '2026-03-24',
         planEnd: '2026-03-30',
         currentStep: 2,
@@ -155,7 +196,7 @@ describe('WeekPlanService', () => {
 
     it('should default floatingTasks to [] when draft has none', () => {
       const draft = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         planStart: '2026-03-24',
         planEnd: '2026-03-30',
         currentStep: 1,
@@ -170,105 +211,111 @@ describe('WeekPlanService', () => {
     });
   });
 
-  it('commitPlan defers plan POST until all pending-slot suggestions are loaded', () => {
-    service.initSession('2026-03-24', '2026-03-24');
-    let planPosted = false;
-    service.commitPlan('task-1').subscribe(() => { planPosted = true; });
+  describe('commitPlan / buildCommitRequest', () => {
+    it('commitPlan posts directly to /schedule/plan without waiting for suggestions', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      let planPosted = false;
+      service.commitPlan('task-1').subscribe(() => { planPosted = true; });
 
-    // Plan POST must NOT fire before suggestion preloads complete
-    httpMock.expectNone(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      // Plan POST must fire immediately — no suggestion preloads
+      const planReq = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      planReq.flush({ committed: 3, planning_task_status: 'completed' });
+      expect(planPosted).toBeTrue();
+    });
 
-    // Flush the three standard-slot suggestion requests
-    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
-    expect(suggReqs.length).toBe(3);
-    suggReqs.forEach(r => r.flush([]));
+    it('buildCommitRequest uses (slot) placeholder for a pending (no-entry) slot', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.commitPlan('task-1').subscribe();
 
-    // Now the plan POST should fire
-    const planReq = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
-    planReq.flush({ committed: 3, planning_task_status: 'completed' });
-    expect(planPosted).toBeTrue();
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      expect(breakfast).toBeTruthy();
+      expect(breakfast!.title).toBe('(breakfast)');
+      req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest uses title from proposed meal when set', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Oatmeal' });
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      expect(breakfast!.title).toBe('Oatmeal');
+      req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest includes an explicit snack entry', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'snack', { approvalState: 'approved', mealRef: null, title: 'Apple' });
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const snack = body.entries.find(e => e.after_milepost === 'snack');
+      expect(snack).toBeTruthy();
+      expect(snack!.title).toBe('Apple');
+      req.flush({ committed: 4, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest excludes skipped meals', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'skipped', mealRef: null, title: '' });
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      expect(breakfast).toBeUndefined();
+      req.flush({ committed: 2, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest uses task_ref_id and type for approved meals with a mealRef', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMealRef('2026-03-24', 'lunch', { type: 'user', id: 'u1' }, 'Greek yogurt');
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const lunch = body.entries.find(e => e.after_milepost === 'lunch');
+      expect(lunch).toBeTruthy();
+      expect(lunch!.task_ref_id).toBe('u1');
+      expect(lunch!.task_ref_type).toBe('user');
+      expect(lunch!.title).toBeUndefined();
+      req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
   });
 
-  it('buildCommitRequest includes actual suggestion name for a pending (no-entry) slot', () => {
-    service.initSession('2026-03-24', '2026-03-24');
-    service.commitPlan('task-1').subscribe();
+  describe('currentState()', () => {
+    it('returns a MealPlanState with all horizon days × standard slots', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      const state = service.currentState();
+      expect(state.week_start).toBe('2026-03-24');
+      expect(state.meals.length).toBe(3); // 1 day × 3 slots
+    });
 
-    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
-    expect(suggReqs.length).toBe(3);
-    suggReqs.find(r => r.request.params.get('slot') === 'breakfast')
-      ?.flush([{ id: 's1', name: 'Oatmeal', suggestion_type: 'meal' }]);
-    suggReqs.find(r => r.request.params.get('slot') === 'lunch')
-      ?.flush([{ id: 's2', name: 'Salad', suggestion_type: 'meal' }]);
-    suggReqs.find(r => r.request.params.get('slot') === 'dinner')
-      ?.flush([{ id: 's3', name: 'Pasta', suggestion_type: 'meal' }]);
+    it('marks an approved meal correctly in currentState', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.approveMeal('2026-03-24', 'breakfast');
+      // approveMeal on a non-existent cell is a no-op; pre-seed first
+      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Oatmeal' });
+      service.approveMeal('2026-03-24', 'breakfast');
+      const state = service.currentState();
+      const entry = state.meals.find(m => m.occasion === 'breakfast');
+      expect(entry?.approved).toBeTrue();
+      expect(entry?.skipped).toBeFalse();
+    });
 
-    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
-    const body = req.request.body as PostSchedulePlanRequest;
-    const breakfast = body.entries.find(
-      e => e.date === '2026-03-24' && e.after_milepost === 'breakfast',
-    );
-    expect(breakfast).toBeTruthy();
-    expect(breakfast!.title).toBe('Oatmeal');
-    expect(breakfast!.task_type).toBe('meal');
-    req.flush({ committed: 3, planning_task_status: 'completed' });
-  });
-
-  it('buildCommitRequest includes an explicit snack entry', () => {
-    service.initSession('2026-03-24', '2026-03-24');
-    service.setMeal('2026-03-24', 'snack', { type: 'user_meal', title: 'Apple' });
-    service.commitPlan('task-1').subscribe();
-
-    // Standard slots still need suggestion preloads (snack is non-standard)
-    httpMock.match(r => r.url.includes('/my/meal-suggestions')).forEach(r => r.flush([]));
-
-    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
-    const body = req.request.body as PostSchedulePlanRequest;
-    const snack = body.entries.find(
-      e => e.date === '2026-03-24' && e.after_milepost === 'snack',
-    );
-    expect(snack).toBeTruthy();
-    expect(snack!.title).toBe('Apple');
-    expect(snack!.task_ref_type).toBe('user_meal');
-    req.flush({ committed: 4, planning_task_status: 'completed' });
-  });
-
-  it('buildCommitRequest excludes slots with __skipped__ sentinel', () => {
-    service.initSession('2026-03-24', '2026-03-24');
-    service.setMeal('2026-03-24', 'breakfast', { type: 'mock', title: SKIP_SENTINEL });
-    service.commitPlan('task-1').subscribe();
-
-    // Only lunch and dinner are unset — breakfast has a value (SKIP_SENTINEL), no suggestion needed
-    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
-    expect(suggReqs.length).toBe(2);
-    suggReqs.forEach(r => r.flush([]));
-
-    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
-    const body = req.request.body as PostSchedulePlanRequest;
-    const breakfast = body.entries.find(
-      e => e.date === '2026-03-24' && e.after_milepost === 'breakfast',
-    );
-    expect(breakfast).toBeUndefined();
-    req.flush({ committed: 2, planning_task_status: 'completed' });
-  });
-
-  it('buildCommitRequest includes user_meal entries as-is', () => {
-    service.initSession('2026-03-24', '2026-03-24');
-    service.setMeal('2026-03-24', 'lunch', { type: 'user_meal', title: 'Greek yogurt' });
-    service.commitPlan('task-1').subscribe();
-
-    // Only breakfast and dinner are unset — lunch has a value
-    const suggReqs = httpMock.match(r => r.url.includes('/my/meal-suggestions'));
-    expect(suggReqs.length).toBe(2);
-    suggReqs.forEach(r => r.flush([]));
-
-    const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
-    const body = req.request.body as PostSchedulePlanRequest;
-    const lunch = body.entries.find(
-      e => e.date === '2026-03-24' && e.after_milepost === 'lunch',
-    );
-    expect(lunch).toBeTruthy();
-    expect(lunch!.task_ref_type).toBe('user_meal');
-    expect(lunch!.title).toBe('Greek yogurt'); // title included when no id (phase 2 typed meals)
-    req.flush({ committed: 3, planning_task_status: 'completed' });
+    it('marks a skipped meal correctly in currentState', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'dinner', { approvalState: 'proposed', mealRef: null, title: 'Pasta' });
+      service.skipMeal('2026-03-24', 'dinner');
+      const state = service.currentState();
+      const entry = state.meals.find(m => m.occasion === 'dinner');
+      expect(entry?.skipped).toBeTrue();
+      expect(entry?.approved).toBeFalse();
+    });
   });
 });
