@@ -114,6 +114,7 @@ describe('MealReviewPaneComponent', () => {
     const input: HTMLInputElement = f.debugElement.query(By.css('.resolve-input')).nativeElement;
     input.value = 'Greek yogurt bowl';
     input.dispatchEvent(new Event('input'));
+    f.detectChanges();
     f.debugElement.query(By.css('.resolve-submit')).nativeElement.click();
     f.detectChanges();
 

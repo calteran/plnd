@@ -117,7 +117,7 @@ export class MealReviewPaneComponent {
     this.agentService
       .resolveText(text, this.occasionFor(this.meal()), this.date())
       .subscribe({
-        next: (_: ResolveResponse) => {
+        next: () => {
           this.resolving.set(false);
           this.scheduleService.loadDay(this.date());
           this.closed.emit();
