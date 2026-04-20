@@ -6,7 +6,10 @@ use plnd_agent::{xml_escape, AgentContext, AgentError, UseCase};
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
-use crate::models::{MealPlanRequest, MealPlanResponse, TaskEntryRequest, TaskEntryResponse};
+use crate::models::{
+    MealEntry, MealPlanRequest, MealPlanResponse, MealSuggestRequest, TaskEntryRequest,
+    TaskEntryResponse,
+};
 use crate::state::AppState;
 
 fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> String {
@@ -211,6 +214,77 @@ pub async fn post_meal_plan_rebalance(
 
     let response: MealPlanResponse = serde_json::from_str(&output.content).map_err(|e| {
         tracing::error!(error = %e, content = %output.content, "failed to parse rebalanced meal plan output");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(response))
+}
+
+/// POST /agent/meal-plan/suggest — suggest a single meal for one open slot via the AI agent.
+///
+/// Accepts an optional `avoid_meal_refs` list so the wizard's swap button can avoid
+/// re-proposing the same meal. Returns a single meal envelope; no DB writes occur here.
+#[utoipa::path(
+    post,
+    path = "/agent/meal-plan/suggest",
+    tag = "Agent",
+    security(("bearer_auth" = [])),
+    request_body = MealSuggestRequest,
+    responses(
+        (status = 200, description = "Single meal suggestion", body = MealEntry),
+        (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Agent response failed schema validation"),
+        (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
+        (status = 500, description = "LLM provider failure or infrastructure error"),
+    )
+)]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+pub async fn post_meal_plan_suggest(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(body): Json<MealSuggestRequest>,
+) -> Result<Json<MealEntry>, StatusCode> {
+    if state.agent_task_limiter.check_key(&claims.sub).is_err() {
+        tracing::warn!(user_id = %claims.sub, "agent meal-plan suggest rate limit exceeded");
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let date = body.date.format("%Y-%m-%d").to_string();
+    let occasion = &body.occasion;
+
+    let avoid_str = body
+        .avoid_meal_refs
+        .as_deref()
+        .filter(|refs| !refs.is_empty())
+        .map(|refs| {
+            serde_json::to_string(refs)
+                .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+
+    let ctx = AgentContext {
+        user_id,
+        use_case: UseCase::MealSuggestSlot,
+        input: format!("Suggest a {occasion} meal for {date}."),
+        prior_context: Some(format!(
+            "{avoid_str}[Date: {date}]\n[Occasion: {occasion}]\n"
+        )),
+        extra: None,
+    };
+
+    let output = state.agent.run(&ctx).await.map_err(|e| match &e {
+        AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        _ => {
+            tracing::error!(error = %e, "agent meal-plan suggest run failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+
+    let response: MealEntry = serde_json::from_str(&output.content).map_err(|e| {
+        tracing::error!(error = %e, content = %output.content, "failed to parse suggest-slot output");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 

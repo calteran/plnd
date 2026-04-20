@@ -631,6 +631,78 @@ impl Tool for RebalanceMealPlanTool {
     }
 }
 
+// ── SuggestSlotMealTool ───────────────────────────────────────────────────────
+
+/// Terminal tool: the LLM calls this with a single meal envelope for the requested slot.
+///
+/// Input is returned verbatim. Schema validation in `AgentService::run` enforces
+/// `SUGGEST_SLOT_RESPONSE_SCHEMA` before the API layer sees the data.
+pub struct SuggestSlotMealTool;
+
+#[async_trait::async_trait]
+impl Tool for SuggestSlotMealTool {
+    fn name(&self) -> &str {
+        "suggest_slot_meal"
+    }
+
+    fn description(&self) -> &str {
+        "Submit your single meal suggestion for the requested slot. Call this as your \
+         final action once you have selected a meal. Pass the date, occasion, and meal_ref; \
+         include estimated_nutrition if you have it from a prior get_meal_nutrition call."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["date", "occasion", "meal_ref"],
+            "additionalProperties": false,
+            "properties": {
+                "date": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "ISO date for this slot"
+                },
+                "occasion": {
+                    "type": "string",
+                    "enum": ["breakfast", "lunch", "dinner", "snack"]
+                },
+                "meal_ref": {
+                    "type": "object",
+                    "required": ["type", "id"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "type": { "type": "string", "enum": ["catalog", "user"] },
+                        "id":   { "type": "string", "format": "uuid" }
+                    }
+                },
+                "estimated_nutrition": {
+                    "type": "object",
+                    "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+                    "additionalProperties": false,
+                    "properties": {
+                        "kcal":      { "type": "number" },
+                        "protein_g": { "type": "number" },
+                        "carbs_g":   { "type": "number" },
+                        "fat_g":     { "type": "number" }
+                    }
+                }
+            }
+        })
+    }
+
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
+    async fn execute(
+        &self,
+        _ctx: &ToolContext,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        Ok(input)
+    }
+}
+
 // ── Registration ──────────────────────────────────────────────────────────────
 
 pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db::Database) {
@@ -659,6 +731,11 @@ pub fn register_meal_planning_tools(registry: &mut ToolRegistry, week_state: ser
 pub fn register_meal_rebalance_tools(registry: &mut ToolRegistry, week_state: serde_json::Value) {
     registry.register(Arc::new(GetWeekScheduleTool(week_state)));
     registry.register(Arc::new(RebalanceMealPlanTool));
+}
+
+/// Registers the terminal tool for the `MealSuggestSlot` use case.
+pub fn register_meal_suggest_slot_tools(registry: &mut ToolRegistry) {
+    registry.register(Arc::new(SuggestSlotMealTool));
 }
 
 // ── Schema constructors ───────────────────────────────────────────────────────
@@ -883,6 +960,16 @@ mod tests {
     #[test]
     fn propose_meal_plan_tool_is_terminal() {
         assert!(ProposeMealPlanTool.is_terminal());
+    }
+
+    #[test]
+    fn suggest_slot_meal_tool_is_terminal() {
+        assert!(SuggestSlotMealTool.is_terminal());
+    }
+
+    #[test]
+    fn suggest_slot_meal_tool_name() {
+        assert_eq!(SuggestSlotMealTool.name(), "suggest_slot_meal");
     }
 
     #[tokio::test]
@@ -1178,6 +1265,23 @@ mod tests {
             let missing = result["missing"].as_array().unwrap();
             assert_eq!(missing.len(), 1);
             assert_eq!(missing[0], "unicorn meat");
+        }
+
+        #[tokio::test]
+        async fn suggest_slot_meal_tool_echoes_input() {
+            let input = serde_json::json!({
+                "date": "2026-04-21",
+                "occasion": "lunch",
+                "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+            });
+            let ctx = crate::tools::ToolContext {
+                user_id: uuid::Uuid::new_v4(),
+            };
+            let result = SuggestSlotMealTool
+                .execute(&ctx, input.clone())
+                .await
+                .unwrap();
+            assert_eq!(result, input);
         }
 
         #[sqlx::test(migrations = "../plnd_data/migrations")]

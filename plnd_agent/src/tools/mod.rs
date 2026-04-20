@@ -2,6 +2,7 @@ pub(crate) mod meal;
 pub(crate) use meal::register_meal_planning_tools;
 pub(crate) use meal::register_meal_read_tools;
 pub(crate) use meal::register_meal_rebalance_tools;
+pub(crate) use meal::register_meal_suggest_slot_tools;
 
 pub(crate) mod memory;
 pub(crate) use memory::register_memory_tools;
@@ -164,7 +165,11 @@ pub(crate) fn build_tool_registry(
             let week_state = extra.unwrap_or_default();
             register_meal_rebalance_tools(&mut registry, week_state);
         }
-        UseCase::MealSuggestSlot | UseCase::MealAdhocResolve => {
+        UseCase::MealSuggestSlot => {
+            register_meal_read_tools(&mut registry, db);
+            register_meal_suggest_slot_tools(&mut registry);
+        }
+        UseCase::MealAdhocResolve => {
             register_meal_read_tools(&mut registry, db);
         }
     }
