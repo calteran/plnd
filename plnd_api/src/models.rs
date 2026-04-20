@@ -170,6 +170,13 @@ pub struct MealPlanResponse {
     pub nutrition_summary: Option<NutritionSummary>,
 }
 
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct MealSuggestRequest {
+    pub date: NaiveDate,
+    pub occasion: String,
+    pub avoid_meal_refs: Option<Vec<MealRef>>,
+}
+
 #[cfg(test)]
 mod meal_plan_tests {
     use super::*;
@@ -216,5 +223,37 @@ mod meal_plan_tests {
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.current_state.skipped.len(), 1);
         assert_eq!(req.current_state.skipped[0].occasion, "breakfast");
+    }
+
+    #[test]
+    fn meal_suggest_request_deserializes_minimal() {
+        let json = r#"{"date": "2026-04-21", "occasion": "lunch"}"#;
+        let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.date.to_string(), "2026-04-21");
+        assert_eq!(req.occasion, "lunch");
+        assert!(req.avoid_meal_refs.is_none());
+    }
+
+    #[test]
+    fn meal_suggest_request_deserializes_with_avoid_refs() {
+        let json = r#"{
+            "date": "2026-04-21",
+            "occasion": "dinner",
+            "avoid_meal_refs": [
+                {"type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
+            ]
+        }"#;
+        let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.occasion, "dinner");
+        let refs = req.avoid_meal_refs.unwrap();
+        assert_eq!(refs.len(), 1);
+        assert_eq!(refs[0].meal_type, "catalog");
+    }
+
+    #[test]
+    fn meal_suggest_request_rejects_missing_date() {
+        let json = r#"{"occasion": "lunch"}"#;
+        let result: Result<MealSuggestRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err());
     }
 }
