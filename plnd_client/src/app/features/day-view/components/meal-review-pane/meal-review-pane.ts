@@ -22,20 +22,22 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
 
       @if (meal().nutrition) {
         <div class="nutrition-row">
-          <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
-            {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.calories }} kcal
-          </span>
-          @if (meal().nutrition!.protein_g !== null) {
+          @if (meal().nutrition!.calories !== undefined) {
+            <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
+              {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.calories }} kcal
+            </span>
+          }
+          @if (meal().nutrition!.protein_g !== undefined) {
             <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
               {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.protein_g }}g protein
             </span>
           }
-          @if (meal().nutrition!.carbs_g !== null) {
+          @if (meal().nutrition!.carbs_g !== undefined) {
             <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
               {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.carbs_g }}g carbs
             </span>
           }
-          @if (meal().nutrition!.fat_g !== null) {
+          @if (meal().nutrition!.fat_g !== undefined) {
             <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
               {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.fat_g }}g fat
             </span>
@@ -60,6 +62,7 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
             placeholder="Describe a meal…"
             [ngModel]="resolveText()"
             (ngModelChange)="resolveText.set($event)"
+            (keydown.enter)="submitResolve()"
           />
           <button class="resolve-submit" (click)="submitResolve()" [disabled]="resolving()">
             {{ resolving() ? '…' : 'Go' }}
