@@ -25,17 +25,17 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
           <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
             {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.calories }} kcal
           </span>
-          @if (meal().nutrition!.protein_g != null) {
+          @if (meal().nutrition!.protein_g !== null) {
             <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
               {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.protein_g }}g protein
             </span>
           }
-          @if (meal().nutrition!.carbs_g != null) {
+          @if (meal().nutrition!.carbs_g !== null) {
             <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
               {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.carbs_g }}g carbs
             </span>
           }
-          @if (meal().nutrition!.fat_g != null) {
+          @if (meal().nutrition!.fat_g !== null) {
             <span class="nutrition-chip" [class.nutrition-chip--estimated]="meal().estimated">
               {{ meal().estimated ? '~' : '' }}{{ meal().nutrition!.fat_g }}g fat
             </span>
