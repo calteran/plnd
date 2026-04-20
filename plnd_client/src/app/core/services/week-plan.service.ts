@@ -212,8 +212,19 @@ export class WeekPlanService {
     const existing = this.scheduledMealsSignal()[date]?.[slot];
     this.setMeal(date, slot, {
       approvalState: 'skipped',
-      mealRef: null,
+      mealRef: existing?.mealRef ?? null,
       title: existing?.title ?? '',
+    });
+  }
+
+  undoSkip(date: string, slot: MealSlot): void {
+    this.scheduledMealsSignal.update(m => {
+      const existing = m[date]?.[slot];
+      if (!existing || existing.approvalState !== 'skipped') return m;
+      return {
+        ...m,
+        [date]: { ...(m[date] ?? {}), [slot]: { ...existing, approvalState: 'proposed' } },
+      };
     });
   }
 

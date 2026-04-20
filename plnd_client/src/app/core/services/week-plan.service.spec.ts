@@ -288,6 +288,60 @@ describe('WeekPlanService', () => {
     });
   });
 
+  describe('undoSkip()', () => {
+    it('should restore approvalState to proposed and preserve the original title', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Oatmeal' });
+      service.skipMeal('2026-03-24', 'breakfast');
+      service.undoSkip('2026-03-24', 'breakfast');
+      const meal = service.scheduledMeals()['2026-03-24']?.['breakfast'];
+      expect(meal?.approvalState).toBe('proposed');
+      expect(meal?.title).toBe('Oatmeal');
+    });
+
+    it('should be a no-op when the cell is not skipped', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'lunch', { approvalState: 'approved', mealRef: null, title: 'Salad' });
+      service.undoSkip('2026-03-24', 'lunch');
+      expect(service.scheduledMeals()['2026-03-24']?.['lunch']?.approvalState).toBe('approved');
+    });
+  });
+
+  describe('applyAgentMeals()', () => {
+    const AGENT_MEALS = [
+      { date: '2026-03-24', occasion: 'breakfast' as const, meal_ref: null, title: 'Agent breakfast' },
+      { date: '2026-03-24', occasion: 'lunch'     as const, meal_ref: null, title: 'Agent lunch'     },
+    ];
+
+    it('should overwrite a proposed cell with the agent result', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Old title' });
+      service.applyAgentMeals(AGENT_MEALS);
+      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('Agent breakfast');
+    });
+
+    it('should NOT overwrite an approved cell', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'approved', mealRef: null, title: 'User approved' });
+      service.applyAgentMeals(AGENT_MEALS);
+      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('User approved');
+    });
+
+    it('should NOT overwrite a skipped cell', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'lunch', { approvalState: 'skipped', mealRef: null, title: '' });
+      service.applyAgentMeals(AGENT_MEALS);
+      expect(service.scheduledMeals()['2026-03-24']?.['lunch']?.approvalState).toBe('skipped');
+    });
+
+    it('should set isGenerating to false when complete', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setGenerating(true);
+      service.applyAgentMeals([]);
+      expect(service.isGenerating()).toBeFalse();
+    });
+  });
+
   describe('currentState()', () => {
     it('returns a MealPlanState with all horizon days × standard slots', () => {
       service.initSession('2026-03-24', '2026-03-24');

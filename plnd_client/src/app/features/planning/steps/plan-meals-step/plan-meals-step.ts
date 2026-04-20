@@ -338,6 +338,7 @@ export class PlanMealsStepComponent implements OnInit {
 
   readonly editingCell     = signal<{ date: string; slot: MealSlot } | null>(null);
   readonly editingValue    = signal('');
+  private confirmingEdit   = false;
   readonly showRefreshModal = signal(false);
 
   readonly unapprovedCount = computed(() => {
@@ -408,21 +409,22 @@ export class PlanMealsStepComponent implements OnInit {
   }
 
   undoSkip(date: string, slot: MealSlot): void {
-    this.weekPlanService.clearMeal(date, slot);
+    this.weekPlanService.undoSkip(date, slot);
   }
 
   startEdit(date: string, slot: MealSlot): void {
     const existing = this.getMeal(date, slot);
-    this.editingValue.set(existing?.approvalState === 'approved' ? existing.title : '');
+    this.editingValue.set(existing?.title ?? '');
     this.editingCell.set({ date, slot });
     setTimeout(() => this.mealInput?.nativeElement.focus());
   }
 
   confirmEdit(date: string, slot: MealSlot, value: string): void {
     const trimmed = value.trim();
+    this.confirmingEdit = true;
     this.editingCell.set(null);
     this.editingValue.set('');
-    if (!trimmed) return;
+    if (!trimmed) { this.confirmingEdit = false; return; }
     // Resolve via agent; auto-approves the cell with the matched meal ref
     this.mealPlannerAgentService
       .resolveText(trimmed, slot, date)
@@ -431,12 +433,13 @@ export class PlanMealsStepComponent implements OnInit {
         next: resp =>
           this.weekPlanService.setMealRef(date, slot, resp.meal_ref, trimmed, resp.estimated_nutrition),
         error: () =>
-          // Fallback: approve with plain title if resolution fails
           this.weekPlanService.setMealRef(date, slot, null, trimmed),
       });
+    this.confirmingEdit = false;
   }
 
   cancelEdit(): void {
+    if (this.confirmingEdit) return;
     this.editingCell.set(null);
     this.editingValue.set('');
   }
@@ -450,8 +453,8 @@ export class PlanMealsStepComponent implements OnInit {
       .suggestSlot(date, slot, avoid)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: entry =>
-          this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title, entry.estimated_nutrition, entry.estimated),
+        next:  entry => this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title, entry.estimated_nutrition, entry.estimated),
+        error: ()    => { /* leave cell unchanged; no user-visible feedback for now */ },
       });
   }
 
