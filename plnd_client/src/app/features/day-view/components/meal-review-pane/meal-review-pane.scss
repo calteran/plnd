@@ -1,0 +1,116 @@
+.review-pane {
+  padding: 12px 16px 12px 64px;
+  background: var(--color-surface-warm);
+  border-top: 1px solid color-mix(in srgb, var(--color-border-meal) 50%, transparent);
+}
+
+.review-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.review-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.review-subtitle {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.nutrition-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.nutrition-chip {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--color-accent-light);
+  color: var(--color-text-primary);
+  border: 1.5px solid transparent;
+
+  &--estimated {
+    border-style: dashed;
+    border-color: var(--color-border-meal);
+    background: var(--color-surface-warm);
+    color: var(--color-text-secondary);
+  }
+}
+
+.estimated-note {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin: 0 0 6px;
+}
+
+.dish-list {
+  margin-bottom: 8px;
+  ul { margin: 0; padding-left: 16px; }
+  li { font-size: 12px; color: var(--color-text-secondary); }
+}
+
+.resolve-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+  align-items: center;
+
+  .resolve-input {
+    flex: 1;
+    font-size: 12px;
+    padding: 4px 8px;
+    border: 1.5px solid var(--color-border-meal);
+    border-radius: 4px;
+    background: var(--color-surface-meal);
+    color: var(--color-text-primary);
+  }
+
+  .resolve-submit, .resolve-cancel {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border-meal);
+    cursor: pointer;
+  }
+
+  .resolve-submit {
+    background: var(--color-accent);
+    color: white;
+    border-color: var(--color-accent);
+  }
+
+  .resolve-cancel {
+    background: transparent;
+    color: var(--color-text-muted);
+  }
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+
+  button {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--color-border-meal);
+    background: var(--color-surface-meal);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    @media (max-width: 767px) { min-height: 44px; }
+
+    &:hover { background: var(--color-accent-light); }
+  }
+}
