@@ -1,7 +1,7 @@
 import { Component, inject, input, output, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MealAnchor } from '../../../../core/models/schedule';
-import { MealSlot, ResolveResponse } from '../../../../core/models/week-plan';
+import { MealSlot } from '../../../../core/models/week-plan';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
 import { ScheduleService } from '../../../../core/services/schedule.service';
 
