@@ -1,27 +1,125 @@
-use async_openai::{
-    config::OpenAIConfig,
-    types::chat::{
-        ChatCompletionMessageToolCall, ChatCompletionMessageToolCalls,
-        ChatCompletionRequestAssistantMessageArgs, ChatCompletionRequestMessage,
-        ChatCompletionRequestSystemMessageArgs, ChatCompletionRequestToolMessageArgs,
-        ChatCompletionRequestUserMessageArgs, ChatCompletionTool, ChatCompletionTools,
-        CreateChatCompletionRequestArgs, CreateChatCompletionResponse, FunctionCall,
-        FunctionObject,
-    },
-    Client,
-};
+use serde::{Deserialize, Serialize};
 
 use super::{
     CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent, MessageRole,
     StopReason, ToolCall,
 };
 
-/// Parse a raw OpenAI chat completion HTTP response into the provider-agnostic
+// ── Request wire types ────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct OaiRequest {
+    model: String,
+    messages: Vec<OaiReqMsg>,
+    max_completion_tokens: u32,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    tools: Vec<OaiToolDef>,
+}
+
+/// Internally tagged on "role" — matches OpenAI's chat completion wire format.
+#[derive(Serialize)]
+#[serde(tag = "role", rename_all = "lowercase")]
+enum OaiReqMsg {
+    System {
+        content: String,
+    },
+    User {
+        content: String,
+    },
+    Assistant {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        content: Option<String>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        tool_calls: Vec<OaiReqToolCall>,
+    },
+    Tool {
+        content: String,
+        tool_call_id: String,
+    },
+}
+
+#[derive(Serialize)]
+struct OaiReqToolCall {
+    id: String,
+    #[serde(rename = "type")]
+    kind: String, // always "function"
+    function: OaiFnBody,
+}
+
+/// Shared function body for outgoing tool_calls and incoming function_call.
+#[derive(Serialize, Deserialize)]
+struct OaiFnBody {
+    name: String,
+    arguments: String, // JSON-serialized
+}
+
+#[derive(Serialize)]
+struct OaiToolDef {
+    #[serde(rename = "type")]
+    kind: String, // always "function"
+    function: OaiFnDef,
+}
+
+#[derive(Serialize)]
+struct OaiFnDef {
+    name: String,
+    description: String,
+    parameters: serde_json::Value,
+}
+
+// ── Response wire types ───────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct OaiResponse {
+    choices: Vec<OaiChoice>,
+    usage: Option<OaiUsage>,
+}
+
+#[derive(Deserialize)]
+struct OaiChoice {
+    finish_reason: Option<OaiFinishReason>,
+    message: OaiRespMsg,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum OaiFinishReason {
+    Stop,
+    ToolCalls,
+    FunctionCall,
+    Length,
+    #[serde(other)]
+    Other,
+}
+
+#[derive(Deserialize)]
+struct OaiRespMsg {
+    content: Option<String>,
+    #[serde(default)]
+    tool_calls: Vec<OaiRespToolCall>,
+    /// Legacy field populated by older/alternative providers (e.g. Ollama, older Azure).
+    function_call: Option<OaiFnBody>,
+}
+
+#[derive(Deserialize)]
+struct OaiRespToolCall {
+    id: String,
+    function: OaiFnBody,
+}
+
+#[derive(Deserialize)]
+struct OaiUsage {
+    prompt_tokens: u32,
+    completion_tokens: u32,
+    total_tokens: u32,
+}
+
+// ── Response parsing ──────────────────────────────────────────────────────────
+
+/// Parse a raw OpenAI chat completion response into the provider-agnostic
 /// [`CompletionResponse`]. Extracted as a free function so it can be unit-tested
 /// without standing up an HTTP server.
-fn parse_completion(
-    response: CreateChatCompletionResponse,
-) -> Result<CompletionResponse, LlmError> {
+fn parse_completion(response: OaiResponse) -> Result<CompletionResponse, LlmError> {
     let usage = response.usage.map(|u| super::TokenUsage {
         prompt_tokens: u.prompt_tokens,
         completion_tokens: u.completion_tokens,
@@ -38,36 +136,21 @@ fn parse_completion(
         })?;
 
     let stop_reason = match choice.finish_reason {
-        Some(async_openai::types::chat::FinishReason::Stop) => StopReason::EndTurn,
-        Some(async_openai::types::chat::FinishReason::ToolCalls) => StopReason::ToolUse,
+        Some(OaiFinishReason::Stop) => StopReason::EndTurn,
+        Some(OaiFinishReason::ToolCalls) => StopReason::ToolUse,
         // Legacy finish_reason used by older/alternative providers (e.g. Ollama, older Azure).
         // Map to ToolUse so the agent loop dispatches the accompanying function_call payload.
-        Some(async_openai::types::chat::FinishReason::FunctionCall) => StopReason::ToolUse,
-        Some(async_openai::types::chat::FinishReason::Length) => StopReason::MaxTokens,
-        Some(other) => StopReason::Other(format!("{other:?}")),
-        None => StopReason::Other("none".to_string()),
+        Some(OaiFinishReason::FunctionCall) => StopReason::ToolUse,
+        Some(OaiFinishReason::Length) => StopReason::MaxTokens,
+        Some(OaiFinishReason::Other) | None => StopReason::Other("other".to_string()),
     };
 
     let content = choice.message.content.filter(|s| !s.is_empty());
 
-    // Extract the legacy function_call field before other fields are moved.
-    // Older/alternative providers (e.g. Ollama, older Azure) may populate this
-    // instead of tool_calls when finish_reason is "function_call".
-    #[allow(deprecated)]
-    let legacy_function_call = choice.message.function_call;
-
     let mut tool_calls = choice
         .message
         .tool_calls
-        .unwrap_or_default()
         .into_iter()
-        .filter_map(|tc| match tc {
-            ChatCompletionMessageToolCalls::Function(f) => Some(f),
-            other => {
-                tracing::warn!("dropping unsupported tool call variant: {:?}", other);
-                None
-            }
-        })
         .map(|tc| {
             let arguments = serde_json::from_str(&tc.function.arguments).map_err(|e| {
                 LlmError::ToolCallParsing(format!("tool '{}': {}", tc.function.name, e))
@@ -83,7 +166,7 @@ fn parse_completion(
     // Fall back to the legacy function_call field when tool_calls is empty.
     // The legacy API carries no call ID, so we synthesise a stable placeholder.
     if tool_calls.is_empty() {
-        if let Some(fc) = legacy_function_call {
+        if let Some(fc) = choice.message.function_call {
             let arguments = serde_json::from_str(&fc.arguments).map_err(|e| {
                 LlmError::ToolCallParsing(format!("function_call '{}': {}", fc.name, e))
             })?;
@@ -103,8 +186,12 @@ fn parse_completion(
     })
 }
 
+// ── Provider ──────────────────────────────────────────────────────────────────
+
 pub struct OpenAiCompatibleProvider {
-    client: Client<OpenAIConfig>,
+    http: reqwest::Client,
+    api_key: String,
+    base_url: String,
     model: String,
 }
 
@@ -114,12 +201,10 @@ impl OpenAiCompatibleProvider {
         api_key: impl Into<String>,
         model: impl Into<String>,
     ) -> Self {
-        let config = OpenAIConfig::new()
-            .with_api_base(base_url.into())
-            .with_api_key(api_key.into());
-        let client = Client::with_config(config);
         Self {
-            client,
+            http: reqwest::Client::new(),
+            api_key: api_key.into(),
+            base_url: base_url.into(),
             model: model.into(),
         }
     }
@@ -128,16 +213,11 @@ impl OpenAiCompatibleProvider {
 #[async_trait::async_trait]
 impl LlmProvider for OpenAiCompatibleProvider {
     async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
-        // Build message list: system prompt first, then conversation messages.
-        let mut messages: Vec<ChatCompletionRequestMessage> = Vec::new();
+        let mut messages: Vec<OaiReqMsg> = Vec::new();
 
-        messages.push(
-            ChatCompletionRequestSystemMessageArgs::default()
-                .content(request.system)
-                .build()
-                .map_err(|e| LlmError::Configuration(e.to_string()))?
-                .into(),
-        );
+        messages.push(OaiReqMsg::System {
+            content: request.system,
+        });
 
         for msg in request.messages {
             match msg.role {
@@ -148,13 +228,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
                             unreachable!("User role should never carry ToolResults content")
                         }
                     };
-                    messages.push(
-                        ChatCompletionRequestUserMessageArgs::default()
-                            .content(text)
-                            .build()
-                            .map_err(|e| LlmError::Configuration(e.to_string()))?
-                            .into(),
-                    );
+                    messages.push(OaiReqMsg::User { content: text });
                 }
                 MessageRole::Assistant => {
                     let text = match msg.content {
@@ -163,36 +237,24 @@ impl LlmProvider for OpenAiCompatibleProvider {
                             unreachable!("Assistant role should never carry ToolResults content")
                         }
                     };
-                    let mut builder = ChatCompletionRequestAssistantMessageArgs::default();
-                    if !text.is_empty() {
-                        builder.content(text);
-                    }
-                    if !msg.tool_calls.is_empty() {
-                        // OpenAI requires the assistant's tool calls to be echoed back
-                        // so that the following tool-result messages are understood.
-                        let oai_calls: Vec<ChatCompletionMessageToolCalls> = msg
-                            .tool_calls
-                            .into_iter()
-                            .map(|tc| {
-                                ChatCompletionMessageToolCalls::Function(
-                                    ChatCompletionMessageToolCall {
-                                        id: tc.id,
-                                        function: FunctionCall {
-                                            name: tc.name,
-                                            arguments: tc.arguments.to_string(),
-                                        },
-                                    },
-                                )
-                            })
-                            .collect();
-                        builder.tool_calls(oai_calls);
-                    }
-                    messages.push(
-                        builder
-                            .build()
-                            .map_err(|e| LlmError::Configuration(e.to_string()))?
-                            .into(),
-                    );
+                    // OpenAI requires the assistant's tool calls to be echoed back
+                    // so that the following tool-result messages are understood.
+                    let tool_calls = msg
+                        .tool_calls
+                        .into_iter()
+                        .map(|tc| OaiReqToolCall {
+                            id: tc.id,
+                            kind: "function".to_string(),
+                            function: OaiFnBody {
+                                name: tc.name,
+                                arguments: tc.arguments.to_string(),
+                            },
+                        })
+                        .collect();
+                    messages.push(OaiReqMsg::Assistant {
+                        content: if text.is_empty() { None } else { Some(text) },
+                        tool_calls,
+                    });
                 }
                 // OpenAI expects one tool message per result, each with its
                 // own tool_call_id. All results from one assistant turn are
@@ -200,65 +262,60 @@ impl LlmProvider for OpenAiCompatibleProvider {
                 MessageRole::Tool => {
                     if let MessageContent::ToolResults(parts) = msg.content {
                         for part in parts {
-                            messages.push(
-                                ChatCompletionRequestToolMessageArgs::default()
-                                    .tool_call_id(part.tool_call_id)
-                                    .content(part.content)
-                                    .build()
-                                    .map_err(|e| LlmError::Configuration(e.to_string()))?
-                                    .into(),
-                            );
+                            messages.push(OaiReqMsg::Tool {
+                                content: part.content,
+                                tool_call_id: part.tool_call_id,
+                            });
                         }
                     }
                 }
             }
         }
 
-        // Build tool definitions.
-        let tools: Vec<ChatCompletionTools> = request
+        let tools = request
             .tools
             .into_iter()
-            .map(|t| {
-                ChatCompletionTools::Function(ChatCompletionTool {
-                    function: FunctionObject {
-                        name: t.name,
-                        description: Some(t.description),
-                        parameters: Some(t.schema),
-                        strict: None,
-                    },
-                })
+            .map(|t| OaiToolDef {
+                kind: "function".to_string(),
+                function: OaiFnDef {
+                    name: t.name,
+                    description: t.description,
+                    parameters: t.schema,
+                },
             })
             .collect();
 
-        let mut req_builder = CreateChatCompletionRequestArgs::default();
-        req_builder
-            .model(&self.model)
-            .messages(messages)
-            .max_completion_tokens(request.max_tokens);
+        let body = OaiRequest {
+            model: self.model.clone(),
+            messages,
+            max_completion_tokens: request.max_tokens,
+            tools,
+        };
 
-        if !tools.is_empty() {
-            req_builder.tools(tools);
+        let url = format!("{}/chat/completions", self.base_url);
+        let http_response = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .json(&body)
+            .send()
+            .await?;
+
+        if !http_response.status().is_success() {
+            let status = http_response.status().as_u16();
+            let message = http_response
+                .text()
+                .await
+                .unwrap_or_else(|_| "(unreadable body)".to_string());
+            return Err(LlmError::Api { status, message });
         }
 
-        let oai_request = req_builder
-            .build()
-            .map_err(|e| LlmError::Configuration(e.to_string()))?;
-
-        let response = self
-            .client
-            .chat()
-            .create(oai_request)
+        let parsed: OaiResponse = http_response
+            .json()
             .await
-            .map_err(|e| match e {
-                async_openai::error::OpenAIError::ApiError(ae) => LlmError::Api {
-                    // HTTP status is not preserved in OpenAIError::ApiError
-                    status: 0,
-                    message: ae.to_string(),
-                },
-                other => LlmError::Http(other.to_string()),
-            })?;
+            .map_err(|e| LlmError::Deserialization(e.to_string()))?;
 
-        parse_completion(response)
+        parse_completion(parsed)
     }
 
     fn name(&self) -> &str {
@@ -273,48 +330,28 @@ impl LlmProvider for OpenAiCompatibleProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_openai::types::chat::{
-        ChatChoice, ChatCompletionResponseMessage, FinishReason, Role,
-    };
 
-    fn make_response(
-        finish_reason: FinishReason,
-        message: ChatCompletionResponseMessage,
-    ) -> CreateChatCompletionResponse {
-        #[allow(deprecated)]
-        CreateChatCompletionResponse {
-            id: "test".to_string(),
-            choices: vec![ChatChoice {
-                index: 0,
-                message,
+    fn make_response(finish_reason: OaiFinishReason, message: OaiRespMsg) -> OaiResponse {
+        OaiResponse {
+            choices: vec![OaiChoice {
                 finish_reason: Some(finish_reason),
-                logprobs: None,
+                message,
             }],
-            created: 0,
-            model: "test-model".to_string(),
-            service_tier: None,
-            system_fingerprint: None,
-            object: "chat.completion".to_string(),
             usage: None,
         }
     }
 
     #[test]
     fn function_call_finish_reason_maps_to_tool_use() {
-        #[allow(deprecated)]
-        let message = ChatCompletionResponseMessage {
+        let message = OaiRespMsg {
             content: None,
-            refusal: None,
-            tool_calls: None,
-            annotations: None,
-            role: Role::Assistant,
-            function_call: Some(FunctionCall {
+            tool_calls: vec![],
+            function_call: Some(OaiFnBody {
                 name: "get_weather".to_string(),
                 arguments: r#"{"city":"London"}"#.to_string(),
             }),
-            audio: None,
         };
-        let response = make_response(FinishReason::FunctionCall, message);
+        let response = make_response(OaiFinishReason::FunctionCall, message);
         let result = parse_completion(response).expect("parse should succeed");
 
         assert_eq!(result.stop_reason, StopReason::ToolUse);
@@ -326,25 +363,18 @@ mod tests {
 
     #[test]
     fn tool_calls_finish_reason_is_unaffected() {
-        #[allow(deprecated)]
-        let message = ChatCompletionResponseMessage {
+        let message = OaiRespMsg {
             content: None,
-            refusal: None,
-            tool_calls: Some(vec![ChatCompletionMessageToolCalls::Function(
-                ChatCompletionMessageToolCall {
-                    id: "call_abc".to_string(),
-                    function: FunctionCall {
-                        name: "do_thing".to_string(),
-                        arguments: r#"{"x":1}"#.to_string(),
-                    },
+            tool_calls: vec![OaiRespToolCall {
+                id: "call_abc".to_string(),
+                function: OaiFnBody {
+                    name: "do_thing".to_string(),
+                    arguments: r#"{"x":1}"#.to_string(),
                 },
-            )]),
-            annotations: None,
-            role: Role::Assistant,
+            }],
             function_call: None,
-            audio: None,
         };
-        let response = make_response(FinishReason::ToolCalls, message);
+        let response = make_response(OaiFinishReason::ToolCalls, message);
         let result = parse_completion(response).expect("parse should succeed");
 
         assert_eq!(result.stop_reason, StopReason::ToolUse);
@@ -355,17 +385,12 @@ mod tests {
 
     #[test]
     fn stop_finish_reason_maps_to_end_turn() {
-        #[allow(deprecated)]
-        let message = ChatCompletionResponseMessage {
+        let message = OaiRespMsg {
             content: Some("hello".to_string()),
-            refusal: None,
-            tool_calls: None,
-            annotations: None,
-            role: Role::Assistant,
+            tool_calls: vec![],
             function_call: None,
-            audio: None,
         };
-        let response = make_response(FinishReason::Stop, message);
+        let response = make_response(OaiFinishReason::Stop, message);
         let result = parse_completion(response).expect("parse should succeed");
 
         assert_eq!(result.stop_reason, StopReason::EndTurn);
