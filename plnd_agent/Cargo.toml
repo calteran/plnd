@@ -19,7 +19,7 @@ tokio        = { version = "1", features = ["full"] }
 thiserror    = "2.0"
 uuid         = { version = "1", features = ["v4", "serde"] }
 reqwest      = { version = "0.13", default-features = false, features = ["json", "native-tls"] }
-async-openai = { version = "0.34", features = ["chat-completion"] }
+async-openai = { version = "0.35", features = ["chat-completion"] }
 jsonschema   = { version = "0.45", default-features = false } # disables resolve-http/resolve-file; format validators (uuid, date-time) are unconditional
 tracing      = "0.1"
 
