@@ -41,9 +41,9 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
             </span>
           }
         </div>
-        @if (meal().estimated) {
-          <p class="estimated-note">Estimated from similar catalog meals. Edit to refine.</p>
-        }
+      }
+      @if (meal().estimated) {
+        <p class="estimated-note">Estimated from similar catalog meals. Edit to refine.</p>
       }
 
       @if (meal().description) {
