@@ -3,6 +3,7 @@ pub(crate) use meal::register_meal_planning_tools;
 pub(crate) use meal::register_meal_read_tools;
 pub(crate) use meal::register_meal_rebalance_tools;
 pub(crate) use meal::register_meal_suggest_slot_tools;
+pub(crate) use meal::register_meal_adhoc_resolve_tools;
 
 pub(crate) mod memory;
 pub(crate) use memory::register_memory_tools;
@@ -171,6 +172,7 @@ pub(crate) fn build_tool_registry(
         }
         UseCase::MealAdhocResolve => {
             register_meal_read_tools(&mut registry, db);
+            register_meal_adhoc_resolve_tools(&mut registry, db);
         }
     }
     registry
