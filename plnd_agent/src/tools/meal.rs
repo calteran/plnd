@@ -1257,27 +1257,32 @@ mod tests {
             assert_eq!(missing[0], "unicorn meat");
         }
 
-    #[test]
-    fn suggest_slot_meal_tool_is_terminal() {
-        assert!(SuggestSlotMealTool.is_terminal());
-    }
+        #[test]
+        fn suggest_slot_meal_tool_is_terminal() {
+            assert!(SuggestSlotMealTool.is_terminal());
+        }
 
-    #[test]
-    fn suggest_slot_meal_tool_name() {
-        assert_eq!(SuggestSlotMealTool.name(), "suggest_slot_meal");
-    }
+        #[test]
+        fn suggest_slot_meal_tool_name() {
+            assert_eq!(SuggestSlotMealTool.name(), "suggest_slot_meal");
+        }
 
-    #[tokio::test]
-    async fn suggest_slot_meal_tool_echoes_input() {
-        let input = serde_json::json!({
-            "date": "2026-04-21",
-            "occasion": "lunch",
-            "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
-        });
-        let ctx = crate::tools::ToolContext { user_id: uuid::Uuid::new_v4() };
-        let result = SuggestSlotMealTool.execute(&ctx, input.clone()).await.unwrap();
-        assert_eq!(result, input);
-    }
+        #[tokio::test]
+        async fn suggest_slot_meal_tool_echoes_input() {
+            let input = serde_json::json!({
+                "date": "2026-04-21",
+                "occasion": "lunch",
+                "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+            });
+            let ctx = crate::tools::ToolContext {
+                user_id: uuid::Uuid::new_v4(),
+            };
+            let result = SuggestSlotMealTool
+                .execute(&ctx, input.clone())
+                .await
+                .unwrap();
+            assert_eq!(result, input);
+        }
 
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn get_meal_nutrition_returns_not_found_for_wrong_user(pool: PgPool) {

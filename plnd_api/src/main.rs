@@ -354,6 +354,10 @@ async fn main() {
             "/agent/meal-plan/rebalance",
             post(agent::post_meal_plan_rebalance),
         )
+        .route(
+            "/agent/meal-plan/suggest",
+            post(agent::post_meal_plan_suggest),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
