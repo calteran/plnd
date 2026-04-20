@@ -177,6 +177,20 @@ pub struct MealSuggestRequest {
     pub avoid_meal_refs: Option<Vec<MealRef>>,
 }
 
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct MealAdhocResolveRequest {
+    pub text: String,
+    pub occasion: String,
+    pub date: Option<NaiveDate>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct MealAdhocResolveResponse {
+    pub meal_ref: MealRef,
+    pub estimated_nutrition: Option<Nutrition>,
+    pub confirmation: String,
+}
+
 #[cfg(test)]
 mod meal_plan_tests {
     use super::*;
@@ -255,5 +269,40 @@ mod meal_plan_tests {
         let json = r#"{"occasion": "lunch"}"#;
         let result: Result<MealSuggestRequest, _> = serde_json::from_str(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn meal_adhoc_resolve_request_deserializes() {
+        let json = r#"{"text": "grilled cheese sandwich", "occasion": "lunch"}"#;
+        let req: MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.text, "grilled cheese sandwich");
+        assert_eq!(req.occasion, "lunch");
+        assert!(req.date.is_none());
+    }
+
+    #[test]
+    fn meal_adhoc_resolve_request_with_date_deserializes() {
+        let json = r#"{"text": "oatmeal", "occasion": "breakfast", "date": "2026-04-21"}"#;
+        let req: MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.date, Some(chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap()));
+    }
+
+    #[test]
+    fn meal_adhoc_resolve_request_rejects_missing_text() {
+        let json = r#"{"occasion": "lunch"}"#;
+        let result: Result<MealAdhocResolveRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn meal_adhoc_resolve_response_serializes() {
+        let resp = MealAdhocResolveResponse {
+            meal_ref: MealRef { meal_type: "catalog".to_string(), id: uuid::Uuid::new_v4() },
+            estimated_nutrition: None,
+            confirmation: "Found it.".to_string(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"type\":\"catalog\""));
+        assert!(json.contains("\"confirmation\":\"Found it.\""));
     }
 }
