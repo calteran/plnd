@@ -1,11 +1,12 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, signal } from '@angular/core';
 import { MealAnchor } from '../../../../core/models/schedule';
 import { TaskRowComponent } from '../task-row/task-row';
+import { MealReviewPaneComponent } from '../../../day-view/components/meal-review-pane/meal-review-pane';
 
 @Component({
   selector: 'app-meal-row',
   standalone: true,
-  imports: [TaskRowComponent],
+  imports: [TaskRowComponent, MealReviewPaneComponent],
   template: `
     <div class="meal-band">
       <div class="meal-header">
@@ -18,18 +19,33 @@ import { TaskRowComponent } from '../task-row/task-row';
             <span class="meal-desc">{{ meal().description }}</span>
           }
         </div>
-        <div class="meal-badge">
-          @if (meal().status === 'done') {
-            <span class="badge badge--done" aria-hidden="true">Done</span>
-          } @else {
-            <button
-              class="badge badge--plan"
-              (click)="planMeal.emit(meal().id)"
-              [attr.aria-label]="'Plan ' + meal().name"
-            >Plan ›</button>
-          }
+        <div class="meal-controls">
+          <input
+            class="done-checkbox"
+            type="checkbox"
+            [checked]="meal().status === 'done'"
+            [attr.aria-label]="'Mark ' + meal().name + ' done'"
+            (change)="doneToggle.emit(meal().id)"
+          />
+          <button
+            class="review-btn"
+            [attr.aria-expanded]="reviewOpen()"
+            [attr.aria-label]="'Review ' + meal().name"
+            (click)="reviewOpen.set(!reviewOpen())"
+          >Review</button>
         </div>
       </div>
+
+      @if (reviewOpen()) {
+        <app-meal-review-pane
+          [meal]="meal()"
+          [date]="date()"
+          (closed)="closePane()"
+          (skipped)="toggled.emit($event)"
+          (doneOut)="onDoneFromPane($event)"
+        />
+      }
+
       @if (meal().duringMealTasks.length > 0) {
         <div class="during-meal">
           @for (task of meal().duringMealTasks; track task.id) {
@@ -42,7 +58,17 @@ import { TaskRowComponent } from '../task-row/task-row';
   styleUrl: './meal-row.scss'
 })
 export class MealRowComponent {
-  readonly meal     = input.required<MealAnchor>();
-  readonly toggled  = output<string>();
-  readonly planMeal = output<string>();
+  readonly meal       = input.required<MealAnchor>();
+  readonly date       = input.required<string>();
+  readonly toggled    = output<string>();
+  readonly doneToggle = output<string>();
+
+  readonly reviewOpen = signal(false);
+
+  closePane(): void { this.reviewOpen.set(false); }
+
+  onDoneFromPane(mealId: string): void {
+    this.doneToggle.emit(mealId);
+    this.reviewOpen.set(false);
+  }
 }

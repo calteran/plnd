@@ -22,6 +22,9 @@ export class DayViewPage {
 
   // Schedule row items
   getMealRows() { return this.page.locator('app-meal-row'); }
+  getMealRowReviewBtn(row: Locator) { return row.locator('.review-btn'); }
+  getMealRowDoneCheckbox(row: Locator) { return row.locator('.done-checkbox'); }
+  getMealReviewPane(row: Locator) { return row.locator('app-meal-review-pane'); }
   getTaskRows() { return this.page.locator('.schedule-list > app-task-row'); }
   getTaskRowInner(row: Locator) { return row.locator('.task-row'); }
   getTaskRowCheckbox(row: Locator) { return row.getByRole('checkbox'); }
