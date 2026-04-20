@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
@@ -17,7 +18,7 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
     <div class="plan-meals-wrapper">
 
       <!-- Top toolbar: Refresh button + confirmation modal -->
-      @if (unapprovedCount() > 0) {
+      @if (!isGenerating() && unapprovedCount() > 0) {
         <div class="meals-toolbar">
           <button class="btn-refresh-all" type="button"
                   [disabled]="isGenerating()"
@@ -28,9 +29,9 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
       }
 
       @if (showRefreshModal()) {
-        <div class="modal-overlay" role="dialog" aria-modal="true">
+        <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="refresh-modal-msg">
           <div class="modal-box">
-            <p class="modal-msg">
+            <p class="modal-msg" id="refresh-modal-msg">
               This will replace <strong>{{ unapprovedCount() }}</strong>
               {{ unapprovedCount() === 1 ? 'unapproved meal' : 'unapproved meals' }}.
               Approved and edited meals stay as they are. Continue?
@@ -326,6 +327,7 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
 export class PlanMealsStepComponent implements OnInit {
   private readonly weekPlanService         = inject(WeekPlanService);
   private readonly mealPlannerAgentService = inject(MealPlannerAgentService);
+  private readonly destroyRef              = inject(DestroyRef);
 
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
 
@@ -361,7 +363,7 @@ export class PlanMealsStepComponent implements OnInit {
 
   private runAgentPlan(obs$: Observable<MealPlanResponse>): void {
     this.weekPlanService.setGenerating(true);
-    obs$.subscribe({
+    obs$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  resp => this.weekPlanService.applyAgentMeals(resp.meals),
       error: ()   => this.weekPlanService.setGenerating(false),
     });
@@ -424,6 +426,7 @@ export class PlanMealsStepComponent implements OnInit {
     // Resolve via agent; auto-approves the cell with the matched meal ref
     this.mealPlannerAgentService
       .resolveText(trimmed, slot, date)
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: resp =>
           this.weekPlanService.setMealRef(date, slot, resp.meal_ref, trimmed, resp.estimated_nutrition),
@@ -438,10 +441,14 @@ export class PlanMealsStepComponent implements OnInit {
     this.editingValue.set('');
   }
 
-  /** Per-cell agent refresh — suggests a replacement and auto-approves it. */
+  /** Per-cell agent refresh — suggests a replacement and auto-approves it.
+   *  Passes the current mealRef as avoid so the agent doesn't return the same meal. */
   refreshSlot(date: string, slot: MealSlot): void {
+    const existing = this.getMeal(date, slot);
+    const avoid    = existing?.mealRef ? [existing.mealRef] : [];
     this.mealPlannerAgentService
-      .suggestSlot(date, slot, [])
+      .suggestSlot(date, slot, avoid)
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: entry =>
           this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title, entry.estimated_nutrition, entry.estimated),

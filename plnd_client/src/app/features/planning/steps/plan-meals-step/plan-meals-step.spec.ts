@@ -173,10 +173,18 @@ describe('PlanMealsStepComponent', () => {
     expect(firstCell.querySelector('.gc-edit-custom')).toBeTruthy();
   });
 
-  it('should call suggestSlot when 🔀 Suggest is clicked on a proposed cell', () => {
+  it('should call suggestSlot when 🔀 Suggest is clicked, passing existing mealRef as avoid', () => {
+    // The cell has a proposed meal with no mealRef (mealRef: null), so avoid should be []
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
     expect(agentSpy.suggestSlot).toHaveBeenCalledWith('2026-03-23', 'breakfast', []);
+  });
+
+  it('should pass existing mealRef in avoid when refreshing an approved cell with a ref', () => {
+    service.setMealRef('2026-03-23', 'breakfast', { type: 'user', id: 'u1' }, 'Egg toast');
+    fixture.detectChanges();
+    component.refreshSlot('2026-03-23', 'breakfast');
+    expect(agentSpy.suggestSlot).toHaveBeenCalledWith('2026-03-23', 'breakfast', [{ type: 'user', id: 'u1' }]);
   });
 
   it('should apply the suggestSlot result to the cell', () => {

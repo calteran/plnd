@@ -7,6 +7,14 @@ import { seedAuth, API_BASE, MOCK_PREFS } from '../helpers/auth';
 
 const MOCK_PREFS_3DAY = { ...MOCK_PREFS, default_plan_length_days: 3 };
 
+// Agent meal fixtures for the 3-day horizon
+const STEP3_MEAL_DAYS = ['2026-03-30', '2026-03-31', '2026-04-01'];
+const STEP3_AGENT_MEALS = STEP3_MEAL_DAYS.flatMap(date =>
+  (['breakfast', 'lunch', 'dinner'] as const).map(occasion => ({
+    date, occasion, meal_ref: null, title: `${occasion} on ${date}`,
+  }))
+);
+
 async function seedWizard(page: Page): Promise<void> {
   await seedAuth(page);
   await page.route(`${API_BASE}/preferences/me`, route =>
@@ -18,12 +26,23 @@ async function seedWizard(page: Page): Promise<void> {
   await page.route(`${API_BASE}/schedule/period**`, route =>
     route.fulfill({ status: 200, json: { carryover: [], entries: [] } })
   );
+  // Step 3 auto-generates via agent on first entry when no meals are stored.
+  await page.route(`${API_BASE}/agent/meal-plan`, route =>
+    route.fulfill({ status: 200, json: { week: '2026-03-30', meals: STEP3_AGENT_MEALS } })
+  );
+  // Per-cell resolve (edit → Enter) and suggest (🔀) routes
+  await page.route(`${API_BASE}/agent/meal-plan/resolve`, route =>
+    route.fulfill({ status: 200, json: { meal_ref: null, confirmation: 'Added' } })
+  );
+  await page.route(`${API_BASE}/agent/meal-plan/suggest`, route =>
+    route.fulfill({ status: 200, json: { date: '2026-03-30', occasion: 'breakfast', meal_ref: null, title: 'Suggested meal' } })
+  );
 }
 
 async function seedStep3(page: Page): Promise<void> {
   await page.addInitScript(() => {
     localStorage.setItem('plnd:plan-draft', JSON.stringify({
-      schemaVersion: 1,
+      schemaVersion: 2,
       planStart: '2026-03-30',
       planEnd: '2026-04-01',
       currentStep: 3,
@@ -96,13 +115,16 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
       await expect(cell.locator('.mock-input')).toBeVisible();
     });
 
-    test('typing a name and pressing Enter fills the cell with custom-g state', async ({ page }) => {
+    test('typing a name and pressing Enter fills the cell with approved-g state', async ({ page }) => {
+      // Wait for auto-generate to complete before interacting
+      await expect(page.locator('.gc').first().locator('.gc-pick')).toBeVisible();
       const cell = page.locator('.gc').first();
       await cell.locator('.gc-pick').click();
       await cell.locator('.mock-input').fill('Greek yogurt');
       await cell.locator('.mock-input').press('Enter');
-      await expect(cell).toHaveClass(/custom-g/);
-      await expect(cell.locator('.gc-text.custom-t')).toHaveText('Greek yogurt');
+      // resolveText fires async; Playwright polls until approved-g appears
+      await expect(cell).toHaveClass(/approved-g/);
+      await expect(cell.locator('.gc-text.approved-t')).toHaveText('Greek yogurt');
     });
 
     test('pressing Escape cancels edit without saving', async ({ page }) => {
@@ -112,33 +134,33 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
       await cell.locator('.mock-input').press('Escape');
       await expect(cell).not.toHaveClass(/gc-editing/);
       await expect(cell.locator('.gc-pick')).toBeVisible();
-      await expect(cell.locator('.gc-text.custom-t')).not.toBeVisible();
+      await expect(cell.locator('.gc-text.approved-t')).not.toBeVisible();
     });
   });
 
   // ── Custom meal cell ─────────────────────────────────────────────────────────
 
   test.describe('Custom meal cell', () => {
-    test('a filled cell shows the meal title in gc-text.custom-t', async ({ page }) => {
+    test('a filled cell shows the meal title in gc-text.approved-t', async ({ page }) => {
       const cell = page.locator('.gc').first();
       // Fill via the editor
       await cell.locator('.gc-pick').click();
       await cell.locator('.mock-input').fill('Avocado toast');
       await cell.locator('.mock-input').press('Enter');
-      await expect(cell.locator('.gc-text.custom-t')).toHaveText('Avocado toast');
+      await expect(cell.locator('.gc-text.approved-t')).toHaveText('Avocado toast');
     });
 
-    test('clicking gc-x on a custom cell clears it back to pending', async ({ page }) => {
+    test('clicking gc-x on an approved cell skips it', async ({ page }) => {
       const cell = page.locator('.gc').first();
       // First fill the cell
       await cell.locator('.gc-pick').click();
       await cell.locator('.mock-input').fill('Avocado toast');
       await cell.locator('.mock-input').press('Enter');
-      await expect(cell).toHaveClass(/custom-g/);
-      // Then clear it
+      await expect(cell).toHaveClass(/approved-g/);
+      // gc-x now skips (not clears) — matches proposed and approved behaviour
       await cell.locator('.gc-x').click();
-      await expect(cell).not.toHaveClass(/custom-g/);
-      await expect(cell.locator('.gc-pick')).toBeVisible();
+      await expect(cell).toHaveClass(/skipped-g/);
+      await expect(cell.locator('.gc-undo')).toBeVisible();
     });
   });
 
@@ -170,7 +192,7 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     await cell.locator('.gc-pick').click();
     await cell.locator('.mock-input').fill('Overnight oats');
     await cell.locator('.mock-input').press('Enter');
-    await expect(cell).toHaveClass(/custom-g/);
+    await expect(cell).toHaveClass(/approved-g/);
 
     // Navigate to Step 4
     await page.getByLabel('Next step').click();
@@ -181,8 +203,8 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
 
     // Meal should still be set
-    await expect(page.locator('.gc').first()).toHaveClass(/custom-g/);
-    await expect(page.locator('.gc').first().locator('.gc-text.custom-t')).toHaveText('Overnight oats');
+    await expect(page.locator('.gc').first()).toHaveClass(/approved-g/);
+    await expect(page.locator('.gc').first().locator('.gc-text.approved-t')).toHaveText('Overnight oats');
   });
 
   // ── Autocomplete — test.fail() (phase-3) ─────────────────────────────────────
@@ -205,7 +227,7 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     // Autocomplete dropdown does not yet exist — fail fast so test.fail() registers correctly
     await expect(page.locator('.autocomplete-dropdown')).toBeVisible({ timeout: 3000 });
     await page.locator('.autocomplete-dropdown .suggestion-item').first().click();
-    await expect(cell).toHaveClass(/custom-g/);
+    await expect(cell).toHaveClass(/approved-g/);
     await expect(cell.locator('.mock-input')).not.toBeVisible();
   });
 });

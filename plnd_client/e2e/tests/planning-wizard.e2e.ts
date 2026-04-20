@@ -267,7 +267,7 @@ test.describe('Planning Wizard', () => {
       await page.clock.setFixedTime('2026-03-28T00:00:00');
       await page.addInitScript((tasks) => {
         localStorage.setItem('plnd:plan-draft', JSON.stringify({
-          schemaVersion: 1,
+          schemaVersion: 2,
           planStart: '2026-03-30',
           planEnd: '2026-04-05',
           currentStep: 2,
