@@ -187,6 +187,58 @@ static SUGGEST_SLOT_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|
         .expect("BUG: failed to compile SUGGEST_SLOT_RESPONSE_SCHEMA")
 });
 
+/// JSON Schema (Draft 7) for the `MealAdhocResolveResponse` type.
+///
+/// Three valid shapes:
+/// - Catalog hit: `{ meal_ref: {type:"catalog", id:UUID}, confirmation }`
+/// - User hit:    `{ meal_ref: {type:"user",    id:UUID}, confirmation }`
+/// - New custom:  same as user hit, plus `estimated_nutrition`
+const RESOLVE_RESPONSE_SCHEMA: &str = r##"{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MealAdhocResolveResponse",
+  "type": "object",
+  "required": ["meal_ref", "confirmation"],
+  "additionalProperties": false,
+  "properties": {
+    "meal_ref":             { "$ref": "#/definitions/MealRef" },
+    "estimated_nutrition":  { "$ref": "#/definitions/Nutrition" },
+    "confirmation":         { "type": "string" }
+  },
+  "definitions": {
+    "MealRef": {
+      "type": "object",
+      "required": ["type", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["catalog", "user"] },
+        "id":   { "type": "string", "format": "uuid" }
+      }
+    },
+    "Nutrition": {
+      "type": "object",
+      "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+      "additionalProperties": false,
+      "properties": {
+        "kcal":      { "type": "number" },
+        "protein_g": { "type": "number" },
+        "carbs_g":   { "type": "number" },
+        "fat_g":     { "type": "number" }
+      }
+    }
+  }
+}"##;
+
+/// Pre-compiled validator for [`RESOLVE_RESPONSE_SCHEMA`].
+static RESOLVE_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
+    let schema: serde_json::Value = serde_json::from_str(RESOLVE_RESPONSE_SCHEMA)
+        .expect("BUG: RESOLVE_RESPONSE_SCHEMA is not valid JSON");
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft7)
+        .should_validate_formats(true)
+        .build(&schema)
+        .expect("BUG: failed to compile RESOLVE_RESPONSE_SCHEMA")
+});
+
 /// Identifies the type of agentic interaction.
 ///
 /// Each variant maps to a system prompt and a [`ProviderTier`]. The tool
@@ -266,7 +318,7 @@ impl UseCase {
             UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
             UseCase::MealPlanning | UseCase::MealRebalance => Some(&MEAL_PLAN_VALIDATOR),
             UseCase::MealSuggestSlot => Some(&SUGGEST_SLOT_VALIDATOR),
-            UseCase::MealAdhocResolve => None,
+            UseCase::MealAdhocResolve => Some(&RESOLVE_VALIDATOR),
         }
     }
 }
@@ -371,8 +423,56 @@ mod tests {
     }
 
     #[test]
-    fn meal_adhoc_resolve_has_no_response_validator_yet() {
-        assert!(UseCase::MealAdhocResolve.response_validator().is_none());
+    fn meal_adhoc_resolve_has_response_validator() {
+        assert!(UseCase::MealAdhocResolve.response_validator().is_some());
+    }
+
+    #[test]
+    fn resolve_validator_accepts_catalog_hit() {
+        let v = UseCase::MealAdhocResolve.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
+            "confirmation": "Matched grilled cheese in catalog."
+        });
+        assert!(v.is_valid(&ok));
+    }
+
+    #[test]
+    fn resolve_validator_accepts_new_with_nutrition() {
+        let v = UseCase::MealAdhocResolve.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "meal_ref": { "type": "user", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
+            "estimated_nutrition": { "kcal": 350.0, "protein_g": 15.0, "carbs_g": 40.0, "fat_g": 10.0 },
+            "confirmation": "Created custom grilled cheese with estimated nutrition."
+        });
+        assert!(v.is_valid(&ok));
+    }
+
+    #[test]
+    fn resolve_validator_rejects_missing_confirmation() {
+        let v = UseCase::MealAdhocResolve.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn resolve_validator_rejects_missing_meal_ref() {
+        let v = UseCase::MealAdhocResolve.response_validator().unwrap();
+        let bad = serde_json::json!({ "confirmation": "done" });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn resolve_validator_rejects_extra_properties() {
+        let v = UseCase::MealAdhocResolve.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
+            "confirmation": "ok",
+            "surprise_field": "boom"
+        });
+        assert!(!v.is_valid(&bad));
     }
 
     #[test]

@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
 use crate::models::{
-    MealEntry, MealPlanRequest, MealPlanResponse, MealSuggestRequest, TaskEntryRequest,
-    TaskEntryResponse,
+    MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealPlanRequest,
+    MealPlanResponse, MealSuggestRequest, TaskEntryRequest, TaskEntryResponse,
 };
 use crate::state::AppState;
 
@@ -291,6 +291,71 @@ pub async fn post_meal_plan_suggest(
     Ok(Json(response))
 }
 
+/// POST /agent/meal-plan/resolve — resolve free-text meal description to a meal_ref via the AI agent.
+///
+/// The user provides a plain-text description of a meal they ate or plan to eat.
+/// The agent searches the user's library and the catalog; if no match is found it
+/// creates a new `user_meals` row with `nutrition_estimated = true`.
+/// Returns a `meal_ref` and an optional `estimated_nutrition` block.
+#[utoipa::path(
+    post,
+    path = "/agent/meal-plan/resolve",
+    tag = "Agent",
+    security(("bearer_auth" = [])),
+    request_body = MealAdhocResolveRequest,
+    responses(
+        (status = 200, description = "Resolved meal reference", body = MealAdhocResolveResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Agent response failed schema validation"),
+        (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
+        (status = 500, description = "LLM provider failure or infrastructure error"),
+    )
+)]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+pub async fn post_meal_plan_resolve(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(body): Json<MealAdhocResolveRequest>,
+) -> Result<Json<MealAdhocResolveResponse>, StatusCode> {
+    if state.agent_task_limiter.check_key(&claims.sub).is_err() {
+        tracing::warn!(user_id = %claims.sub, "agent meal-plan resolve rate limit exceeded");
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let occasion = &body.occasion;
+    let date_str = body.date.map(|d| d.format("%Y-%m-%d").to_string());
+    let date_context = date_str
+        .as_deref()
+        .map(|d| format!("[Date: {d}]\n"))
+        .unwrap_or_default();
+
+    let ctx = AgentContext {
+        user_id,
+        use_case: UseCase::MealAdhocResolve,
+        input: body.text.clone(),
+        prior_context: Some(format!("{date_context}[Occasion: {occasion}]\n")),
+        extra: None,
+    };
+
+    let output = state.agent.run(&ctx).await.map_err(|e| match &e {
+        AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        _ => {
+            tracing::error!(error = %e, "agent meal-plan resolve run failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+
+    let response: MealAdhocResolveResponse =
+        serde_json::from_str(&output.content).map_err(|e| {
+            tracing::error!(error = %e, content = %output.content, "failed to parse adhoc-resolve output");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    Ok(Json(response))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
@@ -536,6 +601,22 @@ mod tests {
         assert!(result.contains("&lt;/answers&gt;"));
         assert!(result.starts_with("<prior_context>"));
         assert!(result.ends_with("</prior_context>\n"));
+    }
+
+    #[test]
+    fn meal_adhoc_resolve_request_text_is_required() {
+        let json = r#"{"occasion": "lunch"}"#;
+        let result: Result<crate::models::MealAdhocResolveRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err(), "text field must be required");
+    }
+
+    #[test]
+    fn meal_adhoc_resolve_request_with_all_fields() {
+        let json = r#"{"text": "homemade pizza", "occasion": "dinner", "date": "2026-04-21"}"#;
+        let req: crate::models::MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.text, "homemade pizza");
+        assert_eq!(req.occasion, "dinner");
+        assert!(req.date.is_some());
     }
 
     #[test]

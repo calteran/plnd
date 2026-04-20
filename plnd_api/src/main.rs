@@ -358,6 +358,10 @@ async fn main() {
             "/agent/meal-plan/suggest",
             post(agent::post_meal_plan_suggest),
         )
+        .route(
+            "/agent/meal-plan/resolve",
+            post(agent::post_meal_plan_resolve),
+        )
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
