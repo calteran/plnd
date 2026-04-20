@@ -41,7 +41,7 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
           [meal]="meal()"
           [date]="date()"
           (closed)="closePane()"
-          (skipped)="toggled.emit($event)"
+          (skipped)="skipped.emit($event)"
           (doneOut)="onDoneFromPane($event)"
         />
       }
@@ -62,6 +62,7 @@ export class MealRowComponent {
   readonly date       = input.required<string>();
   readonly toggled    = output<string>();
   readonly doneToggle = output<string>();
+  readonly skipped    = output<string>();
 
   readonly reviewOpen = signal(false);
 

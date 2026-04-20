@@ -344,6 +344,10 @@ async fn main() {
         .route("/schedule/period", get(schedule::get_period))
         .route("/schedule/plan/status", get(schedule::get_plan_status))
         .route("/schedule/plan", post(schedule::post_plan))
+        .route(
+            "/schedule/entries/{id}/status",
+            patch(schedule::patch_entry_status),
+        )
         .route("/briefing/weather", get(briefing::get_weather))
         .route("/briefing/news", get(briefing::get_news))
         .route("/briefing/yesterday", get(briefing::get_yesterday))

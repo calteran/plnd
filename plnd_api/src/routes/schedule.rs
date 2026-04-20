@@ -2,10 +2,12 @@ use crate::api_response::{
     PlanStatusApiResponse, PostSchedulePlanApiResponse, SchedulePeriodApiResponse,
 };
 use crate::auth::jwt::Claims;
-use crate::models::{CarryoverDecision as HttpCarryoverDecision, PostSchedulePlanRequest};
+use crate::models::{
+    CarryoverDecision as HttpCarryoverDecision, PatchEntryStatusRequest, PostSchedulePlanRequest,
+};
 use crate::state::AppState;
 use axum::{
-    extract::{Extension, Query, State},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -170,6 +172,48 @@ pub async fn post_plan(
             plnd_data::db::error::DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             _ => {
                 tracing::error!(error = %e, "post_plan error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })
+}
+
+const VALID_STATUSES: &[&str] = &["planned", "in_progress", "completed", "skipped", "deferred"];
+
+#[utoipa::path(
+    patch,
+    path = "/schedule/entries/{id}/status",
+    tag = "Schedule",
+    params(("id" = Uuid, Path, description = "Schedule entry ID")),
+    request_body = PatchEntryStatusRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Status updated"),
+        (status = 400, description = "Invalid status value"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Entry not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+pub async fn patch_entry_status(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(entry_id): Path<Uuid>,
+    Json(body): Json<PatchEntryStatusRequest>,
+) -> Result<StatusCode, StatusCode> {
+    if !VALID_STATUSES.contains(&body.status.as_str()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let pool = state.db.get_pool();
+
+    db::schedule::update_entry_status(pool, user_id, entry_id, &body.status)
+        .await
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| match e {
+            plnd_data::db::error::DatabaseError::NotFound => StatusCode::NOT_FOUND,
+            _ => {
+                tracing::error!(error = %e, "patch_entry_status error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })

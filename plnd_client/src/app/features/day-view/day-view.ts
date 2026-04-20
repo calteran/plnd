@@ -60,6 +60,7 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
                   [date]="scheduleService.date()"
                   (toggled)="scheduleService.toggleItem($event)"
                   (doneToggle)="scheduleService.toggleItem($event)"
+                  (skipped)="scheduleService.skipMeal($event)"
                 />
               } @else {
                 <app-task-row

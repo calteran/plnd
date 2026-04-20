@@ -67,6 +67,11 @@ pub enum CarryoverDecision {
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct PatchEntryStatusRequest {
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct PostSchedulePlanRequest {
     pub plan_start: NaiveDate,
     pub plan_end: NaiveDate,

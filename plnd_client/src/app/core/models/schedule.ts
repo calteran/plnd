@@ -16,7 +16,7 @@ export interface MealAnchor {
   name: string;           // 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack'
   emoji: string;
   description?: string;   // dish name, e.g. 'Avocado toast + eggs'
-  status: 'done' | 'planned' | 'unplanned';
+  status: 'done' | 'planned' | 'unplanned' | 'skipped';
   duringMealTasks: ScheduleTask[];
   nutrition?: MealNutrition;
   estimated?: boolean;

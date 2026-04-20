@@ -180,4 +180,42 @@ describe('ScheduleService', () => {
     expect(svc.scheduleItems()).toContain(task);
     expect(svc.scheduleItems().length).toBe(1);
   });
+
+  describe('skipMeal', () => {
+    beforeEach(() => {
+      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+        id: 'meal-1', name: 'Lunch', emoji: '🥗',
+        status: 'planned', duringMealTasks: [],
+      }]);
+    });
+
+    it('immediately sets the meal status to skipped in the signal', () => {
+      svc.skipMeal('meal-1');
+      httpMock.expectOne(r => r.url.includes('/schedule/entries/meal-1/status')).flush(null);
+
+      const meal = svc.scheduleItems()[0] as MealAnchor;
+      expect(meal.status).toBe('skipped');
+    });
+
+    it('issues PATCH /schedule/entries/:id/status with body { status: skipped }', () => {
+      svc.skipMeal('meal-1');
+
+      const req = httpMock.expectOne('http://localhost:3000/schedule/entries/meal-1/status');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ status: 'skipped' });
+      req.flush(null);
+    });
+
+    it('reloads the day on HTTP error to restore server state', () => {
+      svc['_date'].set('2026-04-20');
+      svc.skipMeal('meal-1');
+
+      const patchReq = httpMock.expectOne(r => r.url.includes('/schedule/entries/meal-1/status'));
+      patchReq.flush('error', { status: 500, statusText: 'Internal Server Error' });
+
+      const getReq = httpMock.expectOne(r => r.url.includes('/schedule/period'));
+      expect(getReq.request.params.get('start')).toBe('2026-04-20');
+      getReq.flush({ entries: [], carryover: [] });
+    });
+  });
 });
