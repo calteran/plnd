@@ -57,8 +57,9 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
               @if (isMealAnchor(item)) {
                 <app-meal-row
                   [meal]="item"
+                  [date]="scheduleService.date()"
                   (toggled)="scheduleService.toggleItem($event)"
-                  (planMeal)="onPlanMeal($event)"
+                  (doneToggle)="scheduleService.toggleItem($event)"
                 />
               } @else {
                 <app-task-row
@@ -117,7 +118,6 @@ export class DayViewComponent implements OnInit, OnDestroy {
 
   onDateChange(date: string): void { this.router.navigate(['/day', date]); }
   retry(): void { this.scheduleService.loadDay(this.scheduleService.date()); }
-  onPlanMeal(_mealId: string): void { /* TODO: open meal planning panel */ }
   onItemAdded(_entry: AddedEntry): void {
     this.scheduleService.loadDay(this.scheduleService.date());
   }

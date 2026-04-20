@@ -1,7 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { MealRowComponent } from './meal-row';
 import { MealAnchor } from '../../../../core/models/schedule';
+import { ConfigService } from '../../../../core/services/config.service';
+
+const mockConfig = { getConfig: () => ({ api: { baseUrl: 'http://test' } }) };
 
 const doneMeal: MealAnchor = {
   id: 'm1', name: 'Breakfast', emoji: '🥑',
@@ -18,15 +23,23 @@ const withTasks: MealAnchor = {
   ]
 };
 
-describe('MealRowComponent', () => {
-  async function setup(meal: MealAnchor) {
-    await TestBed.configureTestingModule({ imports: [MealRowComponent] }).compileComponents();
-    const f = TestBed.createComponent(MealRowComponent);
-    f.componentRef.setInput('meal', meal);
-    f.detectChanges();
-    return f;
-  }
+async function setup(meal: MealAnchor, date = '2026-04-20') {
+  await TestBed.configureTestingModule({
+    imports: [MealRowComponent],
+    providers: [
+      provideHttpClient(),
+      provideHttpClientTesting(),
+      { provide: ConfigService, useValue: mockConfig },
+    ],
+  }).compileComponents();
+  const f = TestBed.createComponent(MealRowComponent);
+  f.componentRef.setInput('meal', meal);
+  f.componentRef.setInput('date', date);
+  f.detectChanges();
+  return f;
+}
 
+describe('MealRowComponent', () => {
   it('renders meal name and emoji', async () => {
     const f = await setup(doneMeal);
     expect(f.nativeElement.textContent).toContain('Breakfast');
@@ -38,23 +51,47 @@ describe('MealRowComponent', () => {
     expect(f.nativeElement.textContent).toContain('Avocado toast');
   });
 
-  it('shows Done badge for completed meal', async () => {
+  it('shows done checkbox checked for a done meal', async () => {
     const f = await setup(doneMeal);
-    expect(f.nativeElement.textContent).toContain('Done');
+    const checkbox: HTMLInputElement = f.debugElement.query(By.css('.done-checkbox')).nativeElement;
+    expect(checkbox.checked).toBeTrue();
   });
 
-  it('shows Plan button for unplanned meal', async () => {
+  it('shows done checkbox unchecked for an unplanned meal', async () => {
     const f = await setup(unplanned);
-    const btn = f.debugElement.query(By.css('.badge--plan'));
-    expect(btn).toBeTruthy();
+    const checkbox: HTMLInputElement = f.debugElement.query(By.css('.done-checkbox')).nativeElement;
+    expect(checkbox.checked).toBeFalse();
   });
 
-  it('emits planMeal when Plan button clicked', async () => {
-    const f = await setup(unplanned);
+  it('emits doneToggle when checkbox clicked without opening the pane', async () => {
+    const f = await setup(doneMeal);
     let emitted: string | undefined;
-    f.componentInstance.planMeal.subscribe((id: string) => emitted = id);
-    f.debugElement.query(By.css('.badge--plan')).nativeElement.click();
-    expect(emitted).toBe('m2');
+    f.componentInstance.doneToggle.subscribe((id: string) => emitted = id);
+    f.debugElement.query(By.css('.done-checkbox')).nativeElement.click();
+    f.detectChanges();
+    expect(emitted).toBe('m1');
+    expect(f.debugElement.query(By.css('app-meal-review-pane'))).toBeNull();
+  });
+
+  it('shows Review button', async () => {
+    const f = await setup(unplanned);
+    expect(f.debugElement.query(By.css('.review-btn'))).toBeTruthy();
+  });
+
+  it('opens review pane when Review button clicked', async () => {
+    const f = await setup(unplanned);
+    f.debugElement.query(By.css('.review-btn')).nativeElement.click();
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('app-meal-review-pane'))).toBeTruthy();
+  });
+
+  it('closes review pane when closePane() is called', async () => {
+    const f = await setup(unplanned);
+    f.debugElement.query(By.css('.review-btn')).nativeElement.click();
+    f.detectChanges();
+    f.componentInstance.closePane();
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('app-meal-review-pane'))).toBeNull();
   });
 
   it('renders during-meal tasks inside the band', async () => {
@@ -63,7 +100,7 @@ describe('MealRowComponent', () => {
     expect(taskRows.length).toBe(1);
   });
 
-  it('emits toggle when a during-meal task checkbox fires', async () => {
+  it('emits toggled when a during-meal task fires', async () => {
     const f = await setup(withTasks);
     let emitted: string | undefined;
     f.componentInstance.toggled.subscribe((id: string) => emitted = id);

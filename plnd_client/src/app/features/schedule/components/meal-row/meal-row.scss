@@ -40,28 +40,38 @@
   color: var(--color-text-secondary);
 }
 
-.meal-badge { margin-left: auto; }
+.meal-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
-.badge {
+.done-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-accent);
+}
+
+.review-btn {
   font-size: 9px;
   font-weight: 700;
   border-radius: 4px;
   padding: 3px 7px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-warm);
+  border: 1px solid var(--color-border-meal);
+  cursor: pointer;
 
-  &--done {
-    color: var(--color-accent);
-    background: var(--color-accent-light);
-    border: none;
+  @media (max-width: 767px) {
+    min-height: 44px;
+    padding: 0 12px;
   }
 
-  &--plan {
-    color: var(--color-text-secondary);
-    background: var(--color-surface-warm);
-    border: 1px solid var(--color-border-meal);
-    @media (max-width: 767px) {
-      min-height: 44px;
-      padding: 0 12px;
-    }
+  &[aria-expanded="true"] {
+    background: var(--color-accent-light);
+    color: var(--color-text-primary);
   }
 }
 
