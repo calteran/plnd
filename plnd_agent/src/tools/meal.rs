@@ -802,30 +802,36 @@ impl Tool for ResolveMealDescriptionTool {
 
         match kind {
             "catalog" => {
-                let id = input["catalog_id"].as_str().ok_or_else(|| ToolError::InvalidInput {
-                    tool: self.name().to_string(),
-                    reason: "kind='catalog' requires catalog_id".to_string(),
-                })?;
+                let id = input["catalog_id"]
+                    .as_str()
+                    .ok_or_else(|| ToolError::InvalidInput {
+                        tool: self.name().to_string(),
+                        reason: "kind='catalog' requires catalog_id".to_string(),
+                    })?;
                 Ok(serde_json::json!({
                     "meal_ref": { "type": "catalog", "id": id },
                     "confirmation": confirmation
                 }))
             }
             "user" => {
-                let id = input["user_meal_id"].as_str().ok_or_else(|| ToolError::InvalidInput {
-                    tool: self.name().to_string(),
-                    reason: "kind='user' requires user_meal_id".to_string(),
-                })?;
+                let id = input["user_meal_id"]
+                    .as_str()
+                    .ok_or_else(|| ToolError::InvalidInput {
+                        tool: self.name().to_string(),
+                        reason: "kind='user' requires user_meal_id".to_string(),
+                    })?;
                 Ok(serde_json::json!({
                     "meal_ref": { "type": "user", "id": id },
                     "confirmation": confirmation
                 }))
             }
             "new" => {
-                let name = input["name"].as_str().ok_or_else(|| ToolError::InvalidInput {
-                    tool: self.name().to_string(),
-                    reason: "kind='new' requires name".to_string(),
-                })?;
+                let name = input["name"]
+                    .as_str()
+                    .ok_or_else(|| ToolError::InvalidInput {
+                        tool: self.name().to_string(),
+                        reason: "kind='new' requires name".to_string(),
+                    })?;
                 static EMPTY: &[serde_json::Value] = &[];
                 let occasion_tags: Vec<String> = input["occasion_tags"]
                     .as_array()
@@ -853,7 +859,8 @@ impl Tool for ResolveMealDescriptionTool {
 
                 let meal_id = pref.user_meal_id.ok_or_else(|| ToolError::Execution {
                     tool: self.name().to_string(),
-                    reason: "create_from_description returned pref without user_meal_id".to_string(),
+                    reason: "create_from_description returned pref without user_meal_id"
+                        .to_string(),
                 })?;
 
                 let mut response = serde_json::json!({
@@ -909,7 +916,10 @@ pub fn register_meal_suggest_slot_tools(registry: &mut ToolRegistry) {
 }
 
 /// Registers the terminal tool for the `MealAdhocResolve` use case.
-pub fn register_meal_adhoc_resolve_tools(registry: &mut ToolRegistry, db: &plnd_data::db::Database) {
+pub fn register_meal_adhoc_resolve_tools(
+    registry: &mut ToolRegistry,
+    db: &plnd_data::db::Database,
+) {
     let pool = db.get_pool().clone();
     registry.register(Arc::new(ResolveMealDescriptionTool(pool)));
 }
@@ -1210,7 +1220,10 @@ mod tests {
     #[tokio::test]
     async fn resolve_meal_description_tool_name() {
         let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
-        assert_eq!(ResolveMealDescriptionTool(pool).name(), "resolve_meal_description");
+        assert_eq!(
+            ResolveMealDescriptionTool(pool).name(),
+            "resolve_meal_description"
+        );
     }
 
     #[tokio::test]
@@ -1225,14 +1238,18 @@ mod tests {
     #[tokio::test]
     async fn resolve_meal_description_schema_has_no_user_id() {
         let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
-        assert!(!has_user_id_property(&ResolveMealDescriptionTool(pool).schema()));
+        assert!(!has_user_id_property(
+            &ResolveMealDescriptionTool(pool).schema()
+        ));
     }
 
     #[tokio::test]
     async fn resolve_meal_description_catalog_branch_echoes_ref() {
         let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
         let tool = ResolveMealDescriptionTool(pool);
-        let ctx = crate::tools::ToolContext { user_id: uuid::Uuid::new_v4() };
+        let ctx = crate::tools::ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
         let input = serde_json::json!({
             "kind": "catalog",
             "catalog_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
@@ -1240,7 +1257,10 @@ mod tests {
         });
         let result = tool.execute(&ctx, input).await.unwrap();
         assert_eq!(result["meal_ref"]["type"], "catalog");
-        assert_eq!(result["meal_ref"]["id"], "a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+        assert_eq!(
+            result["meal_ref"]["id"],
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        );
         assert_eq!(result["confirmation"], "Matched catalog meal.");
         assert!(result.get("estimated_nutrition").is_none());
     }
@@ -1249,7 +1269,9 @@ mod tests {
     async fn resolve_meal_description_user_branch_echoes_ref() {
         let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
         let tool = ResolveMealDescriptionTool(pool);
-        let ctx = crate::tools::ToolContext { user_id: uuid::Uuid::new_v4() };
+        let ctx = crate::tools::ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
         let input = serde_json::json!({
             "kind": "user",
             "user_meal_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
@@ -1257,7 +1279,10 @@ mod tests {
         });
         let result = tool.execute(&ctx, input).await.unwrap();
         assert_eq!(result["meal_ref"]["type"], "user");
-        assert_eq!(result["meal_ref"]["id"], "b2c3d4e5-f6a7-8901-bcde-f12345678901");
+        assert_eq!(
+            result["meal_ref"]["id"],
+            "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+        );
         assert_eq!(result["confirmation"], "Found your saved grilled cheese.");
     }
 
@@ -1265,7 +1290,9 @@ mod tests {
     async fn resolve_meal_description_invalid_kind_returns_error() {
         let pool = sqlx::PgPool::connect_lazy("postgres://unused").unwrap();
         let tool = ResolveMealDescriptionTool(pool);
-        let ctx = crate::tools::ToolContext { user_id: uuid::Uuid::new_v4() };
+        let ctx = crate::tools::ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
         let input = serde_json::json!({
             "kind": "unknown",
             "confirmation": "irrelevant"
@@ -1555,18 +1582,24 @@ mod tests {
             assert_eq!(result["meal_ref"]["type"], "user");
             assert!(result["meal_ref"]["id"].as_str().is_some());
             assert_eq!(result["estimated_nutrition"]["kcal"], 420.0);
-            assert_eq!(result["confirmation"], "Created custom grilled cheese with estimated nutrition.");
+            assert_eq!(
+                result["confirmation"],
+                "Created custom grilled cheese with estimated nutrition."
+            );
 
             // Confirm DB row has nutrition_estimated = true
             let meal_id: uuid::Uuid = result["meal_ref"]["id"].as_str().unwrap().parse().unwrap();
             let (estimated,): (bool,) = sqlx::query_as(
-                "SELECT nutrition_estimated FROM user_meals WHERE user_meal_id = $1"
+                "SELECT nutrition_estimated FROM user_meals WHERE user_meal_id = $1",
             )
             .bind(meal_id)
             .fetch_one(&pool)
             .await
             .unwrap();
-            assert!(estimated, "nutrition_estimated must be true for new custom meals");
+            assert!(
+                estimated,
+                "nutrition_estimated must be true for new custom meals"
+            );
         }
 
         #[sqlx::test(migrations = "../plnd_data/migrations")]
@@ -1584,8 +1617,14 @@ mod tests {
 
             assert_eq!(result["meal_ref"]["type"], "user");
             assert!(result["meal_ref"]["id"].as_str().is_some());
-            assert!(result.get("estimated_nutrition").is_none(), "no nutrition key when field absent");
-            assert_eq!(result["confirmation"], "Added plain toast with no nutrition data.");
+            assert!(
+                result.get("estimated_nutrition").is_none(),
+                "no nutrition key when field absent"
+            );
+            assert_eq!(
+                result["confirmation"],
+                "Added plain toast with no nutrition data."
+            );
         }
 
         #[sqlx::test(migrations = "../plnd_data/migrations")]

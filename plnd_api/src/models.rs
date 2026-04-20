@@ -284,7 +284,10 @@ mod meal_plan_tests {
     fn meal_adhoc_resolve_request_with_date_deserializes() {
         let json = r#"{"text": "oatmeal", "occasion": "breakfast", "date": "2026-04-21"}"#;
         let req: MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.date, Some(chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap()));
+        assert_eq!(
+            req.date,
+            Some(chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap())
+        );
     }
 
     #[test]
@@ -297,7 +300,10 @@ mod meal_plan_tests {
     #[test]
     fn meal_adhoc_resolve_response_serializes() {
         let resp = MealAdhocResolveResponse {
-            meal_ref: MealRef { meal_type: "catalog".to_string(), id: uuid::Uuid::new_v4() },
+            meal_ref: MealRef {
+                meal_type: "catalog".to_string(),
+                id: uuid::Uuid::new_v4(),
+            },
             estimated_nutrition: None,
             confirmation: "Found it.".to_string(),
         };
