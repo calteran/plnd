@@ -17,10 +17,10 @@ test.describe('Day View — Meal Review Pane', () => {
     await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
 
     const mealRow = dayView.getMealRows().first();
-    await expect(mealRow.locator('.review-btn')).toBeVisible();
+    await expect(dayView.getMealRowReviewBtn(mealRow)).toBeVisible();
 
-    await mealRow.locator('.review-btn').click();
-    await expect(mealRow.locator('app-meal-review-pane')).toBeVisible();
+    await dayView.getMealRowReviewBtn(mealRow).click();
+    await expect(dayView.getMealReviewPane(mealRow)).toBeVisible();
   });
 
   test('done checkbox does not open the review pane', async ({ page }) => {
@@ -29,14 +29,12 @@ test.describe('Day View — Meal Review Pane', () => {
     await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
 
     const mealRow = dayView.getMealRows().first();
-    await mealRow.locator('.done-checkbox').click();
+    await dayView.getMealRowDoneCheckbox(mealRow).click();
 
-    // Pane should NOT open
-    await expect(mealRow.locator('app-meal-review-pane')).not.toBeVisible();
+    await expect(dayView.getMealReviewPane(mealRow)).not.toBeVisible();
   });
 
   test('swap via text input: submits resolve, row updates, pane closes', async ({ page }) => {
-    // Mock the resolve API
     await page.route(`${API_BASE}/agent/meal-plan/resolve`, route =>
       route.fulfill({
         status: 200,
@@ -50,18 +48,13 @@ test.describe('Day View — Meal Review Pane', () => {
 
     const mealRow = dayView.getMealRows().first();
 
-    // Open review pane
-    await mealRow.locator('.review-btn').click();
-    await expect(mealRow.locator('app-meal-review-pane')).toBeVisible();
+    await dayView.getMealRowReviewBtn(mealRow).click();
+    await expect(dayView.getMealReviewPane(mealRow)).toBeVisible();
 
-    // Click Swap (meal from mock has status 'planned' → filled → shows swap)
     await mealRow.locator('[data-action="swap"]').click();
-
-    // Fill and submit
     await mealRow.locator('.resolve-input').fill('Greek yogurt bowl');
     await mealRow.locator('.resolve-submit').click();
 
-    // Pane should close after successful resolve
-    await expect(mealRow.locator('app-meal-review-pane')).not.toBeVisible({ timeout: 5_000 });
+    await expect(dayView.getMealReviewPane(mealRow)).not.toBeVisible({ timeout: 5_000 });
   });
 });
