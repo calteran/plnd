@@ -5,5 +5,4 @@ pub mod repository;
 pub mod search;
 
 pub use db::error::DatabaseError;
-pub use db::Database;
 pub use repository::Repositories;

@@ -23,24 +23,13 @@ impl Database {
         Ok(Database { pool })
     }
 
-    /// Get a reference to the connection pool
-    pub fn get_pool(&self) -> &PgPool {
+    pub(crate) fn get_pool(&self) -> &PgPool {
         &self.pool
-    }
-
-    /// Health check - verify database connectivity
-    #[tracing::instrument(skip_all)]
-    pub async fn health_check(&self) -> Result<(), DatabaseError> {
-        sqlx::query("SELECT 1")
-            .execute(&self.pool)
-            .await
-            .map(|_| ())
-            .map_err(DatabaseError::from)
     }
 }
 
 /// Run all pending database migrations.
-pub async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), DatabaseError> {
+pub(crate) async fn run_migrations(pool: &sqlx::PgPool) -> Result<(), DatabaseError> {
     sqlx::migrate!("./migrations")
         .run(pool)
         .await
