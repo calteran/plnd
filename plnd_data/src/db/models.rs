@@ -560,3 +560,16 @@ pub struct LocalExerciseResult {
     pub external_source: Option<String>,
     pub is_user_exercise: bool,
 }
+
+// ---------------------------------------------------------------------------
+// Meal suggestion query result
+// ---------------------------------------------------------------------------
+
+/// A meal or dish returned as a planning suggestion.
+#[derive(Debug, Clone, sqlx::FromRow, Serialize, Deserialize)]
+pub struct MealSuggestion {
+    pub id: Uuid,
+    pub name: String,
+    /// "meal" or "dish"
+    pub suggestion_type: String,
+}

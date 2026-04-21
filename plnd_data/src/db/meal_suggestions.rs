@@ -2,15 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-
-/// A meal or dish returned as a planning suggestion.
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct MealSuggestion {
-    pub id: Uuid,
-    pub name: String,
-    /// "meal" or "dish"
-    pub suggestion_type: String,
-}
+use crate::db::models::MealSuggestion;
 
 /// Return up to 10 meal/dish suggestions for the given user and slot.
 ///

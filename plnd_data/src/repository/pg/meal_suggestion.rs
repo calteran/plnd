@@ -4,7 +4,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::meal_suggestions::{self, MealSuggestion};
+use crate::db::meal_suggestions;
+use crate::db::models::MealSuggestion;
 use crate::repository::meal_suggestion::MealSuggestionRepository;
 
 pub struct PgMealSuggestionRepository {

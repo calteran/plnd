@@ -32,7 +32,7 @@ pub async fn list(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
-        .user_dish_prefs
+        .user_dish_pref
         .list(user_id)
         .await
         .map(|v| {
@@ -69,7 +69,7 @@ pub async fn get_detail(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
-        .user_dish_prefs
+        .user_dish_pref
         .get(user_id, pref_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
@@ -116,7 +116,7 @@ pub async fn create(
     if let Some(catalog_id) = body.catalog_dish_id {
         match state
             .repos
-            .user_dish_prefs
+            .user_dish_pref
             .create_from_catalog(user_id, catalog_id)
             .await
         {
@@ -131,7 +131,7 @@ pub async fn create(
     } else if let Some(name) = body.name {
         let detail = state
             .repos
-            .user_dish_prefs
+            .user_dish_pref
             .create_from_scratch(
                 user_id,
                 &name,
@@ -212,7 +212,7 @@ pub async fn patch(
 
         state
             .repos
-            .user_dish_prefs
+            .user_dish_pref
             .fork_and_update_recipe(
                 user_id,
                 pref_id,
@@ -248,7 +248,7 @@ pub async fn patch(
 
         state
             .repos
-            .user_dish_prefs
+            .user_dish_pref
             .update_metadata(
                 user_id,
                 pref_id,
@@ -289,7 +289,7 @@ pub async fn delete(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let deleted = state
         .repos
-        .user_dish_prefs
+        .user_dish_pref
         .delete(user_id, pref_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -337,7 +337,7 @@ pub async fn add_ingredient(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
-        .user_dish_prefs
+        .user_dish_pref
         .add_ingredient(
             user_id,
             pref_id,
@@ -382,7 +382,7 @@ pub async fn remove_ingredient(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     match state
         .repos
-        .user_dish_prefs
+        .user_dish_pref
         .remove_ingredient(user_id, pref_id, ingredient_id)
         .await
     {
