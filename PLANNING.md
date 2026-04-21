@@ -128,7 +128,7 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
 
 ## Development Roadmap
 
-### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 COMPLETED | Phase 3.0 COMPLETED | Phase 3.1 COMPLETED | Phase 3.2 COMPLETED
+### Current Status: Phase 1 COMPLETED | Phase 2 COMPLETED | Phase 2.5 COMPLETED | Phase 3.0 COMPLETED | Phase 3.1 COMPLETED | Phase 3.2 COMPLETED | Phase 3.3 COMPLETED
 
 ### Phase 1: Foundation (Core Infrastructure) — COMPLETED
 **Goal**: Set up development environment and implement basic authentication
@@ -281,21 +281,21 @@ To handle "squishy" user input and provide adaptive, personalized planning, PLND
   - [x] Angular: viewed date passed to task entry API; schedule reloads after creation (#332: #364)
   - [x] *(remaining Phase 3.2 work tracked in #289)*
 
-- [ ] **Phase 3.3 — Meal Planning** — *See [`docs/superpowers/specs/2026-04-15-phase-3.3-meal-planning-design.md`](./docs/superpowers/specs/2026-04-15-phase-3.3-meal-planning-design.md) and [implementation plan](./docs/superpowers/plans/2026-04-15-phase-3.3-meal-planning.md)*
-  - [ ] `user_meals.nutrition_estimated` migration + `create_from_description` store path
-  - [ ] Read-side meal tools: `search_meal_catalog`, `get_user_meal_library`, `get_user_meal_preferences`
-  - [ ] Nutrition tools: `get_meal_nutrition`, `estimate_nutrition_from_description`
-  - [ ] `MealPlanning` use case: `get_week_schedule` + `propose_meal_plan` + revised `meal_planning.md` + `/agent/meal-plan`
-  - [ ] `MealRebalance` use case: `rebalance_meal_plan` + revised `meal_rebalance.md` + `/agent/meal-plan/rebalance`
-  - [ ] `MealSuggestSlot` use case: cheap single-meal suggestion + `/agent/meal-plan/suggest`
-  - [ ] `MealAdhocResolve` use case: free-text → meal_ref + `/agent/meal-plan/resolve`
-  - [ ] Angular wizard: auto-generate on step entry, client-local approval state (proposed/approved/skipped), ✓/🔀/✏️/× cell actions, top-level Refresh with confirmation modal
-  - [ ] Angular day view: done checkbox on meal rows, inline Review pane with nutrition + dishes + swap/edit/skip/add actions backed by the resolver
+- [x] **Phase 3.3 — Meal Planning** — *See [`docs/superpowers/specs/2026-04-15-phase-3.3-meal-planning-design.md`](./docs/superpowers/specs/2026-04-15-phase-3.3-meal-planning-design.md) and [implementation plan](./docs/superpowers/plans/2026-04-15-phase-3.3-meal-planning.md)*
+  - [x] `user_meals.nutrition_estimated` migration + `create_from_description` store path
+  - [x] Read-side meal tools: `search_meal_catalog`, `get_user_meal_library`, `get_user_meal_preferences`
+  - [x] Nutrition tools: `get_meal_nutrition`, `estimate_nutrition_from_description`
+  - [x] `MealPlanning` use case: `get_week_schedule` + `propose_meal_plan` + revised `meal_planning.md` + `/agent/meal-plan`
+  - [x] `MealRebalance` use case: `rebalance_meal_plan` + revised `meal_rebalance.md` + `/agent/meal-plan/rebalance`
+  - [x] `MealSuggestSlot` use case: cheap single-meal suggestion + `/agent/meal-plan/suggest`
+  - [x] `MealAdhocResolve` use case: free-text → meal_ref + `/agent/meal-plan/resolve`
+  - [x] Angular wizard: auto-generate on step entry, client-local approval state (proposed/approved/skipped), ✓/🔀/✏️/× cell actions, top-level Refresh with confirmation modal
+  - [x] Angular day view: done checkbox on meal rows, inline Review pane with nutrition + dishes + swap/edit/skip/add actions backed by the resolver
 
 **Deliverables:**
 - [x] Platform-independent LLM abstraction (`plnd_agent` crate)
 - [x] Intent-driven task entry with autonomous scheduling and UI signals
-- [ ] AI-powered weekly meal planning with iterative rebalancing
+- [x] AI-powered weekly meal planning with iterative rebalancing
 - [x] User memory system
 
 ### Phase 3.5: Background Agent Jobs *(deferred)*
