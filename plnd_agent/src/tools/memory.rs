@@ -423,8 +423,8 @@ mod tests {
 
     // ── Schema security ───────────────────────────────────────────────────────
     //
-    // MemoryStore requires a live PgPool. Schema tests don't call execute(), so
-    // we test schemas by reproducing the exact JSON the tools return — this
+    // Memory tools require a live repository. Schema tests don't call execute(),
+    // so we test schemas by reproducing the exact JSON the tools return — this
     // avoids a test-only DB dependency while still pinning the contract.
 
     fn has_user_id_property(schema: &serde_json::Value) -> bool {
