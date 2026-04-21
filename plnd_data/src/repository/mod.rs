@@ -8,7 +8,7 @@ pub mod meal;
 pub mod meal_search;
 pub mod meal_suggestion;
 pub mod memory;
-pub mod pg;
+pub(crate) mod pg;
 pub mod preferences;
 pub mod schedule;
 pub mod session;
