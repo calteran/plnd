@@ -118,8 +118,6 @@ async fn main() {
         config.auth.jwt.jwt_expiration,
     );
 
-    let session = SessionService::with_db(db_conn.clone());
-
     // Build the JWKS cache. The internal_issuer_url (Docker-internal hostname) is used
     // for server-to-server JWKS fetching; the external issuer_url is used to validate
     // the `iss` claim that the IdP embeds in tokens.
@@ -221,6 +219,7 @@ async fn main() {
     let agent_task_limiter = Arc::new(RateLimiter::keyed(agent_task_quota));
 
     let repos = plnd_data::Repositories::from_database(&db_conn);
+    let session = SessionService::with_repo(repos.session.clone());
     let agent = plnd_agent::AgentService::new(&config.llm, repos.clone());
 
     let state = Arc::new(AppState {
