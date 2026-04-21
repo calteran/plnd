@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-
 use plnd_data::repository::{MealRepository, UserIngredientPrefRepository, UserMealPrefRepository};
 use rust_decimal::prelude::ToPrimitive;
 
@@ -1055,28 +1054,21 @@ mod tests {
         async fn list(
             &self,
             _user_id: uuid::Uuid,
-        ) -> Result<
-            Vec<plnd_data::models::UserMealPrefDetail>,
-            plnd_data::Error,
-        > {
+        ) -> Result<Vec<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn get(
             &self,
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
-        ) -> Result<
-            Option<plnd_data::models::UserMealPrefDetail>,
-            plnd_data::Error,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn create_from_catalog(
             &self,
             _user_id: uuid::Uuid,
             _catalog_meal_id: uuid::Uuid,
-        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error>
-        {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn create_from_scratch(
@@ -1084,8 +1076,7 @@ mod tests {
             _user_id: uuid::Uuid,
             _name: &str,
             _description: Option<&str>,
-        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error>
-        {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn create_from_description(
@@ -1095,8 +1086,7 @@ mod tests {
             _occasion_tags: &[String],
             _nutrition: Option<serde_json::Value>,
             _estimated: bool,
-        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error>
-        {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn update_metadata(
@@ -1107,10 +1097,7 @@ mod tests {
             _is_safe_food: Option<bool>,
             _is_blocked: Option<bool>,
             _notes: Option<Option<String>>,
-        ) -> Result<
-            Option<plnd_data::models::UserMealPrefDetail>,
-            plnd_data::Error,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn fork_and_update_recipe(
@@ -1119,10 +1106,7 @@ mod tests {
             _pref_id: uuid::Uuid,
             _name: Option<&str>,
             _description: Option<&str>,
-        ) -> Result<
-            Option<plnd_data::models::UserMealPrefDetail>,
-            plnd_data::Error,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn delete(
@@ -1137,10 +1121,7 @@ mod tests {
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
             _params: plnd_data::repository::user_meal_pref::AddDishParams,
-        ) -> Result<
-            Option<plnd_data::models::UserMealPrefDetail>,
-            plnd_data::Error,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn remove_dish(
@@ -1441,7 +1422,6 @@ mod tests {
         use std::collections::HashMap;
         use std::sync::Mutex;
 
-        
         use plnd_data::models::{
             CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
             DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
@@ -1449,7 +1429,6 @@ mod tests {
         use plnd_data::repository::{
             MealRepository, UserIngredientPrefRepository, UserMealPrefRepository,
         };
-        use plnd_data::DatabaseError;
         use rust_decimal::Decimal;
         use uuid::Uuid;
 
@@ -1673,7 +1652,10 @@ mod tests {
 
         #[async_trait::async_trait]
         impl UserMealPrefRepository for InMemoryUserMealPrefRepository {
-            async fn list(&self, user_id: Uuid) -> Result<Vec<UserMealPrefDetail>, plnd_data::Error> {
+            async fn list(
+                &self,
+                user_id: Uuid,
+            ) -> Result<Vec<UserMealPrefDetail>, plnd_data::Error> {
                 let s = self.store.lock().unwrap();
                 Ok(s.meal_prefs
                     .iter()
@@ -1765,7 +1747,11 @@ mod tests {
                 unimplemented!("not needed by tool-logic tests")
             }
 
-            async fn delete(&self, _user_id: Uuid, _pref_id: Uuid) -> Result<bool, plnd_data::Error> {
+            async fn delete(
+                &self,
+                _user_id: Uuid,
+                _pref_id: Uuid,
+            ) -> Result<bool, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1817,7 +1803,10 @@ mod tests {
 
         #[async_trait::async_trait]
         impl UserIngredientPrefRepository for InMemoryUserIngredientPrefRepository {
-            async fn list(&self, user_id: Uuid) -> Result<Vec<UserIngredientPref>, plnd_data::Error> {
+            async fn list(
+                &self,
+                user_id: Uuid,
+            ) -> Result<Vec<UserIngredientPref>, plnd_data::Error> {
                 let prefs = self.prefs.lock().unwrap();
                 Ok(prefs
                     .iter()

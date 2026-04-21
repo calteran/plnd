@@ -12,6 +12,7 @@ pub(crate) enum DatabaseError {
     #[error("Unique constraint violation")]
     UniqueViolation,
 
+    #[allow(dead_code)]
     #[error("Validation error: {0}")]
     ValidationError(String),
 

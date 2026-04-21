@@ -8,5 +8,5 @@ pub trait ExerciseRepository: Send + Sync {
         &self,
         q: &str,
         limit: i64,
-    ) -> Result<Vec<LocalExerciseResult>,crate::Error>;
+    ) -> Result<Vec<LocalExerciseResult>, crate::Error>;
 }

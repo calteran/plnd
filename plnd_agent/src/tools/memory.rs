@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use plnd_data::repository::MemoryRepository;
-use plnd_data::DatabaseError;
 use uuid::Uuid;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};

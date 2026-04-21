@@ -11,5 +11,5 @@ pub trait MealSuggestionRepository: Send + Sync {
         user_id: Uuid,
         slot: &str,
         date: NaiveDate,
-    ) -> Result<Vec<MealSuggestion>,crate::Error>;
+    ) -> Result<Vec<MealSuggestion>, crate::Error>;
 }

@@ -23,7 +23,9 @@ impl BriefingRepository for PgBriefingRepository {
         &self,
         user_id: Uuid,
         date: NaiveDate,
-    ) -> Result<YesterdaySnapshot,crate::Error> {
-        briefing::yesterday_snapshot(&self.pool, user_id, date).await.map_err(Into::into)
+    ) -> Result<YesterdaySnapshot, crate::Error> {
+        briefing::yesterday_snapshot(&self.pool, user_id, date)
+            .await
+            .map_err(Into::into)
     }
 }

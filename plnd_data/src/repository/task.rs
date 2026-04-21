@@ -16,12 +16,12 @@ pub trait TaskRepository: Send + Sync {
         scheduled_at: Option<DateTime<Utc>>,
         duration_minutes: i32,
         after_milepost: Option<&str>,
-    ) -> Result<Task,crate::Error>;
+    ) -> Result<Task, crate::Error>;
 
     async fn create_weekly_plan_task(
         &self,
         user_id: Uuid,
         plan_start: NaiveDate,
         trigger_offset: i16,
-    ) -> Result<Task,crate::Error>;
+    ) -> Result<Task, crate::Error>;
 }

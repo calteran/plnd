@@ -2,7 +2,6 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-
 use crate::db::search::{search_dishes, search_ingredients, search_user_dishes};
 use crate::models::{LocalDishResult, LocalIngredientResult};
 use crate::repository::meal_search::MealSearchRepository;
@@ -25,16 +24,20 @@ impl MealSearchRepository for PgMealSearchRepository {
         limit: i64,
         exclude_allergens: &[String],
         user_id: Option<Uuid>,
-    ) -> Result<Vec<LocalIngredientResult>,crate::Error> {
-        search_ingredients(&self.pool, q, limit, exclude_allergens, user_id).await.map_err(Into::into)
+    ) -> Result<Vec<LocalIngredientResult>, crate::Error> {
+        search_ingredients(&self.pool, q, limit, exclude_allergens, user_id)
+            .await
+            .map_err(Into::into)
     }
 
     async fn search_catalog_dishes(
         &self,
         q: &str,
         limit: i64,
-    ) -> Result<Vec<LocalDishResult>,crate::Error> {
-        search_dishes(&self.pool, q, limit).await.map_err(Into::into)
+    ) -> Result<Vec<LocalDishResult>, crate::Error> {
+        search_dishes(&self.pool, q, limit)
+            .await
+            .map_err(Into::into)
     }
 
     async fn search_user_dishes(
@@ -42,7 +45,9 @@ impl MealSearchRepository for PgMealSearchRepository {
         user_id: Uuid,
         q: &str,
         limit: i64,
-    ) -> Result<Vec<LocalDishResult>,crate::Error> {
-        search_user_dishes(&self.pool, user_id, q, limit).await.map_err(Into::into)
+    ) -> Result<Vec<LocalDishResult>, crate::Error> {
+        search_user_dishes(&self.pool, user_id, q, limit)
+            .await
+            .map_err(Into::into)
     }
 }

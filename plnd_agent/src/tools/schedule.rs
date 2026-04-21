@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use plnd_data::repository::{ScheduleRepository, TaskRepository};
-use plnd_data::DatabaseError;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 

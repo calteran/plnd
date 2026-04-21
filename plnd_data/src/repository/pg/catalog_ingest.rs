@@ -18,7 +18,7 @@ impl PgCatalogIngestRepository {
 
 #[async_trait]
 impl CatalogIngestRepository for PgCatalogIngestRepository {
-    async fn ingest_ingredient(&self, input: IngestIngredientInput) -> Result<Uuid,crate::Error> {
+    async fn ingest_ingredient(&self, input: IngestIngredientInput) -> Result<Uuid, crate::Error> {
         catalog_ingest::ingest_ingredient(
             &self.pool,
             IngestIngredientParams {
@@ -32,6 +32,7 @@ impl CatalogIngestRepository for PgCatalogIngestRepository {
                 occasion_tags: &input.occasion_tags,
             },
         )
-        .await.map_err(Into::into)
+        .await
+        .map_err(Into::into)
     }
 }

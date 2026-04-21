@@ -6,7 +6,7 @@ use crate::models::UserPreferences;
 
 #[async_trait]
 pub trait PreferencesRepository: Send + Sync {
-    async fn get_or_create(&self, user_id: Uuid) -> Result<UserPreferences,crate::Error>;
+    async fn get_or_create(&self, user_id: Uuid) -> Result<UserPreferences, crate::Error>;
 
     async fn patch_preferences(
         &self,
@@ -15,5 +15,5 @@ pub trait PreferencesRepository: Send + Sync {
         planning_trigger_offset: Option<i16>,
         default_plan_length_days: Option<i16>,
         wake_time: Option<NaiveTime>,
-    ) -> Result<UserPreferences,crate::Error>;
+    ) -> Result<UserPreferences, crate::Error>;
 }

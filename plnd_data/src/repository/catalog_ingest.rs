@@ -3,8 +3,6 @@ use rust_decimal::Decimal;
 use serde_json::Value;
 use uuid::Uuid;
 
-
-
 pub struct IngestIngredientInput {
     pub external_source: String,
     pub external_id: String,
@@ -18,5 +16,5 @@ pub struct IngestIngredientInput {
 
 #[async_trait]
 pub trait CatalogIngestRepository: Send + Sync {
-    async fn ingest_ingredient(&self, input: IngestIngredientInput) -> Result<Uuid,crate::Error>;
+    async fn ingest_ingredient(&self, input: IngestIngredientInput) -> Result<Uuid, crate::Error>;
 }

@@ -9,7 +9,7 @@ pub trait MemoryRepository: Send + Sync {
         &self,
         user_id: Uuid,
         categories: &[&str],
-    ) -> Result<Vec<UserMemory>,crate::Error>;
+    ) -> Result<Vec<UserMemory>, crate::Error>;
 
     async fn save(
         &self,
@@ -17,14 +17,14 @@ pub trait MemoryRepository: Send + Sync {
         category: &str,
         content: &str,
         tags: &[String],
-    ) -> Result<UserMemory,crate::Error>;
+    ) -> Result<UserMemory, crate::Error>;
 
     async fn update(
         &self,
         user_id: Uuid,
         memory_id: Uuid,
         content: &str,
-    ) -> Result<UserMemory,crate::Error>;
+    ) -> Result<UserMemory, crate::Error>;
 
-    async fn forget(&self, user_id: Uuid, memory_id: Uuid) -> Result<(),crate::Error>;
+    async fn forget(&self, user_id: Uuid, memory_id: Uuid) -> Result<(), crate::Error>;
 }
