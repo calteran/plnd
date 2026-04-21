@@ -40,11 +40,6 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
   trait) in `plnd_data`, never a direct query in a consuming crate.
 - Workspace exception: `plnd_seed` (non-production tooling) may use `sqlx` directly.
 
-> **Current reality note:** `plnd_api/src/routes/*` route handlers still use `PgPool` directly.
-> That is existing code predating this rule. The rule covers `plnd_agent` (now clean) and any
-> future code. Do not expand scope by rewriting `plnd_api` routes unless that becomes a
-> dedicated refactor effort.
-
 ### Before Every Commit
 Run `just verify` — this executes the full quality suite and must pass cleanly.
 
