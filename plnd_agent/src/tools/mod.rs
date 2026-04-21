@@ -160,6 +160,7 @@ pub(crate) fn build_tool_registry(
                 &mut registry,
                 Arc::clone(&repos.meal),
                 Arc::clone(&repos.user_ingredient_pref),
+                Arc::clone(&repos.user_meal_pref),
             );
             let week_state = extra.unwrap_or_default();
             register_meal_planning_tools(&mut registry, week_state);
@@ -169,6 +170,7 @@ pub(crate) fn build_tool_registry(
                 &mut registry,
                 Arc::clone(&repos.meal),
                 Arc::clone(&repos.user_ingredient_pref),
+                Arc::clone(&repos.user_meal_pref),
             );
             let week_state = extra.unwrap_or_default();
             register_meal_rebalance_tools(&mut registry, week_state);
@@ -178,6 +180,7 @@ pub(crate) fn build_tool_registry(
                 &mut registry,
                 Arc::clone(&repos.meal),
                 Arc::clone(&repos.user_ingredient_pref),
+                Arc::clone(&repos.user_meal_pref),
             );
             register_meal_suggest_slot_tools(&mut registry);
         }
@@ -186,8 +189,9 @@ pub(crate) fn build_tool_registry(
                 &mut registry,
                 Arc::clone(&repos.meal),
                 Arc::clone(&repos.user_ingredient_pref),
+                Arc::clone(&repos.user_meal_pref),
             );
-            register_meal_adhoc_resolve_tools(&mut registry, Arc::clone(&repos.meal));
+            register_meal_adhoc_resolve_tools(&mut registry, Arc::clone(&repos.user_meal_pref));
         }
     }
     registry
