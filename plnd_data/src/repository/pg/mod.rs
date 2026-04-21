@@ -1,3 +1,4 @@
+pub mod briefing;
 pub mod catalog_ingest;
 pub mod meal;
 pub mod meal_suggestion;

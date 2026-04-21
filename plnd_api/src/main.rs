@@ -231,6 +231,7 @@ async fn main() {
         oidc_client_id: config.auth.oidc.client_id.clone(),
         provider_search,
         briefing,
+        repositories: repos,
         client_error_limiter,
         agent_task_limiter,
         agent,

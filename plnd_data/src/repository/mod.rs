@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+pub mod briefing;
 pub mod catalog_ingest;
 pub mod meal;
 pub mod meal_suggestion;
@@ -11,6 +12,7 @@ pub mod session;
 pub mod task;
 pub mod user;
 
+pub use briefing::BriefingRepository;
 pub use catalog_ingest::CatalogIngestRepository;
 pub use meal::MealRepository;
 pub use meal_suggestion::MealSuggestionRepository;
@@ -23,6 +25,7 @@ pub use user::UserRepository;
 
 #[derive(Clone)]
 pub struct Repositories {
+    pub briefing: Arc<dyn BriefingRepository>,
     pub catalog_ingest: Arc<dyn CatalogIngestRepository>,
     pub meal: Arc<dyn MealRepository>,
     pub meal_suggestion: Arc<dyn MealSuggestionRepository>,
@@ -38,6 +41,7 @@ impl Repositories {
     pub fn from_database(db: &crate::db::Database) -> Self {
         let pool = db.get_pool().clone();
         Self {
+            briefing: Arc::new(pg::briefing::PgBriefingRepository::new(pool.clone())),
             catalog_ingest: Arc::new(pg::catalog_ingest::PgCatalogIngestRepository::new(
                 pool.clone(),
             )),
