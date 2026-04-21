@@ -11,11 +11,8 @@ use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::search::{
-    search_dishes, search_exercises, search_ingredients, search_user_dishes, LocalDishResult,
-    LocalExerciseResult, LocalIngredientResult,
-};
 use plnd_data::providers::dtos::{SearchQuery, SearchResult};
+use plnd_data::repository::{LocalDishResult, LocalExerciseResult, LocalIngredientResult};
 use plnd_data::search::ProviderSearchEvent;
 
 fn default_limit() -> u32 {
@@ -121,18 +118,20 @@ pub async fn search_ingredients_handler(
 ) -> Result<Json<IngredientSearchResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let sq = params.into_search_query();
-    let local = search_ingredients(
-        state.db.get_pool(),
-        &sq.query,
-        sq.limit as i64,
-        &sq.exclude_allergens,
-        Some(user_id),
-    )
-    .await
-    .map_err(|e| {
-        tracing::error!(error = %e, "search_ingredients DB error");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let local = state
+        .repos
+        .meal_search
+        .search_catalog_ingredients(
+            &sq.query,
+            sq.limit as i64,
+            &sq.exclude_allergens,
+            Some(user_id),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "search_ingredients DB error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     let mut stream = state.provider_search.search_ingredients(sq);
     let mut resp = IngredientSearchResponse {
@@ -179,13 +178,19 @@ pub async fn search_dishes_handler(
 ) -> Result<Json<DishSearchResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let sq = params.into_search_query();
-    let local = search_dishes(state.db.get_pool(), &sq.query, sq.limit as i64)
+    let local = state
+        .repos
+        .meal_search
+        .search_catalog_dishes(&sq.query, sq.limit as i64)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "search_dishes DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    let user = search_user_dishes(state.db.get_pool(), user_id, &sq.query, sq.limit as i64)
+    let user = state
+        .repos
+        .meal_search
+        .search_user_dishes(user_id, &sq.query, sq.limit as i64)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "search_user_dishes DB error");
@@ -236,7 +241,10 @@ pub async fn search_exercises_handler(
     Query(params): Query<ExerciseSearchParams>,
 ) -> Result<Json<ExerciseSearchResponse>, StatusCode> {
     let sq = params.into_search_query();
-    let local = search_exercises(state.db.get_pool(), &sq.query, sq.limit as i64)
+    let local = state
+        .repos
+        .exercise
+        .search_exercises(&sq.query, sq.limit as i64)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "search_exercises DB error");
