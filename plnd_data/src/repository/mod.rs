@@ -18,7 +18,6 @@ pub mod user_dish_pref;
 pub mod user_ingredient_pref;
 pub mod user_meal_pref;
 
-pub use crate::db::error::DatabaseError;
 pub use briefing::BriefingRepository;
 pub use catalog_ingest::CatalogIngestRepository;
 pub use exercise::ExerciseRepository;
@@ -58,7 +57,7 @@ pub struct Repositories {
 }
 
 impl Repositories {
-    pub async fn new(database_url: &str, max_connections: u32) -> Result<Self, DatabaseError> {
+    pub async fn new(database_url: &str, max_connections: u32) -> Result<Self, crate::Error> {
         let db = crate::db::connection::Database::new(database_url, max_connections).await?;
         crate::db::connection::run_migrations(db.get_pool()).await?;
         Ok(Self::from_database(&db))
@@ -97,12 +96,12 @@ impl Repositories {
     }
 
     #[tracing::instrument(skip_all)]
-    pub async fn health_check(&self) -> Result<(), DatabaseError> {
+    pub async fn health_check(&self) -> Result<(), crate::Error> {
         sqlx::query("SELECT 1")
             .execute(&self.pool)
             .await
             .map(|_| ())
-            .map_err(DatabaseError::from)
+            .map_err(|e| crate::Error::from(crate::db::error::DatabaseError::from(e)))
     }
 }
 
@@ -112,7 +111,7 @@ mod tests {
 
     fn _assert_health_check_signature(
         repos: &Repositories,
-    ) -> impl std::future::Future<Output = Result<(), DatabaseError>> + '_ {
+    ) -> impl std::future::Future<Output = Result<(), crate::Error>> + '_ {
         repos.health_check()
     }
 }

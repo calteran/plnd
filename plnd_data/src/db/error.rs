@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 #[allow(clippy::enum_variant_names)]
-pub enum DatabaseError {
+pub(crate) enum DatabaseError {
     #[error("Database connection failed: {0}")]
     ConnectionError(String),
 
@@ -11,9 +11,6 @@ pub enum DatabaseError {
 
     #[error("Unique constraint violation")]
     UniqueViolation,
-
-    #[error("Validation error: {0}")]
-    ValidationError(String),
 
     #[error("Migration failed: {0}")]
     MigrationError(String),

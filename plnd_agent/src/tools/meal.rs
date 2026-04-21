@@ -1,14 +1,13 @@
 use std::sync::Arc;
 
 use plnd_data::repository::{MealRepository, UserIngredientPrefRepository, UserMealPrefRepository};
-use plnd_data::DatabaseError;
 use rust_decimal::prelude::ToPrimitive;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
-fn db_err(tool: &str, e: DatabaseError) -> ToolError {
+fn db_err(tool: &str, e: plnd_data::Error) -> ToolError {
     ToolError::Execution {
         tool: tool.to_string(),
         reason: e.to_string(),
@@ -1055,22 +1054,21 @@ mod tests {
         async fn list(
             &self,
             _user_id: uuid::Uuid,
-        ) -> Result<Vec<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError> {
+        ) -> Result<Vec<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn get(
             &self,
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
-        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
-        {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn create_from_catalog(
             &self,
             _user_id: uuid::Uuid,
             _catalog_meal_id: uuid::Uuid,
-        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::DatabaseError> {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn create_from_scratch(
@@ -1078,7 +1076,7 @@ mod tests {
             _user_id: uuid::Uuid,
             _name: &str,
             _description: Option<&str>,
-        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::DatabaseError> {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn create_from_description(
@@ -1088,7 +1086,7 @@ mod tests {
             _occasion_tags: &[String],
             _nutrition: Option<serde_json::Value>,
             _estimated: bool,
-        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::DatabaseError> {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn update_metadata(
@@ -1099,8 +1097,7 @@ mod tests {
             _is_safe_food: Option<bool>,
             _is_blocked: Option<bool>,
             _notes: Option<Option<String>>,
-        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
-        {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn fork_and_update_recipe(
@@ -1109,15 +1106,14 @@ mod tests {
             _pref_id: uuid::Uuid,
             _name: Option<&str>,
             _description: Option<&str>,
-        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
-        {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn delete(
             &self,
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
-        ) -> Result<bool, plnd_data::DatabaseError> {
+        ) -> Result<bool, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn add_dish(
@@ -1125,8 +1121,7 @@ mod tests {
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
             _params: plnd_data::repository::user_meal_pref::AddDishParams,
-        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
-        {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::Error> {
             unimplemented!("stub")
         }
         async fn remove_dish(
@@ -1134,7 +1129,7 @@ mod tests {
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
             _meal_dish_id: uuid::Uuid,
-        ) -> Result<Option<bool>, plnd_data::DatabaseError> {
+        ) -> Result<Option<bool>, plnd_data::Error> {
             unimplemented!("stub")
         }
     }
@@ -1434,7 +1429,6 @@ mod tests {
         use plnd_data::repository::{
             MealRepository, UserIngredientPrefRepository, UserMealPrefRepository,
         };
-        use plnd_data::DatabaseError;
         use rust_decimal::Decimal;
         use uuid::Uuid;
 
@@ -1506,7 +1500,7 @@ mod tests {
             async fn list_dietary_restrictions(
                 &self,
                 user_id: Uuid,
-            ) -> Result<Vec<DietaryRestriction>, DatabaseError> {
+            ) -> Result<Vec<DietaryRestriction>, plnd_data::Error> {
                 let s = self.store.lock().unwrap();
                 Ok(s.dietary_restrictions
                     .iter()
@@ -1522,14 +1516,14 @@ mod tests {
                 _occasion: Option<&str>,
                 _exclude_allergens: &[String],
                 _user_id: Option<Uuid>,
-            ) -> Result<Vec<CatalogMeal>, DatabaseError> {
+            ) -> Result<Vec<CatalogMeal>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
             async fn ingredient_names_by_ids(
                 &self,
                 ids: &[Uuid],
-            ) -> Result<Vec<(Uuid, String)>, DatabaseError> {
+            ) -> Result<Vec<(Uuid, String)>, plnd_data::Error> {
                 let s = self.store.lock().unwrap();
                 Ok(s.ingredient_names
                     .iter()
@@ -1542,7 +1536,7 @@ mod tests {
                 &self,
                 q: &str,
                 limit: i64,
-            ) -> Result<Vec<CatalogIngredient>, DatabaseError> {
+            ) -> Result<Vec<CatalogIngredient>, plnd_data::Error> {
                 use chrono::Utc;
                 let s = self.store.lock().unwrap();
                 let results: Vec<CatalogIngredient> = s
@@ -1571,7 +1565,7 @@ mod tests {
             async fn catalog_meal_nutrition(
                 &self,
                 _meal_id: Uuid,
-            ) -> Result<Option<Option<serde_json::Value>>, DatabaseError> {
+            ) -> Result<Option<Option<serde_json::Value>>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1579,7 +1573,7 @@ mod tests {
                 &self,
                 _meal_id: Uuid,
                 _user_id: Uuid,
-            ) -> Result<Option<(Option<serde_json::Value>, bool)>, DatabaseError> {
+            ) -> Result<Option<(Option<serde_json::Value>, bool)>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1589,7 +1583,7 @@ mod tests {
                 _restriction_type: &str,
                 _name: &str,
                 _notes: Option<&str>,
-            ) -> Result<DietaryRestriction, DatabaseError> {
+            ) -> Result<DietaryRestriction, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1598,7 +1592,7 @@ mod tests {
                 _restriction_id: Uuid,
                 _user_id: Uuid,
                 _notes: Option<&str>,
-            ) -> Result<Option<DietaryRestriction>, DatabaseError> {
+            ) -> Result<Option<DietaryRestriction>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1606,21 +1600,21 @@ mod tests {
                 &self,
                 _restriction_id: Uuid,
                 _user_id: Uuid,
-            ) -> Result<bool, DatabaseError> {
+            ) -> Result<bool, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
             async fn catalog_ingredient(
                 &self,
                 _id: Uuid,
-            ) -> Result<Option<CatalogIngredient>, DatabaseError> {
+            ) -> Result<Option<CatalogIngredient>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
             async fn catalog_dish(
                 &self,
                 _id: Uuid,
-            ) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, DatabaseError>
+            ) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, plnd_data::Error>
             {
                 unimplemented!("not needed by tool-logic tests")
             }
@@ -1628,7 +1622,7 @@ mod tests {
             async fn catalog_meal(
                 &self,
                 _id: Uuid,
-            ) -> Result<Option<(CatalogMeal, Vec<CatalogMealDish>)>, DatabaseError> {
+            ) -> Result<Option<(CatalogMeal, Vec<CatalogMealDish>)>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
         }
@@ -1658,7 +1652,10 @@ mod tests {
 
         #[async_trait::async_trait]
         impl UserMealPrefRepository for InMemoryUserMealPrefRepository {
-            async fn list(&self, user_id: Uuid) -> Result<Vec<UserMealPrefDetail>, DatabaseError> {
+            async fn list(
+                &self,
+                user_id: Uuid,
+            ) -> Result<Vec<UserMealPrefDetail>, plnd_data::Error> {
                 let s = self.store.lock().unwrap();
                 Ok(s.meal_prefs
                     .iter()
@@ -1671,7 +1668,7 @@ mod tests {
                 &self,
                 _user_id: Uuid,
                 _pref_id: Uuid,
-            ) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
+            ) -> Result<Option<UserMealPrefDetail>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1679,7 +1676,7 @@ mod tests {
                 &self,
                 _user_id: Uuid,
                 _catalog_meal_id: Uuid,
-            ) -> Result<UserMealPrefDetail, DatabaseError> {
+            ) -> Result<UserMealPrefDetail, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1688,7 +1685,7 @@ mod tests {
                 _user_id: Uuid,
                 _name: &str,
                 _description: Option<&str>,
-            ) -> Result<UserMealPrefDetail, DatabaseError> {
+            ) -> Result<UserMealPrefDetail, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1699,7 +1696,7 @@ mod tests {
                 occasion_tags: &[String],
                 nutrition: Option<serde_json::Value>,
                 estimated: bool,
-            ) -> Result<UserMealPrefDetail, DatabaseError> {
+            ) -> Result<UserMealPrefDetail, plnd_data::Error> {
                 use chrono::Utc;
                 let meal_id = Uuid::new_v4();
                 let pref_id = Uuid::new_v4();
@@ -1736,7 +1733,7 @@ mod tests {
                 _is_safe_food: Option<bool>,
                 _is_blocked: Option<bool>,
                 _notes: Option<Option<String>>,
-            ) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
+            ) -> Result<Option<UserMealPrefDetail>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1746,11 +1743,15 @@ mod tests {
                 _pref_id: Uuid,
                 _name: Option<&str>,
                 _description: Option<&str>,
-            ) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
+            ) -> Result<Option<UserMealPrefDetail>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
-            async fn delete(&self, _user_id: Uuid, _pref_id: Uuid) -> Result<bool, DatabaseError> {
+            async fn delete(
+                &self,
+                _user_id: Uuid,
+                _pref_id: Uuid,
+            ) -> Result<bool, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1759,7 +1760,7 @@ mod tests {
                 _user_id: Uuid,
                 _pref_id: Uuid,
                 _params: plnd_data::repository::user_meal_pref::AddDishParams,
-            ) -> Result<Option<UserMealPrefDetail>, DatabaseError> {
+            ) -> Result<Option<UserMealPrefDetail>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1768,7 +1769,7 @@ mod tests {
                 _user_id: Uuid,
                 _pref_id: Uuid,
                 _meal_dish_id: Uuid,
-            ) -> Result<Option<bool>, DatabaseError> {
+            ) -> Result<Option<bool>, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
         }
@@ -1802,7 +1803,10 @@ mod tests {
 
         #[async_trait::async_trait]
         impl UserIngredientPrefRepository for InMemoryUserIngredientPrefRepository {
-            async fn list(&self, user_id: Uuid) -> Result<Vec<UserIngredientPref>, DatabaseError> {
+            async fn list(
+                &self,
+                user_id: Uuid,
+            ) -> Result<Vec<UserIngredientPref>, plnd_data::Error> {
                 let prefs = self.prefs.lock().unwrap();
                 Ok(prefs
                     .iter()
@@ -1817,7 +1821,7 @@ mod tests {
                 _catalog_ingredient_id: Uuid,
                 _is_blocked: bool,
                 _notes: Option<&str>,
-            ) -> Result<UserIngredientPref, DatabaseError> {
+            ) -> Result<UserIngredientPref, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
 
@@ -1825,7 +1829,7 @@ mod tests {
                 &self,
                 _user_id: Uuid,
                 _catalog_ingredient_id: Uuid,
-            ) -> Result<bool, DatabaseError> {
+            ) -> Result<bool, plnd_data::Error> {
                 unimplemented!("not needed by tool-logic tests")
             }
         }

@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use plnd_data::repository::MemoryRepository;
-use plnd_data::DatabaseError;
 use uuid::Uuid;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -65,9 +64,9 @@ fn validate_category(category: &str, tool: &str) -> Result<(), ToolError> {
     }
 }
 
-// ── Helper: map DatabaseError → ToolError ─────────────────────────────────────
+// ── Helper: map Error → ToolError ─────────────────────────────────────────────
 
-fn db_err(tool: &str, e: DatabaseError) -> ToolError {
+fn db_err(tool: &str, e: plnd_data::Error) -> ToolError {
     ToolError::Execution {
         tool: tool.to_string(),
         reason: e.to_string(),

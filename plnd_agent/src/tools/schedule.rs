@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use plnd_data::repository::{ScheduleRepository, TaskRepository};
-use plnd_data::DatabaseError;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
@@ -42,9 +41,9 @@ fn validate_duration_minutes(value: i64, tool: &str) -> Result<i32, ToolError> {
     Ok(value as i32)
 }
 
-// ── Helper: map DatabaseError → ToolError ─────────────────────────────────────
+// ── Helper: map plnd_data::Error → ToolError ─────────────────────────────────────
 
-fn db_err(tool: &str, e: DatabaseError) -> ToolError {
+fn db_err(tool: &str, e: plnd_data::Error) -> ToolError {
     ToolError::Execution {
         tool: tool.to_string(),
         reason: e.to_string(),

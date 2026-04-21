@@ -6,7 +6,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use plnd_data::DatabaseError;
+use plnd_data::Error;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -116,8 +116,8 @@ pub async fn create_restriction(
             )
         })
         .map_err(|e| match e {
-            DatabaseError::UniqueViolation => StatusCode::CONFLICT,
-            DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            Error::Conflict => StatusCode::CONFLICT,
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             e => {
                 tracing::error!(error = %e, "create_restriction DB error");
                 StatusCode::INTERNAL_SERVER_ERROR
