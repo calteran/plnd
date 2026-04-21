@@ -3,6 +3,7 @@ use crate::briefing::BriefingState;
 use governor::DefaultKeyedRateLimiter;
 use plnd_agent::AgentService;
 use plnd_data::db::Database;
+use plnd_data::repository::Repositories;
 use plnd_data::search::ProviderSearchService;
 use plnd_data::Repositories;
 use std::sync::Arc;
@@ -11,6 +12,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
+    pub repos: Repositories,
     pub jwt: JwtService,
     pub session: SessionService,
     /// JWKS cache for validating RS256 ID tokens from the configured IdP.

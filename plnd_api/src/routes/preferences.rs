@@ -7,7 +7,6 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use plnd_data::db;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -47,22 +46,23 @@ pub async fn patch_preferences(
     }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::preferences::patch_preferences(
-        pool,
-        user_id,
-        body.week_start_day,
-        body.planning_trigger_offset,
-        body.default_plan_length_days,
-        body.wake_time,
-    )
-    .await
-    .map(|p| Json(UserPreferencesResponse::from(p)))
-    .map_err(|e| {
-        tracing::error!(error = %e, "patch_preferences error");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+    state
+        .repos
+        .preferences
+        .patch_preferences(
+            user_id,
+            body.week_start_day,
+            body.planning_trigger_offset,
+            body.default_plan_length_days,
+            body.wake_time,
+        )
+        .await
+        .map(|p| Json(UserPreferencesResponse::from(p)))
+        .map_err(|e| {
+            tracing::error!(error = %e, "patch_preferences error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
 }
 
 #[utoipa::path(
@@ -82,9 +82,11 @@ pub async fn get_preferences(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<UserPreferencesResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::preferences::get_or_create(pool, user_id)
+    state
+        .repos
+        .preferences
+        .get_or_create(user_id)
         .await
         .map(|p| Json(UserPreferencesResponse::from(p)))
         .map_err(|e| {

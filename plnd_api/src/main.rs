@@ -225,6 +225,7 @@ async fn main() {
 
     let state = Arc::new(AppState {
         db: db_conn,
+        repos,
         jwt,
         session,
         jwks,

@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::db::models::Task;
-use crate::db::tasks::create_user_task;
+use crate::db::tasks::{create_user_task, create_weekly_plan_task};
 use crate::repository::task::TaskRepository;
 
 pub struct PgTaskRepository {
@@ -42,5 +42,14 @@ impl TaskRepository for PgTaskRepository {
             after_milepost,
         )
         .await
+    }
+
+    async fn create_weekly_plan_task(
+        &self,
+        user_id: Uuid,
+        plan_start: NaiveDate,
+        trigger_offset: i16,
+    ) -> Result<Task, DatabaseError> {
+        create_weekly_plan_task(&self.pool, user_id, plan_start, trigger_offset).await
     }
 }
