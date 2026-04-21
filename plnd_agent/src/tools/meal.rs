@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use plnd_data::db::error::DatabaseError;
-use plnd_data::PgPool;
+use plnd_data::repository::MealRepository;
 use rust_decimal::prelude::ToPrimitive;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -17,7 +17,7 @@ fn db_err(tool: &str, e: DatabaseError) -> ToolError {
 
 // ── SearchMealCatalogTool ─────────────────────────────────────────────────────
 
-pub struct SearchMealCatalogTool(pub PgPool);
+pub struct SearchMealCatalogTool(pub Arc<dyn MealRepository>);
 
 #[async_trait::async_trait]
 impl Tool for SearchMealCatalogTool {
@@ -60,7 +60,9 @@ impl Tool for SearchMealCatalogTool {
             .and_then(|v| v.as_str())
             .map(str::to_string);
 
-        let restrictions = plnd_data::db::dietary_restrictions::list(&self.0, ctx.user_id)
+        let restrictions = self
+            .0
+            .list_dietary_restrictions(ctx.user_id)
             .await
             .map_err(|e| db_err(self.name(), e))?;
         let allergens: Vec<String> = restrictions
@@ -69,16 +71,11 @@ impl Tool for SearchMealCatalogTool {
             .map(|r| r.name.clone())
             .collect();
 
-        let meals = plnd_data::db::search::search_catalog_meals(
-            &self.0,
-            &q,
-            limit,
-            occasion.as_deref(),
-            &allergens,
-            Some(ctx.user_id),
-        )
-        .await
-        .map_err(|e| db_err(self.name(), e))?;
+        let meals = self
+            .0
+            .search_catalog_meals(&q, limit, occasion.as_deref(), &allergens, Some(ctx.user_id))
+            .await
+            .map_err(|e| db_err(self.name(), e))?;
 
         Ok(serde_json::json!({ "meals": meals }))
     }
@@ -86,7 +83,7 @@ impl Tool for SearchMealCatalogTool {
 
 // ── GetUserMealLibraryTool ────────────────────────────────────────────────────
 
-pub struct GetUserMealLibraryTool(pub PgPool);
+pub struct GetUserMealLibraryTool(pub Arc<dyn MealRepository>);
 
 #[async_trait::async_trait]
 impl Tool for GetUserMealLibraryTool {
@@ -113,7 +110,9 @@ impl Tool for GetUserMealLibraryTool {
             .and_then(|v| v.as_str())
             .map(|s| s.to_lowercase());
 
-        let mut meals = plnd_data::db::user_meal_prefs::list(&self.0, ctx.user_id)
+        let mut meals = self
+            .0
+            .list_user_meal_prefs(ctx.user_id)
             .await
             .map_err(|e| db_err(self.name(), e))?;
 
@@ -129,7 +128,7 @@ impl Tool for GetUserMealLibraryTool {
 
 // ── GetUserMealPreferencesTool ────────────────────────────────────────────────
 
-pub struct GetUserMealPreferencesTool(pub PgPool);
+pub struct GetUserMealPreferencesTool(pub Arc<dyn MealRepository>);
 
 #[async_trait::async_trait]
 impl Tool for GetUserMealPreferencesTool {
@@ -153,9 +152,9 @@ impl Tool for GetUserMealPreferencesTool {
         _input: serde_json::Value,
     ) -> Result<serde_json::Value, ToolError> {
         let (restrictions, ingredient_prefs, meal_prefs) = tokio::try_join!(
-            plnd_data::db::dietary_restrictions::list(&self.0, ctx.user_id),
-            plnd_data::db::user_ingredient_prefs::list(&self.0, ctx.user_id),
-            plnd_data::db::user_meal_prefs::list(&self.0, ctx.user_id),
+            self.0.list_dietary_restrictions(ctx.user_id),
+            self.0.list_user_ingredient_prefs(ctx.user_id),
+            self.0.list_user_meal_prefs(ctx.user_id),
         )
         .map_err(|e| db_err(self.name(), e))?;
 
@@ -166,13 +165,14 @@ impl Tool for GetUserMealPreferencesTool {
             .collect();
 
         // Fetch names for blocked ingredients so the LLM can reason about them
-        let blocked_ingredients: Vec<serde_json::Value> =
-            plnd_data::db::catalog_details::get_ingredient_names_by_ids(&self.0, &blocked_ids)
-                .await
-                .map_err(|e| db_err(self.name(), e))?
-                .into_iter()
-                .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
-                .collect();
+        let blocked_ingredients: Vec<serde_json::Value> = self
+            .0
+            .ingredient_names_by_ids(&blocked_ids)
+            .await
+            .map_err(|e| db_err(self.name(), e))?
+            .into_iter()
+            .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
+            .collect();
 
         let top_rated: Vec<_> = meal_prefs
             .iter()
@@ -207,7 +207,7 @@ impl NutritionTotals {
     }
 }
 
-pub struct EstimateNutritionFromDescriptionTool(pub PgPool);
+pub struct EstimateNutritionFromDescriptionTool(pub Arc<dyn MealRepository>);
 
 #[async_trait::async_trait]
 impl Tool for EstimateNutritionFromDescriptionTool {
@@ -262,7 +262,9 @@ impl Tool for EstimateNutritionFromDescriptionTool {
                 })?;
             let grams = item.get("grams").and_then(|v| v.as_f64()).unwrap_or(100.0);
 
-            let hits = plnd_data::db::search::search_ingredient_nutrition(&self.0, ing_name, 1)
+            let hits = self
+                .0
+                .search_ingredient_nutrition(ing_name, 1)
                 .await
                 .map_err(|e| db_err(self.name(), e))?;
 
@@ -294,7 +296,7 @@ impl Tool for EstimateNutritionFromDescriptionTool {
 
 // ── GetMealNutritionTool ──────────────────────────────────────────────────────
 
-pub struct GetMealNutritionTool(pub PgPool);
+pub struct GetMealNutritionTool(pub Arc<dyn MealRepository>);
 
 #[async_trait::async_trait]
 impl Tool for GetMealNutritionTool {
@@ -348,10 +350,13 @@ impl Tool for GetMealNutritionTool {
 
         match meal_type {
             "catalog" => {
-                let row = plnd_data::db::catalog_details::get_meal_nutrition(&self.0, id)
+                let row = self
+                    .0
+                    .catalog_meal_nutrition(id)
                     .await
                     .map_err(|e| db_err(self.name(), e))?;
 
+                // Outer Option: meal row existence; inner Option: nutrition populated.
                 match row {
                     None => Ok(serde_json::json!({ "found": false })),
                     Some(nutrition) => {
@@ -365,7 +370,9 @@ impl Tool for GetMealNutritionTool {
                 }
             }
             "user" => {
-                let row = plnd_data::db::user_meals::get_nutrition(&self.0, id, ctx.user_id)
+                let row = self
+                    .0
+                    .user_meal_nutrition(id, ctx.user_id)
                     .await
                     .map_err(|e| db_err(self.name(), e))?;
 
@@ -692,7 +699,7 @@ impl Tool for SuggestSlotMealTool {
 /// - `kind = "user"`:    returns the user meal_ref verbatim (no DB write)
 /// - `kind = "new"`: inserts a new `user_meals` row via `create_from_description`
 ///   with `nutrition_estimated = true`, returns the new meal_ref
-pub struct ResolveMealDescriptionTool(pub PgPool);
+pub struct ResolveMealDescriptionTool(pub Arc<dyn MealRepository>);
 
 #[async_trait::async_trait]
 impl Tool for ResolveMealDescriptionTool {
@@ -826,16 +833,17 @@ impl Tool for ResolveMealDescriptionTool {
                     None
                 };
 
-                let pref = plnd_data::db::user_meal_prefs::create_from_description(
-                    &self.0,
-                    ctx.user_id,
-                    name,
-                    &occasion_tags,
-                    nutrition_json.clone(),
-                    true,
-                )
-                .await
-                .map_err(|e| db_err(self.name(), e))?;
+                let pref = self
+                    .0
+                    .create_user_meal_pref_from_description(
+                        ctx.user_id,
+                        name,
+                        &occasion_tags,
+                        nutrition_json.clone(),
+                        true,
+                    )
+                    .await
+                    .map_err(|e| db_err(self.name(), e))?;
 
                 let meal_id = pref.user_meal_id.ok_or_else(|| ToolError::Execution {
                     tool: self.name().to_string(),
@@ -862,13 +870,15 @@ impl Tool for ResolveMealDescriptionTool {
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
-pub fn register_meal_read_tools(registry: &mut ToolRegistry, db: &plnd_data::db::Database) {
-    let pool = db.get_pool().clone();
-    registry.register(Arc::new(SearchMealCatalogTool(pool.clone())));
-    registry.register(Arc::new(GetUserMealLibraryTool(pool.clone())));
-    registry.register(Arc::new(GetUserMealPreferencesTool(pool.clone())));
-    registry.register(Arc::new(GetMealNutritionTool(pool.clone())));
-    registry.register(Arc::new(EstimateNutritionFromDescriptionTool(pool)));
+pub fn register_meal_read_tools(
+    registry: &mut ToolRegistry,
+    meal_repo: Arc<dyn MealRepository>,
+) {
+    registry.register(Arc::new(SearchMealCatalogTool(Arc::clone(&meal_repo))));
+    registry.register(Arc::new(GetUserMealLibraryTool(Arc::clone(&meal_repo))));
+    registry.register(Arc::new(GetUserMealPreferencesTool(Arc::clone(&meal_repo))));
+    registry.register(Arc::new(GetMealNutritionTool(Arc::clone(&meal_repo))));
+    registry.register(Arc::new(EstimateNutritionFromDescriptionTool(meal_repo)));
 }
 
 /// Registers the terminal tools for the `MealPlanning` use case.
@@ -898,10 +908,9 @@ pub fn register_meal_suggest_slot_tools(registry: &mut ToolRegistry) {
 /// Registers the terminal tool for the `MealAdhocResolve` use case.
 pub fn register_meal_adhoc_resolve_tools(
     registry: &mut ToolRegistry,
-    db: &plnd_data::db::Database,
+    meal_repo: Arc<dyn MealRepository>,
 ) {
-    let pool = db.get_pool().clone();
-    registry.register(Arc::new(ResolveMealDescriptionTool(pool)));
+    registry.register(Arc::new(ResolveMealDescriptionTool(meal_repo)));
 }
 
 // ── Schema constructors ───────────────────────────────────────────────────────
@@ -1018,6 +1027,89 @@ fn get_meal_nutrition_schema() -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── Minimal stub for unit tests that don't need DB access ─────────────────
+
+    struct StubMealRepo;
+
+    #[async_trait::async_trait]
+    impl MealRepository for StubMealRepo {
+        async fn list_dietary_restrictions(
+            &self,
+            _user_id: uuid::Uuid,
+        ) -> Result<Vec<plnd_data::db::models::DietaryRestriction>, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+        async fn search_catalog_meals(
+            &self,
+            _q: &str,
+            _limit: i64,
+            _occasion: Option<&str>,
+            _exclude_allergens: &[String],
+            _user_id: Option<uuid::Uuid>,
+        ) -> Result<Vec<plnd_data::db::models::CatalogMeal>, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+        async fn list_user_meal_prefs(
+            &self,
+            _user_id: uuid::Uuid,
+        ) -> Result<Vec<plnd_data::db::models::UserMealPrefDetail>, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+        async fn list_user_ingredient_prefs(
+            &self,
+            _user_id: uuid::Uuid,
+        ) -> Result<Vec<plnd_data::db::models::UserIngredientPref>, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+        async fn ingredient_names_by_ids(
+            &self,
+            _ids: &[uuid::Uuid],
+        ) -> Result<Vec<(uuid::Uuid, String)>, plnd_data::db::error::DatabaseError> {
+            unimplemented!("stub")
+        }
+        async fn search_ingredient_nutrition(
+            &self,
+            _q: &str,
+            _limit: i64,
+        ) -> Result<Vec<plnd_data::db::models::CatalogIngredient>, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+        async fn catalog_meal_nutrition(
+            &self,
+            _meal_id: uuid::Uuid,
+        ) -> Result<Option<Option<serde_json::Value>>, plnd_data::db::error::DatabaseError> {
+            unimplemented!("stub")
+        }
+        async fn user_meal_nutrition(
+            &self,
+            _meal_id: uuid::Uuid,
+            _user_id: uuid::Uuid,
+        ) -> Result<Option<(Option<serde_json::Value>, bool)>, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+        async fn create_user_meal_pref_from_description(
+            &self,
+            _user_id: uuid::Uuid,
+            _name: &str,
+            _occasion_tags: &[String],
+            _nutrition: Option<serde_json::Value>,
+            _estimated: bool,
+        ) -> Result<plnd_data::db::models::UserMealPrefDetail, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+    }
+
+    fn stub_meal_repo() -> Arc<dyn MealRepository> {
+        Arc::new(StubMealRepo)
+    }
 
     fn has_user_id_property(schema: &serde_json::Value) -> bool {
         schema
@@ -1191,42 +1283,37 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn resolve_meal_description_tool_is_terminal() {
-        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
-        assert!(ResolveMealDescriptionTool(pool).is_terminal());
+    #[test]
+    fn resolve_meal_description_tool_is_terminal() {
+        assert!(ResolveMealDescriptionTool(stub_meal_repo()).is_terminal());
     }
 
-    #[tokio::test]
-    async fn resolve_meal_description_tool_name() {
-        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
+    #[test]
+    fn resolve_meal_description_tool_name() {
         assert_eq!(
-            ResolveMealDescriptionTool(pool).name(),
+            ResolveMealDescriptionTool(stub_meal_repo()).name(),
             "resolve_meal_description"
         );
     }
 
-    #[tokio::test]
-    async fn resolve_meal_description_schema_requires_kind_and_confirmation() {
-        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
-        let schema = ResolveMealDescriptionTool(pool).schema();
+    #[test]
+    fn resolve_meal_description_schema_requires_kind_and_confirmation() {
+        let schema = ResolveMealDescriptionTool(stub_meal_repo()).schema();
         let required = schema["required"].as_array().unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("kind")));
         assert!(required.iter().any(|v| v.as_str() == Some("confirmation")));
     }
 
-    #[tokio::test]
-    async fn resolve_meal_description_schema_has_no_user_id() {
-        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
+    #[test]
+    fn resolve_meal_description_schema_has_no_user_id() {
         assert!(!has_user_id_property(
-            &ResolveMealDescriptionTool(pool).schema()
+            &ResolveMealDescriptionTool(stub_meal_repo()).schema()
         ));
     }
 
     #[tokio::test]
     async fn resolve_meal_description_catalog_branch_echoes_ref() {
-        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
-        let tool = ResolveMealDescriptionTool(pool);
+        let tool = ResolveMealDescriptionTool(stub_meal_repo());
         let ctx = crate::tools::ToolContext {
             user_id: uuid::Uuid::new_v4(),
         };
@@ -1247,8 +1334,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_user_branch_echoes_ref() {
-        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
-        let tool = ResolveMealDescriptionTool(pool);
+        let tool = ResolveMealDescriptionTool(stub_meal_repo());
         let ctx = crate::tools::ToolContext {
             user_id: uuid::Uuid::new_v4(),
         };
@@ -1268,8 +1354,7 @@ mod tests {
 
     #[tokio::test]
     async fn resolve_meal_description_invalid_kind_returns_error() {
-        let pool = PgPool::connect_lazy("postgres://unused").unwrap();
-        let tool = ResolveMealDescriptionTool(pool);
+        let tool = ResolveMealDescriptionTool(stub_meal_repo());
         let ctx = crate::tools::ToolContext {
             user_id: uuid::Uuid::new_v4(),
         };
@@ -1306,7 +1391,12 @@ mod tests {
 
     mod integration {
         use super::*;
+        use sqlx::PgPool;
         use uuid::Uuid;
+
+        fn pg_meal_repo(pool: PgPool) -> Arc<dyn MealRepository> {
+            Arc::new(plnd_data::repository::pg::meal::PgMealRepository::new(pool))
+        }
 
         async fn seed_user(pool: &PgPool) -> Uuid {
             plnd_data::db::users::create(
@@ -1338,7 +1428,7 @@ mod tests {
             .await
             .unwrap();
 
-            let tool = SearchMealCatalogTool(pool.clone());
+            let tool = SearchMealCatalogTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
             let result = tool
                 .execute(&ctx, serde_json::json!({ "q": "oatmeal" }))
@@ -1362,7 +1452,7 @@ mod tests {
             .await
             .unwrap();
 
-            let tool = GetUserMealLibraryTool(pool.clone());
+            let tool = GetUserMealLibraryTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
             let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
 
@@ -1378,7 +1468,7 @@ mod tests {
                 .await
                 .unwrap();
 
-            let tool = GetUserMealPreferencesTool(pool.clone());
+            let tool = GetUserMealPreferencesTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
             let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
 
@@ -1407,7 +1497,7 @@ mod tests {
             .unwrap();
 
             let user_id = seed_user(&pool).await;
-            let tool = GetMealNutritionTool(pool.clone());
+            let tool = GetMealNutritionTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
             let result = tool
                 .execute(
@@ -1437,7 +1527,7 @@ mod tests {
             .unwrap();
             let meal_id = pref.user_meal_id.unwrap();
 
-            let tool = GetMealNutritionTool(pool.clone());
+            let tool = GetMealNutritionTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
             let result = tool
                 .execute(
@@ -1482,7 +1572,7 @@ mod tests {
             }
 
             let user_id = seed_user(&pool).await;
-            let tool = EstimateNutritionFromDescriptionTool(pool.clone());
+            let tool = EstimateNutritionFromDescriptionTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
 
             let result = tool
@@ -1521,7 +1611,7 @@ mod tests {
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn estimate_nutrition_reports_missing_ingredients(pool: PgPool) {
             let user_id = seed_user(&pool).await;
-            let tool = EstimateNutritionFromDescriptionTool(pool.clone());
+            let tool = EstimateNutritionFromDescriptionTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
 
             let result = tool
@@ -1563,7 +1653,8 @@ mod tests {
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn resolve_meal_description_new_branch_inserts_user_meal(pool: PgPool) {
             let user_id = seed_user(&pool).await;
-            let tool = ResolveMealDescriptionTool(pool.clone());
+            let pool2 = pool.clone();
+            let tool = ResolveMealDescriptionTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
             let input = serde_json::json!({
                 "kind": "new",
@@ -1589,7 +1680,7 @@ mod tests {
 
             // Confirm DB row has nutrition_estimated = true
             let meal_id: uuid::Uuid = result["meal_ref"]["id"].as_str().unwrap().parse().unwrap();
-            let row = plnd_data::db::user_meals::get_nutrition(&pool, meal_id, user_id)
+            let row = plnd_data::db::user_meals::get_nutrition(&pool2, meal_id, user_id)
                 .await
                 .unwrap()
                 .expect("meal must exist");
@@ -1602,7 +1693,7 @@ mod tests {
         #[sqlx::test(migrations = "../plnd_data/migrations")]
         async fn resolve_meal_description_new_branch_without_nutrition(pool: PgPool) {
             let user_id = seed_user(&pool).await;
-            let tool = ResolveMealDescriptionTool(pool.clone());
+            let tool = ResolveMealDescriptionTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id };
             let input = serde_json::json!({
                 "kind": "new",
@@ -1640,7 +1731,7 @@ mod tests {
             .unwrap();
             let meal_id = pref.user_meal_id.unwrap();
 
-            let tool = GetMealNutritionTool(pool.clone());
+            let tool = GetMealNutritionTool(pg_meal_repo(pool));
             let ctx = ToolContext { user_id: other };
             let result = tool
                 .execute(
