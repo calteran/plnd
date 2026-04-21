@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::db::error::DatabaseError;
 use crate::db::models::UserDishPrefDetail;
 use crate::db::user_dish_prefs as db;
-use crate::repository::user_dish_prefs::{AddIngredientParams, UserDishPrefRepository};
+use crate::repository::user_dish_pref::{AddIngredientParams, UserDishPrefRepository};
 
 pub struct PgUserDishPrefRepository {
     pool: PgPool,

@@ -566,7 +566,7 @@ pub struct LocalExerciseResult {
 // ---------------------------------------------------------------------------
 
 /// A meal or dish returned as a planning suggestion.
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow, Serialize, Deserialize)]
 pub struct MealSuggestion {
     pub id: Uuid,
     pub name: String,
