@@ -57,7 +57,7 @@ pub async fn ingest_ingredient(
     .map(|(id,)| id)
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 pub struct IngestMealParams<'a> {
     pub name: &'a str,
     pub description: Option<&'a str>,
@@ -68,7 +68,7 @@ pub struct IngestMealParams<'a> {
     pub nutrition: Option<Value>,
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 #[tracing::instrument(
     skip(pool, params),
     fields(table = "catalog_meals", op = "ingest_meal")

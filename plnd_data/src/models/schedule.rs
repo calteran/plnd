@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+/// Maximum number of days before the period start to search for carryover entries.
+/// Older planned/deferred entries are excluded to prevent unbounded historical scans.
+pub const CARRYOVER_LOOKBACK_DAYS: i64 = 90;
+
 // ---------------------------------------------------------------------------
 // Schedule templates (recurring patterns)
 // ---------------------------------------------------------------------------

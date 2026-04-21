@@ -7,5 +7,4 @@ pub mod repository;
 pub mod search;
 
 pub use db::error::DatabaseError;
-pub use db::schedule::CARRYOVER_LOOKBACK_DAYS;
 pub use repository::Repositories;
