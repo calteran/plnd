@@ -6,7 +6,6 @@ use axum::{
     Json,
 };
 use chrono::{NaiveDate, Utc};
-use plnd_data::db;
 use plnd_data::providers::{Location, NewsQuery};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -208,11 +207,13 @@ pub async fn get_yesterday(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<YesterdayResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
     let yesterday: NaiveDate = Utc::now().date_naive() - chrono::Duration::days(1);
 
-    let snapshot = db::briefing::yesterday_snapshot(pool, user_id, yesterday)
+    let snapshot = state
+        .repos
+        .briefing
+        .yesterday_snapshot(user_id, yesterday)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "yesterday snapshot error");
