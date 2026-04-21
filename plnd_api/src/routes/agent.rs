@@ -358,7 +358,7 @@ pub async fn post_meal_plan_resolve(
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
+    use crate::models::{ActionTaken, Occasion, TaskEntryRequest, TaskEntryResponse};
 
     #[test]
     fn meal_plan_request_state_deserializes_with_skipped() {
@@ -373,7 +373,7 @@ mod tests {
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.current_state.skipped.len(), 1);
-        assert_eq!(req.current_state.skipped[0].occasion, "breakfast");
+        assert_eq!(req.current_state.skipped[0].occasion, Occasion::Breakfast);
     }
 
     #[test]
@@ -397,7 +397,7 @@ mod tests {
 
         let req: MealPlanRequest = serde_json::from_str(json).expect("should deserialize");
         assert_eq!(req.current_state.approved.len(), 1);
-        assert_eq!(req.current_state.approved[0].occasion, "breakfast");
+        assert_eq!(req.current_state.approved[0].occasion, Occasion::Breakfast);
     }
 
     #[test]
@@ -615,7 +615,7 @@ mod tests {
         let json = r#"{"text": "homemade pizza", "occasion": "dinner", "date": "2026-04-21"}"#;
         let req: crate::models::MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.text, "homemade pizza");
-        assert_eq!(req.occasion, "dinner");
+        assert_eq!(req.occasion, Occasion::Dinner);
         assert!(req.date.is_some());
     }
 

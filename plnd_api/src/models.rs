@@ -161,7 +161,7 @@ pub struct Nutrition {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MealEntry {
     pub date: NaiveDate,
-    pub occasion: String,
+    pub occasion: Occasion,
     pub meal_ref: MealRef,
     pub estimated_nutrition: Option<Nutrition>,
 }
@@ -169,7 +169,7 @@ pub struct MealEntry {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SlotRef {
     pub date: NaiveDate,
-    pub occasion: String,
+    pub occasion: Occasion,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -202,14 +202,14 @@ pub struct MealPlanResponse {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MealSuggestRequest {
     pub date: NaiveDate,
-    pub occasion: String,
+    pub occasion: Occasion,
     pub avoid_meal_refs: Option<Vec<MealRef>>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MealAdhocResolveRequest {
     pub text: String,
-    pub occasion: String,
+    pub occasion: Occasion,
     pub date: Option<NaiveDate>,
 }
 
@@ -265,7 +265,7 @@ mod meal_plan_tests {
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.current_state.skipped.len(), 1);
-        assert_eq!(req.current_state.skipped[0].occasion, "breakfast");
+        assert_eq!(req.current_state.skipped[0].occasion, Occasion::Breakfast);
     }
 
     #[test]
@@ -273,7 +273,7 @@ mod meal_plan_tests {
         let json = r#"{"date": "2026-04-21", "occasion": "lunch"}"#;
         let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.date.to_string(), "2026-04-21");
-        assert_eq!(req.occasion, "lunch");
+        assert_eq!(req.occasion, Occasion::Lunch);
         assert!(req.avoid_meal_refs.is_none());
     }
 
@@ -287,7 +287,7 @@ mod meal_plan_tests {
             ]
         }"#;
         let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.occasion, "dinner");
+        assert_eq!(req.occasion, Occasion::Dinner);
         let refs = req.avoid_meal_refs.unwrap();
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].meal_type, "catalog");
@@ -305,7 +305,7 @@ mod meal_plan_tests {
         let json = r#"{"text": "grilled cheese sandwich", "occasion": "lunch"}"#;
         let req: MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.text, "grilled cheese sandwich");
-        assert_eq!(req.occasion, "lunch");
+        assert_eq!(req.occasion, Occasion::Lunch);
         assert!(req.date.is_none());
     }
 
@@ -339,5 +339,43 @@ mod meal_plan_tests {
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"type\":\"catalog\""));
         assert!(json.contains("\"confirmation\":\"Found it.\""));
+    }
+
+    #[test]
+    fn occasion_rejects_invalid_value() {
+        let result: Result<MealSuggestRequest, _> =
+            serde_json::from_str(r#"{"date": "2026-04-21", "occasion": "brunch"}"#);
+        assert!(result.is_err(), "brunch must be rejected at deserialization");
+    }
+
+    #[test]
+    fn occasion_accepts_all_valid_values() {
+        for (json, expected) in [
+            ("breakfast", Occasion::Breakfast),
+            ("lunch", Occasion::Lunch),
+            ("dinner", Occasion::Dinner),
+            ("snack", Occasion::Snack),
+        ] {
+            let req: MealSuggestRequest = serde_json::from_str(&format!(
+                r#"{{"date": "2026-04-21", "occasion": "{}"}}"#,
+                json
+            ))
+            .unwrap_or_else(|_| panic!("{json} should deserialize"));
+            assert_eq!(req.occasion, expected);
+        }
+    }
+
+    #[test]
+    fn occasion_serializes_to_lowercase() {
+        for (variant, expected) in [
+            (Occasion::Breakfast, "breakfast"),
+            (Occasion::Lunch, "lunch"),
+            (Occasion::Dinner, "dinner"),
+            (Occasion::Snack, "snack"),
+        ] {
+            assert_eq!(variant.to_string(), expected);
+            let json = serde_json::to_string(&variant).unwrap();
+            assert_eq!(json, format!("\"{}\"", expected));
+        }
     }
 }
