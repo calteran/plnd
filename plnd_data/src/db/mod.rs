@@ -17,6 +17,7 @@ pub mod tasks;
 pub mod user_dish_prefs;
 pub mod user_ingredient_prefs;
 pub mod user_meal_prefs;
+pub mod user_meals;
 pub mod users;
 
 pub use connection::run_migrations;

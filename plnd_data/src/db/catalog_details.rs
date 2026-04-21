@@ -83,3 +83,101 @@ pub async fn get_meal(
 
     Ok(Some((meal, dishes)))
 }
+
+#[tracing::instrument(
+    skip(pool, ids),
+    fields(table = "catalog_ingredients", op = "get_names_by_ids")
+)]
+pub async fn get_ingredient_names_by_ids(
+    pool: &PgPool,
+    ids: &[Uuid],
+) -> Result<Vec<(Uuid, String)>, DatabaseError> {
+    sqlx::query_as::<_, (Uuid, String)>(
+        "SELECT ingredient_id, name FROM catalog_ingredients WHERE ingredient_id = ANY($1::uuid[])",
+    )
+    .bind(ids)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
+#[tracing::instrument(skip(pool), fields(table = "catalog_meals", op = "get_nutrition"))]
+pub async fn get_meal_nutrition(
+    pool: &PgPool,
+    meal_id: Uuid,
+) -> Result<Option<Option<serde_json::Value>>, DatabaseError> {
+    sqlx::query_as::<_, (Option<serde_json::Value>,)>(
+        "SELECT nutrition FROM catalog_meals WHERE meal_id = $1",
+    )
+    .bind(meal_id)
+    .fetch_optional(pool)
+    .await
+    .map(|row| row.map(|(n,)| n))
+    .map_err(DatabaseError::from)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_ingredient_names_by_ids_returns_names(pool: PgPool) {
+        let (id_a, id_b) = sqlx::query_as::<_, (Uuid, Uuid)>(
+            "WITH a AS (
+                INSERT INTO catalog_ingredients (name, allergens, occasion_tags)
+                VALUES ('Chicken', '{}', '{}') RETURNING ingredient_id
+             ),
+             b AS (
+                INSERT INTO catalog_ingredients (name, allergens, occasion_tags)
+                VALUES ('Broccoli', '{}', '{}') RETURNING ingredient_id
+             )
+             SELECT a.ingredient_id, b.ingredient_id FROM a, b",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let results = get_ingredient_names_by_ids(&pool, &[id_a, id_b])
+            .await
+            .unwrap();
+
+        assert_eq!(results.len(), 2);
+        let names: Vec<_> = results.iter().map(|(_, n)| n.as_str()).collect();
+        assert!(names.contains(&"Chicken"));
+        assert!(names.contains(&"Broccoli"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_ingredient_names_by_ids_returns_empty_for_empty_input(pool: PgPool) {
+        let results = get_ingredient_names_by_ids(&pool, &[]).await.unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_meal_nutrition_returns_nutrition(pool: PgPool) {
+        let nutrition = serde_json::json!({"calories_kcal": 500, "protein_g": 30});
+        let (meal_id,): (Uuid,) = sqlx::query_as(
+            "INSERT INTO catalog_meals (name, servings, allergens, occasion_tags, tags, nutrition)
+             VALUES ('Test Meal', 1.0, '{}', '{}', '{}', $1)
+             RETURNING meal_id",
+        )
+        .bind(&nutrition)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let result = get_meal_nutrition(&pool, meal_id).await.unwrap();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), Some(nutrition));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_meal_nutrition_returns_none_when_not_found(pool: PgPool) {
+        let result = get_meal_nutrition(&pool, Uuid::new_v4()).await.unwrap();
+        assert!(result.is_none());
+    }
+}
