@@ -7,7 +7,6 @@ use axum::{
     Json,
 };
 use chrono::NaiveDate;
-use plnd_data::db;
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -47,9 +46,11 @@ pub async fn get_suggestions(
     }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::meal_suggestions::get_suggestions(pool, user_id, &params.slot, &params.date.to_string())
+    state
+        .repos
+        .meal_suggestion
+        .get_suggestions(user_id, &params.slot, params.date)
         .await
         .map(|v| Json(v.into_iter().map(MealSuggestionResponse::from).collect()))
         .map_err(|e| {
