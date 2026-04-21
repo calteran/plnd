@@ -13,6 +13,7 @@ pub mod task;
 pub mod user;
 pub mod user_dish_prefs;
 pub mod user_ingredient_pref;
+pub mod user_meal_pref;
 
 pub use crate::db::error::DatabaseError;
 pub use briefing::BriefingRepository;
@@ -27,6 +28,7 @@ pub use task::TaskRepository;
 pub use user::UserRepository;
 pub use user_dish_prefs::{AddIngredientParams, UserDishPrefRepository};
 pub use user_ingredient_pref::UserIngredientPrefRepository;
+pub use user_meal_pref::UserMealPrefRepository;
 
 #[derive(Clone)]
 pub struct Repositories {
@@ -42,6 +44,7 @@ pub struct Repositories {
     pub user: Arc<dyn UserRepository>,
     pub user_dish_prefs: Arc<dyn UserDishPrefRepository>,
     pub user_ingredient_pref: Arc<dyn UserIngredientPrefRepository>,
+    pub user_meal_pref: Arc<dyn UserMealPrefRepository>,
 }
 
 impl Repositories {
@@ -66,8 +69,9 @@ impl Repositories {
                 pool.clone(),
             )),
             user_ingredient_pref: Arc::new(
-                pg::user_ingredient_pref::PgUserIngredientPrefRepository::new(pool),
+                pg::user_ingredient_pref::PgUserIngredientPrefRepository::new(pool.clone()),
             ),
+            user_meal_pref: Arc::new(pg::user_meal_pref::PgUserMealPrefRepository::new(pool)),
         }
     }
 }

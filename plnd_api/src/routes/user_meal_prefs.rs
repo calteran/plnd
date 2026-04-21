@@ -11,7 +11,8 @@ use uuid::Uuid;
 use crate::api_response::UserMealPrefDetailResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::{error::DatabaseError, user_meal_prefs};
+use plnd_data::repository::user_meal_pref::AddDishParams;
+use plnd_data::repository::DatabaseError;
 
 #[utoipa::path(
     get,
@@ -30,7 +31,10 @@ pub async fn list(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<UserMealPrefDetailResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    user_meal_prefs::list(state.db.get_pool(), user_id)
+    state
+        .repos
+        .user_meal_pref
+        .list(user_id)
         .await
         .map(|v| {
             Json(
@@ -64,7 +68,10 @@ pub async fn get_detail(
     Path(pref_id): Path<Uuid>,
 ) -> Result<Json<UserMealPrefDetailResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    user_meal_prefs::get(state.db.get_pool(), user_id, pref_id)
+    state
+        .repos
+        .user_meal_pref
+        .get(user_id, pref_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .map(UserMealPrefDetailResponse::from)
@@ -106,7 +113,12 @@ pub async fn create(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     if let Some(catalog_id) = body.catalog_meal_id {
-        match user_meal_prefs::create_from_catalog(state.db.get_pool(), user_id, catalog_id).await {
+        match state
+            .repos
+            .user_meal_pref
+            .create_from_catalog(user_id, catalog_id)
+            .await
+        {
             Ok(detail) => Ok((
                 StatusCode::CREATED,
                 Json(UserMealPrefDetailResponse::from(detail)),
@@ -116,14 +128,12 @@ pub async fn create(
             Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         }
     } else if let Some(name) = body.name {
-        let detail = user_meal_prefs::create_from_scratch(
-            state.db.get_pool(),
-            user_id,
-            &name,
-            body.description.as_deref(),
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let detail = state
+            .repos
+            .user_meal_pref
+            .create_from_scratch(user_id, &name, body.description.as_deref())
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         Ok((
             StatusCode::CREATED,
             Json(UserMealPrefDetailResponse::from(detail)),
@@ -188,18 +198,15 @@ pub async fn patch(
                 .as_ref()
                 .and_then(|v| if v.is_null() { None } else { v.as_str() });
 
-        user_meal_prefs::fork_and_update_recipe(
-            state.db.get_pool(),
-            user_id,
-            pref_id,
-            body.name.as_deref(),
-            description,
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .map(UserMealPrefDetailResponse::from)
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+        state
+            .repos
+            .user_meal_pref
+            .fork_and_update_recipe(user_id, pref_id, body.name.as_deref(), description)
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map(UserMealPrefDetailResponse::from)
+            .map(Json)
+            .ok_or(StatusCode::NOT_FOUND)
     } else {
         // Metadata-only update
         let rating: Option<Option<i16>> = body.rating.as_ref().map(|v| {
@@ -218,20 +225,22 @@ pub async fn patch(
             }
         });
 
-        user_meal_prefs::update_metadata(
-            state.db.get_pool(),
-            user_id,
-            pref_id,
-            rating,
-            body.is_safe_food,
-            body.is_blocked,
-            notes,
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .map(UserMealPrefDetailResponse::from)
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+        state
+            .repos
+            .user_meal_pref
+            .update_metadata(
+                user_id,
+                pref_id,
+                rating,
+                body.is_safe_food,
+                body.is_blocked,
+                notes,
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map(UserMealPrefDetailResponse::from)
+            .map(Json)
+            .ok_or(StatusCode::NOT_FOUND)
     }
 }
 
@@ -257,7 +266,10 @@ pub async fn delete(
     Path(pref_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let deleted = user_meal_prefs::delete(state.db.get_pool(), user_id, pref_id)
+    let deleted = state
+        .repos
+        .user_meal_pref
+        .delete(user_id, pref_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
@@ -308,23 +320,25 @@ pub async fn add_dish(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    user_meal_prefs::add_dish(
-        state.db.get_pool(),
-        user_id,
-        pref_id,
-        user_meal_prefs::AddDishParams {
-            catalog_dish_id: body.catalog_dish_id,
-            user_dish_id: body.user_dish_pref_id,
-            dish_servings: body.dish_servings,
-            notes: body.notes,
-            sort_order: body.sort_order.unwrap_or(0),
-        },
-    )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .map(UserMealPrefDetailResponse::from)
-    .map(Json)
-    .ok_or(StatusCode::NOT_FOUND)
+    state
+        .repos
+        .user_meal_pref
+        .add_dish(
+            user_id,
+            pref_id,
+            AddDishParams {
+                catalog_dish_id: body.catalog_dish_id,
+                user_dish_id: body.user_dish_pref_id,
+                dish_servings: body.dish_servings,
+                notes: body.notes,
+                sort_order: body.sort_order.unwrap_or(0),
+            },
+        )
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map(UserMealPrefDetailResponse::from)
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
 }
 
 #[utoipa::path(
@@ -350,7 +364,12 @@ pub async fn remove_dish(
     Path((pref_id, dish_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    match user_meal_prefs::remove_dish(state.db.get_pool(), user_id, pref_id, dish_id).await {
+    match state
+        .repos
+        .user_meal_pref
+        .remove_dish(user_id, pref_id, dish_id)
+        .await
+    {
         Ok(Some(true)) => Ok(StatusCode::NO_CONTENT),
         Ok(Some(false)) | Ok(None) => Err(StatusCode::NOT_FOUND),
         Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),

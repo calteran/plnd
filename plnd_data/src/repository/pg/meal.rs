@@ -9,13 +9,12 @@ use crate::db::dietary_restrictions;
 use crate::db::error::DatabaseError;
 use crate::db::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction, UserMealPrefDetail,
+    DietaryRestriction,
 };
 use crate::db::search::{
     search_catalog_meals as db_search_catalog_meals,
     search_ingredient_nutrition as db_search_ingredient_nutrition,
 };
-use crate::db::user_meal_prefs;
 use crate::db::user_meals;
 use crate::repository::meal::MealRepository;
 
@@ -76,12 +75,6 @@ impl MealRepository for PgMealRepository {
         db_search_catalog_meals(&self.pool, q, limit, occasion, exclude_allergens, user_id).await
     }
 
-    async fn list_user_meal_prefs(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Vec<UserMealPrefDetail>, DatabaseError> {
-        user_meal_prefs::list(&self.pool, user_id).await
-    }
 
     async fn ingredient_names_by_ids(
         &self,
@@ -111,25 +104,6 @@ impl MealRepository for PgMealRepository {
         user_id: Uuid,
     ) -> Result<Option<(Option<serde_json::Value>, bool)>, DatabaseError> {
         user_meals::get_nutrition(&self.pool, meal_id, user_id).await
-    }
-
-    async fn create_user_meal_pref_from_description(
-        &self,
-        user_id: Uuid,
-        name: &str,
-        occasion_tags: &[String],
-        nutrition: Option<serde_json::Value>,
-        estimated: bool,
-    ) -> Result<UserMealPrefDetail, DatabaseError> {
-        user_meal_prefs::create_from_description(
-            &self.pool,
-            user_id,
-            name,
-            occasion_tags,
-            nutrition,
-            estimated,
-        )
-        .await
     }
 
     async fn catalog_ingredient(
