@@ -6,7 +6,6 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use plnd_data::db;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -33,9 +32,8 @@ pub async fn get_me(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<UserResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    match db::users::find_by_id(pool, user_id).await.map_err(|e| {
+    match state.repos.user.find_by_id(user_id).await.map_err(|e| {
         tracing::error!(error = %e, "get_me DB error");
         StatusCode::INTERNAL_SERVER_ERROR
     })? {
@@ -76,19 +74,19 @@ pub async fn patch_me(
         }
     }
 
-    let pool = state.db.get_pool();
-
-    match db::users::update_profile(
-        pool,
-        user_id,
-        body.display_name.as_deref(),
-        body.avatar_url.as_deref(),
-    )
-    .await
-    .map_err(|e| {
-        tracing::error!(error = %e, "patch_me DB error");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })? {
+    match state
+        .repos
+        .user
+        .update_profile(
+            user_id,
+            body.display_name.as_deref(),
+            body.avatar_url.as_deref(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "patch_me DB error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })? {
         Some(user) => Ok(Json(UserResponse::from(user))),
         None => Err(StatusCode::NOT_FOUND),
     }
@@ -111,8 +109,10 @@ pub async fn post_complete_onboarding(
     Extension(claims): Extension<Claims>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
-    db::users::complete_onboarding(pool, user_id)
+    state
+        .repos
+        .user
+        .complete_onboarding(user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "complete_onboarding error");
@@ -138,9 +138,11 @@ pub async fn delete_me(
     Extension(claims): Extension<Claims>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    let found = db::users::deactivate_user(pool, user_id)
+    let found = state
+        .repos
+        .user
+        .deactivate_user(user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "delete_me DB error");
