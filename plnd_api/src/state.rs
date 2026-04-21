@@ -2,7 +2,6 @@ use crate::auth::{JwksCache, JwtService, SessionService};
 use crate::briefing::BriefingState;
 use governor::DefaultKeyedRateLimiter;
 use plnd_agent::AgentService;
-use plnd_data::db::Database;
 use plnd_data::search::ProviderSearchService;
 use plnd_data::Repositories;
 use std::sync::Arc;
@@ -10,7 +9,6 @@ use std::sync::Arc;
 /// Shared application state available to all route handlers
 #[derive(Clone)]
 pub struct AppState {
-    pub db: Database,
     /// Repository layer — typed access to all storage-backed domain operations.
     pub repos: Repositories,
     pub jwt: JwtService,
@@ -27,6 +25,5 @@ pub struct AppState {
     /// Per-user rate limiter for POST /agent/task. Keyed by authenticated user_id (UUID string).
     pub agent_task_limiter: Arc<DefaultKeyedRateLimiter<String>>,
     /// Agent service for LLM-backed task and meal-plan generation.
-    /// Stub in Phase 3.1 — fully implemented in Phase 3.2/3.3.
     pub agent: AgentService,
 }
