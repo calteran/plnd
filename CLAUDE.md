@@ -33,7 +33,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 
 ### PR Lifecycle
 - **After opening a PR**: invoke the `monitor-pr` skill to watch CI and address any review comments
-- **After a PR merges**: `git checkout main && git pull`, delete the local branch (`git branch -d <branch>`), and remove the worktree if one was used (`just worktree-new` creates them under `../plnd-<name>`)
+- **After a PR merges**: `git checkout main && git pull`, remove the worktree if one was used (`just worktree-new` creates them under `.worktrees/<branch>`), then delete the local branch (`git branch -d <branch>`)
 
 ### Storage Layer Isolation
 - No production crate other than `plnd_data` may depend on `sqlx`, import `PgPool`, or
