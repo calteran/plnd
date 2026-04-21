@@ -152,6 +152,7 @@ fn user_meal_pref_detail_round_trip() {
         source: "catalog".to_string(),
         has_personal_recipe: false,
         origin_external_source: None,
+        nutrition_estimated: false,
     };
     let v = to_value(&detail).expect("serialize");
     assert_eq!(v["name"], "Sunday Roast");

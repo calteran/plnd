@@ -556,6 +556,7 @@ pub struct UserMealPrefDetailResponse {
     pub source: String,
     pub has_personal_recipe: bool,
     pub origin_external_source: Option<String>,
+    pub nutrition_estimated: bool,
 }
 
 impl From<UserMealPrefDetail> for UserMealPrefDetailResponse {
@@ -575,6 +576,7 @@ impl From<UserMealPrefDetail> for UserMealPrefDetailResponse {
             source: m.source,
             has_personal_recipe: m.has_personal_recipe,
             origin_external_source: m.origin_external_source,
+            nutrition_estimated: m.nutrition_estimated,
         }
     }
 }
