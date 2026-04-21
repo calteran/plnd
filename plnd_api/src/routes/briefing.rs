@@ -211,7 +211,7 @@ pub async fn get_yesterday(
     let yesterday: NaiveDate = Utc::now().date_naive() - chrono::Duration::days(1);
 
     let snapshot = state
-        .repositories
+        .repos
         .briefing
         .yesterday_snapshot(user_id, yesterday)
         .await

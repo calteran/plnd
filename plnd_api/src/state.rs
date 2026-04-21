@@ -21,7 +21,6 @@ pub struct AppState {
     pub oidc_client_id: String,
     pub provider_search: ProviderSearchService,
     pub briefing: BriefingState,
-    pub repositories: Repositories,
     /// Per-IP rate limiter for unauthenticated POST /api/client_error requests.
     /// Authenticated requests (valid JWT) bypass this limiter entirely.
     pub client_error_limiter: Arc<DefaultKeyedRateLimiter<String>>,
