@@ -158,6 +158,7 @@ fn user_meal_pref_detail_round_trip() {
     assert_eq!(v["name"], "Sunday Roast");
     assert_eq!(v["source"], "catalog");
     assert_eq!(v["has_personal_recipe"], false);
+    assert_eq!(v["nutrition_estimated"], false);
 }
 
 // --- UserIngredientPref serde round-trip ---
