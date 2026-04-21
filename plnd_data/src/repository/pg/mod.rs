@@ -8,4 +8,5 @@ pub mod schedule;
 pub mod session;
 pub mod task;
 pub mod user;
+pub mod user_dish_prefs;
 pub mod user_ingredient_pref;
