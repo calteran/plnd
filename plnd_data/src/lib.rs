@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod db;
 pub mod providers;
+pub mod repository;
 pub mod search;
 
-pub use sqlx::PgPool;
+pub use repository::Repositories;

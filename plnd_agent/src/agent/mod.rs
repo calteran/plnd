@@ -334,15 +334,16 @@ impl AgentLoop<'_> {
 pub struct AgentService {
     pub config: LlmConfig,
     registry: Arc<ProviderRegistry>,
-    /// Database for loading user memories. `None` only in unit-test constructors
-    /// that do not exercise the memory-loading path.
-    db: Option<plnd_data::db::Database>,
+    /// Repositories for loading user memories and running tools.
+    /// `None` only in unit-test constructors that do not exercise the
+    /// memory-loading path.
+    repos: Option<plnd_data::Repositories>,
 }
 
 impl AgentService {
     /// Build an `AgentService` from LLM configuration, eagerly constructing
     /// HTTP clients for each provider tier.
-    pub fn new(config: &LlmConfig, db: plnd_data::db::Database) -> Self {
+    pub fn new(config: &LlmConfig, repos: plnd_data::Repositories) -> Self {
         let mut registry = ProviderRegistry::new();
 
         registry.register(ProviderTier::Fast, build_provider(&config.fast));
@@ -351,7 +352,7 @@ impl AgentService {
         Self {
             config: config.clone(),
             registry: Arc::new(registry),
-            db: Some(db),
+            repos: Some(repos),
         }
     }
 
@@ -369,13 +370,11 @@ impl AgentService {
     #[tracing::instrument(skip(self), fields(use_case = ?ctx.use_case, user_id = %ctx.user_id), err)]
     pub async fn run(&self, ctx: &AgentContext) -> Result<AgentOutput, AgentError> {
         // Step 1: Load memories filtered by use case.
-        let memory_entries = if let Some(ref db) = self.db {
-            let memories = plnd_data::db::memories::get_memories(
-                db.get_pool(),
-                ctx.user_id,
-                ctx.use_case.memory_categories(),
-            )
-            .await?;
+        let memory_entries = if let Some(ref repos) = self.repos {
+            let memories = repos
+                .memory
+                .get(ctx.user_id, ctx.use_case.memory_categories())
+                .await?;
             if memories.is_empty() {
                 None
             } else {
@@ -398,10 +397,12 @@ impl AgentService {
         };
 
         // Step 2: Build the tool registry for this use case.
-        // When `db` is `None` (unit-test constructors that skip DB access), an empty
+        // When `repos` is `None` (unit-test constructors that skip DB access), an empty
         // registry is used — those tests do not exercise tool-execution paths.
-        let tools = match self.db {
-            Some(ref db) => crate::tools::build_tool_registry(&ctx.use_case, db, ctx.extra.clone()),
+        let tools = match self.repos {
+            Some(ref repos) => {
+                crate::tools::build_tool_registry(&ctx.use_case, repos, ctx.extra.clone())
+            }
             None => ToolRegistry::new(),
         };
 
@@ -544,7 +545,7 @@ impl std::fmt::Debug for AgentService {
         f.debug_struct("AgentService")
             .field("fast_provider", &self.config.fast.provider)
             .field("capable_provider", &self.config.capable.provider)
-            .field("db", &self.db.as_ref().map(|_| "<Database>"))
+            .field("repos", &self.repos.as_ref().map(|_| "<Repositories>"))
             .finish()
     }
 }
@@ -555,8 +556,8 @@ impl std::fmt::Debug for AgentService {
 impl AgentService {
     /// Test-only constructor that injects a pre-built registry.
     ///
-    /// Sets `db = None` so memory loading is skipped. Use
-    /// `new_with_registry_and_db` for tests that exercise the memory path.
+    /// Sets `repos = None` so memory loading is skipped. Use
+    /// `new_with_registry_and_repos` for tests that exercise the memory path.
     fn new_with_registry(registry: ProviderRegistry) -> Self {
         use crate::config::LlmModelConfig;
         let model_cfg = LlmModelConfig {
@@ -570,7 +571,7 @@ impl AgentService {
                 capable: model_cfg,
             },
             registry: Arc::new(registry),
-            db: None,
+            repos: None,
         }
     }
 
@@ -588,7 +589,7 @@ impl AgentService {
                 capable: model_cfg,
             },
             registry: Arc::new(registry),
-            db: Some(db),
+            repos: Some(plnd_data::Repositories::from_database(&db)),
         }
     }
 }

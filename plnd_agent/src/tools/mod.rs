@@ -136,43 +136,42 @@ impl ToolRegistry {
 
 // ── Registry factory ──────────────────────────────────────────────────────────
 
-/// Build the `ToolRegistry` for a given [`UseCase`], creating stores directly
-/// from the database pool.
+/// Build the `ToolRegistry` for a given [`UseCase`].
 ///
 /// Each use case registers only its own tool subset — task-entry tools are
 /// never exposed to meal-planning runs, and vice versa.
 pub(crate) fn build_tool_registry(
     use_case: &UseCase,
-    db: &plnd_data::db::Database,
+    repos: &plnd_data::Repositories,
     extra: Option<serde_json::Value>,
 ) -> ToolRegistry {
-    let pool = db.get_pool().clone();
-    let memory_store = Arc::new(plnd_data::db::MemoryStore::new(pool.clone()));
     let mut registry = ToolRegistry::new();
-    register_memory_tools(&mut registry, memory_store);
+    register_memory_tools(&mut registry, Arc::clone(&repos.memory));
     match use_case {
         UseCase::TaskEntry => {
-            let task_store = Arc::new(plnd_data::db::TaskStore::new(pool.clone()));
-            let schedule_store = Arc::new(plnd_data::db::ScheduleStore::new(pool));
-            register_schedule_tools(&mut registry, task_store, schedule_store);
+            register_schedule_tools(
+                &mut registry,
+                Arc::clone(&repos.task),
+                Arc::clone(&repos.schedule),
+            );
         }
         UseCase::MealPlanning => {
-            register_meal_read_tools(&mut registry, db);
+            register_meal_read_tools(&mut registry, Arc::clone(&repos.meal));
             let week_state = extra.unwrap_or_default();
             register_meal_planning_tools(&mut registry, week_state);
         }
         UseCase::MealRebalance => {
-            register_meal_read_tools(&mut registry, db);
+            register_meal_read_tools(&mut registry, Arc::clone(&repos.meal));
             let week_state = extra.unwrap_or_default();
             register_meal_rebalance_tools(&mut registry, week_state);
         }
         UseCase::MealSuggestSlot => {
-            register_meal_read_tools(&mut registry, db);
+            register_meal_read_tools(&mut registry, Arc::clone(&repos.meal));
             register_meal_suggest_slot_tools(&mut registry);
         }
         UseCase::MealAdhocResolve => {
-            register_meal_read_tools(&mut registry, db);
-            register_meal_adhoc_resolve_tools(&mut registry, db);
+            register_meal_read_tools(&mut registry, Arc::clone(&repos.meal));
+            register_meal_adhoc_resolve_tools(&mut registry, Arc::clone(&repos.meal));
         }
     }
     registry

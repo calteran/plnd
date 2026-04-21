@@ -145,47 +145,6 @@ pub async fn create_user_task(
     Ok(task)
 }
 
-// ── TaskStore ─────────────────────────────────────────────────────────────────
-
-/// Owned handle for task scheduling operations.
-///
-/// Wraps [`PgPool`] so callers (e.g. `plnd_agent` tools) do not need a direct
-/// sqlx dependency — sqlx is a private implementation detail of `plnd_data`.
-#[derive(Clone)]
-pub struct TaskStore {
-    pool: PgPool,
-}
-
-impl TaskStore {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub async fn create_user_task(
-        &self,
-        user_id: Uuid,
-        title: &str,
-        energy_level: &str,
-        date: NaiveDate,
-        scheduled_at: Option<DateTime<Utc>>,
-        duration_minutes: i32,
-        after_milepost: Option<&str>,
-    ) -> Result<Task, DatabaseError> {
-        create_user_task(
-            &self.pool,
-            user_id,
-            title,
-            energy_level,
-            date,
-            scheduled_at,
-            duration_minutes,
-            after_milepost,
-        )
-        .await
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

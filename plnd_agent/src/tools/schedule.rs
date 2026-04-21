@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, Utc};
 use plnd_data::db::error::DatabaseError;
-use plnd_data::db::{ScheduleStore, TaskStore};
+use plnd_data::repository::{ScheduleRepository, TaskRepository};
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
@@ -53,7 +53,7 @@ fn db_err(tool: &str, e: DatabaseError) -> ToolError {
 
 // ── GetDayScheduleTool ────────────────────────────────────────────────────────
 
-pub struct GetDayScheduleTool(Arc<ScheduleStore>);
+pub struct GetDayScheduleTool(Arc<dyn ScheduleRepository>);
 
 #[async_trait::async_trait]
 impl Tool for GetDayScheduleTool {
@@ -151,7 +151,7 @@ impl Tool for GetDayScheduleTool {
 
 // ── CreateTaskTool ────────────────────────────────────────────────────────────
 
-pub struct CreateTaskTool(Arc<TaskStore>);
+pub struct CreateTaskTool(Arc<dyn TaskRepository>);
 
 #[async_trait::async_trait]
 impl Tool for CreateTaskTool {
@@ -347,17 +347,17 @@ impl Tool for RequestClarificationTool {
 /// # Example
 ///
 /// ```ignore
-/// let task_store = Arc::new(TaskStore::new(pool.clone()));
-/// let schedule_store = Arc::new(ScheduleStore::new(pool));
-/// register_schedule_tools(&mut registry, task_store, schedule_store);
+/// let task_repo: Arc<dyn TaskRepository> = Arc::new(PgTaskRepository::new(pool.clone()));
+/// let schedule_repo: Arc<dyn ScheduleRepository> = Arc::new(PgScheduleRepository::new(pool));
+/// register_schedule_tools(&mut registry, task_repo, schedule_repo);
 /// ```
 pub fn register_schedule_tools(
     registry: &mut ToolRegistry,
-    task_store: Arc<TaskStore>,
-    schedule_store: Arc<ScheduleStore>,
+    task_repo: Arc<dyn TaskRepository>,
+    schedule_repo: Arc<dyn ScheduleRepository>,
 ) {
-    registry.register(Arc::new(GetDayScheduleTool(schedule_store)));
-    registry.register(Arc::new(CreateTaskTool(task_store)));
+    registry.register(Arc::new(GetDayScheduleTool(schedule_repo)));
+    registry.register(Arc::new(CreateTaskTool(task_repo)));
     registry.register(Arc::new(RequestClarificationTool));
 }
 

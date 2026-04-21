@@ -24,4 +24,3 @@ tracing      = "0.1"
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 toml  = "1.1"
-sqlx  = { version = "0.8", features = ["postgres", "uuid", "chrono", "runtime-tokio", "migrate", "macros"] }
