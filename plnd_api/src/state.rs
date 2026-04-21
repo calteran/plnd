@@ -3,7 +3,6 @@ use crate::briefing::BriefingState;
 use governor::DefaultKeyedRateLimiter;
 use plnd_agent::AgentService;
 use plnd_data::db::Database;
-use plnd_data::repository::Repositories;
 use plnd_data::search::ProviderSearchService;
 use plnd_data::Repositories;
 use std::sync::Arc;
@@ -12,6 +11,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
+    /// Repository layer — typed access to all storage-backed domain operations.
     pub repos: Repositories,
     pub jwt: JwtService,
     pub session: SessionService,
@@ -29,6 +29,4 @@ pub struct AppState {
     /// Agent service for LLM-backed task and meal-plan generation.
     /// Stub in Phase 3.1 — fully implemented in Phase 3.2/3.3.
     pub agent: AgentService,
-    /// Repository layer — typed access to all storage-backed domain operations.
-    pub repos: Repositories,
 }
