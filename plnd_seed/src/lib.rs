@@ -8,6 +8,21 @@ pub use error::SeedError;
 use plnd_data::providers::{NutritionProvider, RecipeProvider};
 use std::sync::Arc;
 
+/// Autonomous entry point for seeding — creates its own pool from a URL.
+pub async fn run_seed(
+    database_url: &str,
+    max_connections: u32,
+    nutrition_providers: &[Arc<dyn NutritionProvider>],
+    recipe_providers: &[Arc<dyn RecipeProvider>],
+) -> Result<(), SeedError> {
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(max_connections)
+        .connect(database_url)
+        .await
+        .map_err(SeedError::Database)?;
+    seed(&pool, nutrition_providers, recipe_providers).await
+}
+
 /// Seed the catalog tables with real data from external providers.
 ///
 /// **Idempotent**: if any externally-sourced ingredient already exists,

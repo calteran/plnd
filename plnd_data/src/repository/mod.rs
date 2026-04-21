@@ -58,7 +58,13 @@ pub struct Repositories {
 }
 
 impl Repositories {
-    pub fn from_database(db: &crate::db::Database) -> Self {
+    pub async fn new(database_url: &str, max_connections: u32) -> Result<Self, DatabaseError> {
+        let db = crate::db::connection::Database::new(database_url, max_connections).await?;
+        crate::db::connection::run_migrations(db.get_pool()).await?;
+        Ok(Self::from_database(&db))
+    }
+
+    pub(crate) fn from_database(db: &crate::db::connection::Database) -> Self {
         let pool = db.get_pool().clone();
         Self {
             briefing: Arc::new(pg::briefing::PgBriefingRepository::new(pool.clone())),

@@ -26,7 +26,7 @@ pub enum AgentError {
     Tool(#[from] ToolError),
 
     #[error("Database error: {0}")]
-    Database(#[from] plnd_data::db::error::DatabaseError),
+    Database(#[from] plnd_data::DatabaseError),
 
     #[error("agent response failed schema validation: {violations}")]
     SchemaValidation { violations: String },
@@ -576,7 +576,10 @@ impl AgentService {
     }
 
     /// Test-only constructor that exercises the memory-loading path.
-    fn new_with_registry_and_db(registry: ProviderRegistry, db: plnd_data::db::Database) -> Self {
+    fn new_with_registry_and_repos(
+        registry: ProviderRegistry,
+        repos: plnd_data::Repositories,
+    ) -> Self {
         use crate::config::LlmModelConfig;
         let model_cfg = LlmModelConfig {
             max_iterations: 10,
@@ -589,7 +592,7 @@ impl AgentService {
                 capable: model_cfg,
             },
             registry: Arc::new(registry),
-            repos: Some(plnd_data::Repositories::from_database(&db)),
+            repos: Some(repos),
         }
     }
 }
@@ -1020,26 +1023,19 @@ mod tests {
 
     /// Connect to the test DB from `DATABASE_URL`, run migrations, or return
     /// `None` to skip the test.
-    async fn test_db() -> Option<plnd_data::db::Database> {
+    async fn test_db() -> Option<plnd_data::Repositories> {
         let url = std::env::var("DATABASE_URL").ok()?;
-        let db = plnd_data::db::Database::new(&url, 1).await.ok()?;
-        plnd_data::db::connection::run_migrations(db.get_pool())
-            .await
-            .ok()?;
-        Some(db)
+        plnd_data::Repositories::new(&url, 1).await.ok()
     }
 
     /// Create a throwaway user and return its UUID.
-    async fn new_user(db: &plnd_data::db::Database) -> Uuid {
-        plnd_data::db::users::create(
-            db.get_pool(),
-            &format!("{}@test.invalid", Uuid::new_v4()),
-            None,
-            None,
-        )
-        .await
-        .expect("failed to create test user")
-        .user_id
+    async fn new_user(repos: &plnd_data::Repositories) -> Uuid {
+        repos
+            .user
+            .create(&format!("{}@test.invalid", Uuid::new_v4()), None, None)
+            .await
+            .expect("failed to create test user")
+            .user_id
     }
 
     // ── AgentService::run — AgentContext wiring tests ─────────────────────────
@@ -1051,20 +1047,16 @@ mod tests {
     /// Requires `DATABASE_URL` to be set (provided by `just verify`).
     #[tokio::test]
     async fn test_memory_context_prepended_to_system_prompt() {
-        let db = match test_db().await {
-            Some(db) => db,
+        let repos = match test_db().await {
+            Some(repos) => repos,
             None => return, // skip when running without a DB
         };
-        let user_id = new_user(&db).await;
-        plnd_data::db::memories::create_memory(
-            db.get_pool(),
-            user_id,
-            "habits",
-            "user prefers oat milk",
-            vec![],
-        )
-        .await
-        .expect("seed failed");
+        let user_id = new_user(&repos).await;
+        repos
+            .memory
+            .save(user_id, "habits", "user prefers oat milk", &[])
+            .await
+            .expect("seed failed");
 
         let mock = MockLlmProvider::new("test");
         let last_request = mock.last_request_handle();
@@ -1083,7 +1075,7 @@ mod tests {
             usage: None,
         });
 
-        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos);
         // Both meal use cases include "habits".
         let ctx = AgentContext {
             user_id,
@@ -1118,12 +1110,12 @@ mod tests {
     /// Requires `DATABASE_URL` to be set (provided by `just verify`).
     #[tokio::test]
     async fn test_no_memories_omits_memory_block() {
-        let db = match test_db().await {
-            Some(db) => db,
+        let repos = match test_db().await {
+            Some(repos) => repos,
             None => return,
         };
         // Real user with no memories seeded.
-        let user_id = new_user(&db).await;
+        let user_id = new_user(&repos).await;
 
         let mock = MockLlmProvider::new("test");
         let last_request = mock.last_request_handle();
@@ -1142,7 +1134,7 @@ mod tests {
             usage: None,
         });
 
-        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos);
         let ctx = AgentContext {
             user_id,
             use_case: UseCase::MealSuggestSlot,
@@ -1172,18 +1164,20 @@ mod tests {
     /// Requires `DATABASE_URL` to be set (provided by `just verify`).
     #[tokio::test]
     async fn test_task_entry_injects_task_memories_not_food() {
-        let db = match test_db().await {
-            Some(db) => db,
+        let repos = match test_db().await {
+            Some(repos) => repos,
             None => return,
         };
-        let user_id = new_user(&db).await;
+        let user_id = new_user(&repos).await;
         for (cat, content) in [
             ("habits", "wakes up at 7am"),
             ("schedule", "productive in the mornings"),
             ("energy", "low energy after lunch"),
             ("food", "likes spicy food"),
         ] {
-            plnd_data::db::memories::create_memory(db.get_pool(), user_id, cat, content, vec![])
+            repos
+                .memory
+                .save(user_id, cat, content, &[])
                 .await
                 .expect("seed failed");
         }
@@ -1200,7 +1194,7 @@ mod tests {
             usage: None,
         });
 
-        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos);
         let ctx = AgentContext {
             user_id,
             use_case: UseCase::TaskEntry,
@@ -1233,17 +1227,19 @@ mod tests {
     /// Requires `DATABASE_URL` to be set (provided by `just verify`).
     #[tokio::test]
     async fn test_meal_planning_injects_meal_memories_not_schedule() {
-        let db = match test_db().await {
-            Some(db) => db,
+        let repos = match test_db().await {
+            Some(repos) => repos,
             None => return,
         };
-        let user_id = new_user(&db).await;
+        let user_id = new_user(&repos).await;
         for (cat, content) in [
             ("food", "likes mediterranean cuisine"),
             ("habits", "fridays = sandwich"),
             ("schedule", "productive in the mornings"),
         ] {
-            plnd_data::db::memories::create_memory(db.get_pool(), user_id, cat, content, vec![])
+            repos
+                .memory
+                .save(user_id, cat, content, &[])
                 .await
                 .expect("seed failed");
         }
@@ -1265,7 +1261,7 @@ mod tests {
             usage: None,
         });
 
-        let service = AgentService::new_with_registry_and_db(make_registry(mock), db);
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos);
         let ctx = AgentContext {
             user_id,
             use_case: UseCase::MealSuggestSlot,

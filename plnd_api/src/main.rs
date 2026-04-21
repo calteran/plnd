@@ -40,7 +40,6 @@ use plnd_data::providers::{
     OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider, UsdaFdcProvider,
 };
 use plnd_data::search::ProviderSearchService;
-use plnd_data::Database;
 
 #[tokio::main]
 async fn main() {
@@ -98,20 +97,19 @@ async fn main() {
         "configuration loaded"
     );
 
-    let db_conn =
-        match Database::new(&config.database.url, config.database.max_connections as u32).await {
-            Ok(db) => db,
-            Err(e) => {
-                tracing::error!(error = %e, "failed to connect to database");
-                std::process::exit(1);
-            }
-        };
-
-    if let Err(e) = plnd_data::db::run_migrations(db_conn.get_pool()).await {
-        tracing::error!(error = %e, "failed to run database migrations");
-        std::process::exit(1);
-    }
-    tracing::info!("database migrations applied successfully");
+    let repos = match plnd_data::Repositories::new(
+        &config.database.url,
+        config.database.max_connections as u32,
+    )
+    .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!(error = %e, "failed to connect to database or run migrations");
+            std::process::exit(1);
+        }
+    };
+    tracing::info!("database connected and migrations applied");
 
     let jwt = JwtService::new(
         config.auth.jwt.secret.clone(),
@@ -173,13 +171,13 @@ async fn main() {
     // Seed catalog tables in the background so the server binds immediately.
     // The seed is idempotent — safe to run on every startup.
     {
-        let seed_pool = db_conn.get_pool().clone();
+        let seed_url = config.database.url.clone();
         let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::providers::NutritionProvider>> =
             vec![nutrition_usda.clone(), nutrition_off.clone()];
         let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::providers::RecipeProvider>> =
             vec![recipe_mdb.clone()];
         tokio::spawn(async move {
-            if let Err(e) = plnd_seed::seed(&seed_pool, &seed_nutrition, &seed_recipe).await {
+            if let Err(e) = plnd_seed::run_seed(&seed_url, 3, &seed_nutrition, &seed_recipe).await {
                 tracing::warn!(error = %e, "catalog seed failed (non-fatal)");
             }
         });
@@ -218,7 +216,6 @@ async fn main() {
         Quota::per_minute(NonZeroU32::new(config.agent.rate_limit_per_minute).unwrap());
     let agent_task_limiter = Arc::new(RateLimiter::keyed(agent_task_quota));
 
-    let repos = plnd_data::Repositories::from_database(&db_conn);
     let session = SessionService::with_repo(repos.session.clone());
     let agent = plnd_agent::AgentService::new(&config.llm, repos.clone());
 

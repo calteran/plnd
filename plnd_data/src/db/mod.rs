@@ -1,4 +1,4 @@
-pub mod connection;
+pub(crate) mod connection;
 pub mod error;
 pub mod models;
 pub mod query_types;
@@ -19,6 +19,3 @@ pub mod user_ingredient_prefs;
 pub mod user_meal_prefs;
 pub mod user_meals;
 pub mod users;
-
-pub use connection::run_migrations;
-pub use connection::Database;
