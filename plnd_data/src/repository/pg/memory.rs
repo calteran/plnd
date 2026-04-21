@@ -22,12 +22,9 @@ impl MemoryRepository for PgMemoryRepository {
     async fn get(
         &self,
         user_id: Uuid,
-        category: Option<&str>,
+        categories: &[&str],
     ) -> Result<Vec<UserMemory>, DatabaseError> {
-        match category {
-            Some(cat) => get_memories(&self.pool, user_id, &[cat]).await,
-            None => get_memories(&self.pool, user_id, &[]).await,
-        }
+        get_memories(&self.pool, user_id, categories).await
     }
 
     async fn save(

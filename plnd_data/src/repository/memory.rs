@@ -9,7 +9,7 @@ pub trait MemoryRepository: Send + Sync {
     async fn get(
         &self,
         user_id: Uuid,
-        category: Option<&str>,
+        categories: &[&str],
     ) -> Result<Vec<UserMemory>, DatabaseError>;
 
     async fn save(

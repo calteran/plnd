@@ -120,9 +120,10 @@ impl Tool for GetUserMemoriesTool {
             validate_category(cat, self.name())?;
         }
 
+        let categories: Vec<&str> = category.as_deref().into_iter().collect();
         let memories = self
             .repo
-            .get(ctx.user_id, category.as_deref())
+            .get(ctx.user_id, &categories)
             .await
             .map_err(|e| db_err(self.name(), e))?;
 
