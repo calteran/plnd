@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::api_response::UserDishPrefDetailResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::{error::DatabaseError, user_dish_prefs};
+use plnd_data::repository::{AddIngredientParams, DatabaseError};
 
 #[utoipa::path(
     get,
@@ -30,7 +30,10 @@ pub async fn list(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<UserDishPrefDetailResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    user_dish_prefs::list(state.db.get_pool(), user_id)
+    state
+        .repos
+        .user_dish_prefs
+        .list(user_id)
         .await
         .map(|v| {
             Json(
@@ -64,7 +67,10 @@ pub async fn get_detail(
     Path(pref_id): Path<Uuid>,
 ) -> Result<Json<UserDishPrefDetailResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    user_dish_prefs::get(state.db.get_pool(), user_id, pref_id)
+    state
+        .repos
+        .user_dish_prefs
+        .get(user_id, pref_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .map(UserDishPrefDetailResponse::from)
@@ -108,7 +114,12 @@ pub async fn create(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     if let Some(catalog_id) = body.catalog_dish_id {
-        match user_dish_prefs::create_from_catalog(state.db.get_pool(), user_id, catalog_id).await {
+        match state
+            .repos
+            .user_dish_prefs
+            .create_from_catalog(user_id, catalog_id)
+            .await
+        {
             Ok(detail) => Ok((
                 StatusCode::CREATED,
                 Json(UserDishPrefDetailResponse::from(detail)),
@@ -118,16 +129,18 @@ pub async fn create(
             Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         }
     } else if let Some(name) = body.name {
-        let detail = user_dish_prefs::create_from_scratch(
-            state.db.get_pool(),
-            user_id,
-            &name,
-            body.instructions.as_deref(),
-            body.prep_time_minutes,
-            body.cook_time_minutes,
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let detail = state
+            .repos
+            .user_dish_prefs
+            .create_from_scratch(
+                user_id,
+                &name,
+                body.instructions.as_deref(),
+                body.prep_time_minutes,
+                body.cook_time_minutes,
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
         Ok((
             StatusCode::CREATED,
             Json(UserDishPrefDetailResponse::from(detail)),
@@ -197,20 +210,22 @@ pub async fn patch(
                 .as_ref()
                 .and_then(|v| if v.is_null() { None } else { v.as_str() });
 
-        user_dish_prefs::fork_and_update_recipe(
-            state.db.get_pool(),
-            user_id,
-            pref_id,
-            body.name.as_deref(),
-            instructions,
-            body.prep_time_minutes,
-            body.cook_time_minutes,
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .map(UserDishPrefDetailResponse::from)
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+        state
+            .repos
+            .user_dish_prefs
+            .fork_and_update_recipe(
+                user_id,
+                pref_id,
+                body.name.as_deref(),
+                instructions,
+                body.prep_time_minutes,
+                body.cook_time_minutes,
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map(UserDishPrefDetailResponse::from)
+            .map(Json)
+            .ok_or(StatusCode::NOT_FOUND)
     } else {
         // Metadata-only update
         // rating: Some(Value) means "was provided"; inner value may be null (→ None) or i64
@@ -231,20 +246,22 @@ pub async fn patch(
             }
         });
 
-        user_dish_prefs::update_metadata(
-            state.db.get_pool(),
-            user_id,
-            pref_id,
-            rating,
-            body.is_safe_food,
-            body.is_blocked,
-            notes,
-        )
-        .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-        .map(UserDishPrefDetailResponse::from)
-        .map(Json)
-        .ok_or(StatusCode::NOT_FOUND)
+        state
+            .repos
+            .user_dish_prefs
+            .update_metadata(
+                user_id,
+                pref_id,
+                rating,
+                body.is_safe_food,
+                body.is_blocked,
+                notes,
+            )
+            .await
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+            .map(UserDishPrefDetailResponse::from)
+            .map(Json)
+            .ok_or(StatusCode::NOT_FOUND)
     }
 }
 
@@ -270,7 +287,10 @@ pub async fn delete(
     Path(pref_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let deleted = user_dish_prefs::delete(state.db.get_pool(), user_id, pref_id)
+    let deleted = state
+        .repos
+        .user_dish_prefs
+        .delete(user_id, pref_id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
@@ -315,24 +335,26 @@ pub async fn add_ingredient(
     Json(body): Json<AddIngredientBody>,
 ) -> Result<Json<UserDishPrefDetailResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    user_dish_prefs::add_ingredient(
-        state.db.get_pool(),
-        user_id,
-        pref_id,
-        user_dish_prefs::AddIngredientParams {
-            ingredient_id: body.catalog_ingredient_id,
-            quantity: body.quantity,
-            unit: body.unit,
-            preparation_note: body.preparation_note,
-            is_optional: body.is_optional.unwrap_or(false),
-            sort_order: body.sort_order.unwrap_or(0),
-        },
-    )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
-    .map(UserDishPrefDetailResponse::from)
-    .map(Json)
-    .ok_or(StatusCode::NOT_FOUND)
+    state
+        .repos
+        .user_dish_prefs
+        .add_ingredient(
+            user_id,
+            pref_id,
+            AddIngredientParams {
+                ingredient_id: body.catalog_ingredient_id,
+                quantity: body.quantity,
+                unit: body.unit,
+                preparation_note: body.preparation_note,
+                is_optional: body.is_optional.unwrap_or(false),
+                sort_order: body.sort_order.unwrap_or(0),
+            },
+        )
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map(UserDishPrefDetailResponse::from)
+        .map(Json)
+        .ok_or(StatusCode::NOT_FOUND)
 }
 
 #[utoipa::path(
@@ -358,7 +380,10 @@ pub async fn remove_ingredient(
     Path((pref_id, ingredient_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    match user_dish_prefs::remove_ingredient(state.db.get_pool(), user_id, pref_id, ingredient_id)
+    match state
+        .repos
+        .user_dish_prefs
+        .remove_ingredient(user_id, pref_id, ingredient_id)
         .await
     {
         Ok(Some(true)) => Ok(StatusCode::NO_CONTENT),
