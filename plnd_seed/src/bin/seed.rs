@@ -2,6 +2,7 @@ use plnd_data::providers::{
     NutritionProvider, OpenFoodFactsProvider, RecipeProvider, TheMealDbProvider, UsdaFdcProvider,
 };
 use std::sync::Arc;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -11,6 +12,8 @@ async fn main() -> anyhow::Result<()> {
 
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(5)
+        .acquire_timeout(Duration::from_secs(30))
+        .idle_timeout(Duration::from_secs(600))
         .connect(&database_url)
         .await?;
 
