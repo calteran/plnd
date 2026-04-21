@@ -220,7 +220,8 @@ async fn main() {
         Quota::per_minute(NonZeroU32::new(config.agent.rate_limit_per_minute).unwrap());
     let agent_task_limiter = Arc::new(RateLimiter::keyed(agent_task_quota));
 
-    let agent = plnd_agent::AgentService::new(&config.llm, db_conn.clone());
+    let repos = plnd_data::Repositories::from_database(&db_conn);
+    let agent = plnd_agent::AgentService::new(&config.llm, repos);
 
     let state = Arc::new(AppState {
         db: db_conn,
