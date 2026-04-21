@@ -99,3 +99,12 @@ pub struct AddIngredientParams {
     pub is_optional: bool,
     pub sort_order: i16,
 }
+
+/// Parameters for adding a dish to a user meal (via fork if needed).
+pub struct AddDishParams {
+    pub catalog_dish_id: Option<Uuid>,
+    pub user_dish_id: Option<Uuid>,
+    pub dish_servings: rust_decimal::Decimal,
+    pub notes: Option<String>,
+    pub sort_order: i16,
+}

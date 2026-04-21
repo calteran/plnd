@@ -2,7 +2,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::error::DatabaseError;
-use crate::models::UserMealPrefDetail;
+use crate::models::{AddDishParams, UserMealPrefDetail};
 
 /// Single SQL fragment for selecting a UserMealPrefDetail row.
 /// Used in both list and get queries.
@@ -320,14 +320,6 @@ pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool,
 
     tx.commit().await?;
     Ok(true)
-}
-
-pub struct AddDishParams {
-    pub catalog_dish_id: Option<Uuid>,
-    pub user_dish_id: Option<Uuid>,
-    pub dish_servings: rust_decimal::Decimal,
-    pub notes: Option<String>,
-    pub sort_order: i16,
 }
 
 #[tracing::instrument(skip(pool, params), fields(table = "user_meal_prefs", op = "add_dish"))]

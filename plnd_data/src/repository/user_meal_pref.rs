@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-pub use crate::db::user_meal_prefs::AddDishParams;
+pub use crate::models::AddDishParams;
 use crate::models::UserMealPrefDetail;
 
 #[async_trait]
