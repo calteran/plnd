@@ -11,7 +11,6 @@ use crate::api_response::{
 };
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::catalog_details;
 
 #[utoipa::path(
     get,
@@ -34,7 +33,10 @@ pub async fn get_ingredient(
     Extension(_claims): Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<CatalogIngredientResponse>, StatusCode> {
-    catalog_details::get_ingredient(state.db.get_pool(), id)
+    state
+        .repos
+        .meal
+        .catalog_ingredient(id)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .map(CatalogIngredientResponse::from)
@@ -63,10 +65,13 @@ pub async fn get_dish(
     Extension(_claims): Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<DishDetailApiResponse>, StatusCode> {
-    let result = catalog_details::get_dish(state.db.get_pool(), id)
+    match state
+        .repos
+        .meal
+        .catalog_dish(id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    match result {
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
         None => Err(StatusCode::NOT_FOUND),
         Some(pair) => Ok(Json(DishDetailApiResponse::from(pair))),
     }
@@ -93,10 +98,13 @@ pub async fn get_meal(
     Extension(_claims): Extension<Claims>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<MealDetailApiResponse>, StatusCode> {
-    let result = catalog_details::get_meal(state.db.get_pool(), id)
+    match state
+        .repos
+        .meal
+        .catalog_meal(id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    match result {
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    {
         None => Err(StatusCode::NOT_FOUND),
         Some(pair) => Ok(Json(MealDetailApiResponse::from(pair))),
     }

@@ -2,11 +2,14 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::db::catalog_details::{get_ingredient_names_by_ids, get_meal_nutrition};
+use crate::db::catalog_details::{
+    get_dish, get_ingredient, get_ingredient_names_by_ids, get_meal, get_meal_nutrition,
+};
 use crate::db::dietary_restrictions;
 use crate::db::error::DatabaseError;
 use crate::db::models::{
-    CatalogIngredient, CatalogMeal, DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
+    CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
+    DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
 };
 use crate::db::search::{
     search_catalog_meals as db_search_catalog_meals,
@@ -135,5 +138,26 @@ impl MealRepository for PgMealRepository {
             estimated,
         )
         .await
+    }
+
+    async fn catalog_ingredient(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<CatalogIngredient>, DatabaseError> {
+        get_ingredient(&self.pool, id).await
+    }
+
+    async fn catalog_dish(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, DatabaseError> {
+        get_dish(&self.pool, id).await
+    }
+
+    async fn catalog_meal(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<(CatalogMeal, Vec<CatalogMealDish>)>, DatabaseError> {
+        get_meal(&self.pool, id).await
     }
 }
