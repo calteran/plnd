@@ -2,7 +2,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 #[allow(clippy::enum_variant_names)]
-pub enum DatabaseError {
+pub(crate) enum DatabaseError {
     #[error("Database connection failed: {0}")]
     ConnectionError(String),
 

@@ -3,7 +3,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::db::error::DatabaseError;
+
 use crate::db::tasks::{create_user_task, create_weekly_plan_task};
 use crate::models::Task;
 use crate::repository::task::TaskRepository;
@@ -30,7 +30,7 @@ impl TaskRepository for PgTaskRepository {
         scheduled_at: Option<DateTime<Utc>>,
         duration_minutes: i32,
         after_milepost: Option<&str>,
-    ) -> Result<Task, DatabaseError> {
+    ) -> Result<Task,crate::Error> {
         create_user_task(
             &self.pool,
             user_id,
@@ -41,7 +41,7 @@ impl TaskRepository for PgTaskRepository {
             duration_minutes,
             after_milepost,
         )
-        .await
+        .await.map_err(Into::into)
     }
 
     async fn create_weekly_plan_task(
@@ -49,7 +49,7 @@ impl TaskRepository for PgTaskRepository {
         user_id: Uuid,
         plan_start: NaiveDate,
         trigger_offset: i16,
-    ) -> Result<Task, DatabaseError> {
-        create_weekly_plan_task(&self.pool, user_id, plan_start, trigger_offset).await
+    ) -> Result<Task,crate::Error> {
+        create_weekly_plan_task(&self.pool, user_id, plan_start, trigger_offset).await.map_err(Into::into)
     }
 }

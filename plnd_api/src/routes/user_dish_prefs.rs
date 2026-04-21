@@ -11,7 +11,8 @@ use uuid::Uuid;
 use crate::api_response::UserDishPrefDetailResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::repository::{AddIngredientParams, DatabaseError};
+use plnd_data::repository::AddIngredientParams;
+use plnd_data::Error;
 
 #[utoipa::path(
     get,
@@ -124,8 +125,8 @@ pub async fn create(
                 StatusCode::CREATED,
                 Json(UserDishPrefDetailResponse::from(detail)),
             )),
-            Err(DatabaseError::UniqueViolation) => Err(StatusCode::CONFLICT),
-            Err(DatabaseError::ConnectionLost) => Err(StatusCode::SERVICE_UNAVAILABLE),
+            Err(Error::Conflict) => Err(StatusCode::CONFLICT),
+            Err(Error::ConnectionLost) => Err(StatusCode::SERVICE_UNAVAILABLE),
             Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         }
     } else if let Some(name) = body.name {

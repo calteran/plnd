@@ -3,7 +3,7 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::db::error::DatabaseError;
+
 use crate::db::meal_suggestions;
 use crate::models::MealSuggestion;
 use crate::repository::meal_suggestion::MealSuggestionRepository;
@@ -25,7 +25,7 @@ impl MealSuggestionRepository for PgMealSuggestionRepository {
         user_id: Uuid,
         slot: &str,
         date: NaiveDate,
-    ) -> Result<Vec<MealSuggestion>, DatabaseError> {
-        meal_suggestions::get_suggestions(&self.pool, user_id, slot, &date.to_string()).await
+    ) -> Result<Vec<MealSuggestion>,crate::Error> {
+        meal_suggestions::get_suggestions(&self.pool, user_id, slot, &date.to_string()).await.map_err(Into::into)
     }
 }

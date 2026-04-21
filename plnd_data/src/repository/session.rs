@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::db::error::DatabaseError;
+
 
 #[async_trait]
 pub trait SessionRepository: Send + Sync {
@@ -11,9 +11,9 @@ pub trait SessionRepository: Send + Sync {
         jti: &str,
         ip_address: Option<&str>,
         user_agent: Option<&str>,
-    ) -> Result<String, DatabaseError>;
+    ) -> Result<String,crate::Error>;
 
-    async fn validate(&self, jti: &str) -> Result<bool, DatabaseError>;
+    async fn validate(&self, jti: &str) -> Result<bool,crate::Error>;
 
-    async fn revoke(&self, jti: &str) -> Result<(), DatabaseError>;
+    async fn revoke(&self, jti: &str) -> Result<(),crate::Error>;
 }

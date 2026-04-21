@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::db::error::DatabaseError;
 use crate::models::{LocalDishResult, LocalIngredientResult};
 
 #[async_trait]
@@ -15,18 +14,18 @@ pub trait MealSearchRepository: Send + Sync {
         limit: i64,
         exclude_allergens: &[String],
         user_id: Option<Uuid>,
-    ) -> Result<Vec<LocalIngredientResult>, DatabaseError>;
+    ) -> Result<Vec<LocalIngredientResult>,crate::Error>;
 
     async fn search_catalog_dishes(
         &self,
         q: &str,
         limit: i64,
-    ) -> Result<Vec<LocalDishResult>, DatabaseError>;
+    ) -> Result<Vec<LocalDishResult>,crate::Error>;
 
     async fn search_user_dishes(
         &self,
         user_id: Uuid,
         q: &str,
         limit: i64,
-    ) -> Result<Vec<LocalDishResult>, DatabaseError>;
+    ) -> Result<Vec<LocalDishResult>,crate::Error>;
 }

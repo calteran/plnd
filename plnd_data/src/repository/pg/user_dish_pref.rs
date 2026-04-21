@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::db::error::DatabaseError;
+
 use crate::db::user_dish_prefs as db;
 use crate::models::UserDishPrefDetail;
 use crate::repository::user_dish_pref::{AddIngredientParams, UserDishPrefRepository};
@@ -19,24 +19,24 @@ impl PgUserDishPrefRepository {
 
 #[async_trait]
 impl UserDishPrefRepository for PgUserDishPrefRepository {
-    async fn list(&self, user_id: Uuid) -> Result<Vec<UserDishPrefDetail>, DatabaseError> {
-        db::list(&self.pool, user_id).await
+    async fn list(&self, user_id: Uuid) -> Result<Vec<UserDishPrefDetail>,crate::Error> {
+        db::list(&self.pool, user_id).await.map_err(Into::into)
     }
 
     async fn get(
         &self,
         user_id: Uuid,
         pref_id: Uuid,
-    ) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
-        db::get(&self.pool, user_id, pref_id).await
+    ) -> Result<Option<UserDishPrefDetail>,crate::Error> {
+        db::get(&self.pool, user_id, pref_id).await.map_err(Into::into)
     }
 
     async fn create_from_catalog(
         &self,
         user_id: Uuid,
         catalog_dish_id: Uuid,
-    ) -> Result<UserDishPrefDetail, DatabaseError> {
-        db::create_from_catalog(&self.pool, user_id, catalog_dish_id).await
+    ) -> Result<UserDishPrefDetail,crate::Error> {
+        db::create_from_catalog(&self.pool, user_id, catalog_dish_id).await.map_err(Into::into)
     }
 
     async fn create_from_scratch(
@@ -46,7 +46,7 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
         instructions: Option<&str>,
         prep_time_minutes: Option<i32>,
         cook_time_minutes: Option<i32>,
-    ) -> Result<UserDishPrefDetail, DatabaseError> {
+    ) -> Result<UserDishPrefDetail,crate::Error> {
         db::create_from_scratch(
             &self.pool,
             user_id,
@@ -55,7 +55,7 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
             prep_time_minutes,
             cook_time_minutes,
         )
-        .await
+        .await.map_err(Into::into)
     }
 
     async fn update_metadata(
@@ -66,7 +66,7 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
         is_safe_food: Option<bool>,
         is_blocked: Option<bool>,
         notes: Option<Option<String>>,
-    ) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
+    ) -> Result<Option<UserDishPrefDetail>,crate::Error> {
         db::update_metadata(
             &self.pool,
             user_id,
@@ -76,7 +76,7 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
             is_blocked,
             notes,
         )
-        .await
+        .await.map_err(Into::into)
     }
 
     async fn fork_and_update_recipe(
@@ -87,7 +87,7 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
         instructions: Option<&str>,
         prep_time_minutes: Option<i32>,
         cook_time_minutes: Option<i32>,
-    ) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
+    ) -> Result<Option<UserDishPrefDetail>,crate::Error> {
         db::fork_and_update_recipe(
             &self.pool,
             user_id,
@@ -97,11 +97,11 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
             prep_time_minutes,
             cook_time_minutes,
         )
-        .await
+        .await.map_err(Into::into)
     }
 
-    async fn delete(&self, user_id: Uuid, pref_id: Uuid) -> Result<bool, DatabaseError> {
-        db::delete(&self.pool, user_id, pref_id).await
+    async fn delete(&self, user_id: Uuid, pref_id: Uuid) -> Result<bool,crate::Error> {
+        db::delete(&self.pool, user_id, pref_id).await.map_err(Into::into)
     }
 
     async fn add_ingredient(
@@ -109,8 +109,8 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
         user_id: Uuid,
         pref_id: Uuid,
         params: AddIngredientParams,
-    ) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
-        db::add_ingredient(&self.pool, user_id, pref_id, params).await
+    ) -> Result<Option<UserDishPrefDetail>,crate::Error> {
+        db::add_ingredient(&self.pool, user_id, pref_id, params).await.map_err(Into::into)
     }
 
     async fn remove_ingredient(
@@ -118,7 +118,7 @@ impl UserDishPrefRepository for PgUserDishPrefRepository {
         user_id: Uuid,
         pref_id: Uuid,
         ingredient_id: Uuid,
-    ) -> Result<Option<bool>, DatabaseError> {
-        db::remove_ingredient(&self.pool, user_id, pref_id, ingredient_id).await
+    ) -> Result<Option<bool>,crate::Error> {
+        db::remove_ingredient(&self.pool, user_id, pref_id, ingredient_id).await.map_err(Into::into)
     }
 }

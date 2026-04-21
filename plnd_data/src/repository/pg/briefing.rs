@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::briefing::{self, YesterdaySnapshot};
-use crate::db::error::DatabaseError;
+
 use crate::repository::briefing::BriefingRepository;
 
 pub struct PgBriefingRepository {
@@ -23,7 +23,7 @@ impl BriefingRepository for PgBriefingRepository {
         &self,
         user_id: Uuid,
         date: NaiveDate,
-    ) -> Result<YesterdaySnapshot, DatabaseError> {
-        briefing::yesterday_snapshot(&self.pool, user_id, date).await
+    ) -> Result<YesterdaySnapshot,crate::Error> {
+        briefing::yesterday_snapshot(&self.pool, user_id, date).await.map_err(Into::into)
     }
 }

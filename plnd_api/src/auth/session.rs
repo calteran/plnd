@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::auth::error::AuthError;
 use async_trait::async_trait;
 use plnd_data::repository::SessionRepository;
-use plnd_data::DatabaseError;
+use plnd_data::Error;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -78,15 +78,15 @@ impl SessionRepository for StubSessionRepository {
         _jti: &str,
         _ip_address: Option<&str>,
         _user_agent: Option<&str>,
-    ) -> Result<String, DatabaseError> {
+    ) -> Result<String, Error> {
         Ok(Uuid::new_v4().to_string())
     }
 
-    async fn validate(&self, _jti: &str) -> Result<bool, DatabaseError> {
+    async fn validate(&self, _jti: &str) -> Result<bool, Error> {
         Ok(true)
     }
 
-    async fn revoke(&self, _jti: &str) -> Result<(), DatabaseError> {
+    async fn revoke(&self, _jti: &str) -> Result<(), Error> {
         Ok(())
     }
 }

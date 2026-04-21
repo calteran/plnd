@@ -1,5 +1,5 @@
 pub(crate) mod connection;
-pub mod error;
+pub(crate) mod error;
 
 pub(crate) mod briefing;
 pub(crate) mod catalog_details;

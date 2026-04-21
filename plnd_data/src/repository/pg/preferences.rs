@@ -3,7 +3,7 @@ use chrono::NaiveTime;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::db::error::DatabaseError;
+
 use crate::db::preferences;
 use crate::models::UserPreferences;
 use crate::repository::preferences::PreferencesRepository;
@@ -20,8 +20,8 @@ impl PgPreferencesRepository {
 
 #[async_trait]
 impl PreferencesRepository for PgPreferencesRepository {
-    async fn get_or_create(&self, user_id: Uuid) -> Result<UserPreferences, DatabaseError> {
-        preferences::get_or_create(&self.pool, user_id).await
+    async fn get_or_create(&self, user_id: Uuid) -> Result<UserPreferences,crate::Error> {
+        preferences::get_or_create(&self.pool, user_id).await.map_err(Into::into)
     }
 
     async fn patch_preferences(
@@ -31,7 +31,7 @@ impl PreferencesRepository for PgPreferencesRepository {
         planning_trigger_offset: Option<i16>,
         default_plan_length_days: Option<i16>,
         wake_time: Option<NaiveTime>,
-    ) -> Result<UserPreferences, DatabaseError> {
+    ) -> Result<UserPreferences,crate::Error> {
         preferences::patch_preferences(
             &self.pool,
             user_id,
@@ -40,6 +40,6 @@ impl PreferencesRepository for PgPreferencesRepository {
             default_plan_length_days,
             wake_time,
         )
-        .await
+        .await.map_err(Into::into)
     }
 }

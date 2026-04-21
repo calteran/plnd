@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::db::error::DatabaseError;
+
 use crate::db::search::search_exercises;
 use crate::models::LocalExerciseResult;
 use crate::repository::exercise::ExerciseRepository;
@@ -22,7 +22,7 @@ impl ExerciseRepository for PgExerciseRepository {
         &self,
         q: &str,
         limit: i64,
-    ) -> Result<Vec<LocalExerciseResult>, DatabaseError> {
-        search_exercises(&self.pool, q, limit).await
+    ) -> Result<Vec<LocalExerciseResult>,crate::Error> {
+        search_exercises(&self.pool, q, limit).await.map_err(Into::into)
     }
 }

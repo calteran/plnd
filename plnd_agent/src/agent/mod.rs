@@ -26,7 +26,7 @@ pub enum AgentError {
     Tool(#[from] ToolError),
 
     #[error("Database error: {0}")]
-    Database(#[from] plnd_data::DatabaseError),
+    Database(#[from] plnd_data::Error),
 
     #[error("agent response failed schema validation: {violations}")]
     SchemaValidation { violations: String },

@@ -12,8 +12,8 @@ use axum::{
     Json,
 };
 use chrono::NaiveDate;
-use plnd_data::models::{CarryoverDecision, CommitPlanInput, PlanEntryInput};
-use plnd_data::DatabaseError;
+use plnd_data::Error;
+use plnd_data::db::models::{CarryoverDecision, CommitPlanInput, PlanEntryInput};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -174,8 +174,8 @@ pub async fn post_plan(
         .map(PostSchedulePlanApiResponse::from)
         .map(Json)
         .map_err(|e| match e {
-            DatabaseError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            Error::Validation(_) => StatusCode::BAD_REQUEST,
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             _ => {
                 tracing::error!(error = %e, "post_plan error");
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -219,7 +219,7 @@ pub async fn patch_entry_status(
         .await
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| match e {
-            DatabaseError::NotFound => StatusCode::NOT_FOUND,
+            Error::NotFound => StatusCode::NOT_FOUND,
             _ => {
                 tracing::error!(error = %e, "patch_entry_status error");
                 StatusCode::INTERNAL_SERVER_ERROR

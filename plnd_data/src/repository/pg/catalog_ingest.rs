@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::catalog_ingest::{self, IngestIngredientParams};
-use crate::db::error::DatabaseError;
+
 use crate::repository::catalog_ingest::{CatalogIngestRepository, IngestIngredientInput};
 
 pub struct PgCatalogIngestRepository {
@@ -18,7 +18,7 @@ impl PgCatalogIngestRepository {
 
 #[async_trait]
 impl CatalogIngestRepository for PgCatalogIngestRepository {
-    async fn ingest_ingredient(&self, input: IngestIngredientInput) -> Result<Uuid, DatabaseError> {
+    async fn ingest_ingredient(&self, input: IngestIngredientInput) -> Result<Uuid,crate::Error> {
         catalog_ingest::ingest_ingredient(
             &self.pool,
             IngestIngredientParams {
@@ -32,6 +32,6 @@ impl CatalogIngestRepository for PgCatalogIngestRepository {
                 occasion_tags: &input.occasion_tags,
             },
         )
-        .await
+        .await.map_err(Into::into)
     }
 }
