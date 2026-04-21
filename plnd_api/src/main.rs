@@ -221,7 +221,7 @@ async fn main() {
     let agent_task_limiter = Arc::new(RateLimiter::keyed(agent_task_quota));
 
     let repos = plnd_data::Repositories::from_database(&db_conn);
-    let agent = plnd_agent::AgentService::new(&config.llm, repos);
+    let agent = plnd_agent::AgentService::new(&config.llm, repos.clone());
 
     let state = Arc::new(AppState {
         db: db_conn,
@@ -234,6 +234,7 @@ async fn main() {
         client_error_limiter,
         agent_task_limiter,
         agent,
+        repos,
     });
 
     let x_request_id = HeaderName::from_static("x-request-id");
