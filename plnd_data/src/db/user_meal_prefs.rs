@@ -21,7 +21,8 @@ const PREF_DETAIL_SELECT: &str = r#"
         COALESCE(um.name, cm.name, '')     AS name,
         CASE WHEN p.user_meal_id IS NOT NULL THEN 'personal' ELSE 'catalog' END AS source,
         (p.user_meal_id IS NOT NULL)       AS has_personal_recipe,
-        cm.external_source                 AS origin_external_source
+        cm.external_source                 AS origin_external_source,
+        COALESCE(um.nutrition_estimated, false) AS nutrition_estimated
     FROM user_meal_prefs p
     LEFT JOIN catalog_meals cm ON cm.meal_id = p.catalog_meal_id
     LEFT JOIN user_meals    um ON um.user_meal_id = p.user_meal_id

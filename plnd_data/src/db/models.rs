@@ -286,6 +286,7 @@ pub struct UserMealPrefDetail {
     pub source: String, // "catalog" | "personal"
     pub has_personal_recipe: bool,
     pub origin_external_source: Option<String>,
+    pub nutrition_estimated: bool,
 }
 
 /// User preference for a catalog ingredient (blocked/notes only — no fork concept for ingredients).

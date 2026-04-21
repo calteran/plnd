@@ -1732,6 +1732,7 @@ mod tests {
                     source: "personal".to_string(),
                     has_personal_recipe: false,
                     origin_external_source: None,
+                    nutrition_estimated: estimated,
                 };
                 let mut s = self.store.lock().unwrap();
                 s.meal_prefs.push(pref.clone());
