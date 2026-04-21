@@ -73,7 +73,13 @@ impl Tool for SearchMealCatalogTool {
 
         let meals = self
             .0
-            .search_catalog_meals(&q, limit, occasion.as_deref(), &allergens, Some(ctx.user_id))
+            .search_catalog_meals(
+                &q,
+                limit,
+                occasion.as_deref(),
+                &allergens,
+                Some(ctx.user_id),
+            )
             .await
             .map_err(|e| db_err(self.name(), e))?;
 
@@ -870,10 +876,7 @@ impl Tool for ResolveMealDescriptionTool {
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
-pub fn register_meal_read_tools(
-    registry: &mut ToolRegistry,
-    meal_repo: Arc<dyn MealRepository>,
-) {
+pub fn register_meal_read_tools(registry: &mut ToolRegistry, meal_repo: Arc<dyn MealRepository>) {
     registry.register(Arc::new(SearchMealCatalogTool(Arc::clone(&meal_repo))));
     registry.register(Arc::new(GetUserMealLibraryTool(Arc::clone(&meal_repo))));
     registry.register(Arc::new(GetUserMealPreferencesTool(Arc::clone(&meal_repo))));
@@ -1037,8 +1040,10 @@ mod tests {
         async fn list_dietary_restrictions(
             &self,
             _user_id: uuid::Uuid,
-        ) -> Result<Vec<plnd_data::db::models::DietaryRestriction>, plnd_data::db::error::DatabaseError>
-        {
+        ) -> Result<
+            Vec<plnd_data::db::models::DietaryRestriction>,
+            plnd_data::db::error::DatabaseError,
+        > {
             unimplemented!("stub")
         }
         async fn search_catalog_meals(
@@ -1055,15 +1060,19 @@ mod tests {
         async fn list_user_meal_prefs(
             &self,
             _user_id: uuid::Uuid,
-        ) -> Result<Vec<plnd_data::db::models::UserMealPrefDetail>, plnd_data::db::error::DatabaseError>
-        {
+        ) -> Result<
+            Vec<plnd_data::db::models::UserMealPrefDetail>,
+            plnd_data::db::error::DatabaseError,
+        > {
             unimplemented!("stub")
         }
         async fn list_user_ingredient_prefs(
             &self,
             _user_id: uuid::Uuid,
-        ) -> Result<Vec<plnd_data::db::models::UserIngredientPref>, plnd_data::db::error::DatabaseError>
-        {
+        ) -> Result<
+            Vec<plnd_data::db::models::UserIngredientPref>,
+            plnd_data::db::error::DatabaseError,
+        > {
             unimplemented!("stub")
         }
         async fn ingredient_names_by_ids(
@@ -1076,14 +1085,17 @@ mod tests {
             &self,
             _q: &str,
             _limit: i64,
-        ) -> Result<Vec<plnd_data::db::models::CatalogIngredient>, plnd_data::db::error::DatabaseError>
-        {
+        ) -> Result<
+            Vec<plnd_data::db::models::CatalogIngredient>,
+            plnd_data::db::error::DatabaseError,
+        > {
             unimplemented!("stub")
         }
         async fn catalog_meal_nutrition(
             &self,
             _meal_id: uuid::Uuid,
-        ) -> Result<Option<Option<serde_json::Value>>, plnd_data::db::error::DatabaseError> {
+        ) -> Result<Option<Option<serde_json::Value>>, plnd_data::db::error::DatabaseError>
+        {
             unimplemented!("stub")
         }
         async fn user_meal_nutrition(
@@ -1593,9 +1605,10 @@ mod tests {
             ) -> Result<Option<(Option<serde_json::Value>, bool)>, DatabaseError> {
                 let s = self.store.lock().unwrap();
                 // Check that the meal was created by this user (stored in meal_prefs)
-                let owned = s.meal_prefs.iter().any(|p| {
-                    p.user_id == user_id && p.user_meal_id == Some(meal_id)
-                });
+                let owned = s
+                    .meal_prefs
+                    .iter()
+                    .any(|p| p.user_id == user_id && p.user_meal_id == Some(meal_id));
                 if !owned {
                     return Ok(None);
                 }

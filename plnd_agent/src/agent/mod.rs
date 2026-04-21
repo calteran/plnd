@@ -371,10 +371,7 @@ impl AgentService {
     pub async fn run(&self, ctx: &AgentContext) -> Result<AgentOutput, AgentError> {
         // Step 1: Load memories filtered by use case.
         let memory_entries = if let Some(ref repos) = self.repos {
-            let memories = repos
-                .memory
-                .get(ctx.user_id, None)
-                .await?;
+            let memories = repos.memory.get(ctx.user_id, None).await?;
             // Filter to use-case categories client-side (trait returns all or category-filtered).
             let categories = ctx.use_case.memory_categories();
             let memories: Vec<_> = if categories.is_empty() {
