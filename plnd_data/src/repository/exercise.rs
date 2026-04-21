@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::LocalExerciseResult;
+use crate::models::LocalExerciseResult;
 
 #[async_trait]
 pub trait ExerciseRepository: Send + Sync {

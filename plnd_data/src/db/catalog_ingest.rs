@@ -57,6 +57,7 @@ pub async fn ingest_ingredient(
     .map(|(id,)| id)
 }
 
+#[cfg(test)]
 pub struct IngestMealParams<'a> {
     pub name: &'a str,
     pub description: Option<&'a str>,
@@ -67,6 +68,7 @@ pub struct IngestMealParams<'a> {
     pub nutrition: Option<Value>,
 }
 
+#[cfg(test)]
 #[tracing::instrument(
     skip(pool, params),
     fields(table = "catalog_meals", op = "ingest_meal")

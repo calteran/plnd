@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::User;
+use crate::models::User;
 
 /// Find a user by their email address
 #[tracing::instrument(skip(pool), fields(table = "users", op = "find_by_email"))]

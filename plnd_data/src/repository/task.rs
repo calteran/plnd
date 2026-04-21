@@ -3,7 +3,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::Task;
+use crate::models::Task;
 
 #[async_trait]
 pub trait TaskRepository: Send + Sync {

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::{LocalDishResult, LocalIngredientResult};
+use crate::models::{LocalDishResult, LocalIngredientResult};
 
 #[async_trait]
 pub trait MealSearchRepository: Send + Sync {

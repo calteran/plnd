@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::{LocalDishResult, LocalIngredientResult};
 use crate::db::search::{search_dishes, search_ingredients, search_user_dishes};
+use crate::models::{LocalDishResult, LocalIngredientResult};
 use crate::repository::meal_search::MealSearchRepository;
 
 pub struct PgMealSearchRepository {

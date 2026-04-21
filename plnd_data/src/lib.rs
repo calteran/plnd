@@ -1,6 +1,8 @@
 pub mod cache;
-pub mod db;
+pub(crate) mod db;
+pub mod models;
 pub mod providers;
+pub mod query_types;
 pub mod repository;
 pub mod search;
 

@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserDishPrefDetail;
 use crate::db::user_dish_prefs as db;
+use crate::models::UserDishPrefDetail;
 use crate::repository::user_dish_pref::{AddIngredientParams, UserDishPrefRepository};
 
 pub struct PgUserDishPrefRepository {

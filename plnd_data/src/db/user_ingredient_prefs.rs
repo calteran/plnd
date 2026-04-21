@@ -1,8 +1,8 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::models::UserIngredientPref;
 use crate::db::error::DatabaseError;
+use crate::models::UserIngredientPref;
 
 #[tracing::instrument(skip(pool), fields(table = "user_ingredient_prefs", op = "list"))]
 pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserIngredientPref>, DatabaseError> {

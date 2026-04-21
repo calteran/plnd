@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use super::error::DatabaseError;
 
-use super::models::{
+use crate::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
 };
 

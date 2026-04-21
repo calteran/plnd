@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserPreferences;
+use crate::models::UserPreferences;
 
 /// Upsert preferences: creates the row with defaults if absent, then applies any provided fields.
 #[tracing::instrument(skip(pool), fields(table = "preferences", op = "patch_preferences"))]

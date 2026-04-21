@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use plnd_data::db::error::DatabaseError;
 use plnd_data::repository::{MealRepository, UserIngredientPrefRepository, UserMealPrefRepository};
+use plnd_data::DatabaseError;
 use rust_decimal::prelude::ToPrimitive;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -1055,28 +1055,22 @@ mod tests {
         async fn list(
             &self,
             _user_id: uuid::Uuid,
-        ) -> Result<
-            Vec<plnd_data::db::models::UserMealPrefDetail>,
-            plnd_data::db::error::DatabaseError,
-        > {
+        ) -> Result<Vec<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError> {
             unimplemented!("stub")
         }
         async fn get(
             &self,
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
-        ) -> Result<
-            Option<plnd_data::db::models::UserMealPrefDetail>,
-            plnd_data::db::error::DatabaseError,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
+        {
             unimplemented!("stub")
         }
         async fn create_from_catalog(
             &self,
             _user_id: uuid::Uuid,
             _catalog_meal_id: uuid::Uuid,
-        ) -> Result<plnd_data::db::models::UserMealPrefDetail, plnd_data::db::error::DatabaseError>
-        {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::DatabaseError> {
             unimplemented!("stub")
         }
         async fn create_from_scratch(
@@ -1084,8 +1078,7 @@ mod tests {
             _user_id: uuid::Uuid,
             _name: &str,
             _description: Option<&str>,
-        ) -> Result<plnd_data::db::models::UserMealPrefDetail, plnd_data::db::error::DatabaseError>
-        {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::DatabaseError> {
             unimplemented!("stub")
         }
         async fn create_from_description(
@@ -1095,8 +1088,7 @@ mod tests {
             _occasion_tags: &[String],
             _nutrition: Option<serde_json::Value>,
             _estimated: bool,
-        ) -> Result<plnd_data::db::models::UserMealPrefDetail, plnd_data::db::error::DatabaseError>
-        {
+        ) -> Result<plnd_data::models::UserMealPrefDetail, plnd_data::DatabaseError> {
             unimplemented!("stub")
         }
         async fn update_metadata(
@@ -1107,10 +1099,8 @@ mod tests {
             _is_safe_food: Option<bool>,
             _is_blocked: Option<bool>,
             _notes: Option<Option<String>>,
-        ) -> Result<
-            Option<plnd_data::db::models::UserMealPrefDetail>,
-            plnd_data::db::error::DatabaseError,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
+        {
             unimplemented!("stub")
         }
         async fn fork_and_update_recipe(
@@ -1119,17 +1109,15 @@ mod tests {
             _pref_id: uuid::Uuid,
             _name: Option<&str>,
             _description: Option<&str>,
-        ) -> Result<
-            Option<plnd_data::db::models::UserMealPrefDetail>,
-            plnd_data::db::error::DatabaseError,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
+        {
             unimplemented!("stub")
         }
         async fn delete(
             &self,
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
-        ) -> Result<bool, plnd_data::db::error::DatabaseError> {
+        ) -> Result<bool, plnd_data::DatabaseError> {
             unimplemented!("stub")
         }
         async fn add_dish(
@@ -1137,10 +1125,8 @@ mod tests {
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
             _params: plnd_data::repository::user_meal_pref::AddDishParams,
-        ) -> Result<
-            Option<plnd_data::db::models::UserMealPrefDetail>,
-            plnd_data::db::error::DatabaseError,
-        > {
+        ) -> Result<Option<plnd_data::models::UserMealPrefDetail>, plnd_data::DatabaseError>
+        {
             unimplemented!("stub")
         }
         async fn remove_dish(
@@ -1148,7 +1134,7 @@ mod tests {
             _user_id: uuid::Uuid,
             _pref_id: uuid::Uuid,
             _meal_dish_id: uuid::Uuid,
-        ) -> Result<Option<bool>, plnd_data::db::error::DatabaseError> {
+        ) -> Result<Option<bool>, plnd_data::DatabaseError> {
             unimplemented!("stub")
         }
     }
@@ -1441,14 +1427,14 @@ mod tests {
         use std::collections::HashMap;
         use std::sync::Mutex;
 
-        use plnd_data::db::error::DatabaseError;
-        use plnd_data::db::models::{
+        use plnd_data::models::{
             CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
             DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
         };
         use plnd_data::repository::{
             MealRepository, UserIngredientPrefRepository, UserMealPrefRepository,
         };
+        use plnd_data::DatabaseError;
         use rust_decimal::Decimal;
         use uuid::Uuid;
 

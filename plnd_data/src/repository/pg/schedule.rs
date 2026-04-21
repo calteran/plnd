@@ -4,11 +4,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::{CommitPlanInput, ScheduleEntry};
-use crate::db::query_types::{
-    PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
-};
 use crate::db::schedule;
+use crate::models::{CommitPlanInput, ScheduleEntry};
+use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 use crate::repository::schedule::ScheduleRepository;
 
 pub struct PgScheduleRepository {

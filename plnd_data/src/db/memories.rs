@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserMemory;
+use crate::models::UserMemory;
 
 /// Create a new memory record for a user, returning the persisted record.
 #[tracing::instrument(skip(pool), fields(table = "user_memories", op = "create_memory"))]

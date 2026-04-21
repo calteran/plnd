@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserIngredientPref;
+use crate::models::UserIngredientPref;
 
 #[async_trait]
 pub trait UserIngredientPrefRepository: Send + Sync {

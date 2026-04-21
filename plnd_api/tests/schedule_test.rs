@@ -1,10 +1,10 @@
 use chrono::{Duration, NaiveDate, NaiveTime};
 use plnd_api::models::{PlanEntryRequest, PostSchedulePlanRequest};
 use plnd_api::routes::schedule::PeriodQuery;
-use plnd_data::db::query_types::{
+use plnd_data::models::CARRYOVER_LOOKBACK_DAYS;
+use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
-use plnd_data::db::schedule::CARRYOVER_LOOKBACK_DAYS;
 
 #[test]
 fn test_plan_entry_request_serde() {

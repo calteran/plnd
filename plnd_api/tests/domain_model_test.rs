@@ -5,7 +5,7 @@ use plnd_api::routes::domain_constants::{
     VALID_FAMILY_ROLES, VALID_FOCUS_LEVELS, VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS,
     VALID_RECURRENCE_TYPES, VALID_TASK_STATUSES, VALID_TASK_TYPES,
 };
-use plnd_data::db::models::{
+use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
     CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, MealTask,
     ScheduleEntry, ScheduleTemplate, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,

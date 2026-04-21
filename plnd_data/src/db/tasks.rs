@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::Task;
+use crate::models::Task;
 
 /// Idempotently create the "Plan your week" generic task for a horizon.
 /// Inserts into `tasks` + `generic_tasks` in a transaction.

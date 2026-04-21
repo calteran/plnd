@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::error::DatabaseError;
-use super::models::{LocalDishResult, LocalExerciseResult, LocalIngredientResult};
+use crate::models::{LocalDishResult, LocalExerciseResult, LocalIngredientResult};
 
 #[tracing::instrument(
     skip(pool, exclude_allergens),
@@ -115,8 +115,8 @@ pub async fn search_ingredient_nutrition(
     pool: &PgPool,
     q: &str,
     limit: i64,
-) -> Result<Vec<super::models::CatalogIngredient>, DatabaseError> {
-    sqlx::query_as::<_, super::models::CatalogIngredient>(
+) -> Result<Vec<crate::models::CatalogIngredient>, DatabaseError> {
+    sqlx::query_as::<_, crate::models::CatalogIngredient>(
         r#"
         SELECT ingredient_id, name, description, serving_size_g, nutrition,
                allergens, occasion_tags, external_id, external_source,
@@ -150,8 +150,8 @@ pub async fn search_catalog_meals(
     occasion: Option<&str>,
     exclude_allergens: &[String],
     user_id: Option<uuid::Uuid>,
-) -> Result<Vec<super::models::CatalogMeal>, DatabaseError> {
-    sqlx::query_as::<_, super::models::CatalogMeal>(
+) -> Result<Vec<crate::models::CatalogMeal>, DatabaseError> {
+    sqlx::query_as::<_, crate::models::CatalogMeal>(
         r#"
         SELECT meal_id, name, description, servings, allergens, allergens_overridden,
                occasion_tags, tags, nutrition, nutrition_overridden,

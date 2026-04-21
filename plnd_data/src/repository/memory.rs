@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserMemory;
+use crate::models::UserMemory;
 
 #[async_trait]
 pub trait MemoryRepository: Send + Sync {

@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::DietaryRestriction;
+use crate::models::DietaryRestriction;
 
 /// List all dietary restrictions for a user, ordered by type then name.
 #[tracing::instrument(skip(pool), fields(table = "dietary_restrictions", op = "list"))]

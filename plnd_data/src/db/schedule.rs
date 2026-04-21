@@ -3,14 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::{CarryoverDecision, CommitPlanInput, ScheduleEntry};
-use crate::db::query_types::{
-    PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
-};
-
-/// Maximum number of days before the period start to search for carryover entries.
-/// Older planned/deferred entries are excluded to prevent unbounded historical scans.
-pub const CARRYOVER_LOOKBACK_DAYS: i64 = 90;
+use crate::models::{CarryoverDecision, CommitPlanInput, ScheduleEntry, CARRYOVER_LOOKBACK_DAYS};
+use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 const ENTRY_COLS: &str =
     "entry_id, user_id, template_id, task_type, task_ref_id, task_ref_type, title,
@@ -272,7 +266,8 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::db::{models::PlanEntryInput, tasks, users};
+    use crate::db::{tasks, users};
+    use crate::models::PlanEntryInput;
 
     async fn new_user(pool: &PgPool) -> Uuid {
         users::create(

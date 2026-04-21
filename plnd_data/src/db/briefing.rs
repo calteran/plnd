@@ -47,10 +47,8 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::db::{
-        models::{CommitPlanInput, PlanEntryInput},
-        schedule, tasks, users,
-    };
+    use crate::db::{schedule, tasks, users};
+    use crate::models::{CommitPlanInput, PlanEntryInput};
 
     async fn new_user(pool: &PgPool) -> Uuid {
         users::create(

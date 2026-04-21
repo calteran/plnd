@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserDishPrefDetail;
-pub use crate::db::user_dish_prefs::AddIngredientParams;
+pub use crate::models::AddIngredientParams;
+use crate::models::UserDishPrefDetail;
 
 #[async_trait]
 pub trait UserDishPrefRepository: Send + Sync {

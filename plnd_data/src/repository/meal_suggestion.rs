@@ -3,7 +3,7 @@ use chrono::NaiveDate;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::MealSuggestion;
+use crate::models::MealSuggestion;
 
 #[async_trait]
 pub trait MealSuggestionRepository: Send + Sync {
