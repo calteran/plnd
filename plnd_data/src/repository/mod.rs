@@ -51,7 +51,7 @@ pub struct Repositories {
     pub session: Arc<dyn SessionRepository>,
     pub task: Arc<dyn TaskRepository>,
     pub user: Arc<dyn UserRepository>,
-    pub user_dish_prefs: Arc<dyn UserDishPrefRepository>,
+    pub user_dish_pref: Arc<dyn UserDishPrefRepository>,
     pub user_ingredient_pref: Arc<dyn UserIngredientPrefRepository>,
     pub user_meal_pref: Arc<dyn UserMealPrefRepository>,
     pool: PgPool,
@@ -77,7 +77,7 @@ impl Repositories {
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),
             task: Arc::new(pg::task::PgTaskRepository::new(pool.clone())),
             user: Arc::new(pg::user::PgUserRepository::new(pool.clone())),
-            user_dish_prefs: Arc::new(pg::user_dish_prefs::PgUserDishPrefRepository::new(
+            user_dish_pref: Arc::new(pg::user_dish_prefs::PgUserDishPrefRepository::new(
                 pool.clone(),
             )),
             user_ingredient_pref: Arc::new(
