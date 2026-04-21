@@ -116,6 +116,30 @@ pub struct TaskEntryResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Agent — Occasion
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Occasion {
+    Breakfast,
+    Lunch,
+    Dinner,
+    Snack,
+}
+
+impl std::fmt::Display for Occasion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Occasion::Breakfast => "breakfast",
+            Occasion::Lunch => "lunch",
+            Occasion::Dinner => "dinner",
+            Occasion::Snack => "snack",
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Agent — Meal Planning
 // ---------------------------------------------------------------------------
 
