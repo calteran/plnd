@@ -36,6 +36,33 @@ impl MealRepository for PgMealRepository {
         dietary_restrictions::list(&self.pool, user_id).await
     }
 
+    async fn create_dietary_restriction(
+        &self,
+        user_id: Uuid,
+        restriction_type: &str,
+        name: &str,
+        notes: Option<&str>,
+    ) -> Result<DietaryRestriction, DatabaseError> {
+        dietary_restrictions::create(&self.pool, user_id, restriction_type, name, notes).await
+    }
+
+    async fn update_dietary_restriction(
+        &self,
+        restriction_id: Uuid,
+        user_id: Uuid,
+        notes: Option<&str>,
+    ) -> Result<Option<DietaryRestriction>, DatabaseError> {
+        dietary_restrictions::update(&self.pool, restriction_id, user_id, notes).await
+    }
+
+    async fn delete_dietary_restriction(
+        &self,
+        restriction_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, DatabaseError> {
+        dietary_restrictions::delete(&self.pool, restriction_id, user_id).await
+    }
+
     async fn search_catalog_meals(
         &self,
         q: &str,

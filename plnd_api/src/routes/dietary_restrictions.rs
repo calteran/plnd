@@ -6,7 +6,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use plnd_data::db;
+use plnd_data::db::error::DatabaseError;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -43,9 +43,11 @@ pub async fn list_restrictions(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<DietaryRestrictionResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::dietary_restrictions::list(pool, user_id)
+    state
+        .repos
+        .meal
+        .list_dietary_restrictions(user_id)
         .await
         .map(|v| {
             Json(
@@ -97,30 +99,30 @@ pub async fn create_restriction(
         }
     }
 
-    let pool = state.db.get_pool();
-
-    db::dietary_restrictions::create(
-        pool,
-        user_id,
-        &body.restriction_type,
-        &name,
-        body.notes.as_deref(),
-    )
-    .await
-    .map(|r| {
-        (
-            StatusCode::CREATED,
-            Json(DietaryRestrictionResponse::from(r)),
+    state
+        .repos
+        .meal
+        .create_dietary_restriction(
+            user_id,
+            &body.restriction_type,
+            &name,
+            body.notes.as_deref(),
         )
-    })
-    .map_err(|e| match e {
-        db::error::DatabaseError::UniqueViolation => StatusCode::CONFLICT,
-        db::error::DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
-        e => {
-            tracing::error!(error = %e, "create_restriction DB error");
-            StatusCode::INTERNAL_SERVER_ERROR
-        }
-    })
+        .await
+        .map(|r| {
+            (
+                StatusCode::CREATED,
+                Json(DietaryRestrictionResponse::from(r)),
+            )
+        })
+        .map_err(|e| match e {
+            DatabaseError::UniqueViolation => StatusCode::CONFLICT,
+            DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            e => {
+                tracing::error!(error = %e, "create_restriction DB error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })
 }
 
 #[utoipa::path(
@@ -153,9 +155,10 @@ pub async fn update_restriction(
         }
     }
 
-    let pool = state.db.get_pool();
-
-    db::dietary_restrictions::update(pool, restriction_id, user_id, body.notes.as_deref())
+    state
+        .repos
+        .meal
+        .update_dietary_restriction(restriction_id, user_id, body.notes.as_deref())
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "update_restriction DB error");
@@ -185,9 +188,11 @@ pub async fn delete_restriction(
     Path(restriction_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::dietary_restrictions::delete(pool, restriction_id, user_id)
+    state
+        .repos
+        .meal
+        .delete_dietary_restriction(restriction_id, user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "delete_restriction DB error");

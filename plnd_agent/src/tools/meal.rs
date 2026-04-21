@@ -1117,6 +1117,34 @@ mod tests {
         {
             unimplemented!("stub")
         }
+        async fn create_dietary_restriction(
+            &self,
+            _user_id: uuid::Uuid,
+            _restriction_type: &str,
+            _name: &str,
+            _notes: Option<&str>,
+        ) -> Result<plnd_data::db::models::DietaryRestriction, plnd_data::db::error::DatabaseError>
+        {
+            unimplemented!("stub")
+        }
+        async fn update_dietary_restriction(
+            &self,
+            _restriction_id: uuid::Uuid,
+            _user_id: uuid::Uuid,
+            _notes: Option<&str>,
+        ) -> Result<
+            Option<plnd_data::db::models::DietaryRestriction>,
+            plnd_data::db::error::DatabaseError,
+        > {
+            unimplemented!("stub")
+        }
+        async fn delete_dietary_restriction(
+            &self,
+            _restriction_id: uuid::Uuid,
+            _user_id: uuid::Uuid,
+        ) -> Result<bool, plnd_data::db::error::DatabaseError> {
+            unimplemented!("stub")
+        }
     }
 
     fn stub_meal_repo() -> Arc<dyn MealRepository> {
@@ -1613,6 +1641,33 @@ mod tests {
                     return Ok(None);
                 }
                 Ok(s.user_meal_nutrition.get(&meal_id).cloned())
+            }
+
+            async fn create_dietary_restriction(
+                &self,
+                _user_id: Uuid,
+                _restriction_type: &str,
+                _name: &str,
+                _notes: Option<&str>,
+            ) -> Result<DietaryRestriction, DatabaseError> {
+                unimplemented!("not needed by tool-logic tests")
+            }
+
+            async fn update_dietary_restriction(
+                &self,
+                _restriction_id: Uuid,
+                _user_id: Uuid,
+                _notes: Option<&str>,
+            ) -> Result<Option<DietaryRestriction>, DatabaseError> {
+                unimplemented!("not needed by tool-logic tests")
+            }
+
+            async fn delete_dietary_restriction(
+                &self,
+                _restriction_id: Uuid,
+                _user_id: Uuid,
+            ) -> Result<bool, DatabaseError> {
+                unimplemented!("not needed by tool-logic tests")
             }
 
             async fn create_user_meal_pref_from_description(
