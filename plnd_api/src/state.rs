@@ -15,6 +15,7 @@ pub struct AppState {
     pub repos: Repositories,
     pub jwt: JwtService,
     pub session: SessionService,
+    pub repos: Repositories,
     /// JWKS cache for validating RS256 ID tokens from the configured IdP.
     pub jwks: Arc<JwksCache>,
     /// OIDC client_id used as the expected `aud` claim in ID tokens.

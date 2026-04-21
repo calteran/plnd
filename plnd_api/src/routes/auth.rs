@@ -5,7 +5,6 @@ use axum::{
     http::{HeaderMap, StatusCode},
     Json,
 };
-use plnd_data::db;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -63,29 +62,34 @@ pub async fn token_exchange(
         .unwrap_or_else(|| format!("{}@mock.plnd", sub));
     let name = id_claims.name.as_deref();
     let picture = id_claims.picture.as_deref();
-    let pool = state.db.get_pool();
 
     // 3. Find or create the user, linking the OAuth provider identity.
-    let user = match db::users::find_by_provider(pool, &req.provider, sub)
+    let user = match state
+        .repos
+        .user
+        .find_by_provider(&req.provider, sub)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "provider lookup failed");
             StatusCode::INTERNAL_SERVER_ERROR
         })? {
         Some(existing) => {
-            let _ = db::users::touch_last_login(pool, existing.user_id).await;
+            let _ = state.repos.user.touch_last_login(existing.user_id).await;
             existing
         }
         None => {
-            let user = match db::users::find_by_email(pool, &email).await.map_err(|e| {
+            let user = match state.repos.user.find_by_email(&email).await.map_err(|e| {
                 tracing::error!(error = %e, "email lookup failed");
                 StatusCode::INTERNAL_SERVER_ERROR
             })? {
                 Some(existing) => {
-                    let _ = db::users::touch_last_login(pool, existing.user_id).await;
+                    let _ = state.repos.user.touch_last_login(existing.user_id).await;
                     existing
                 }
-                None => db::users::create(pool, &email, name, picture)
+                None => state
+                    .repos
+                    .user
+                    .create(&email, name, picture)
                     .await
                     .map_err(|e| {
                         tracing::error!(error = %e, "user creation failed");
@@ -93,8 +97,11 @@ pub async fn token_exchange(
                     })?,
             };
 
-            if let Err(e) =
-                db::users::link_oauth_provider(pool, user.user_id, &req.provider, sub).await
+            if let Err(e) = state
+                .repos
+                .user
+                .link_oauth_provider(user.user_id, &req.provider, sub)
+                .await
             {
                 tracing::warn!(error = %e, "failed to link OAuth provider (non-fatal)");
             }
