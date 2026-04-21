@@ -1,4 +1,4 @@
-use plnd_data::db::error::DatabaseError;
+use plnd_data::DatabaseError;
 use plnd_data::Repositories;
 
 #[tokio::test]

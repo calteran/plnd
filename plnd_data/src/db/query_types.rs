@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::db::models::ScheduleEntry;
+use crate::models::ScheduleEntry;
 
 // ---------------------------------------------------------------------------
 // Weekly planning — computed query result aggregates

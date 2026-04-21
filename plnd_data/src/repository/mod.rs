@@ -35,7 +35,7 @@ pub use user_dish_pref::{AddIngredientParams, UserDishPrefRepository};
 pub use user_ingredient_pref::UserIngredientPrefRepository;
 pub use user_meal_pref::UserMealPrefRepository;
 
-pub use crate::db::models::{LocalDishResult, LocalExerciseResult, LocalIngredientResult};
+pub use crate::models::{LocalDishResult, LocalExerciseResult, LocalIngredientResult};
 
 #[derive(Clone)]
 pub struct Repositories {

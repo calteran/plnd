@@ -3,7 +3,7 @@ use chrono::NaiveTime;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserPreferences;
+use crate::models::UserPreferences;
 
 #[async_trait]
 pub trait PreferencesRepository: Send + Sync {

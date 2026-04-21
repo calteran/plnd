@@ -3,10 +3,8 @@ use chrono::NaiveDate;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::{CommitPlanInput, ScheduleEntry};
-use crate::db::query_types::{
-    PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
-};
+use crate::models::{CommitPlanInput, ScheduleEntry};
+use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 #[async_trait]
 pub trait ScheduleRepository: Send + Sync {

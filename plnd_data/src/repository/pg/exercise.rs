@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::LocalExerciseResult;
 use crate::db::search::search_exercises;
+use crate::models::LocalExerciseResult;
 use crate::repository::exercise::ExerciseRepository;
 
 pub struct PgExerciseRepository {

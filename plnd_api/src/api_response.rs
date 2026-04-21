@@ -1,10 +1,10 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
-use plnd_data::db::models::{
+use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
     DietaryRestriction, MealSuggestion, ScheduleEntry, Task, User, UserDishPrefDetail,
     UserIngredientPref, UserMealPrefDetail, UserPreferences,
 };
-use plnd_data::db::query_types::{
+use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
 use rust_decimal::Decimal;
@@ -12,7 +12,7 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-/// API response wrapper for `plnd_data::db::models::User`.
+/// API response wrapper for `plnd_data::models::User`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserResponse {
     pub user_id: Uuid,
@@ -42,7 +42,7 @@ impl From<User> for UserResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::UserPreferences`.
+/// API response wrapper for `plnd_data::models::UserPreferences`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserPreferencesResponse {
     pub user_id: Uuid,
@@ -91,7 +91,7 @@ impl From<MealSuggestion> for MealSuggestionResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::DietaryRestriction`.
+/// API response wrapper for `plnd_data::models::DietaryRestriction`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct DietaryRestrictionResponse {
     pub restriction_id: Uuid,
@@ -121,7 +121,7 @@ impl From<DietaryRestriction> for DietaryRestrictionResponse {
 // Catalog response types
 // ---------------------------------------------------------------------------
 
-/// API response wrapper for `plnd_data::db::models::CatalogIngredient`.
+/// API response wrapper for `plnd_data::models::CatalogIngredient`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct CatalogIngredientResponse {
     pub ingredient_id: Uuid,
@@ -159,7 +159,7 @@ impl From<CatalogIngredient> for CatalogIngredientResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::CatalogDishIngredient`.
+/// API response wrapper for `plnd_data::models::CatalogDishIngredient`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct CatalogDishIngredientResponse {
     pub dish_ingredient_id: Uuid,
@@ -188,7 +188,7 @@ impl From<CatalogDishIngredient> for CatalogDishIngredientResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::CatalogMealDish`.
+/// API response wrapper for `plnd_data::models::CatalogMealDish`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct CatalogMealDishResponse {
     pub meal_dish_id: Uuid,
@@ -325,7 +325,7 @@ impl From<(CatalogMeal, Vec<CatalogMealDish>)> for MealDetailApiResponse {
 // Task response types
 // ---------------------------------------------------------------------------
 
-/// API response wrapper for `plnd_data::db::models::Task`.
+/// API response wrapper for `plnd_data::models::Task`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct TaskResponse {
     pub task_id: Uuid,
@@ -363,7 +363,7 @@ impl From<Task> for TaskResponse {
 // Schedule response types
 // ---------------------------------------------------------------------------
 
-/// API response wrapper for `plnd_data::db::models::ScheduleEntry`.
+/// API response wrapper for `plnd_data::models::ScheduleEntry`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct ScheduleEntryResponse {
     pub entry_id: Uuid,
@@ -413,7 +413,7 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::query_types::SchedulePeriodResponse`.
+/// API response wrapper for `plnd_data::query_types::SchedulePeriodResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SchedulePeriodApiResponse {
     pub entries: Vec<ScheduleEntryResponse>,
@@ -437,7 +437,7 @@ impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::query_types::PlanStatusResponse`.
+/// API response wrapper for `plnd_data::query_types::PlanStatusResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct PlanStatusApiResponse {
     pub planned: bool,
@@ -453,7 +453,7 @@ impl From<PlanStatusResponse> for PlanStatusApiResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::query_types::PostSchedulePlanResponse`.
+/// API response wrapper for `plnd_data::query_types::PostSchedulePlanResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct PostSchedulePlanApiResponse {
     pub committed: i64,
@@ -473,7 +473,7 @@ impl From<PostSchedulePlanResponse> for PostSchedulePlanApiResponse {
 // User library preference response types
 // ---------------------------------------------------------------------------
 
-/// API response wrapper for `plnd_data::db::models::UserDishPrefDetail`.
+/// API response wrapper for `plnd_data::models::UserDishPrefDetail`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserDishPrefDetailResponse {
     pub user_dish_pref_id: Uuid,
@@ -513,7 +513,7 @@ impl From<UserDishPrefDetail> for UserDishPrefDetailResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::UserIngredientPref`.
+/// API response wrapper for `plnd_data::models::UserIngredientPref`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserIngredientPrefResponse {
     pub user_ingredient_pref_id: Uuid,
@@ -539,7 +539,7 @@ impl From<UserIngredientPref> for UserIngredientPrefResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::db::models::UserMealPrefDetail`.
+/// API response wrapper for `plnd_data::models::UserMealPrefDetail`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct UserMealPrefDetailResponse {
     pub user_meal_pref_id: Uuid,

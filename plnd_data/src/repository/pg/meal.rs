@@ -7,15 +7,15 @@ use crate::db::catalog_details::{
 };
 use crate::db::dietary_restrictions;
 use crate::db::error::DatabaseError;
-use crate::db::models::{
-    CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction,
-};
 use crate::db::search::{
     search_catalog_meals as db_search_catalog_meals,
     search_ingredient_nutrition as db_search_ingredient_nutrition,
 };
 use crate::db::user_meals;
+use crate::models::{
+    CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
+    DietaryRestriction,
+};
 use crate::repository::meal::MealRepository;
 
 pub struct PgMealRepository {

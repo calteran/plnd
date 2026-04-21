@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserIngredientPref;
 use crate::db::user_ingredient_prefs;
+use crate::models::UserIngredientPref;
 use crate::repository::user_ingredient_pref::UserIngredientPrefRepository;
 
 pub struct PgUserIngredientPrefRepository {

@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::MealSuggestion;
+use crate::models::MealSuggestion;
 
 /// Return up to 10 meal/dish suggestions for the given user and slot.
 ///

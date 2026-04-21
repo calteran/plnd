@@ -4,8 +4,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::Task;
 use crate::db::tasks::{create_user_task, create_weekly_plan_task};
+use crate::models::Task;
 use crate::repository::task::TaskRepository;
 
 pub struct PgTaskRepository {

@@ -4,8 +4,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::UserPreferences;
 use crate::db::preferences;
+use crate::models::UserPreferences;
 use crate::repository::preferences::PreferencesRepository;
 
 pub struct PgPreferencesRepository {

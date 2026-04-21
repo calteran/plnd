@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::db::memories::{create_memory, delete_memory, get_memories, update_memory};
-use crate::db::models::UserMemory;
+use crate::models::UserMemory;
 use crate::repository::memory::MemoryRepository;
 
 pub struct PgMemoryRepository {

@@ -1,5 +1,5 @@
 use chrono::Utc;
-use plnd_data::db::models::User;
+use plnd_data::models::User;
 use uuid::Uuid;
 
 fn make_user(onboarding_completed: bool) -> User {

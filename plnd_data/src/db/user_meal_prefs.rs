@@ -2,7 +2,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::error::DatabaseError;
-use super::models::UserMealPrefDetail;
+use crate::models::UserMealPrefDetail;
 
 /// Single SQL fragment for selecting a UserMealPrefDetail row.
 /// Used in both list and get queries.

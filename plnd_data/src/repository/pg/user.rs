@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::User;
 use crate::db::users;
+use crate::models::User;
 use crate::repository::user::UserRepository;
 
 pub struct PgUserRepository {

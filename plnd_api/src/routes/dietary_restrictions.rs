@@ -6,7 +6,7 @@ use axum::{
     http::StatusCode,
     Json,
 };
-use plnd_data::db::error::DatabaseError;
+use plnd_data::DatabaseError;
 use std::sync::Arc;
 use uuid::Uuid;
 

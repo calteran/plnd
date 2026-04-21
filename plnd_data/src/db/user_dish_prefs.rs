@@ -2,7 +2,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 use super::error::DatabaseError;
-use super::models::UserDishPrefDetail;
+use crate::models::{AddIngredientParams, UserDishPrefDetail};
 
 /// Single SQL fragment for selecting a UserDishPrefDetail row.
 /// Used in both list and get queries.
@@ -285,15 +285,6 @@ pub async fn delete(pool: &PgPool, user_id: Uuid, pref_id: Uuid) -> Result<bool,
 
     tx.commit().await?;
     Ok(true)
-}
-
-pub struct AddIngredientParams {
-    pub ingredient_id: Uuid,
-    pub quantity: rust_decimal::Decimal,
-    pub unit: String,
-    pub preparation_note: Option<String>,
-    pub is_optional: bool,
-    pub sort_order: i16,
 }
 
 #[tracing::instrument(
