@@ -1,3 +1,4 @@
+use sqlx::PgPool;
 use std::sync::Arc;
 
 pub mod briefing;
@@ -53,6 +54,7 @@ pub struct Repositories {
     pub user_dish_prefs: Arc<dyn UserDishPrefRepository>,
     pub user_ingredient_pref: Arc<dyn UserIngredientPrefRepository>,
     pub user_meal_pref: Arc<dyn UserMealPrefRepository>,
+    pool: PgPool,
 }
 
 impl Repositories {
@@ -81,7 +83,29 @@ impl Repositories {
             user_ingredient_pref: Arc::new(
                 pg::user_ingredient_pref::PgUserIngredientPrefRepository::new(pool.clone()),
             ),
-            user_meal_pref: Arc::new(pg::user_meal_pref::PgUserMealPrefRepository::new(pool)),
+            user_meal_pref: Arc::new(pg::user_meal_pref::PgUserMealPrefRepository::new(
+                pool.clone(),
+            )),
+            pool,
         }
+    }
+
+    #[tracing::instrument(skip_all)]
+    pub async fn health_check(&self) -> Result<(), DatabaseError> {
+        sqlx::query("SELECT 1")
+            .execute(&self.pool)
+            .await
+            .map(|_| ())
+            .map_err(DatabaseError::from)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn _assert_health_check_exists(repos: &Repositories) {
+        let _: std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), DatabaseError>> + '_>> =
+            Box::pin(repos.health_check());
     }
 }
