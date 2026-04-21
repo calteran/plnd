@@ -1,14 +1,12 @@
 # CLAUDE.md
 
-Claude Code configuration for the PLND project. See AGENTS.md for full agent directives and PLANNING.md for the development roadmap.
+Claude Code configuration for the PLND project. See PLANNING.md for the development roadmap.
 
 ## Project Overview
 
 PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutrition, exercise, and daily planning. It consists of a Rust/Axum backend (`plnd_api`) and an Angular frontend (`plnd_client`).
 
 - **Current Phase**: Phase 3.2 — COMPLETED (intent-driven task entry shipped; Phase 3.3 Meal Planning Wizard is next)
-- **Phase 1**: Foundation — COMPLETED (auth, database, basic API, Angular shell)
-- **Phase 2**: Core Features — COMPLETED (domain model, catalog/library API, external providers)
 
 - **Repository**: https://github.com/calteran/plnd
 
@@ -19,7 +17,10 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 ### Testing
 - **NEVER run `just test` or `just test-ci`** — both have been removed from the justfile
 - **ALWAYS use `just verify`** for pre-commit validation (parallel pipeline: quality + build + tests + e2e)
-- Unit tests only: `just test-ng-headless` (Angular) or `cargo nextest run --workspace` (Rust)
+- Unit tests only: `just test-ng-headless` (Angular)
+
+### Shell Commands
+- **Never chain `cd` with `&&`** — run `cd <dir>` as a standalone command first, then follow with subsequent commands separately; this avoids triggering a permission prompt on every compound command
 
 ### Server Processes
 - **NEVER run `cargo run` directly**
@@ -30,6 +31,10 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - **NEVER commit directly to `main`** — always work on a feature or fix branch and open a PR
 - **ALWAYS branch from `main`** — never base a branch on another feature branch; this avoids merge conflicts and spurious commits when the parent branch merges
 
+### PR Lifecycle
+- **After opening a PR**: invoke the `monitor-pr` skill to watch CI and address any review comments
+- **After a PR merges**: `git checkout main && git pull`, remove the worktree if one was used (`just worktree-new` creates them under `.worktrees/<branch>`), then delete the local branch (`git branch -d <branch>`)
+
 ### Storage Layer Isolation
 - No production crate other than `plnd_data` may depend on `sqlx`, import `PgPool`, or
   execute database queries. `plnd_api` and `plnd_agent` interact with storage only through
@@ -39,9 +44,6 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - New storage-backed functionality adds a method to an existing repository trait (or a new
   trait) in `plnd_data`, never a direct query in a consuming crate.
 - Workspace exception: `plnd_seed` (non-production tooling) may use `sqlx` directly.
-
-### Before Every Commit
-Run `just verify` — this executes the full quality suite and must pass cleanly.
 
 ## Common Commands
 
@@ -68,10 +70,6 @@ just verify           # Full quality + build + tests (run before every commit)
 just test-ng-headless # Angular unit tests (headless Chrome)
 
 # Utilities
-just build            # Build all services
-just clean            # Clean build artifacts
-just stop             # Stop running services
-just logs             # View service logs
 just worktree-new     # Create a worktree with Angular deps installed (prevents LSP false positives)
 ```
 
