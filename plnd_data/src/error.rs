@@ -34,7 +34,6 @@ impl From<DatabaseError> for Error {
         match e {
             DatabaseError::NotFound => Error::NotFound,
             DatabaseError::UniqueViolation => Error::Conflict,
-            DatabaseError::ValidationError(s) => Error::Validation(s),
             DatabaseError::ConnectionError(s) => Error::Connection(s),
             DatabaseError::ConnectionLost => Error::ConnectionLost,
             DatabaseError::MigrationError(s) => Error::Migration(s),
