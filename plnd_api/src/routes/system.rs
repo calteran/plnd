@@ -36,7 +36,7 @@ pub async fn health_check() -> &'static str {
 pub async fn readiness_check(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ReadyStatus>, StatusCode> {
-    match state.db.health_check().await {
+    match state.repos.health_check().await {
         Ok(_) => Ok(Json(ReadyStatus {
             status: "ready".to_string(),
             database: "connected".to_string(),
