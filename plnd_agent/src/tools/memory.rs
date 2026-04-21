@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use plnd_data::db::error::DatabaseError;
-use plnd_data::db::MemoryStore;
+use plnd_data::repository::MemoryRepository;
 use uuid::Uuid;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -77,7 +77,7 @@ fn db_err(tool: &str, e: DatabaseError) -> ToolError {
 // ── GetUserMemoriesTool ───────────────────────────────────────────────────────
 
 pub struct GetUserMemoriesTool {
-    store: Arc<MemoryStore>,
+    repo: Arc<dyn MemoryRepository>,
 }
 
 #[async_trait::async_trait]
@@ -121,7 +121,7 @@ impl Tool for GetUserMemoriesTool {
         }
 
         let memories = self
-            .store
+            .repo
             .get(ctx.user_id, category.as_deref())
             .await
             .map_err(|e| db_err(self.name(), e))?;
@@ -146,7 +146,7 @@ impl Tool for GetUserMemoriesTool {
 // ── SaveMemoryTool ────────────────────────────────────────────────────────────
 
 pub struct SaveMemoryTool {
-    store: Arc<MemoryStore>,
+    repo: Arc<dyn MemoryRepository>,
     limiter: Arc<WriteRateLimiter>,
 }
 
@@ -226,8 +226,8 @@ impl Tool for SaveMemoryTool {
         }
 
         let memory = self
-            .store
-            .save(ctx.user_id, category, content, tags)
+            .repo
+            .save(ctx.user_id, category, content, &tags)
             .await
             .map_err(|e| db_err(self.name(), e))?;
 
@@ -244,7 +244,7 @@ impl Tool for SaveMemoryTool {
 // ── UpdateMemoryTool ──────────────────────────────────────────────────────────
 
 pub struct UpdateMemoryTool {
-    store: Arc<MemoryStore>,
+    repo: Arc<dyn MemoryRepository>,
     limiter: Arc<WriteRateLimiter>,
 }
 
@@ -300,7 +300,7 @@ impl Tool for UpdateMemoryTool {
         }
 
         let memory = self
-            .store
+            .repo
             .update(ctx.user_id, memory_id, content)
             .await
             .map_err(|e| db_err(self.name(), e))?;
@@ -318,7 +318,7 @@ impl Tool for UpdateMemoryTool {
 // ── ForgetMemoryTool ──────────────────────────────────────────────────────────
 
 pub struct ForgetMemoryTool {
-    store: Arc<MemoryStore>,
+    repo: Arc<dyn MemoryRepository>,
     limiter: Arc<WriteRateLimiter>,
 }
 
@@ -361,7 +361,7 @@ impl Tool for ForgetMemoryTool {
             });
         }
 
-        self.store
+        self.repo
             .forget(ctx.user_id, memory_id)
             .await
             .map_err(|e| db_err(self.name(), e))?;
@@ -396,23 +396,23 @@ fn parse_uuid(input: &serde_json::Value, field: &str, tool: &str) -> Result<Uuid
 /// # Example
 ///
 /// ```ignore
-/// let store = Arc::new(MemoryStore::new(pool));
-/// register_memory_tools(&mut registry, store);
+/// let repo: Arc<dyn MemoryRepository> = Arc::new(PgMemoryRepository::new(pool));
+/// register_memory_tools(&mut registry, repo);
 /// ```
-pub fn register_memory_tools(registry: &mut ToolRegistry, store: Arc<MemoryStore>) {
+pub fn register_memory_tools(registry: &mut ToolRegistry, repo: Arc<dyn MemoryRepository>) {
     let limiter = Arc::new(WriteRateLimiter::new(10, Duration::from_secs(60)));
     registry.register(Arc::new(GetUserMemoriesTool {
-        store: Arc::clone(&store),
+        repo: Arc::clone(&repo),
     }));
     registry.register(Arc::new(SaveMemoryTool {
-        store: Arc::clone(&store),
+        repo: Arc::clone(&repo),
         limiter: Arc::clone(&limiter),
     }));
     registry.register(Arc::new(UpdateMemoryTool {
-        store: Arc::clone(&store),
+        repo: Arc::clone(&repo),
         limiter: Arc::clone(&limiter),
     }));
-    registry.register(Arc::new(ForgetMemoryTool { store, limiter }));
+    registry.register(Arc::new(ForgetMemoryTool { repo, limiter }));
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
