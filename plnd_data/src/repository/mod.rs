@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 pub mod briefing;
 pub mod catalog_ingest;
+pub mod exercise;
 pub mod meal;
+pub mod meal_search;
 pub mod meal_suggestion;
 pub mod memory;
 pub mod pg;
@@ -18,7 +20,9 @@ pub mod user_meal_pref;
 pub use crate::db::error::DatabaseError;
 pub use briefing::BriefingRepository;
 pub use catalog_ingest::CatalogIngestRepository;
+pub use exercise::ExerciseRepository;
 pub use meal::MealRepository;
+pub use meal_search::MealSearchRepository;
 pub use meal_suggestion::MealSuggestionRepository;
 pub use memory::MemoryRepository;
 pub use preferences::PreferencesRepository;
@@ -30,11 +34,15 @@ pub use user_dish_prefs::{AddIngredientParams, UserDishPrefRepository};
 pub use user_ingredient_pref::UserIngredientPrefRepository;
 pub use user_meal_pref::UserMealPrefRepository;
 
+pub use crate::db::models::{LocalDishResult, LocalExerciseResult, LocalIngredientResult};
+
 #[derive(Clone)]
 pub struct Repositories {
     pub briefing: Arc<dyn BriefingRepository>,
     pub catalog_ingest: Arc<dyn CatalogIngestRepository>,
+    pub exercise: Arc<dyn ExerciseRepository>,
     pub meal: Arc<dyn MealRepository>,
+    pub meal_search: Arc<dyn MealSearchRepository>,
     pub meal_suggestion: Arc<dyn MealSuggestionRepository>,
     pub memory: Arc<dyn MemoryRepository>,
     pub preferences: Arc<dyn PreferencesRepository>,
@@ -55,7 +63,9 @@ impl Repositories {
             catalog_ingest: Arc::new(pg::catalog_ingest::PgCatalogIngestRepository::new(
                 pool.clone(),
             )),
+            exercise: Arc::new(pg::exercise::PgExerciseRepository::new(pool.clone())),
             meal: Arc::new(pg::meal::PgMealRepository::new(pool.clone())),
+            meal_search: Arc::new(pg::meal_search::PgMealSearchRepository::new(pool.clone())),
             meal_suggestion: Arc::new(pg::meal_suggestion::PgMealSuggestionRepository::new(
                 pool.clone(),
             )),
