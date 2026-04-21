@@ -13,6 +13,32 @@ pub trait MealRepository: Send + Sync {
         user_id: Uuid,
     ) -> Result<Vec<DietaryRestriction>, DatabaseError>;
 
+    /// Creates a dietary restriction for the given user. Returns the new record.
+    async fn create_dietary_restriction(
+        &self,
+        user_id: Uuid,
+        restriction_type: &str,
+        name: &str,
+        notes: Option<&str>,
+    ) -> Result<DietaryRestriction, DatabaseError>;
+
+    /// Updates the notes on an existing restriction. Returns `Some(record)` on
+    /// success, or `None` if no restriction with the given id belongs to user_id.
+    async fn update_dietary_restriction(
+        &self,
+        restriction_id: Uuid,
+        user_id: Uuid,
+        notes: Option<&str>,
+    ) -> Result<Option<DietaryRestriction>, DatabaseError>;
+
+    /// Deletes a restriction. Returns `true` if a row was deleted, `false` if
+    /// no restriction with the given id belongs to user_id.
+    async fn delete_dietary_restriction(
+        &self,
+        restriction_id: Uuid,
+        user_id: Uuid,
+    ) -> Result<bool, DatabaseError>;
+
     async fn search_catalog_meals(
         &self,
         q: &str,
