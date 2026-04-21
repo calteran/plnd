@@ -1,4 +1,6 @@
+pub mod catalog_ingest;
 pub mod meal;
+pub mod meal_suggestion;
 pub mod memory;
 pub mod preferences;
 pub mod schedule;

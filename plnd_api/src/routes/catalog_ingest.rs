@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::catalog_ingest;
+use plnd_data::repository::catalog_ingest::IngestIngredientInput;
 
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct IngestIngredientBody {
@@ -46,23 +46,21 @@ pub async fn ingest_ingredient(
     Extension(_claims): Extension<Claims>,
     Json(body): Json<IngestIngredientBody>,
 ) -> Result<(StatusCode, Json<IngestIngredientResponse>), StatusCode> {
-    let allergens = body.allergens.unwrap_or_default();
-    let occasion_tags = body.occasion_tags.unwrap_or_default();
-    let id = catalog_ingest::ingest_ingredient(
-        state.db.get_pool(),
-        catalog_ingest::IngestIngredientParams {
-            external_source: &body.external_source,
-            external_id: &body.external_id,
-            name: &body.name,
-            description: body.description.as_deref(),
+    let id = state
+        .repos
+        .catalog_ingest
+        .ingest_ingredient(IngestIngredientInput {
+            external_source: body.external_source,
+            external_id: body.external_id,
+            name: body.name,
+            description: body.description,
             serving_size_g: body.serving_size_g,
             nutrition: body.nutrition,
-            allergens: &allergens,
-            occasion_tags: &occasion_tags,
-        },
-    )
-    .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+            allergens: body.allergens.unwrap_or_default(),
+            occasion_tags: body.occasion_tags.unwrap_or_default(),
+        })
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((
         StatusCode::CREATED,
         Json(IngestIngredientResponse {
