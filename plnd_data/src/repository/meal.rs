@@ -49,7 +49,6 @@ pub trait MealRepository: Send + Sync {
         user_id: Option<Uuid>,
     ) -> Result<Vec<CatalogMeal>, DatabaseError>;
 
-
     async fn ingredient_names_by_ids(
         &self,
         ids: &[Uuid],

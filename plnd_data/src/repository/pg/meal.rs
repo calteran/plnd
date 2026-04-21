@@ -75,7 +75,6 @@ impl MealRepository for PgMealRepository {
         db_search_catalog_meals(&self.pool, q, limit, occasion, exclude_allergens, user_id).await
     }
 
-
     async fn ingredient_names_by_ids(
         &self,
         ids: &[Uuid],

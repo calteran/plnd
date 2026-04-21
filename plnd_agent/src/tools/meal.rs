@@ -1540,7 +1540,6 @@ mod tests {
                 unimplemented!("not needed by tool-logic tests")
             }
 
-
             async fn ingredient_names_by_ids(
                 &self,
                 ids: &[Uuid],
@@ -1635,7 +1634,8 @@ mod tests {
             async fn catalog_dish(
                 &self,
                 _id: Uuid,
-            ) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, DatabaseError> {
+            ) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, DatabaseError>
+            {
                 unimplemented!("not needed by tool-logic tests")
             }
 
