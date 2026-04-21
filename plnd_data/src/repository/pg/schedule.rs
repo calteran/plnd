@@ -4,8 +4,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::db::models::ScheduleEntry;
-use crate::db::schedule::get_period;
+use crate::db::models::{CommitPlanInput, ScheduleEntry};
+use crate::db::query_types::{
+    PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
+};
+use crate::db::schedule;
 use crate::repository::schedule::ScheduleRepository;
 
 pub struct PgScheduleRepository {
@@ -25,7 +28,42 @@ impl ScheduleRepository for PgScheduleRepository {
         user_id: Uuid,
         date: NaiveDate,
     ) -> Result<Vec<ScheduleEntry>, DatabaseError> {
-        let period = get_period(&self.pool, user_id, date, date).await?;
+        let period = schedule::get_period(&self.pool, user_id, date, date).await?;
         Ok(period.entries)
+    }
+
+    async fn get_period(
+        &self,
+        user_id: Uuid,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<SchedulePeriodResponse, DatabaseError> {
+        schedule::get_period(&self.pool, user_id, start, end).await
+    }
+
+    async fn get_plan_status(
+        &self,
+        user_id: Uuid,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<PlanStatusResponse, DatabaseError> {
+        schedule::get_plan_status(&self.pool, user_id, start, end).await
+    }
+
+    async fn commit_plan(
+        &self,
+        user_id: Uuid,
+        input: &CommitPlanInput,
+    ) -> Result<PostSchedulePlanResponse, DatabaseError> {
+        schedule::commit_plan(&self.pool, user_id, input).await
+    }
+
+    async fn update_entry_status(
+        &self,
+        user_id: Uuid,
+        entry_id: Uuid,
+        status: &str,
+    ) -> Result<(), DatabaseError> {
+        schedule::update_entry_status(&self.pool, user_id, entry_id, status).await
     }
 }

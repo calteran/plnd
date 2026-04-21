@@ -12,7 +12,7 @@ use axum::{
     Json,
 };
 use chrono::NaiveDate;
-use plnd_data::db;
+use plnd_data::db::error::DatabaseError;
 use plnd_data::db::models::{CarryoverDecision, CommitPlanInput, PlanEntryInput};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -51,9 +51,11 @@ pub async fn get_period(
         return Err(StatusCode::BAD_REQUEST);
     }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::schedule::get_period(pool, user_id, params.start, params.end)
+    state
+        .repos
+        .schedule
+        .get_period(user_id, params.start, params.end)
         .await
         .map(SchedulePeriodApiResponse::from)
         .map(Json)
@@ -89,9 +91,11 @@ pub async fn get_plan_status(
         return Err(StatusCode::BAD_REQUEST);
     }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::schedule::get_plan_status(pool, user_id, params.start, params.end)
+    state
+        .repos
+        .schedule
+        .get_plan_status(user_id, params.start, params.end)
         .await
         .map(PlanStatusApiResponse::from)
         .map(Json)
@@ -124,7 +128,6 @@ pub async fn post_plan(
         return Err(StatusCode::BAD_REQUEST);
     }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
     // Map from HTTP request type to DB-layer input type
     let entries = body
@@ -163,13 +166,16 @@ pub async fn post_plan(
         carryover_decisions,
     };
 
-    db::schedule::commit_plan(pool, user_id, &input)
+    state
+        .repos
+        .schedule
+        .commit_plan(user_id, &input)
         .await
         .map(PostSchedulePlanApiResponse::from)
         .map(Json)
         .map_err(|e| match e {
-            plnd_data::db::error::DatabaseError::ValidationError(_) => StatusCode::BAD_REQUEST,
-            plnd_data::db::error::DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            DatabaseError::ValidationError(_) => StatusCode::BAD_REQUEST,
+            DatabaseError::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             _ => {
                 tracing::error!(error = %e, "post_plan error");
                 StatusCode::INTERNAL_SERVER_ERROR
@@ -205,13 +211,15 @@ pub async fn patch_entry_status(
         return Err(StatusCode::BAD_REQUEST);
     }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
-    db::schedule::update_entry_status(pool, user_id, entry_id, &body.status)
+    state
+        .repos
+        .schedule
+        .update_entry_status(user_id, entry_id, &body.status)
         .await
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| match e {
-            plnd_data::db::error::DatabaseError::NotFound => StatusCode::NOT_FOUND,
+            DatabaseError::NotFound => StatusCode::NOT_FOUND,
             _ => {
                 tracing::error!(error = %e, "patch_entry_status error");
                 StatusCode::INTERNAL_SERVER_ERROR
