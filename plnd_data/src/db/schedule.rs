@@ -263,32 +263,6 @@ pub async fn commit_plan(
     })
 }
 
-// ── ScheduleStore ─────────────────────────────────────────────────────────────
-
-/// Owned handle for schedule query operations.
-///
-/// Wraps [`PgPool`] so callers (e.g. `plnd_agent` tools) do not need a direct
-/// sqlx dependency — sqlx is a private implementation detail of `plnd_data`.
-#[derive(Clone)]
-pub struct ScheduleStore {
-    pool: PgPool,
-}
-
-impl ScheduleStore {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn get_day_entries(
-        &self,
-        user_id: Uuid,
-        date: NaiveDate,
-    ) -> Result<Vec<ScheduleEntry>, DatabaseError> {
-        let period = get_period(&self.pool, user_id, date, date).await?;
-        Ok(period.entries)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;

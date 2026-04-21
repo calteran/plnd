@@ -99,57 +99,6 @@ pub async fn delete_memory(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<(),
         .map_err(DatabaseError::from)
 }
 
-// ── MemoryStore ───────────────────────────────────────────────────────────────
-
-/// Owned handle for memory operations.
-///
-/// Holds [`PgPool`] internally so callers (e.g. `plnd_agent`) do not need a
-/// sqlx dependency — sqlx is a private implementation detail of `plnd_data`.
-#[derive(Clone)]
-pub struct MemoryStore {
-    pool: PgPool,
-}
-
-impl MemoryStore {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-
-    pub async fn get(
-        &self,
-        user_id: Uuid,
-        category: Option<&str>,
-    ) -> Result<Vec<UserMemory>, DatabaseError> {
-        match category {
-            Some(cat) => get_memories(&self.pool, user_id, &[cat]).await,
-            None => get_memories(&self.pool, user_id, &[]).await,
-        }
-    }
-
-    pub async fn save(
-        &self,
-        user_id: Uuid,
-        category: &str,
-        content: &str,
-        tags: Vec<String>,
-    ) -> Result<UserMemory, DatabaseError> {
-        create_memory(&self.pool, user_id, category, content, tags).await
-    }
-
-    pub async fn update(
-        &self,
-        user_id: Uuid,
-        memory_id: Uuid,
-        content: &str,
-    ) -> Result<UserMemory, DatabaseError> {
-        update_memory(&self.pool, memory_id, user_id, content).await
-    }
-
-    pub async fn forget(&self, user_id: Uuid, memory_id: Uuid) -> Result<(), DatabaseError> {
-        delete_memory(&self.pool, memory_id, user_id).await
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
