@@ -1145,6 +1145,42 @@ mod tests {
         ) -> Result<bool, plnd_data::db::error::DatabaseError> {
             unimplemented!("stub")
         }
+
+        async fn catalog_ingredient(
+            &self,
+            _id: uuid::Uuid,
+        ) -> Result<
+            Option<plnd_data::db::models::CatalogIngredient>,
+            plnd_data::db::error::DatabaseError,
+        > {
+            unimplemented!("stub")
+        }
+
+        async fn catalog_dish(
+            &self,
+            _id: uuid::Uuid,
+        ) -> Result<
+            Option<(
+                plnd_data::db::models::CatalogDish,
+                Vec<plnd_data::db::models::CatalogDishIngredient>,
+            )>,
+            plnd_data::db::error::DatabaseError,
+        > {
+            unimplemented!("stub")
+        }
+
+        async fn catalog_meal(
+            &self,
+            _id: uuid::Uuid,
+        ) -> Result<
+            Option<(
+                plnd_data::db::models::CatalogMeal,
+                Vec<plnd_data::db::models::CatalogMealDish>,
+            )>,
+            plnd_data::db::error::DatabaseError,
+        > {
+            unimplemented!("stub")
+        }
     }
 
     fn stub_meal_repo() -> Arc<dyn MealRepository> {
@@ -1437,8 +1473,8 @@ mod tests {
 
         use plnd_data::db::error::DatabaseError;
         use plnd_data::db::models::{
-            CatalogIngredient, CatalogMeal, DietaryRestriction, UserIngredientPref,
-            UserMealPrefDetail,
+            CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
+            DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
         };
         use plnd_data::repository::MealRepository;
         use rust_decimal::Decimal;
@@ -1704,6 +1740,28 @@ mod tests {
                 // suppress unused-variable warning
                 let _ = occasion_tags;
                 Ok(pref)
+            }
+
+            async fn catalog_ingredient(
+                &self,
+                _id: Uuid,
+            ) -> Result<Option<CatalogIngredient>, DatabaseError> {
+                unimplemented!("not needed by tool-logic tests")
+            }
+
+            async fn catalog_dish(
+                &self,
+                _id: Uuid,
+            ) -> Result<Option<(CatalogDish, Vec<CatalogDishIngredient>)>, DatabaseError>
+            {
+                unimplemented!("not needed by tool-logic tests")
+            }
+
+            async fn catalog_meal(
+                &self,
+                _id: Uuid,
+            ) -> Result<Option<(CatalogMeal, Vec<CatalogMealDish>)>, DatabaseError> {
+                unimplemented!("not needed by tool-logic tests")
             }
         }
     }
