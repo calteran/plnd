@@ -11,6 +11,8 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
+    /// Repository layer — typed access to all storage-backed domain operations.
+    pub repos: Repositories,
     pub jwt: JwtService,
     pub session: SessionService,
     /// JWKS cache for validating RS256 ID tokens from the configured IdP.
@@ -27,6 +29,4 @@ pub struct AppState {
     /// Agent service for LLM-backed task and meal-plan generation.
     /// Stub in Phase 3.1 — fully implemented in Phase 3.2/3.3.
     pub agent: AgentService,
-    /// Repository layer — typed access to all storage-backed domain operations.
-    pub repos: Repositories,
 }

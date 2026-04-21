@@ -7,7 +7,6 @@ use axum::{
     Json,
 };
 use chrono::NaiveDate;
-use plnd_data::db;
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -38,27 +37,27 @@ pub async fn post_weekly_plan_task(
     Query(params): Query<WeeklyPlanQuery>,
 ) -> Result<Json<TaskResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let pool = state.db.get_pool();
 
     // Read trigger_offset from the user's stored preferences (not client-supplied)
-    let prefs = db::preferences::get_or_create(pool, user_id)
+    let prefs = state
+        .repos
+        .preferences
+        .get_or_create(user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "weekly plan task: get_prefs error");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    db::tasks::create_weekly_plan_task(
-        pool,
-        user_id,
-        params.plan_start,
-        prefs.planning_trigger_offset,
-    )
-    .await
-    .map(TaskResponse::from)
-    .map(Json)
-    .map_err(|e| {
-        tracing::error!(error = %e, "weekly plan task: post error");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })
+    state
+        .repos
+        .task
+        .create_weekly_plan_task(user_id, params.plan_start, prefs.planning_trigger_offset)
+        .await
+        .map(TaskResponse::from)
+        .map(Json)
+        .map_err(|e| {
+            tracing::error!(error = %e, "weekly plan task: post error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })
 }

@@ -225,6 +225,7 @@ async fn main() {
 
     let state = Arc::new(AppState {
         db: db_conn,
+        repos,
         jwt,
         session,
         jwks,
@@ -234,7 +235,6 @@ async fn main() {
         client_error_limiter,
         agent_task_limiter,
         agent,
-        repos,
     });
 
     let x_request_id = HeaderName::from_static("x-request-id");
