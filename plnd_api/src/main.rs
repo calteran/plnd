@@ -227,7 +227,6 @@ async fn main() {
         repos,
         jwt,
         session,
-        repos,
         jwks,
         oidc_client_id: config.auth.oidc.client_id.clone(),
         provider_search,

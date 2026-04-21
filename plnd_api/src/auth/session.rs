@@ -30,16 +30,13 @@ impl SessionService {
     /// Create a session record. Returns the session_id (UUID string).
     pub async fn create_session(
         &self,
-        user_id: &str,
+        user_id: Uuid,
         jti: &str,
         ip_address: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<String, AuthError> {
-        let user_uuid = Uuid::parse_str(user_id)
-            .map_err(|e| AuthError::SessionError(format!("Invalid user_id UUID: {}", e)))?;
-
         self.session_repo
-            .create(user_uuid, jti, ip_address, user_agent)
+            .create(user_id, jti, ip_address, user_agent)
             .await
             .map_err(|e| AuthError::SessionError(format!("Failed to create session: {}", e)))
     }

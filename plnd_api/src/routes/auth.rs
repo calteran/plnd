@@ -145,7 +145,7 @@ pub async fn token_exchange(
     let _ = state
         .session
         .create_session(
-            &user.user_id.to_string(),
+            user.user_id,
             &backend_claims.jti,
             ip_string.as_deref(),
             ua_string.as_deref(),

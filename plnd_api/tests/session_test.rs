@@ -1,12 +1,14 @@
 use plnd_api::auth::SessionService;
+use uuid::Uuid;
 
 #[tokio::test]
 async fn test_session_creation() {
     let session_service = SessionService::new();
+    let user_id = Uuid::parse_str("a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11").unwrap();
 
     let session_id = session_service
         .create_session(
-            "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+            user_id,
             "mock-token-hash",
             Some("192.168.1.1"),
             Some("Mozilla/5.0"),
