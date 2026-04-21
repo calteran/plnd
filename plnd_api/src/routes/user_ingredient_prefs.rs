@@ -10,7 +10,6 @@ use uuid::Uuid;
 use crate::api_response::UserIngredientPrefResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::db::user_ingredient_prefs;
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpsertIngredientPrefBody {
@@ -35,7 +34,10 @@ pub async fn list(
     Extension(claims): Extension<Claims>,
 ) -> Result<Json<Vec<UserIngredientPrefResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    user_ingredient_prefs::list(state.db.get_pool(), user_id)
+    state
+        .repos
+        .user_ingredient_pref
+        .list(user_id)
         .await
         .map(|v| {
             Json(
@@ -70,17 +72,19 @@ pub async fn upsert(
     Json(body): Json<UpsertIngredientPrefBody>,
 ) -> Result<Json<UserIngredientPrefResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    user_ingredient_prefs::upsert(
-        state.db.get_pool(),
-        user_id,
-        catalog_ingredient_id,
-        body.is_blocked,
-        body.notes.as_deref(),
-    )
-    .await
-    .map(UserIngredientPrefResponse::from)
-    .map(Json)
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
+    state
+        .repos
+        .user_ingredient_pref
+        .upsert(
+            user_id,
+            catalog_ingredient_id,
+            body.is_blocked,
+            body.notes.as_deref(),
+        )
+        .await
+        .map(UserIngredientPrefResponse::from)
+        .map(Json)
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)
 }
 
 #[utoipa::path(
@@ -105,10 +109,12 @@ pub async fn delete(
     Path(catalog_ingredient_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-    let deleted =
-        user_ingredient_prefs::delete(state.db.get_pool(), user_id, catalog_ingredient_id)
-            .await
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let deleted = state
+        .repos
+        .user_ingredient_pref
+        .delete(user_id, catalog_ingredient_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     if deleted {
         Ok(StatusCode::NO_CONTENT)
     } else {

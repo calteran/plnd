@@ -4,7 +4,7 @@ use uuid::Uuid;
 use crate::db::error::DatabaseError;
 use crate::db::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
+    DietaryRestriction, UserMealPrefDetail,
 };
 
 #[async_trait]
@@ -53,11 +53,6 @@ pub trait MealRepository: Send + Sync {
         &self,
         user_id: Uuid,
     ) -> Result<Vec<UserMealPrefDetail>, DatabaseError>;
-
-    async fn list_user_ingredient_prefs(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Vec<UserIngredientPref>, DatabaseError>;
 
     async fn ingredient_names_by_ids(
         &self,

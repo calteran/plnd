@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use plnd_data::db::error::DatabaseError;
-use plnd_data::repository::MealRepository;
+use plnd_data::repository::{MealRepository, UserIngredientPrefRepository};
 use rust_decimal::prelude::ToPrimitive;
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -134,7 +134,10 @@ impl Tool for GetUserMealLibraryTool {
 
 // ── GetUserMealPreferencesTool ────────────────────────────────────────────────
 
-pub struct GetUserMealPreferencesTool(pub Arc<dyn MealRepository>);
+pub struct GetUserMealPreferencesTool {
+    pub meal: Arc<dyn MealRepository>,
+    pub ingredient_pref: Arc<dyn UserIngredientPrefRepository>,
+}
 
 #[async_trait::async_trait]
 impl Tool for GetUserMealPreferencesTool {
@@ -158,9 +161,9 @@ impl Tool for GetUserMealPreferencesTool {
         _input: serde_json::Value,
     ) -> Result<serde_json::Value, ToolError> {
         let (restrictions, ingredient_prefs, meal_prefs) = tokio::try_join!(
-            self.0.list_dietary_restrictions(ctx.user_id),
-            self.0.list_user_ingredient_prefs(ctx.user_id),
-            self.0.list_user_meal_prefs(ctx.user_id),
+            self.meal.list_dietary_restrictions(ctx.user_id),
+            self.ingredient_pref.list(ctx.user_id),
+            self.meal.list_user_meal_prefs(ctx.user_id),
         )
         .map_err(|e| db_err(self.name(), e))?;
 
@@ -172,7 +175,7 @@ impl Tool for GetUserMealPreferencesTool {
 
         // Fetch names for blocked ingredients so the LLM can reason about them
         let blocked_ingredients: Vec<serde_json::Value> = self
-            .0
+            .meal
             .ingredient_names_by_ids(&blocked_ids)
             .await
             .map_err(|e| db_err(self.name(), e))?
@@ -876,10 +879,17 @@ impl Tool for ResolveMealDescriptionTool {
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
-pub fn register_meal_read_tools(registry: &mut ToolRegistry, meal_repo: Arc<dyn MealRepository>) {
+pub fn register_meal_read_tools(
+    registry: &mut ToolRegistry,
+    meal_repo: Arc<dyn MealRepository>,
+    ingredient_pref_repo: Arc<dyn UserIngredientPrefRepository>,
+) {
     registry.register(Arc::new(SearchMealCatalogTool(Arc::clone(&meal_repo))));
     registry.register(Arc::new(GetUserMealLibraryTool(Arc::clone(&meal_repo))));
-    registry.register(Arc::new(GetUserMealPreferencesTool(Arc::clone(&meal_repo))));
+    registry.register(Arc::new(GetUserMealPreferencesTool {
+        meal: Arc::clone(&meal_repo),
+        ingredient_pref: ingredient_pref_repo,
+    }));
     registry.register(Arc::new(GetMealNutritionTool(Arc::clone(&meal_repo))));
     registry.register(Arc::new(EstimateNutritionFromDescriptionTool(meal_repo)));
 }
@@ -1062,15 +1072,6 @@ mod tests {
             _user_id: uuid::Uuid,
         ) -> Result<
             Vec<plnd_data::db::models::UserMealPrefDetail>,
-            plnd_data::db::error::DatabaseError,
-        > {
-            unimplemented!("stub")
-        }
-        async fn list_user_ingredient_prefs(
-            &self,
-            _user_id: uuid::Uuid,
-        ) -> Result<
-            Vec<plnd_data::db::models::UserIngredientPref>,
             plnd_data::db::error::DatabaseError,
         > {
             unimplemented!("stub")
@@ -1465,7 +1466,7 @@ mod tests {
         assert_eq!(result["meals"].as_array().unwrap().len(), 1);
     }
 
-    // ── InMemoryMealRepository fake for tool-logic tests ─────────────────────
+    // ── In-memory fakes for tool-logic tests ─────────────────────────────────
 
     mod fakes {
         use std::collections::HashMap;
@@ -1476,7 +1477,7 @@ mod tests {
             CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
             DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
         };
-        use plnd_data::repository::MealRepository;
+        use plnd_data::repository::{MealRepository, UserIngredientPrefRepository};
         use rust_decimal::Decimal;
         use uuid::Uuid;
 
@@ -1487,28 +1488,26 @@ mod tests {
             pub nutrition: serde_json::Value,
         }
 
-        /// Storage buckets for the in-memory fake.
-        struct Store {
+        /// Storage buckets for the in-memory meal fake.
+        struct MealStore {
             dietary_restrictions: Vec<DietaryRestriction>,
-            ingredient_prefs: Vec<UserIngredientPref>,
             meal_prefs: Vec<UserMealPrefDetail>,
             catalog_ingredients: Vec<FakeIngredient>,
             /// user_meal_id → (nutrition_json, estimated)
             user_meal_nutrition: HashMap<Uuid, (Option<serde_json::Value>, bool)>,
-            /// ingredient_id → name, populated by add_blocked_ingredient_pref
+            /// ingredient_id → name, for ingredient_names_by_ids lookup
             ingredient_names: Vec<(Uuid, String)>,
         }
 
         pub struct InMemoryMealRepository {
-            store: Mutex<Store>,
+            store: Mutex<MealStore>,
         }
 
         impl InMemoryMealRepository {
             pub fn new() -> Self {
                 Self {
-                    store: Mutex::new(Store {
+                    store: Mutex::new(MealStore {
                         dietary_restrictions: Vec::new(),
-                        ingredient_prefs: Vec::new(),
                         meal_prefs: Vec::new(),
                         catalog_ingredients: Vec::new(),
                         user_meal_nutrition: HashMap::new(),
@@ -1540,27 +1539,13 @@ mod tests {
                 self.store.lock().unwrap().catalog_ingredients.push(ing);
             }
 
-            /// Seed a blocked-ingredient preference.  `ingredient_id` is also the
-            /// catalog_ingredient_id that `ingredient_names_by_ids` will resolve.
-            pub fn add_blocked_ingredient_pref(
-                &self,
-                user_id: Uuid,
-                ingredient_id: Uuid,
-                ingredient_name: &str,
-            ) {
-                use chrono::Utc;
-                let mut s = self.store.lock().unwrap();
-                s.ingredient_prefs.push(UserIngredientPref {
-                    user_ingredient_pref_id: Uuid::new_v4(),
-                    user_id,
-                    catalog_ingredient_id: ingredient_id,
-                    is_blocked: true,
-                    notes: None,
-                    created_at: Utc::now(),
-                    updated_at: Utc::now(),
-                });
-                s.ingredient_names
-                    .push((ingredient_id, ingredient_name.to_string()));
+            /// Seed the ingredient name mapping used by `ingredient_names_by_ids`.
+            pub fn add_ingredient_name(&self, ingredient_id: Uuid, name: &str) {
+                self.store
+                    .lock()
+                    .unwrap()
+                    .ingredient_names
+                    .push((ingredient_id, name.to_string()));
             }
         }
 
@@ -1597,18 +1582,6 @@ mod tests {
                 Ok(s.meal_prefs
                     .iter()
                     .filter(|m| m.user_id == user_id)
-                    .cloned()
-                    .collect())
-            }
-
-            async fn list_user_ingredient_prefs(
-                &self,
-                user_id: Uuid,
-            ) -> Result<Vec<UserIngredientPref>, DatabaseError> {
-                let s = self.store.lock().unwrap();
-                Ok(s.ingredient_prefs
-                    .iter()
-                    .filter(|p| p.user_id == user_id)
                     .cloned()
                     .collect())
             }
@@ -1668,7 +1641,6 @@ mod tests {
                 user_id: Uuid,
             ) -> Result<Option<(Option<serde_json::Value>, bool)>, DatabaseError> {
                 let s = self.store.lock().unwrap();
-                // Check that the meal was created by this user (stored in meal_prefs)
                 let owned = s
                     .meal_prefs
                     .iter()
@@ -1737,7 +1709,6 @@ mod tests {
                 s.meal_prefs.push(pref.clone());
                 s.user_meal_nutrition
                     .insert(meal_id, (nutrition, estimated));
-                // suppress unused-variable warning
                 let _ = occasion_tags;
                 Ok(pref)
             }
@@ -1764,22 +1735,84 @@ mod tests {
                 unimplemented!("not needed by tool-logic tests")
             }
         }
+
+        // ── InMemoryUserIngredientPrefRepository ──────────────────────────────
+
+        pub struct InMemoryUserIngredientPrefRepository {
+            prefs: Mutex<Vec<UserIngredientPref>>,
+        }
+
+        impl InMemoryUserIngredientPrefRepository {
+            pub fn new() -> Self {
+                Self {
+                    prefs: Mutex::new(Vec::new()),
+                }
+            }
+
+            pub fn add_pref(&self, user_id: Uuid, catalog_ingredient_id: Uuid, is_blocked: bool) {
+                use chrono::Utc;
+                self.prefs.lock().unwrap().push(UserIngredientPref {
+                    user_ingredient_pref_id: Uuid::new_v4(),
+                    user_id,
+                    catalog_ingredient_id,
+                    is_blocked,
+                    notes: None,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                });
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl UserIngredientPrefRepository for InMemoryUserIngredientPrefRepository {
+            async fn list(&self, user_id: Uuid) -> Result<Vec<UserIngredientPref>, DatabaseError> {
+                let prefs = self.prefs.lock().unwrap();
+                Ok(prefs
+                    .iter()
+                    .filter(|p| p.user_id == user_id)
+                    .cloned()
+                    .collect())
+            }
+
+            async fn upsert(
+                &self,
+                _user_id: Uuid,
+                _catalog_ingredient_id: Uuid,
+                _is_blocked: bool,
+                _notes: Option<&str>,
+            ) -> Result<UserIngredientPref, DatabaseError> {
+                unimplemented!("not needed by tool-logic tests")
+            }
+
+            async fn delete(
+                &self,
+                _user_id: Uuid,
+                _catalog_ingredient_id: Uuid,
+            ) -> Result<bool, DatabaseError> {
+                unimplemented!("not needed by tool-logic tests")
+            }
+        }
     }
 
     // ── Tool-logic tests (no DB required) ─────────────────────────────────────
 
     #[tokio::test]
     async fn get_user_meal_preferences_tool_returns_bundle() {
-        use fakes::InMemoryMealRepository;
-        let repo = Arc::new(InMemoryMealRepository::new());
+        use fakes::{InMemoryMealRepository, InMemoryUserIngredientPrefRepository};
+        let meal_repo = Arc::new(InMemoryMealRepository::new());
+        let pref_repo = Arc::new(InMemoryUserIngredientPrefRepository::new());
         let user_id = uuid::Uuid::new_v4();
-        repo.add_dietary_restriction(user_id, "allergy", "peanuts");
+        meal_repo.add_dietary_restriction(user_id, "allergy", "peanuts");
 
         // Seed a blocked ingredient so the id→name translation path is exercised.
         let blocked_id = uuid::Uuid::new_v4();
-        repo.add_blocked_ingredient_pref(user_id, blocked_id, "shellfish");
+        meal_repo.add_ingredient_name(blocked_id, "shellfish");
+        pref_repo.add_pref(user_id, blocked_id, true);
 
-        let tool = GetUserMealPreferencesTool(Arc::clone(&repo) as Arc<dyn MealRepository>);
+        let tool = GetUserMealPreferencesTool {
+            meal: Arc::clone(&meal_repo) as Arc<dyn MealRepository>,
+            ingredient_pref: Arc::clone(&pref_repo) as Arc<dyn UserIngredientPrefRepository>,
+        };
         let ctx = ToolContext { user_id };
         let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
 
