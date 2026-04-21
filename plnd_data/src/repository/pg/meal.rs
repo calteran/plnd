@@ -9,13 +9,12 @@ use crate::db::dietary_restrictions;
 use crate::db::error::DatabaseError;
 use crate::db::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction, UserIngredientPref, UserMealPrefDetail,
+    DietaryRestriction, UserMealPrefDetail,
 };
 use crate::db::search::{
     search_catalog_meals as db_search_catalog_meals,
     search_ingredient_nutrition as db_search_ingredient_nutrition,
 };
-use crate::db::user_ingredient_prefs;
 use crate::db::user_meal_prefs;
 use crate::db::user_meals;
 use crate::repository::meal::MealRepository;
@@ -82,13 +81,6 @@ impl MealRepository for PgMealRepository {
         user_id: Uuid,
     ) -> Result<Vec<UserMealPrefDetail>, DatabaseError> {
         user_meal_prefs::list(&self.pool, user_id).await
-    }
-
-    async fn list_user_ingredient_prefs(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Vec<UserIngredientPref>, DatabaseError> {
-        user_ingredient_prefs::list(&self.pool, user_id).await
     }
 
     async fn ingredient_names_by_ids(

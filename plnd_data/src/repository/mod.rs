@@ -11,6 +11,7 @@ pub mod schedule;
 pub mod session;
 pub mod task;
 pub mod user;
+pub mod user_ingredient_pref;
 
 pub use briefing::BriefingRepository;
 pub use catalog_ingest::CatalogIngestRepository;
@@ -22,6 +23,7 @@ pub use schedule::ScheduleRepository;
 pub use session::SessionRepository;
 pub use task::TaskRepository;
 pub use user::UserRepository;
+pub use user_ingredient_pref::UserIngredientPrefRepository;
 
 #[derive(Clone)]
 pub struct Repositories {
@@ -35,6 +37,7 @@ pub struct Repositories {
     pub session: Arc<dyn SessionRepository>,
     pub task: Arc<dyn TaskRepository>,
     pub user: Arc<dyn UserRepository>,
+    pub user_ingredient_pref: Arc<dyn UserIngredientPrefRepository>,
 }
 
 impl Repositories {
@@ -54,7 +57,10 @@ impl Repositories {
             schedule: Arc::new(pg::schedule::PgScheduleRepository::new(pool.clone())),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),
             task: Arc::new(pg::task::PgTaskRepository::new(pool.clone())),
-            user: Arc::new(pg::user::PgUserRepository::new(pool)),
+            user: Arc::new(pg::user::PgUserRepository::new(pool.clone())),
+            user_ingredient_pref: Arc::new(
+                pg::user_ingredient_pref::PgUserIngredientPrefRepository::new(pool),
+            ),
         }
     }
 }
