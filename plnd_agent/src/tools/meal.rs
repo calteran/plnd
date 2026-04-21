@@ -1419,6 +1419,8 @@ mod tests {
             catalog_ingredients: Vec<FakeIngredient>,
             /// user_meal_id → (nutrition_json, estimated)
             user_meal_nutrition: HashMap<Uuid, (Option<serde_json::Value>, bool)>,
+            /// ingredient_id → name, populated by add_blocked_ingredient_pref
+            ingredient_names: Vec<(Uuid, String)>,
         }
 
         pub struct InMemoryMealRepository {
@@ -1434,6 +1436,7 @@ mod tests {
                         meal_prefs: Vec::new(),
                         catalog_ingredients: Vec::new(),
                         user_meal_nutrition: HashMap::new(),
+                        ingredient_names: Vec::new(),
                     }),
                 }
             }
@@ -1459,6 +1462,29 @@ mod tests {
 
             pub fn add_catalog_ingredient(&self, ing: FakeIngredient) {
                 self.store.lock().unwrap().catalog_ingredients.push(ing);
+            }
+
+            /// Seed a blocked-ingredient preference.  `ingredient_id` is also the
+            /// catalog_ingredient_id that `ingredient_names_by_ids` will resolve.
+            pub fn add_blocked_ingredient_pref(
+                &self,
+                user_id: Uuid,
+                ingredient_id: Uuid,
+                ingredient_name: &str,
+            ) {
+                use chrono::Utc;
+                let mut s = self.store.lock().unwrap();
+                s.ingredient_prefs.push(UserIngredientPref {
+                    user_ingredient_pref_id: Uuid::new_v4(),
+                    user_id,
+                    catalog_ingredient_id: ingredient_id,
+                    is_blocked: true,
+                    notes: None,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                });
+                s.ingredient_names
+                    .push((ingredient_id, ingredient_name.to_string()));
             }
         }
 
@@ -1513,10 +1539,14 @@ mod tests {
 
             async fn ingredient_names_by_ids(
                 &self,
-                _ids: &[Uuid],
+                ids: &[Uuid],
             ) -> Result<Vec<(Uuid, String)>, DatabaseError> {
-                // No blocked ingredients in these tests; return empty.
-                Ok(vec![])
+                let s = self.store.lock().unwrap();
+                Ok(s.ingredient_names
+                    .iter()
+                    .filter(|(id, _)| ids.contains(id))
+                    .cloned()
+                    .collect())
             }
 
             async fn search_ingredient_nutrition(
@@ -1619,6 +1649,10 @@ mod tests {
         let user_id = uuid::Uuid::new_v4();
         repo.add_dietary_restriction(user_id, "allergy", "peanuts");
 
+        // Seed a blocked ingredient so the id→name translation path is exercised.
+        let blocked_id = uuid::Uuid::new_v4();
+        repo.add_blocked_ingredient_pref(user_id, blocked_id, "shellfish");
+
         let tool = GetUserMealPreferencesTool(Arc::clone(&repo) as Arc<dyn MealRepository>);
         let ctx = ToolContext { user_id };
         let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
@@ -1626,7 +1660,12 @@ mod tests {
         let restrictions = result["dietary_restrictions"].as_array().unwrap();
         assert_eq!(restrictions.len(), 1);
         assert_eq!(restrictions[0]["name"], "peanuts");
-        assert!(result["blocked_ingredients"].is_array());
+
+        let blocked = result["blocked_ingredients"].as_array().unwrap();
+        assert_eq!(blocked.len(), 1);
+        assert_eq!(blocked[0]["id"], blocked_id.to_string());
+        assert_eq!(blocked[0]["name"], "shellfish");
+
         assert!(result["top_rated_meals"].is_array());
     }
 
