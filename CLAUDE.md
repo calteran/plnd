@@ -30,6 +30,21 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - **NEVER commit directly to `main`** — always work on a feature or fix branch and open a PR
 - **ALWAYS branch from `main`** — never base a branch on another feature branch; this avoids merge conflicts and spurious commits when the parent branch merges
 
+### Storage Layer Isolation
+- No production crate other than `plnd_data` may depend on `sqlx`, import `PgPool`, or
+  execute database queries. `plnd_api` and `plnd_agent` interact with storage only through
+  trait-based repositories defined in `plnd_data::repository`.
+- `plnd_data` MUST NOT re-export `sqlx` types publicly. Domain types (`DatabaseError`,
+  model structs, query response types) are public; connection/query primitives are private.
+- New storage-backed functionality adds a method to an existing repository trait (or a new
+  trait) in `plnd_data`, never a direct query in a consuming crate.
+- Workspace exception: `plnd_seed` (non-production tooling) may use `sqlx` directly.
+
+> **Current reality note:** `plnd_api/src/routes/*` route handlers still use `PgPool` directly.
+> That is existing code predating this rule. The rule covers `plnd_agent` (now clean) and any
+> future code. Do not expand scope by rewriting `plnd_api` routes unless that becomes a
+> dedicated refactor effort.
+
 ### Before Every Commit
 Run `just verify` — this executes the full quality suite and must pass cleanly.
 
