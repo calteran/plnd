@@ -17,6 +17,8 @@ pub async fn run_seed(
 ) -> Result<(), SeedError> {
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(max_connections)
+        .acquire_timeout(std::time::Duration::from_secs(30))
+        .idle_timeout(std::time::Duration::from_secs(600))
         .connect(database_url)
         .await
         .map_err(SeedError::Database)?;
