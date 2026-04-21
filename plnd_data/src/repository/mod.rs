@@ -105,7 +105,8 @@ mod tests {
     use super::*;
 
     fn _assert_health_check_exists(repos: &Repositories) {
-        let _: std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), DatabaseError>> + '_>> =
-            Box::pin(repos.health_check());
+        let _: std::pin::Pin<
+            Box<dyn std::future::Future<Output = Result<(), DatabaseError>> + '_>,
+        > = Box::pin(repos.health_check());
     }
 }
