@@ -345,7 +345,10 @@ mod meal_plan_tests {
     fn occasion_rejects_invalid_value() {
         let result: Result<MealSuggestRequest, _> =
             serde_json::from_str(r#"{"date": "2026-04-21", "occasion": "brunch"}"#);
-        assert!(result.is_err(), "brunch must be rejected at deserialization");
+        assert!(
+            result.is_err(),
+            "brunch must be rejected at deserialization"
+        );
     }
 
     #[test]

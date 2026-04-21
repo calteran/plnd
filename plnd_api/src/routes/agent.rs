@@ -252,7 +252,7 @@ pub async fn post_meal_plan_suggest(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let date = body.date.format("%Y-%m-%d").to_string();
-    let occasion = &body.occasion;
+    let occasion = body.occasion;
 
     let avoid_str = body
         .avoid_meal_refs
@@ -324,7 +324,7 @@ pub async fn post_meal_plan_resolve(
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    let occasion = &body.occasion;
+    let occasion = body.occasion;
     let date_str = body.date.map(|d| d.format("%Y-%m-%d").to_string());
     let date_context = date_str
         .as_deref()
