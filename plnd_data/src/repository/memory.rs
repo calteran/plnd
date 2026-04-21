@@ -17,7 +17,7 @@ pub trait MemoryRepository: Send + Sync {
         user_id: Uuid,
         category: &str,
         content: &str,
-        tags: Vec<String>,
+        tags: &[String],
     ) -> Result<UserMemory, DatabaseError>;
 
     async fn update(

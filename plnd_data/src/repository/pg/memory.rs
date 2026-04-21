@@ -35,9 +35,9 @@ impl MemoryRepository for PgMemoryRepository {
         user_id: Uuid,
         category: &str,
         content: &str,
-        tags: Vec<String>,
+        tags: &[String],
     ) -> Result<UserMemory, DatabaseError> {
-        create_memory(&self.pool, user_id, category, content, tags).await
+        create_memory(&self.pool, user_id, category, content, tags.to_vec()).await
     }
 
     async fn update(
