@@ -6,7 +6,7 @@ Claude Code configuration for the PLND project. See PLANNING.md for the developm
 
 PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutrition, exercise, and daily planning. It consists of a Rust/Axum backend (`plnd_api`) and an Angular frontend (`plnd_client`).
 
-- **Current Phase**: Phase 3.2 — COMPLETED (intent-driven task entry shipped; Phase 3.3 Meal Planning Wizard is next)
+- **Current Phase**: Phase 3.3 — COMPLETED (AI-powered meal planning wizard shipped; Phase 3.5 Background Agent Jobs is next)
 
 - **Repository**: https://github.com/calteran/plnd
 
