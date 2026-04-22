@@ -29,3 +29,19 @@ export function formatDayName(isoDate: string): string {
 }
 
 export const formatWeekDate = formatDayDate;
+
+/** ISO date strings from start to end inclusive. Noon-local parsing avoids UTC rollback. */
+export function daysInRange(start: string, end: string): string[] {
+  if (!start || !end) return [];
+  const cur     = new Date(`${start}T12:00:00`);
+  const endDate = new Date(`${end}T12:00:00`);
+  const days: string[] = [];
+  while (cur <= endDate) {
+    const y = cur.getFullYear();
+    const m = String(cur.getMonth() + 1).padStart(2, '0');
+    const d = String(cur.getDate()).padStart(2, '0');
+    days.push(`${y}-${m}-${d}`);
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days;
+}
