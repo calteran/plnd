@@ -1,5 +1,8 @@
 use crate::api_response::ScheduleTemplateResponse;
 use crate::auth::jwt::Claims;
+use crate::routes::domain_constants::{
+    VALID_ENERGY_LEVELS, VALID_RECURRENCE_TYPES, VALID_TASK_TYPES,
+};
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Path, State},
@@ -10,18 +13,6 @@ use chrono::NaiveTime;
 use plnd_data::Error;
 use std::sync::Arc;
 use uuid::Uuid;
-
-pub const VALID_TASK_TYPES: &[&str] = &[
-    "meal",
-    "exercise",
-    "work",
-    "leisure",
-    "appointment",
-    "medication",
-    "custom",
-];
-pub const VALID_RECURRENCES: &[&str] = &["daily", "weekdays", "weekly", "custom"];
-pub const VALID_ENERGIES: &[&str] = &["low", "medium", "high"];
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct CreateScheduleTemplateRequest {
@@ -92,11 +83,11 @@ pub async fn create_template(
     if !VALID_TASK_TYPES.contains(&body.task_type.as_str()) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if !VALID_RECURRENCES.contains(&body.recurrence.as_str()) {
+    if !VALID_RECURRENCE_TYPES.contains(&body.recurrence.as_str()) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     let energy = body.energy_required.as_deref().unwrap_or("medium");
-    if !VALID_ENERGIES.contains(&energy) {
+    if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
@@ -190,16 +181,19 @@ mod tests {
     #[test]
     fn valid_recurrences_matches_db_check_constraint() {
         for r in &["daily", "weekdays", "weekly", "custom"] {
-            assert!(VALID_RECURRENCES.contains(r), "missing recurrence: {r}");
+            assert!(
+                VALID_RECURRENCE_TYPES.contains(r),
+                "missing recurrence: {r}"
+            );
         }
-        assert!(!VALID_RECURRENCES.contains(&"biweekly"));
+        assert!(!VALID_RECURRENCE_TYPES.contains(&"biweekly"));
     }
 
     #[test]
     fn valid_energies_matches_db_check_constraint() {
         for e in &["low", "medium", "high"] {
-            assert!(VALID_ENERGIES.contains(e), "missing energy: {e}");
+            assert!(VALID_ENERGY_LEVELS.contains(e), "missing energy: {e}");
         }
-        assert!(!VALID_ENERGIES.contains(&"extreme"));
+        assert!(!VALID_ENERGY_LEVELS.contains(&"extreme"));
     }
 }
