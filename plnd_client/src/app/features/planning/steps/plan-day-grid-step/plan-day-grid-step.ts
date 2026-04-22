@@ -28,16 +28,6 @@ import { daysInRange } from '../../utils/date-format.utils';
     @media (max-width: 600px) {
       .day-grid { flex-direction: column; overflow-x: auto; flex-wrap: nowrap; }
     }
-    .first-run-callout {
-      background: var(--color-accent-light);
-      border: 1px solid var(--color-accent-border);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 13px;
-      color: var(--color-accent-dark);
-      margin-bottom: 12px;
-      line-height: 1.5;
-    }
   `]
 })
 export class PlanDayGridStepComponent {

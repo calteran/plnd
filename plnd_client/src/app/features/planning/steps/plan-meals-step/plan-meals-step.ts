@@ -328,18 +328,6 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
       width: 100%; font-family: inherit; flex: 1; margin-bottom: 4px;
     }
     .input-hint { font-size: 9px; color: var(--color-text-muted); font-style: italic; }
-
-    /* ── First-run welcome callout ── */
-    .first-run-callout {
-      background: var(--color-accent-light);
-      border: 1px solid var(--color-accent-border);
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 13px;
-      color: var(--color-accent-dark);
-      margin-bottom: 12px;
-      line-height: 1.5;
-    }
   `],
 })
 export class PlanMealsStepComponent implements OnInit {
@@ -385,9 +373,11 @@ export class PlanMealsStepComponent implements OnInit {
     const meals  = this.weekPlanService.scheduledMeals();
     const hasAny = this.horizonDays().some(d => Object.keys(meals[d] ?? {}).length > 0);
     if (!hasAny) {
+      const start = this.planStart();
+      const end   = this.planEnd();
       this.runAgentPlan(
         this.mealPlannerAgentService.generateWeek(
-          this.planStart() ?? this.weekPlanService.planStart(),
+          (start && end) ? start : this.weekPlanService.planStart(),
           this.weekPlanService.currentState(),
         ),
       );
@@ -502,9 +492,11 @@ export class PlanMealsStepComponent implements OnInit {
 
   confirmRebalance(): void {
     this.showRefreshModal.set(false);
+    const start = this.planStart();
+    const end   = this.planEnd();
     this.runAgentPlan(
       this.mealPlannerAgentService.rebalance(
-        this.planStart() ?? this.weekPlanService.planStart(),
+        (start && end) ? start : this.weekPlanService.planStart(),
         this.weekPlanService.currentState(),
       ),
     );

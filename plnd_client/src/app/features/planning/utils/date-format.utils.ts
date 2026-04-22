@@ -33,8 +33,8 @@ export const formatWeekDate = formatDayDate;
 /** ISO date strings from start to end inclusive. Noon-local parsing avoids UTC rollback. */
 export function daysInRange(start: string, end: string): string[] {
   if (!start || !end) return [];
-  const cur     = new Date(`${start}T12:00:00`);
-  const endDate = new Date(`${end}T12:00:00`);
+  const cur     = noonDate(start);
+  const endDate = noonDate(end);
   const days: string[] = [];
   while (cur <= endDate) {
     const y = cur.getFullYear();
