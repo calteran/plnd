@@ -240,7 +240,7 @@ The `ScheduleTemplate` data model exists in `plnd_data` but has no repository tr
 
 **`UpdatePreferencesRequest` missing `wake_time`:** The TypeScript model in `core/models/preferences.ts` currently omits `wake_time`. This field must be added before the Account section can save it — the Rust backend already accepts it via `patch_preferences`.
 
-**`planning_trigger_offset` translation:** The backend stores a signed integer (−14 to +14 days, relative to plan end). The Tasks section UI presents this as "which day of the week do you do your planning?" and derives the offset at save time. The exact derivation must be validated against the backend's planning trigger logic during implementation (see Open Questions).
+**`planning_trigger_offset` translation:** The backend stores a signed integer (−14 to +14 days). It is added to `plan_start` of the **next** plan period to compute the trigger date (`plnd_data/src/db/tasks.rs:18`). Negative values fire before the new period starts (typical case). UI derivation: `offset = ((planningDay − weekStartDay) % 7 + 7) % 7; if (offset > 0) offset −= 7;` — result in [−6, 0], e.g. "plan Friday, week starts Monday" → −3.
 
 ## Testing
 
@@ -257,10 +257,14 @@ The `ScheduleTemplate` data model exists in `plnd_data` but has no repository tr
 - `OnboardingStateService` — section status transitions, plan period computation
 - `RoutineEntry` expansion util — daily, weekdays, weekly-on-day patterns across 7-day and 14-day periods; boundary: 85% completion ratio threshold for extending to second trigger date
 
-## Open Questions (resolve during implementation)
+## Open Questions — Resolved (2026-04-22)
 
-1. **`planning_trigger_offset` derivation:** Confirm the exact arithmetic for translating "planning day of week" to the signed offset, and validate against the backend's planning trigger calculation in `plnd_api`.
-2. **Meal plan date range:** ✅ Confirmed backend change required. `POST /agent/meal-plan` currently only accepts `week_start` and uses a fixed "week beginning {week}" prompt. Extend `MealPlanRequest` to accept `plan_start` + `plan_end` and update the agent's prompt accordingly (tracked in "New backend work required" above).
-3. **`PlanMealsStepComponent` date coupling:** The step currently reads dates from `WeekPlanService`. Determine whether to pass dates via `@Input()` or have the component accept an optional date range override.
-4. **Ingredient preference data model:** `UserIngredientPref` currently only has `is_blocked: boolean` — insufficient for the nuance required. The model should be extended to a signed preference scale (proposed: integer −2 to +2, where −2 = "will refuse", −1 = "will tolerate", 0 = neutral/unset, +1 = "enjoy", +2 = "strongly prefer / bridge ingredient"). This replaces `is_blocked` and enables the AI agent to use preference weights when composing meals (e.g., a +2 ingredient increases willingness to suggest meals containing a −1 ingredient alongside it). This is a backend schema change (`user_ingredient_prefs` table, `UserIngredientPref` struct, `IngredientPrefRequest`). Resolve the scale design and migration approach before implementing this sub-step.
-5. **Dietary lifestyle shortcuts:** The Dietary Preferences sub-step should offer quick-select options for common lifestyle patterns (vegan, vegetarian, pescatarian, gluten-free, etc.) so users are not forced to enumerate individual ingredients. Determine the preferred representation: (a) create a `DietaryRestriction` record with `restriction_type = 'preference'` and `name = 'vegan'` (no schema changes; agent already reads restrictions), or (b) derive a bulk set of blocked ingredients from the lifestyle selection. Option (a) is simpler and consistent with the existing model; confirm the meal planning agent interprets lifestyle-type restrictions correctly before implementation.
+1. **`planning_trigger_offset` derivation** ✅ — `offset = ((planningDay − weekStartDay) % 7 + 7) % 7; if (offset > 0) offset −= 7;`. Result in [−6, 0]. Backend adds offset to `plan_start` of the **next** period (`plnd_data/src/db/tasks.rs:18`). Negative = fires before new period starts. See Data Model Notes above.
+
+2. **Meal plan date range** ✅ — `MealPlanRequest` (`plnd_api/src/models.rs:182`) currently accepts only `week_start`. Add `plan_start: NaiveDate` and `plan_end: NaiveDate`; update agent prompt from "the week beginning {week}" to "the period {plan_start} through {plan_end}". Tracked as backend sub-issue.
+
+3. **`PlanMealsStepComponent` date coupling** ✅ — Use `@Input()` override. Add `@Input() planStart?: string` and `@Input() planEnd?: string` to both `PlanMealsStepComponent` and `PlanDayGridStepComponent`. When set, a local computed overrides `WeekPlanService`'s `horizonDays`. Weekly planning wizard unaffected (inputs default to `undefined`).
+
+4. **Ingredient preference data model** ✅ — Extend `user_ingredient_prefs` with `preference_score SMALLINT DEFAULT 0 CHECK (BETWEEN -2 AND 2)`. Migrate `is_blocked = true → preference_score = -2`, drop `is_blocked`. Scale: −2 will refuse · −1 will tolerate · 0 neutral · +1 enjoy · +2 strongly prefer / bridge ingredient. Matches the existing `rating: Option<i16>` pattern on `UserDishPref` / `UserMealPref`. Tracked as backend sub-issue.
+
+5. **Dietary lifestyle shortcuts** ✅ — Use option (a): create `DietaryRestriction` with `restriction_type = 'preference'` and `name = 'vegan'` etc. The `'preference'` type already exists in the TypeScript enum (`core/models/dietary-restriction.ts:1`). No schema changes. Verify agent system prompt reads preference-type restrictions before implementing.

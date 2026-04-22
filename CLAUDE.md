@@ -17,6 +17,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 ### Testing
 - **NEVER run `just test` or `just test-ci`** — both have been removed from the justfile
 - **ALWAYS use `just verify`** for pre-commit validation (parallel pipeline: quality + build + tests + e2e)
+  - Exception: documentation-only changes (`.md` files, `docs/`) do not require `just verify`
 - Unit tests only: `just test-ng-headless` (Angular)
 
 ### Shell Commands
