@@ -412,8 +412,14 @@ mod tests {
             "current_state": { "approved": [], "skipped": [], "custom": [] }
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.plan_start, NaiveDate::from_ymd_opt(2026, 4, 22).unwrap());
-        assert_eq!(req.plan_end, Some(NaiveDate::from_ymd_opt(2026, 5, 5).unwrap()));
+        assert_eq!(
+            req.plan_start,
+            NaiveDate::from_ymd_opt(2026, 4, 22).unwrap()
+        );
+        assert_eq!(
+            req.plan_end,
+            Some(NaiveDate::from_ymd_opt(2026, 5, 5).unwrap())
+        );
     }
 
     #[test]
@@ -425,7 +431,10 @@ mod tests {
             "current_state": { "approved": [], "skipped": [], "custom": [] }
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.plan_start, NaiveDate::from_ymd_opt(2026, 4, 21).unwrap());
+        assert_eq!(
+            req.plan_start,
+            NaiveDate::from_ymd_opt(2026, 4, 21).unwrap()
+        );
         assert_eq!(req.plan_end, None);
     }
 
@@ -439,7 +448,9 @@ mod tests {
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.plan_end, None);
-        let effective_end = req.plan_end.unwrap_or(req.plan_start + chrono::Days::new(6));
+        let effective_end = req
+            .plan_end
+            .unwrap_or(req.plan_start + chrono::Days::new(6));
         assert_eq!(effective_end, NaiveDate::from_ymd_opt(2026, 4, 28).unwrap());
     }
 
