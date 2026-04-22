@@ -24,6 +24,7 @@ pub async fn list_for_user(
 }
 
 /// Insert a new schedule template, returning the created record.
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip(pool), fields(table = "schedule_templates", op = "create"))]
 pub async fn create(
     pool: &PgPool,

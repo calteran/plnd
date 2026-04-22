@@ -11,6 +11,7 @@ pub trait ScheduleTemplateRepository: Send + Sync {
         user_id: Uuid,
     ) -> Result<Vec<ScheduleTemplate>, crate::Error>;
 
+    #[allow(clippy::too_many_arguments)]
     async fn create_template(
         &self,
         user_id: Uuid,
