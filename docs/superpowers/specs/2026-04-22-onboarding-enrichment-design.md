@@ -104,12 +104,11 @@ Intro callout: "These restrictions are used every time PLND generates meals for 
 - Captures medically/ethically significant constraints (allergies, intolerances, lifestyle choices)
 
 **Dietary Preferences sub-step** (saves immediately to DB):
-- Distinct from restrictions: captures the personally significant food patterns common in neurodivergent eaters — strong dislikes, sensory aversions, and foods known to work well — without requiring a medical or ethical framing
-- Two lists, each backed by ingredient search against the catalog:
-  - **Ingredients I avoid** → `PUT /my/ingredient-prefs/{catalogIngredientId}` with `is_blocked: true`
-  - **Ingredients I enjoy** → free-text tags held in state and passed as context to the meal planning agent prompt (no current DB field; captured as notes or agent context until a "liked" preference signal is added to the data model)
+- Distinct from restrictions: captures the personally significant food patterns common in neurodivergent eaters — sensory aversions, strong dislikes, tolerances, and foods that make other foods more palatable — without requiring a medical or ethical framing
+- **Lifestyle shortcuts** (shown prominently at the top): quick-select chips for Vegan, Vegetarian, Pescatarian, Gluten-free, Dairy-free, etc. Each creates a `DietaryRestriction` record with `restriction_type = 'preference'` (see open question #6 for the preferred approach)
+- **Ingredient preference scale** backed by catalog ingredient search: users rate ingredients on a signed scale (−2 will refuse · −1 will tolerate · +1 enjoy · +2 strongly prefer). Stored via `PUT /my/ingredient-prefs/{catalogIngredientId}` pending the data model change described in open question #5. The scale enables the AI agent to reason about trade-offs: a +2 ingredient can "unlock" meals that also contain a −1 ingredient.
 - Framing in the UI should be matter-of-fact and non-judgmental: "Everyone has foods that just don't work for them. Tell us what to skip and what you actually like eating."
-- This sub-step feeds the AI agent context directly: blocked ingredients are excluded from generated meals; enjoyed ingredients are surfaced as candidates
+- This sub-step is intentionally skippable with zero entries
 
 **Meal Plan sub-step** (held in `OnboardingStateService` until commit):
 - Triggered automatically after restrictions are saved and user advances
@@ -263,4 +262,6 @@ The `ScheduleTemplate` data model exists in `plnd_data` but has no repository tr
 2. **Meal plan date range:** Confirm `POST /agent/meal-plan` accepts an arbitrary date range (not just next-Monday-to-Sunday) — the first period may start mid-week.
 3. **`PlanMealsStepComponent` date coupling:** The step currently reads dates from `WeekPlanService`. Determine whether to pass dates via `@Input()` or have the component accept an optional date range override.
 4. **`wake_time` format:** Confirm the backend expects `"HH:MM"` or `"HH:MM:SS"` (the TypeScript `UserPreferences` model shows `"HH:MM:SS"`) and match the picker accordingly.
-5. **Liked ingredients data model:** `UserIngredientPref` currently only has `is_blocked` — no positive preference signal. Determine whether to add a `is_liked` field to the existing model, create a separate liked-ingredients store, or pass enjoyed ingredient names as plain-text context in the meal-plan agent request body. Resolve before implementing the Dietary Preferences sub-step.
+5. **Ingredient preference data model:** `UserIngredientPref` currently only has `is_blocked: boolean` — insufficient for the nuance required. The model should be extended to a signed preference scale (proposed: integer −2 to +2, where −2 = "will refuse", −1 = "will tolerate", 0 = neutral/unset, +1 = "enjoy", +2 = "strongly prefer / bridge ingredient"). This replaces `is_blocked` and enables the AI agent to use preference weights when composing meals (e.g., a +2 ingredient increases willingness to suggest meals containing a −1 ingredient alongside it). This is a backend schema change (`user_ingredient_prefs` table, `UserIngredientPref` struct, `IngredientPrefRequest`). Resolve the scale design and migration approach before implementing this sub-step.
+
+6. **Dietary lifestyle shortcuts:** The Dietary Preferences sub-step should offer quick-select options for common lifestyle patterns (vegan, vegetarian, pescatarian, gluten-free, etc.) so users are not forced to enumerate individual ingredients. Determine the preferred representation: (a) create a `DietaryRestriction` record with `restriction_type = 'preference'` and `name = 'vegan'` (no schema changes; agent already reads restrictions), or (b) derive a bulk set of blocked ingredients from the lifestyle selection. Option (a) is simpler and consistent with the existing model; confirm the meal planning agent interprets lifestyle-type restrictions correctly before implementation.
