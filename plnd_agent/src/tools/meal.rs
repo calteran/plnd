@@ -147,8 +147,9 @@ impl Tool for GetUserMealPreferencesTool {
 
     fn description(&self) -> &str {
         "Return the user's meal preferences bundle: dietary restrictions, \
-         blocked ingredient IDs (preference_score == -2, never propose meals containing these), \
-         preferred ingredient IDs (preference_score >= 1, favor meals featuring these), \
+         blocked ingredients (score == -2, never propose these), \
+         tolerated ingredients (score == -1, avoid when possible), \
+         preferred ingredients (score >= +1, favor meals featuring these), \
          and top-rated meals (rating >= 4). Call this before searching the catalog."
     }
 
@@ -174,27 +175,41 @@ impl Tool for GetUserMealPreferencesTool {
             .map(|p| p.catalog_ingredient_id)
             .collect();
 
+        let tolerated_ids: Vec<uuid::Uuid> = ingredient_prefs
+            .iter()
+            .filter(|p| p.preference_score == -1)
+            .map(|p| p.catalog_ingredient_id)
+            .collect();
+
         let preferred_ids: Vec<uuid::Uuid> = ingredient_prefs
             .iter()
             .filter(|p| p.preference_score >= 1)
             .map(|p| p.catalog_ingredient_id)
             .collect();
 
-        let (blocked_names, preferred_names) = tokio::try_join!(
-            self.meal.ingredient_names_by_ids(&blocked_ids),
-            self.meal.ingredient_names_by_ids(&preferred_ids),
+        async fn resolve(
+            repo: &dyn MealRepository,
+            ids: &[uuid::Uuid],
+        ) -> Result<Vec<(uuid::Uuid, String)>, plnd_data::Error> {
+            if ids.is_empty() {
+                return Ok(vec![]);
+            }
+            repo.ingredient_names_by_ids(ids).await
+        }
+
+        let (blocked_names, tolerated_names, preferred_names) = tokio::try_join!(
+            resolve(self.meal.as_ref(), &blocked_ids),
+            resolve(self.meal.as_ref(), &tolerated_ids),
+            resolve(self.meal.as_ref(), &preferred_ids),
         )
         .map_err(|e| db_err(self.name(), e))?;
 
-        let blocked_ingredients: Vec<serde_json::Value> = blocked_names
-            .into_iter()
-            .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
-            .collect();
-
-        let preferred_ingredients: Vec<serde_json::Value> = preferred_names
-            .into_iter()
-            .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
-            .collect();
+        let to_json = |pairs: Vec<(uuid::Uuid, String)>| -> Vec<serde_json::Value> {
+            pairs
+                .into_iter()
+                .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
+                .collect()
+        };
 
         let top_rated: Vec<_> = meal_prefs
             .iter()
@@ -203,8 +218,9 @@ impl Tool for GetUserMealPreferencesTool {
 
         Ok(serde_json::json!({
             "dietary_restrictions": restrictions,
-            "blocked_ingredients": blocked_ingredients,
-            "preferred_ingredients": preferred_ingredients,
+            "blocked_ingredients": to_json(blocked_names),
+            "tolerated_ingredients": to_json(tolerated_names),
+            "preferred_ingredients": to_json(preferred_names),
             "top_rated_meals": top_rated,
         }))
     }
@@ -1873,6 +1889,11 @@ mod tests {
         meal_repo.add_ingredient_name(blocked_id, "shellfish");
         pref_repo.add_pref(user_id, blocked_id, -2);
 
+        // Seed a tolerated ingredient (score -1)
+        let tolerated_id = uuid::Uuid::new_v4();
+        meal_repo.add_ingredient_name(tolerated_id, "onion");
+        pref_repo.add_pref(user_id, tolerated_id, -1);
+
         // Seed a preferred ingredient (score +2)
         let preferred_id = uuid::Uuid::new_v4();
         meal_repo.add_ingredient_name(preferred_id, "salmon");
@@ -1894,6 +1915,11 @@ mod tests {
         assert_eq!(blocked.len(), 1);
         assert_eq!(blocked[0]["id"], blocked_id.to_string());
         assert_eq!(blocked[0]["name"], "shellfish");
+
+        let tolerated = result["tolerated_ingredients"].as_array().unwrap();
+        assert_eq!(tolerated.len(), 1);
+        assert_eq!(tolerated[0]["id"], tolerated_id.to_string());
+        assert_eq!(tolerated[0]["name"], "onion");
 
         let preferred = result["preferred_ingredients"].as_array().unwrap();
         assert_eq!(preferred.len(), 1);

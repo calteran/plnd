@@ -25,7 +25,7 @@ pub async fn search_ingredients(
           AND ($3::text[] = '{}' OR NOT allergens && $3::text[])
           AND ($4::uuid IS NULL OR NOT EXISTS (
               SELECT 1 FROM user_ingredient_prefs
-              WHERE user_id = $4 AND catalog_ingredient_id = ingredient_id AND is_blocked = TRUE
+              WHERE user_id = $4 AND catalog_ingredient_id = ingredient_id AND preference_score = -2
           ))
         ORDER BY ts_rank(
             to_tsvector('english', name || ' ' || COALESCE(description, '')),
