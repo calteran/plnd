@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 
@@ -275,7 +275,7 @@ export class OnboardingHubComponent {
   private readonly router = inject(Router);
 
   readonly sections = HUB_SECTIONS;
-  readonly allDone = computed(() => this.onboardingState.allSectionsComplete());
+  readonly allDone = this.onboardingState.allSectionsComplete;
 
   statusFor(section: HubSection): 'not-started' | 'complete' | null {
     if (section.disabled) return null;
