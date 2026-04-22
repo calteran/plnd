@@ -7,7 +7,7 @@ const MOCK_PREF: UserIngredientPref = {
   user_ingredient_pref_id: 'pref-1',
   user_id: 'user-1',
   catalog_ingredient_id: 'ing-1',
-  is_blocked: false,
+  preference_score: 0,
   notes: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -58,19 +58,19 @@ describe('UserIngredientPrefsService', () => {
     svc._prefs.set([MOCK_PREF]);
 
     let result: UserIngredientPref | undefined;
-    service.upsert('ing-1', { is_blocked: true }).subscribe(r => (result = r));
+    service.upsert('ing-1', { preference_score: -2 }).subscribe(r => (result = r));
 
     const req = httpMock.expectOne(r => r.url.endsWith('/my/ingredient-prefs/ing-1') && r.method === 'PUT');
-    expect(req.request.body).toEqual({ is_blocked: true });
-    req.flush({ ...MOCK_PREF, is_blocked: true });
+    expect(req.request.body).toEqual({ preference_score: -2 });
+    req.flush({ ...MOCK_PREF, preference_score: -2 });
 
-    expect(result?.is_blocked).toBeTrue();
-    expect(service.prefs()[0].is_blocked).toBeTrue();
+    expect(result?.preference_score).toBe(-2);
+    expect(service.prefs()[0].preference_score).toBe(-2);
   });
 
   it('upsert() appends to signal when entry is new', () => {
     let result: UserIngredientPref | undefined;
-    service.upsert('ing-2', { is_blocked: false }).subscribe(r => (result = r));
+    service.upsert('ing-2', { preference_score: 1 }).subscribe(r => (result = r));
 
     const newPref: UserIngredientPref = { ...MOCK_PREF, user_ingredient_pref_id: 'pref-2', catalog_ingredient_id: 'ing-2' };
     const req = httpMock.expectOne(r => r.url.endsWith('/my/ingredient-prefs/ing-2') && r.method === 'PUT');

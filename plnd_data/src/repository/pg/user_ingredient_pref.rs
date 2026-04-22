@@ -28,14 +28,14 @@ impl UserIngredientPrefRepository for PgUserIngredientPrefRepository {
         &self,
         user_id: Uuid,
         catalog_ingredient_id: Uuid,
-        is_blocked: bool,
+        preference_score: i16,
         notes: Option<&str>,
     ) -> Result<UserIngredientPref, crate::Error> {
         user_ingredient_prefs::upsert(
             &self.pool,
             user_id,
             catalog_ingredient_id,
-            is_blocked,
+            preference_score,
             notes,
         )
         .await

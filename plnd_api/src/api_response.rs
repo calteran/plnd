@@ -519,7 +519,8 @@ pub struct UserIngredientPrefResponse {
     pub user_ingredient_pref_id: Uuid,
     pub user_id: Uuid,
     pub catalog_ingredient_id: Uuid,
-    pub is_blocked: bool,
+    /// −2=refuse, −1=tolerate, 0=neutral, +1=enjoy, +2=strongly prefer
+    pub preference_score: i16,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -531,7 +532,7 @@ impl From<UserIngredientPref> for UserIngredientPrefResponse {
             user_ingredient_pref_id: p.user_ingredient_pref_id,
             user_id: p.user_id,
             catalog_ingredient_id: p.catalog_ingredient_id,
-            is_blocked: p.is_blocked,
+            preference_score: p.preference_score,
             notes: p.notes,
             created_at: p.created_at,
             updated_at: p.updated_at,

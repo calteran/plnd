@@ -8,7 +8,7 @@ use crate::models::UserIngredientPref;
 pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserIngredientPref>, DatabaseError> {
     sqlx::query_as::<_, UserIngredientPref>(
         "SELECT user_ingredient_pref_id, user_id, catalog_ingredient_id, \
-         is_blocked, notes, created_at, updated_at \
+         preference_score, notes, created_at, updated_at \
          FROM user_ingredient_prefs WHERE user_id = $1 ORDER BY created_at",
     )
     .bind(user_id)
@@ -22,24 +22,24 @@ pub async fn upsert(
     pool: &PgPool,
     user_id: Uuid,
     catalog_ingredient_id: Uuid,
-    is_blocked: bool,
+    preference_score: i16,
     notes: Option<&str>,
 ) -> Result<UserIngredientPref, DatabaseError> {
     sqlx::query_as::<_, UserIngredientPref>(
         r#"
-        INSERT INTO user_ingredient_prefs (user_id, catalog_ingredient_id, is_blocked, notes)
+        INSERT INTO user_ingredient_prefs (user_id, catalog_ingredient_id, preference_score, notes)
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (user_id, catalog_ingredient_id) DO UPDATE
-            SET is_blocked = EXCLUDED.is_blocked,
-                notes      = EXCLUDED.notes,
-                updated_at = NOW()
+            SET preference_score = EXCLUDED.preference_score,
+                notes             = EXCLUDED.notes,
+                updated_at        = NOW()
         RETURNING user_ingredient_pref_id, user_id, catalog_ingredient_id,
-                  is_blocked, notes, created_at, updated_at
+                  preference_score, notes, created_at, updated_at
         "#,
     )
     .bind(user_id)
     .bind(catalog_ingredient_id)
-    .bind(is_blocked)
+    .bind(preference_score)
     .bind(notes)
     .fetch_one(pool)
     .await
@@ -114,13 +114,13 @@ mod tests {
         let uid = new_user(&pool).await;
         let iid = new_ingredient(&pool).await;
 
-        let pref = upsert(&pool, uid, iid, true, Some("avoid completely"))
+        let pref = upsert(&pool, uid, iid, -2, Some("avoid completely"))
             .await
             .expect("upsert failed");
 
         assert_eq!(pref.user_id, uid);
         assert_eq!(pref.catalog_ingredient_id, iid);
-        assert!(pref.is_blocked);
+        assert_eq!(pref.preference_score, -2);
         assert_eq!(pref.notes.as_deref(), Some("avoid completely"));
     }
 
@@ -129,11 +129,11 @@ mod tests {
         let uid = new_user(&pool).await;
         let iid = new_ingredient(&pool).await;
 
-        let first = upsert(&pool, uid, iid, true, Some("first note"))
+        let first = upsert(&pool, uid, iid, -2, Some("first note"))
             .await
             .expect("first upsert failed");
 
-        let second = upsert(&pool, uid, iid, false, Some("updated note"))
+        let second = upsert(&pool, uid, iid, 1, Some("updated note"))
             .await
             .expect("second upsert failed");
 
@@ -141,9 +141,19 @@ mod tests {
             second.user_ingredient_pref_id,
             first.user_ingredient_pref_id
         );
-        assert!(!second.is_blocked);
+        assert_eq!(second.preference_score, 1);
         assert_eq!(second.notes.as_deref(), Some("updated note"));
         assert!(second.updated_at >= first.updated_at);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn upsert_rejects_out_of_range_score(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let iid = new_ingredient(&pool).await;
+
+        // score 3 violates the CHECK constraint
+        let result = upsert(&pool, uid, iid, 3, None).await;
+        assert!(result.is_err(), "score 3 should violate CHECK constraint");
     }
 
     // -----------------------------------------------------------------------
@@ -156,8 +166,8 @@ mod tests {
         let iid_a = new_ingredient(&pool).await;
         let iid_b = new_ingredient(&pool).await;
 
-        upsert(&pool, uid, iid_a, true, None).await.unwrap();
-        upsert(&pool, uid, iid_b, false, None).await.unwrap();
+        upsert(&pool, uid, iid_a, -2, None).await.unwrap();
+        upsert(&pool, uid, iid_b, 1, None).await.unwrap();
 
         let prefs = list(&pool, uid).await.unwrap();
         assert_eq!(prefs.len(), 2);
@@ -173,7 +183,7 @@ mod tests {
         let uid = new_user(&pool).await;
         let iid = new_ingredient(&pool).await;
 
-        upsert(&pool, uid, iid, true, None).await.unwrap();
+        upsert(&pool, uid, iid, -2, None).await.unwrap();
 
         let deleted = delete(&pool, uid, iid).await.unwrap();
         assert!(deleted);
