@@ -82,6 +82,16 @@ export class OnboardingFoodComponent implements OnInit {
     effect(() => {
       const period = this.onboardingState.planPeriod();
       if (!period || this.sessionInitialized) return;
+
+      // Skip initSession if the service is already at this period — the component
+      // is re-created on each navigation but WeekPlanService persists (root-scoped),
+      // so re-calling initSession would clear generated meals (no draft to restore).
+      if (this.weekPlanService.planStart() === period.start &&
+          this.weekPlanService.planEnd() === period.end) {
+        this.sessionInitialized = true;
+        return;
+      }
+
       this.sessionInitialized = true;
       this.weekPlanService.initSession(period.start, period.end);
     });
