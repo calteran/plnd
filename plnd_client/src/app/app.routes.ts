@@ -26,12 +26,39 @@ export const routes: Routes = [
     ]
   },
 
-  // Onboarding wizard — self-contained, no layout shell
+  // Onboarding hub-and-spoke — parent shell + child routes
   {
     path: 'onboarding',
     canActivate: [authGuard, onboardingNotCompletedGuard],
     loadComponent: () =>
-      import('./features/onboarding/onboarding').then(m => m.OnboardingComponent)
+      import('./features/onboarding/onboarding').then(m => m.OnboardingComponent),
+    children: [
+      {
+        path: '',
+        loadComponent: () =>
+          import('./features/onboarding/hub/onboarding-hub').then(m => m.OnboardingHubComponent)
+      },
+      {
+        path: 'account',
+        loadComponent: () =>
+          import('./features/onboarding/account/onboarding-account').then(m => m.OnboardingAccountComponent)
+      },
+      {
+        path: 'tasks',
+        loadComponent: () =>
+          import('./features/onboarding/tasks/onboarding-tasks').then(m => m.OnboardingTasksComponent)
+      },
+      {
+        path: 'food',
+        loadComponent: () =>
+          import('./features/onboarding/food/onboarding-food').then(m => m.OnboardingFoodComponent)
+      },
+      {
+        path: 'review',
+        loadComponent: () =>
+          import('./features/onboarding/review/onboarding-review').then(m => m.OnboardingReviewComponent)
+      }
+    ]
   },
 
   // Authenticated pages — wrapped in the main layout shell, guarded
