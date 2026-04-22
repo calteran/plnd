@@ -5,8 +5,9 @@ use crate::api_response::{
     CatalogDishIngredientResponse, CatalogIngredientResponse, CatalogMealDishResponse,
     DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse,
     MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
-    ScheduleEntryResponse, SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
-    UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
+    ScheduleEntryResponse, SchedulePeriodApiResponse, ScheduleTemplateResponse, TaskResponse,
+    UserDishPrefDetailResponse, UserIngredientPrefResponse, UserMealPrefDetailResponse,
+    UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, MealAdhocResolveRequest, MealAdhocResolveResponse,
@@ -18,6 +19,7 @@ use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
     catalog_ingest::{IngestIngredientBody, IngestIngredientResponse},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
+    schedule_template::CreateScheduleTemplateRequest,
     search::{DishSearchResponse, ExerciseSearchResponse, IngredientSearchResponse},
     user_dish_prefs::{AddIngredientBody, CreateDishBody, PatchDishBody},
     user_ingredient_prefs::UpsertIngredientPrefBody,
@@ -111,6 +113,10 @@ impl Modify for BearerSecurityAddon {
         crate::routes::schedule::get_plan_status,
         crate::routes::schedule::post_plan,
         crate::routes::schedule::patch_entry_status,
+        // Schedule Templates
+        crate::routes::schedule_template::list_templates,
+        crate::routes::schedule_template::create_template,
+        crate::routes::schedule_template::delete_template,
         // Agent
         crate::routes::agent::post_task,
         crate::routes::agent::post_meal_plan,
@@ -150,6 +156,8 @@ impl Modify for BearerSecurityAddon {
         PlanEntryRequest,
         CarryoverDecision,
         PatchEntryStatusRequest,
+        ScheduleTemplateResponse,
+        CreateScheduleTemplateRequest,
         // User library preferences
         UserDishPrefDetailResponse,
         UserIngredientPrefResponse,
@@ -202,6 +210,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Tasks", description = "Task management (weekly planning task creation)"),
         (name = "Meal Suggestions", description = "Meal suggestions for a given date and slot"),
         (name = "Schedule", description = "Schedule period queries and weekly plan commits"),
+        (name = "Schedule Templates", description = "Recurring routine template management"),
         (name = "Agent", description = "LLM-backed task parsing and meal planning (stubs — Phase 3.2/3.3)"),
     )
 )]

@@ -31,8 +31,8 @@ use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
     agent, auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, meal_suggestions,
-    preferences, schedule, search, system, tasks, user_dish_prefs, user_ingredient_prefs,
-    user_meal_prefs, users,
+    preferences, schedule, schedule_template, search, system, tasks, user_dish_prefs,
+    user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -344,6 +344,14 @@ async fn main() {
         .route(
             "/schedule/entries/{id}/status",
             patch(schedule::patch_entry_status),
+        )
+        .route(
+            "/schedule/templates",
+            get(schedule_template::list_templates).post(schedule_template::create_template),
+        )
+        .route(
+            "/schedule/templates/{id}",
+            delete(schedule_template::delete_template),
         )
         .route("/briefing/weather", get(briefing::get_weather))
         .route("/briefing/news", get(briefing::get_news))
