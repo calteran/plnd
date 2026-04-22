@@ -22,7 +22,6 @@ This design replaces the linear onboarding wizard with a hub-and-spoke "Getting 
 
 ## Non-Goals
 
-- Creating persistent `ScheduleTemplate` records for recurring tasks (V1 expands routines client-side at commit)
 - Re-entering the onboarding wizard after `onboarding_completed = true` (the weekly planning wizard serves that purpose)
 - Saving partial wizard state across browser sessions (routines and meal plan are in-memory; DB-backed data persists naturally)
 - The Exercise hub section (card is present but disabled)
@@ -69,7 +68,7 @@ Both fields save on "Save & Continue" which returns to hub. Section marked compl
 
 Opens with an educational callout covering three concepts:
 - **Planning day**: the day each week when you'll review and plan the next period (PLND will surface the planning wizard automatically)
-- **Energy levels**: low / medium / high — used to schedule tasks at the right time of day
+- **Energy levels**: low / medium / high — used to balance task load across days and across the week
 - **Floating tasks**: tasks without a fixed time that the AI agent will schedule for you
 
 **Planning Preferences sub-step** (saves immediately to DB via `PATCH /preferences/me`):
@@ -77,19 +76,24 @@ Opens with an educational callout covering three concepts:
 - Plan length in days (slider or stepper, 1–14 days, default: 7)
 - Planning day of week (day-of-week picker — presented as "which day do you plan your week?"; the value is translated to `planning_trigger_offset` relative to `week_start_day + default_plan_length_days` before sending to the API)
 
-**Routines sub-step** (held in `OnboardingStateService` until commit):
+**Routines sub-step** (saved immediately to DB as `ScheduleTemplate` records via `POST /schedule/templates`):
 
-Freeform entry. Each routine has:
-- Title (required)
-- Recurrence pattern: Daily | Weekdays | Weekly on [day] | Custom
-- Scheduled time (optional HH:MM)
-- Duration (minutes)
-- Energy level (low / medium / high)
-- Task type (exercise / work / personal / other)
+Freeform entry. Users may enter routines they want to capture now even if they don't intend to run them during the first week — templates persist and are available to future weekly planning sessions. Each routine maps directly to a `ScheduleTemplate`:
+
+| UI field | `ScheduleTemplate` field |
+|---|---|
+| Title | `title` |
+| Recurrence: Daily / Weekdays / Weekly on [day] / Custom | `recurrence` + `recurrence_rule` (RRULE) |
+| Start time | `time_window_start` |
+| Duration (minutes) | `duration_minutes` |
+| Energy level (low / medium / high) | `energy_required` |
+| Task type | `task_type` |
+
+Simple recurrence patterns are translated to RRULE strings client-side (e.g., Weekdays → `FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR`). Custom recurrence exposes a simplified rule builder.
 
 Inspiration chips shown above the entry form (non-selectable, illustrative only): "Morning walk · 7am · 30 min · daily", "Team standup · Mon–Fri · 9am · 15 min", "Evening wind-down · 9pm · 20 min · daily".
 
-Section marked complete when user taps "Save & Continue" (even with zero routines entered).
+Saved templates are fetched via `GET /schedule/templates` and displayed as removable chips below the entry form. Section marked complete when user taps "Save & Continue" (even with zero routines entered).
 
 ### Section: Food & Meals (`/onboarding/food`)
 
@@ -97,6 +101,15 @@ Intro callout: "These restrictions are used every time PLND generates meals for 
 
 **Dietary Restrictions sub-step** (saves immediately to DB via `POST /dietary-restrictions`):
 - Identical UI to the current onboarding step 3 (restriction type + name + notes, displayed as removable chips)
+- Captures medically/ethically significant constraints (allergies, intolerances, lifestyle choices)
+
+**Dietary Preferences sub-step** (saves immediately to DB):
+- Distinct from restrictions: captures the personally significant food patterns common in neurodivergent eaters — strong dislikes, sensory aversions, and foods known to work well — without requiring a medical or ethical framing
+- Two lists, each backed by ingredient search against the catalog:
+  - **Ingredients I avoid** → `PUT /my/ingredient-prefs/{catalogIngredientId}` with `is_blocked: true`
+  - **Ingredients I enjoy** → free-text tags held in state and passed as context to the meal planning agent prompt (no current DB field; captured as notes or agent context until a "liked" preference signal is added to the data model)
+- Framing in the UI should be matter-of-fact and non-judgmental: "Everyone has foods that just don't work for them. Tell us what to skip and what you actually like eating."
+- This sub-step feeds the AI agent context directly: blocked ingredients are excluded from generated meals; enjoyed ingredients are surfaced as candidates
 
 **Meal Plan sub-step** (held in `OnboardingStateService` until commit):
 - Triggered automatically after restrictions are saved and user advances
@@ -118,8 +131,8 @@ Renders using the adapted `PlanDayGridStepComponent` (with `firstRun: true` inpu
 - Otherwise `plan_end` = today + `default_plan_length_days`
 - The computed period is displayed to the user: "Planning your first [N] days: [start date] – [end date]"
 
-**Routines expansion (client-side):**
-Each routine in `OnboardingStateService.routines` is expanded into individual `PlanEntryInput` records covering `plan_start` through `plan_end` based on its recurrence pattern. This expansion runs in the Review component before rendering the grid.
+**Template application:**
+The Review component fetches the user's `ScheduleTemplate` records via `GET /schedule/templates`. Each template is shown with a toggle: "Include in first week?" defaulting to on. This lets users keep a template they want for future weeks without forcing it into the current period (e.g., a routine starting next month). Toggled-on templates are expanded client-side into `PlanEntryInput` records across `plan_start`–`plan_end` using the template's `recurrence` / `recurrence_rule`.
 
 **Commit sequence:**
 1. `POST /schedule/plan` — commits expanded routines + approved meals
@@ -151,13 +164,13 @@ Provided at `OnboardingComponent` level — lives exactly as long as the user is
 ```typescript
 interface OnboardingState {
   sectionStatus: Record<'account' | 'tasks' | 'food', 'not-started' | 'complete'>;
-  routines: RoutineEntry[];           // expanded to PlanEntryInput[] at commit
   mealPlan: WeekPlanMeals | null;     // type from core/models/week-plan.ts; held until POST /schedule/plan
   planPeriod: { start: string; end: string } | null; // ISO dates, computed in tasks section
+  enjoyedIngredients: string[];       // free-text; passed as agent context at meal plan generation
 }
 ```
 
-DB-backed section readiness (account, restrictions) is derived from existing service signals (`UserService.user()`, `PreferencesService.preferences()`, `DietaryRestrictionsService.restrictions()`), not duplicated in `OnboardingStateService`.
+Routines are now fully DB-backed via `ScheduleTemplate` records and are not held in component state. DB-backed section readiness (account, restrictions, templates) is derived from existing and new service signals — not duplicated in `OnboardingStateService`.
 
 ### Weekly planning wizard adaptations
 
@@ -189,16 +202,17 @@ No functional logic changes to the weekly planning wizard; only additive UI bran
 
 ## Files to Create / Modify
 
-### New files
+### New files — frontend
 - `plnd_client/src/app/features/onboarding/onboarding-state.service.ts`
 - `plnd_client/src/app/features/onboarding/hub/onboarding-hub.ts`
 - `plnd_client/src/app/features/onboarding/account/onboarding-account.ts`
 - `plnd_client/src/app/features/onboarding/tasks/onboarding-tasks.ts`
 - `plnd_client/src/app/features/onboarding/food/onboarding-food.ts`
 - `plnd_client/src/app/features/onboarding/review/onboarding-review.ts`
-- `plnd_client/src/app/features/onboarding/shared/routine-entry.ts` (`RoutineEntry` interface + client-side expansion util)
+- `plnd_client/src/app/core/services/schedule-templates.service.ts` — `GET/POST/DELETE /schedule/templates`
+- `plnd_client/src/app/core/models/schedule-template.ts` — `ScheduleTemplate` interface + RRULE translation util
 
-### Modified files
+### Modified files — frontend
 - `plnd_client/src/app/features/onboarding/onboarding.ts` — rewritten as parent shell with `<router-outlet>`
 - `plnd_client/src/app/features/onboarding/onboarding.scss` — extended for hub layout
 - `plnd_client/src/app/app.routes.ts` — child route tree
@@ -207,8 +221,20 @@ No functional logic changes to the weekly planning wizard; only additive UI bran
 - `plnd_client/src/app/features/planning/steps/plan-day-grid-step.ts` — add `firstRun` input
 - `plnd_client/e2e/tests/onboarding.e2e.ts` — extended for hub navigation + section flows
 
-### Backend (no changes required)
-All needed endpoints already exist: `PATCH /preferences/me`, `PATCH /users/me`, `POST /dietary-restrictions`, `POST /agent/meal-plan`, `POST /schedule/plan`, `POST /users/me/complete-onboarding`.
+### New backend work required
+The `ScheduleTemplate` data model exists in `plnd_data` but has no repository trait methods or API routes.
+
+**`plnd_data`:**
+- New repository trait methods: `create_template`, `list_templates_for_user`, `delete_template`
+- New repository implementation in `plnd_data/src/repository/`
+
+**`plnd_api`:**
+- `GET /schedule/templates` — list the authenticated user's templates
+- `POST /schedule/templates` — create a template from `ScheduleTemplate` fields
+- `DELETE /schedule/templates/{id}` — delete a template
+
+### Existing endpoints used
+`PATCH /preferences/me`, `PATCH /users/me`, `POST /dietary-restrictions`, `PUT /my/ingredient-prefs/{id}`, `POST /agent/meal-plan`, `POST /schedule/plan`, `POST /users/me/complete-onboarding`.
 
 ## Data Model Notes
 
@@ -237,3 +263,4 @@ All needed endpoints already exist: `PATCH /preferences/me`, `PATCH /users/me`, 
 2. **Meal plan date range:** Confirm `POST /agent/meal-plan` accepts an arbitrary date range (not just next-Monday-to-Sunday) — the first period may start mid-week.
 3. **`PlanMealsStepComponent` date coupling:** The step currently reads dates from `WeekPlanService`. Determine whether to pass dates via `@Input()` or have the component accept an optional date range override.
 4. **`wake_time` format:** Confirm the backend expects `"HH:MM"` or `"HH:MM:SS"` (the TypeScript `UserPreferences` model shows `"HH:MM:SS"`) and match the picker accordingly.
+5. **Liked ingredients data model:** `UserIngredientPref` currently only has `is_blocked` — no positive preference signal. Determine whether to add a `is_liked` field to the existing model, create a separate liked-ingredients store, or pass enjoyed ingredient names as plain-text context in the meal-plan agent request body. Resolve before implementing the Dietary Preferences sub-step.
