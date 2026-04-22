@@ -5,7 +5,7 @@ import { Component } from '@angular/core';
   standalone: true,
   template: `
     <div class="onboarding-hub-stub">
-      <h1>Getting Started</h1>
+      <h1>Welcome to PLND!</h1>
       <p>Hub — implementation coming soon.</p>
     </div>
   `,
