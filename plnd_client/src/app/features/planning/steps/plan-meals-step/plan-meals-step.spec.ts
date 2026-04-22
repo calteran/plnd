@@ -286,4 +286,70 @@ describe('PlanMealsStepComponent', () => {
       expect(component.unapprovedCount()).toBe(total - 1);
     });
   });
+
+  describe('signal inputs: planStart / planEnd / firstRun', () => {
+    function createWithInputs(opts: {
+      planStart?: string;
+      planEnd?: string;
+      firstRun?: boolean;
+    }): ComponentFixture<PlanMealsStepComponent> {
+      service.clear();
+      service.initSession('2026-03-23', '2026-03-27');
+      (['2026-03-23', '2026-03-24', '2026-03-25'] as const).forEach(date => {
+        (['breakfast', 'lunch', 'dinner'] as const).forEach(slot => {
+          service.setMeal(date, slot, { approvalState: 'proposed', mealRef: null, title: slot });
+        });
+      });
+      const f = TestBed.createComponent(PlanMealsStepComponent);
+      if (opts.planStart !== undefined) f.componentRef.setInput('planStart', opts.planStart);
+      if (opts.planEnd   !== undefined) f.componentRef.setInput('planEnd',   opts.planEnd);
+      if (opts.firstRun  !== undefined) f.componentRef.setInput('firstRun',  opts.firstRun);
+      f.detectChanges();
+      return f;
+    }
+
+    it('should show no .first-run-callout by default', () => {
+      const f = createWithInputs({});
+      expect(f.nativeElement.querySelector('.first-run-callout')).toBeNull();
+    });
+
+    it('should show .first-run-callout when firstRun=true', () => {
+      const f = createWithInputs({ firstRun: true });
+      expect(f.nativeElement.querySelector('.first-run-callout')).toBeTruthy();
+    });
+
+    it('should use service horizonDays when planStart/planEnd are not set', () => {
+      const f = createWithInputs({});
+      expect(f.componentInstance.horizonDays().length).toBe(5);
+    });
+
+    it('should override horizonDays when planStart and planEnd inputs are provided', () => {
+      const f = createWithInputs({ planStart: '2026-03-23', planEnd: '2026-03-25' });
+      expect(f.componentInstance.horizonDays()).toEqual([
+        '2026-03-23', '2026-03-24', '2026-03-25',
+      ]);
+      expect(f.nativeElement.querySelectorAll('.cell-day-header').length).toBe(3);
+    });
+
+    it('should pass planStart input to generateWeek when meals are empty', () => {
+      service.clear();
+      service.initSession('2026-03-23', '2026-03-27');
+      generateWeek$ = new Subject();
+      agentSpy.generateWeek.and.returnValue(generateWeek$);
+      const f = TestBed.createComponent(PlanMealsStepComponent);
+      f.componentRef.setInput('planStart', '2026-04-01');
+      f.componentRef.setInput('planEnd',   '2026-04-03');
+      f.detectChanges();
+      expect(agentSpy.generateWeek).toHaveBeenCalledWith('2026-04-01', jasmine.any(Object));
+    });
+
+    it('should fall back to service.planStart() when planStart input is not set', () => {
+      service.clear();
+      service.initSession('2026-03-23', '2026-03-27');
+      generateWeek$ = new Subject();
+      agentSpy.generateWeek.and.returnValue(generateWeek$);
+      TestBed.createComponent(PlanMealsStepComponent).detectChanges();
+      expect(agentSpy.generateWeek).toHaveBeenCalledWith('2026-03-23', jasmine.any(Object));
+    });
+  });
 });

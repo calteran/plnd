@@ -1,9 +1,9 @@
-import { Component, DestroyRef, OnInit, computed, inject, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, input, signal, ViewChild, ElementRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
-import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
+import { formatDayName, formatDayDate, daysInRange } from '../../utils/date-format.utils';
 import { MealPlanResponse, MealSlot, PlannedMeal, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
 
 const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
@@ -16,6 +16,12 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
   imports: [],
   template: `
     <div class="plan-meals-wrapper">
+
+      @if (firstRun()) {
+        <div class="first-run-callout">
+          <strong>Welcome!</strong> Let's plan your first week of meals. Approve, edit, or skip anything you like.
+        </div>
+      }
 
       <!-- Top toolbar: Refresh button + confirmation modal -->
       @if (!isGenerating() && unapprovedCount() > 0) {
@@ -322,6 +328,18 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
       width: 100%; font-family: inherit; flex: 1; margin-bottom: 4px;
     }
     .input-hint { font-size: 9px; color: var(--color-text-muted); font-style: italic; }
+
+    /* ── First-run welcome callout ── */
+    .first-run-callout {
+      background: var(--color-accent-light);
+      border: 1px solid var(--color-accent-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--color-accent-dark);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
   `],
 })
 export class PlanMealsStepComponent implements OnInit {
@@ -331,8 +349,21 @@ export class PlanMealsStepComponent implements OnInit {
 
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
 
-  readonly slots        = STANDARD_MEAL_SLOTS;
-  readonly horizonDays  = computed(() => this.weekPlanService.horizonDays());
+  // Onboarding-flow overrides — defaults leave weekly wizard behaviour unchanged
+  readonly firstRun  = input(false);
+  readonly planStart = input<string | undefined>(undefined);
+  readonly planEnd   = input<string | undefined>(undefined);
+
+  readonly slots = STANDARD_MEAL_SLOTS;
+
+  readonly horizonDays = computed(() => {
+    const start = this.planStart();
+    const end   = this.planEnd();
+    return (start && end)
+      ? daysInRange(start, end)
+      : this.weekPlanService.horizonDays();
+  });
+
   readonly gridColumns  = computed(() => `68px repeat(${this.horizonDays().length}, 1fr)`);
   readonly isGenerating = computed(() => this.weekPlanService.isGenerating());
 
@@ -356,7 +387,8 @@ export class PlanMealsStepComponent implements OnInit {
     if (!hasAny) {
       this.runAgentPlan(
         this.mealPlannerAgentService.generateWeek(
-          this.weekPlanService.planStart(), this.weekPlanService.currentState(),
+          this.planStart() ?? this.weekPlanService.planStart(),
+          this.weekPlanService.currentState(),
         ),
       );
     }
