@@ -131,7 +131,7 @@ Renders using the adapted `PlanDayGridStepComponent` (with `firstRun: true` inpu
 - The computed period is displayed to the user: "Planning your first [N] days: [start date] – [end date]"
 
 **Template application:**
-The Review component fetches the user's `ScheduleTemplate` records via `GET /schedule/templates`. Each template is shown with a toggle: "Include in first week?" defaulting to on. This lets users keep a template they want for future weeks without forcing it into the current period (e.g., a routine starting next month). Toggled-on templates are expanded client-side into `PlanEntryInput` records across `plan_start`–`plan_end` using the template's `recurrence` / `recurrence_rule`.
+The Review component fetches the user's `ScheduleTemplate` records via `GET /schedule/templates`. Each template is shown with a toggle: "Include in first week?" defaulting to on. This lets users keep a template they want for future weeks without forcing it into the current period (e.g., a routine starting next month). Toggled-on templates are expanded client-side into `PlanEntryRequest` records across `plan_start`–`plan_end` using the template's `recurrence` / `recurrence_rule`.
 
 **Commit sequence:**
 1. `POST /schedule/plan` — commits expanded routines + approved meals
@@ -163,7 +163,7 @@ Provided at `OnboardingComponent` level — lives exactly as long as the user is
 ```typescript
 interface OnboardingState {
   sectionStatus: Record<'account' | 'tasks' | 'food', 'not-started' | 'complete'>;
-  mealPlan: WeekPlanMeals | null;     // type from core/models/week-plan.ts; held until POST /schedule/plan
+  mealPlan: MealPlanResponse | null;  // type from core/models/week-plan.ts; held until POST /schedule/plan
   planPeriod: { start: string; end: string } | null; // ISO dates, computed in tasks section
   enjoyedIngredients: string[];       // free-text; passed as agent context at meal plan generation
 }
@@ -231,6 +231,7 @@ The `ScheduleTemplate` data model exists in `plnd_data` but has no repository tr
 - `GET /schedule/templates` — list the authenticated user's templates
 - `POST /schedule/templates` — create a template from `ScheduleTemplate` fields
 - `DELETE /schedule/templates/{id}` — delete a template
+- Extend `POST /agent/meal-plan` to accept `plan_start` + `plan_end` instead of only `week_start`; update `MealPlanRequest` struct and the agent's system prompt accordingly (currently hard-codes "the week beginning {week}")
 
 ### Existing endpoints used
 `PATCH /preferences/me`, `PATCH /users/me`, `POST /dietary-restrictions`, `PUT /my/ingredient-prefs/{id}`, `POST /agent/meal-plan`, `POST /schedule/plan`, `POST /users/me/complete-onboarding`.
@@ -259,9 +260,7 @@ The `ScheduleTemplate` data model exists in `plnd_data` but has no repository tr
 ## Open Questions (resolve during implementation)
 
 1. **`planning_trigger_offset` derivation:** Confirm the exact arithmetic for translating "planning day of week" to the signed offset, and validate against the backend's planning trigger calculation in `plnd_api`.
-2. **Meal plan date range:** Confirm `POST /agent/meal-plan` accepts an arbitrary date range (not just next-Monday-to-Sunday) — the first period may start mid-week.
+2. **Meal plan date range:** ✅ Confirmed backend change required. `POST /agent/meal-plan` currently only accepts `week_start` and uses a fixed "week beginning {week}" prompt. Extend `MealPlanRequest` to accept `plan_start` + `plan_end` and update the agent's prompt accordingly (tracked in "New backend work required" above).
 3. **`PlanMealsStepComponent` date coupling:** The step currently reads dates from `WeekPlanService`. Determine whether to pass dates via `@Input()` or have the component accept an optional date range override.
-4. **`wake_time` format:** Confirm the backend expects `"HH:MM"` or `"HH:MM:SS"` (the TypeScript `UserPreferences` model shows `"HH:MM:SS"`) and match the picker accordingly.
-5. **Ingredient preference data model:** `UserIngredientPref` currently only has `is_blocked: boolean` — insufficient for the nuance required. The model should be extended to a signed preference scale (proposed: integer −2 to +2, where −2 = "will refuse", −1 = "will tolerate", 0 = neutral/unset, +1 = "enjoy", +2 = "strongly prefer / bridge ingredient"). This replaces `is_blocked` and enables the AI agent to use preference weights when composing meals (e.g., a +2 ingredient increases willingness to suggest meals containing a −1 ingredient alongside it). This is a backend schema change (`user_ingredient_prefs` table, `UserIngredientPref` struct, `IngredientPrefRequest`). Resolve the scale design and migration approach before implementing this sub-step.
-
-6. **Dietary lifestyle shortcuts:** The Dietary Preferences sub-step should offer quick-select options for common lifestyle patterns (vegan, vegetarian, pescatarian, gluten-free, etc.) so users are not forced to enumerate individual ingredients. Determine the preferred representation: (a) create a `DietaryRestriction` record with `restriction_type = 'preference'` and `name = 'vegan'` (no schema changes; agent already reads restrictions), or (b) derive a bulk set of blocked ingredients from the lifestyle selection. Option (a) is simpler and consistent with the existing model; confirm the meal planning agent interprets lifestyle-type restrictions correctly before implementation.
+4. **Ingredient preference data model:** `UserIngredientPref` currently only has `is_blocked: boolean` — insufficient for the nuance required. The model should be extended to a signed preference scale (proposed: integer −2 to +2, where −2 = "will refuse", −1 = "will tolerate", 0 = neutral/unset, +1 = "enjoy", +2 = "strongly prefer / bridge ingredient"). This replaces `is_blocked` and enables the AI agent to use preference weights when composing meals (e.g., a +2 ingredient increases willingness to suggest meals containing a −1 ingredient alongside it). This is a backend schema change (`user_ingredient_prefs` table, `UserIngredientPref` struct, `IngredientPrefRequest`). Resolve the scale design and migration approach before implementing this sub-step.
+5. **Dietary lifestyle shortcuts:** The Dietary Preferences sub-step should offer quick-select options for common lifestyle patterns (vegan, vegetarian, pescatarian, gluten-free, etc.) so users are not forced to enumerate individual ingredients. Determine the preferred representation: (a) create a `DietaryRestriction` record with `restriction_type = 'preference'` and `name = 'vegan'` (no schema changes; agent already reads restrictions), or (b) derive a bulk set of blocked ingredients from the lifestyle selection. Option (a) is simpler and consistent with the existing model; confirm the meal planning agent interprets lifestyle-type restrictions correctly before implementation.
