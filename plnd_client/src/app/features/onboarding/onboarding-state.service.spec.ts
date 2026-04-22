@@ -1,17 +1,20 @@
 // plnd_client/src/app/features/onboarding/onboarding-state.service.spec.ts
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { signal, WritableSignal } from '@angular/core';
 import { OnboardingStateService, computeFirstPlanPeriod, SectionId } from './onboarding-state.service';
 import { PreferencesService } from '../../core/services/preferences.service';
+import { UserPreferences } from '../../core/models/preferences';
 
 describe('OnboardingStateService', () => {
   let service: OnboardingStateService;
+  let prefsSignal: WritableSignal<UserPreferences | null>;
 
   beforeEach(() => {
+    prefsSignal = signal<UserPreferences | null>(null);
     TestBed.configureTestingModule({
       providers: [
         OnboardingStateService,
-        { provide: PreferencesService, useValue: { preferences: signal(null) } }
+        { provide: PreferencesService, useValue: { preferences: prefsSignal.asReadonly() } }
       ]
     });
     service = TestBed.inject(OnboardingStateService);
@@ -52,6 +55,29 @@ describe('OnboardingStateService', () => {
     service.setEnjoyedIngredients(['broccoli', 'tofu']);
     expect(service.enjoyedIngredients()).toEqual(['broccoli', 'tofu']);
   });
+
+  it('computeAndSetPlanPeriod is a no-op when preferences are not yet loaded', () => {
+    // prefsSignal is null (default) — method should return early without throwing
+    service.computeAndSetPlanPeriod('2026-04-22');
+    expect(service.planPeriod()).toBeNull();
+  });
+
+  it('computeAndSetPlanPeriod sets planPeriod when preferences are loaded', () => {
+    prefsSignal.set({
+      user_id: 'u1',
+      week_start_day: 1,
+      planning_trigger_offset: -3,
+      default_plan_length_days: 7,
+      wake_time: '07:00:00',
+      created_at: '2026-01-01T00:00:00Z',
+      updated_at: '2026-01-01T00:00:00Z',
+    });
+    service.computeAndSetPlanPeriod('2026-04-22');
+    const period = service.planPeriod();
+    expect(period).not.toBeNull();
+    expect(period!.start).toBe('2026-04-22');
+    expect(period!.end).toBe('2026-04-29'); // offset=-3 → ratio 4/7 = 0.57 ≥ 0.15 → normal case
+  });
 });
 
 describe('computeFirstPlanPeriod', () => {
@@ -78,7 +104,7 @@ describe('computeFirstPlanPeriod', () => {
     expect(result.end).toBe('2026-04-29');
   });
 
-  it('does NOT extend when ratio is just above 0.15 (offset=-5, planLength=7)', () => {
+  it('does NOT extend when ratio is above 0.15 (offset=-5, planLength=7, ratio=2/7=0.286)', () => {
     // trigger on day 2 → ratio 2/7 = 0.286 ≥ 0.15 → normal
     const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -5 });
     expect(result.start).toBe('2026-04-22');
