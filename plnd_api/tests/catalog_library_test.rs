@@ -169,14 +169,14 @@ fn user_ingredient_pref_round_trip() {
         user_ingredient_pref_id: Uuid::new_v4(),
         user_id: Uuid::new_v4(),
         catalog_ingredient_id: Uuid::new_v4(),
-        is_blocked: true,
+        preference_score: -2,
         notes: Some("Allergic".to_string()),
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
     let v = to_value(&pref).expect("serialize");
     let back: UserIngredientPref = from_value(v).expect("deserialize");
-    assert!(back.is_blocked);
+    assert_eq!(back.preference_score, -2);
     assert_eq!(back.notes.as_deref(), Some("Allergic"));
     // catalog_ingredient_id must not be Option — verify it's a plain Uuid
     assert_ne!(back.catalog_ingredient_id, Uuid::nil());
@@ -188,14 +188,14 @@ fn user_ingredient_pref_not_blocked_round_trip() {
         user_ingredient_pref_id: Uuid::new_v4(),
         user_id: Uuid::new_v4(),
         catalog_ingredient_id: Uuid::new_v4(),
-        is_blocked: false,
+        preference_score: 0,
         notes: None,
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
     let v = to_value(&pref).expect("serialize");
     let back: UserIngredientPref = from_value(v).expect("deserialize");
-    assert!(!back.is_blocked);
+    assert_eq!(back.preference_score, 0);
     assert!(back.notes.is_none());
 }
 

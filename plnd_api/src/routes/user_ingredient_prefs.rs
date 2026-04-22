@@ -13,7 +13,8 @@ use crate::state::AppState;
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpsertIngredientPrefBody {
-    pub is_blocked: bool,
+    /// −2=refuse, −1=tolerate, 0=neutral, +1=enjoy, +2=strongly prefer
+    pub preference_score: i16,
     pub notes: Option<String>,
 }
 
@@ -61,6 +62,7 @@ pub async fn list(
     responses(
         (status = 200, description = "Created or updated ingredient preference", body = UserIngredientPrefResponse),
         (status = 401, description = "Unauthorized"),
+        (status = 422, description = "preference_score out of range (must be -2..=2)"),
         (status = 500, description = "Internal server error"),
     )
 )]
@@ -71,6 +73,9 @@ pub async fn upsert(
     Path(catalog_ingredient_id): Path<Uuid>,
     Json(body): Json<UpsertIngredientPrefBody>,
 ) -> Result<Json<UserIngredientPrefResponse>, StatusCode> {
+    if !(-2..=2).contains(&body.preference_score) {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
@@ -78,7 +83,7 @@ pub async fn upsert(
         .upsert(
             user_id,
             catalog_ingredient_id,
-            body.is_blocked,
+            body.preference_score,
             body.notes.as_deref(),
         )
         .await
