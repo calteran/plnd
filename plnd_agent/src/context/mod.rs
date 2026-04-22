@@ -77,10 +77,10 @@ const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MealPlanResponse",
   "type": "object",
-  "required": ["week", "meals"],
+  "required": ["plan_start", "meals"],
   "additionalProperties": false,
   "properties": {
-    "week":              { "type": "string", "format": "date" },
+    "plan_start":        { "type": "string", "format": "date" },
     "meals":             { "type": "array", "items": { "$ref": "#/definitions/MealEntry" } },
     "nutrition_summary": { "$ref": "#/definitions/NutritionSummary" }
   },
@@ -530,7 +530,7 @@ mod tests {
     fn meal_plan_validator_accepts_minimal_valid_plan() {
         let validator = UseCase::MealPlanning.response_validator().unwrap();
         let ok = serde_json::json!({
-            "week": "2026-04-21",
+            "plan_start": "2026-04-21",
             "meals": [
                 {
                     "date": "2026-04-21",
@@ -546,7 +546,7 @@ mod tests {
     fn meal_plan_validator_accepts_plan_with_nutrition() {
         let validator = UseCase::MealPlanning.response_validator().unwrap();
         let ok = serde_json::json!({
-            "week": "2026-04-21",
+            "plan_start": "2026-04-21",
             "meals": [
                 {
                     "date": "2026-04-21",
@@ -564,7 +564,7 @@ mod tests {
     }
 
     #[test]
-    fn meal_plan_validator_rejects_missing_week() {
+    fn meal_plan_validator_rejects_missing_plan_start() {
         let validator = UseCase::MealPlanning.response_validator().unwrap();
         let bad = serde_json::json!({ "meals": [] });
         assert!(!validator.is_valid(&bad));
@@ -574,7 +574,7 @@ mod tests {
     fn meal_plan_validator_rejects_invalid_occasion() {
         let validator = UseCase::MealPlanning.response_validator().unwrap();
         let bad = serde_json::json!({
-            "week": "2026-04-21",
+            "plan_start": "2026-04-21",
             "meals": [
                 {
                     "date": "2026-04-21",
@@ -593,7 +593,7 @@ mod tests {
     fn meal_plan_validator_rejects_extra_properties() {
         let validator = UseCase::MealPlanning.response_validator().unwrap();
         let bad = serde_json::json!({
-            "week": "2026-04-21",
+            "plan_start": "2026-04-21",
             "meals": [],
             "unexpected_field": "boom"
         });

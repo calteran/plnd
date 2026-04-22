@@ -209,7 +209,7 @@ pub struct NutritionSummary {
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MealPlanResponse {
-    pub week: NaiveDate,
+    pub plan_start: NaiveDate,
     pub meals: Vec<MealEntry>,
     pub nutrition_summary: Option<NutritionSummary>,
 }
@@ -258,14 +258,14 @@ mod meal_plan_tests {
     }
 
     #[test]
-    fn meal_plan_response_serializes_week_as_date() {
+    fn meal_plan_response_serializes_plan_start_as_date() {
         let resp = MealPlanResponse {
-            week: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
+            plan_start: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
             meals: vec![],
             nutrition_summary: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
-        assert!(json.contains("\"week\":\"2026-04-21\""));
+        assert!(json.contains("\"plan_start\":\"2026-04-21\""));
     }
 
     #[test]

@@ -15,7 +15,7 @@ function makeMockPlanResponse(days: string[]): MealPlanResponse {
       title: `${occasion} for ${date}`,
     }))
   );
-  return { week: days[0], meals };
+  return { plan_start: days[0], meals };
 }
 
 describe('PlanMealsStepComponent', () => {
