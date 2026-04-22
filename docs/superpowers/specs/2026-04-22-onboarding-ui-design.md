@@ -139,7 +139,7 @@ All three active spokes share identical chrome.
 
 **Display Name** — text input, full width. Pre-filled from account if available. Hint below: "Used in greetings and plan summaries."
 
-**Email** — text input, full width. Pre-filled from auth, editable. Gray border + gray background to signal pre-population.
+**Email** — text input, full width. Pre-filled from auth, editable. Uses a muted amber border (`#fde68a`) with a small "Pre-filled" label or chip alongside the field to signal pre-population — do not use a gray background, which reads as disabled.
 
 ### Notifications
 
@@ -172,7 +172,7 @@ Gated by `planningPrefsComplete` flag on `OnboardingStateService`. Auto-shown as
 **Fields**:
 
 - **Plan length** — 3-way segmented control: 1 week / **2 weeks** (default) / 4 weeks.
-- **Week start** — 7-button single-select row (Sun → Sat). Default: Monday.
+- **Week start** — 7-button single-select row. Default: Monday. The row always starts with Sunday on the left and wraps such that the selected week start day is visually first (e.g. selecting Wednesday → W T F S S M T). All subsequent day-picker rows throughout onboarding follow this same order.
 - **Planning day + time** — day pill single-select (M T W T F S S) + time picker. Sets the weekly planning reminder.
 
 **Footer note**: "You can update these after onboarding in **Settings → Planning**."
@@ -311,7 +311,7 @@ Section divider, then:
 - **Entry row**: `[ingredient text input, flex-1]` + `[😖 😕 😐 🙂 😍 buttons]`
 - **Rated rows**: `[✕ · ingredient name, flex-1]` + `[😖 😕 😐 🙂 😍 buttons]` — ✕ sits inside the left cell; emoji column aligns with the entry row.
 
-Emoji scale: 😖 😕 😐 🙂 😍 (confounded face = strongly dislike). Color only on the selected button: red tint for 😖 / 😕, green tint for 🙂 / 😍. All unselected buttons stay flat gray.
+Emoji scale: 😖 😕 😐 🙂 😍 (confounded face = strongly dislike). Color on selected button only: red tint for 😖 / 😕, neutral gray highlight (`#f3f4f6` bg, `#6b7280` border) for 😐, green tint for 🙂 / 😍. All unselected buttons stay flat gray.
 
 #### Meal Ratings
 
