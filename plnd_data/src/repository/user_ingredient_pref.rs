@@ -11,7 +11,7 @@ pub trait UserIngredientPrefRepository: Send + Sync {
         &self,
         user_id: Uuid,
         catalog_ingredient_id: Uuid,
-        is_blocked: bool,
+        preference_score: i16,
         notes: Option<&str>,
     ) -> Result<UserIngredientPref, crate::Error>;
 
