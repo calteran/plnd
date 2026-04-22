@@ -71,6 +71,9 @@ export function computeFirstPlanPeriod(
     planEnd = firstPeriodEnd;
   }
 
+  // Guard: large negative offsets can push planEnd before firstPeriodEnd.
+  if (planEnd.getTime() < firstPeriodEnd.getTime()) planEnd = firstPeriodEnd;
+
   return { start: today, end: toISODate(planEnd) };
 }
 
