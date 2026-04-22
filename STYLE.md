@@ -121,7 +121,7 @@ These are the design decisions that aren't obvious from the tokens alone. Unders
 
 **Skeleton loading.** Loading states use skeleton placeholder elements sized to match the content they'll replace. This preserves layout stability (no reflow when content arrives) and reduces the perception of waiting compared to a spinner. Skeletons use a shimmer animation (1.4s, opacity 0.4→0.7→0.4).
 
-**Accordion expansion.** Collapsible sections use a `max-height` transition (0 → 800px, 0.25s ease-out / 0.3s ease-in) rather than height or display changes. The chevron rotates 180° when open. This pattern is used in the planning wizard's task step and in the day view's meal review pane.
+**Accordion expansion.** Two expand/collapse techniques appear in the codebase; use the one that fits the content size. The planning wizard's task step and day-grid cards use a `max-height` CSS transition (0 → 800px, 0.25s ease-out / 0.3s ease-in) with chevron rotation — this preserves layout continuity during animation. The meal review pane uses Angular's `@if` for conditional DOM inclusion — appropriate when the expanded content is large or carries state that shouldn't persist while hidden. In both cases the chevron rotates 180° when open.
 
 ---
 
@@ -151,38 +151,39 @@ New features must be tested in both light and dark mode before shipping. The mos
 
 ### 9. Day View Components
 
-All in `plnd_client/src/app/features/day-view/` and `plnd_client/src/app/features/schedule/components/`.
-
 | Component | Path | Purpose |
 |-----------|------|---------|
-| `DayViewComponent` | `features/day-view/day-view.ts` | Root shell — composes the full day view including briefing, schedule, and empty/error states |
-| `BriefingHeaderComponent` | `features/day-view/components/briefing-header/` | Side-by-side weather + headlines cards above the schedule; only shown for today |
-| `YesterdaySnapshotComponent` | `features/day-view/components/yesterday-snapshot/` | Compact summary footer below the schedule |
-| `MealReviewPaneComponent` | `features/day-view/components/meal-review-pane/` | Expandable nutrition detail panel; slides open below a meal row |
-| `DayHeaderComponent` | `features/schedule/components/day-header/` | Date display with prev/next navigation; the visual anchor for the schedule |
-| `MealRowComponent` | `features/schedule/components/meal-row/` | A meal "band" — emoji, name, review toggle, nested task rows |
-| `TaskRowComponent` | `features/schedule/components/task-row/` | A single checklist row; used both standalone and nested inside meal bands |
-| `AddEntryComponent` | `features/schedule/components/add-entry/` | Progressive-disclosure entry form; opens from a faded prompt into a full input panel |
+| `DayViewComponent` | `plnd_client/src/app/features/day-view/` | Root shell — composes the full day view including briefing, schedule, and empty/error states |
+| `BriefingHeaderComponent` | `plnd_client/src/app/features/day-view/components/briefing-header/` | Side-by-side weather + headlines cards above the schedule; only shown for today |
+| `YesterdaySnapshotComponent` | `plnd_client/src/app/features/day-view/components/yesterday-snapshot/` | Compact summary footer below the schedule |
+| `MealReviewPaneComponent` | `plnd_client/src/app/features/day-view/components/meal-review-pane/` | Expandable nutrition detail panel; toggled via `@if`, slides open below a meal row |
+| `DayHeaderComponent` | `plnd_client/src/app/features/schedule/components/day-header/` | Date display with prev/next navigation; the visual anchor for the schedule |
+| `MealRowComponent` | `plnd_client/src/app/features/schedule/components/meal-row/` | A meal "band" — emoji, name, review toggle, nested task rows |
+| `TaskRowComponent` | `plnd_client/src/app/features/schedule/components/task-row/` | A single checklist row; used both standalone and nested inside meal bands |
+| `AddEntryComponent` | `plnd_client/src/app/features/schedule/components/add-entry/` | Progressive-disclosure entry form; opens from a faded prompt into a full input panel |
 
 ---
 
 ### 10. Planning Wizard Components
 
-All in `plnd_client/src/app/features/planning/`.
-
 | Component | Path | Purpose |
 |-----------|------|---------|
-| `PlanningWizardComponent` | `features/planning/planning-wizard/` | Wizard shell — progress pills, step navigation, back/next footer |
-| `PlanMealsStepComponent` | `features/planning/steps/plan-meals-step/` | Weekly meal grid — assign, edit, skip, or AI-suggest meals per day |
-| `PlanTasksStepComponent` | `features/planning/steps/plan-tasks-step/` | Weekly task accordion with floating (unscheduled) task panel |
-| `PlanDayGridStepComponent` | `features/planning/steps/plan-day-grid-step/` | Per-day card grid for reviewing the full week at a glance |
-| `PlanConfirmStepComponent` | `features/planning/steps/plan-confirm-step/` | Completion step with summary and CTA to return to the day view |
+| `PlanningWizardComponent` | `plnd_client/src/app/features/planning/planning-wizard/` | Wizard shell — progress pills, step navigation, back/next footer |
+| `PlanReviewStepComponent` | `plnd_client/src/app/features/planning/steps/plan-review-step/` | Carry-over review step for unfinished items from the previous week |
+| `PlanTasksStepComponent` | `plnd_client/src/app/features/planning/steps/plan-tasks-step/` | Weekly task accordion with floating (unscheduled) task panel |
+| `PlanMealsStepComponent` | `plnd_client/src/app/features/planning/steps/plan-meals-step/` | Weekly meal grid — assign, edit, skip, or AI-suggest meals per day |
+| `PlanDayGridStepComponent` | `plnd_client/src/app/features/planning/steps/plan-day-grid-step/` | Per-day card grid for reviewing the full week at a glance |
+| `PlanConfirmStepComponent` | `plnd_client/src/app/features/planning/steps/plan-confirm-step/` | Completion step with summary and CTA to return to the day view |
 
 **Onboarding:**
 
 | Component | Path | Purpose |
 |-----------|------|---------|
-| `OnboardingHubComponent` | `features/onboarding/hub/` | Hub-and-spoke card grid for first-run onboarding steps |
+| `OnboardingHubComponent` | `plnd_client/src/app/features/onboarding/hub/` | Hub-and-spoke card grid for first-run onboarding steps |
+| `OnboardingAccountComponent` | `plnd_client/src/app/features/onboarding/account/` | Initial account setup and preference configuration |
+| `OnboardingFoodComponent` | `plnd_client/src/app/features/onboarding/food/` | Food preferences and typical meal schedule setup |
+| `OnboardingTasksComponent` | `plnd_client/src/app/features/onboarding/tasks/` | Initial task and energy baseline configuration |
+| `OnboardingReviewComponent` | `plnd_client/src/app/features/onboarding/review/` | Final review of onboarding configuration |
 
 ---
 
