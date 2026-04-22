@@ -287,6 +287,8 @@ No functional logic changes to the weekly planning wizard; only additive UI bran
 - `plnd_client/src/app/core/models/preferences.ts` — add `wake_time` to `UpdatePreferencesRequest`
 - `plnd_client/src/app/features/planning/steps/plan-meals-step.ts` — add `firstRun` input
 - `plnd_client/src/app/features/planning/steps/plan-day-grid-step.ts` — add `firstRun` input
+- `plnd_client/src/app/core/models/week-plan.ts` — add `duration_minutes` and `energy_required` to `PlanEntryRequest`
+- `plnd_api/src/models.rs` — add `duration_minutes` and `energy_required` to Rust `PlanEntryRequest` struct
 - `plnd_client/e2e/tests/onboarding.e2e.ts` — extended for hub navigation + section flows
 
 ### New backend work required
@@ -310,6 +312,8 @@ No functional logic changes to the weekly planning wizard; only additive UI bran
 **`UpdatePreferencesRequest` missing `wake_time`:** The TypeScript model in `core/models/preferences.ts` currently omits `wake_time`. This field must be added before the Account section can save it — the Rust backend already accepts it via `patch_preferences`.
 
 **`planning_trigger_offset` translation:** The backend stores a signed integer (−14 to +14 days). It is added to `plan_start` of the **next** plan period to compute the trigger date (`plnd_data/src/db/tasks.rs:18`). Negative values fire before the new period starts (typical case). UI derivation: `offset = ((planningDay − weekStartDay) % 7 + 7) % 7; if (offset > 0) offset −= 7;` — result in [−6, 0], e.g. "plan Friday, week starts Monday" → −3.
+
+**`PlanEntryRequest` missing `duration_minutes` and `energy_required`:** Both the task placement agent response (`POST /agent/place-tasks`) and client-side template expansion need to carry duration and energy level into committed entries. `PlanEntryRequest` must be extended with optional `duration_minutes?: number` and `energy_required?: EnergyLevel` fields. This requires updates to both the TypeScript interface (`plnd_client/src/app/core/models/week-plan.ts`) and the Rust struct (`plnd_api/src/models.rs:49`). Template expansion must explicitly map `ScheduleTemplate.duration_minutes` and `ScheduleTemplate.energy_required` into the resulting `PlanEntryRequest` records.
 
 **`user_ingredient_prefs` schema extension:** Extend with `preference_score SMALLINT DEFAULT 0 CHECK (BETWEEN -2 AND 2)`. Migrate `is_blocked = true → preference_score = -2`, drop `is_blocked`. Scale: −2 will refuse · −1 will tolerate · 0 neutral · +1 enjoy · +2 strongly prefer. Tracked as backend sub-issue.
 
