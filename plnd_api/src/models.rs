@@ -183,7 +183,7 @@ pub struct MealPlanState {
 pub struct MealPlanRequest {
     /// First day (inclusive) of the planning period.
     /// Accepts `week_start` as a backward-compatible alias; when only the alias is
-    /// supplied, `plan_end` defaults to `plan_start + 6` in the handler (7-day week).
+    /// supplied, `plan_end` defaults to `plan_start + 6` (7-day week).
     #[serde(alias = "week_start")]
     pub plan_start: NaiveDate,
     /// Last day (inclusive) of the planning period.
