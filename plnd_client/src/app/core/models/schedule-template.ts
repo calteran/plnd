@@ -1,0 +1,51 @@
+export interface ScheduleTemplate {
+  template_id: string;
+  user_id: string;
+  task_type: 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'custom';
+  title: string;
+  recurrence: 'daily' | 'weekdays' | 'weekly' | 'custom';
+  recurrence_rule: string | null;
+  time_window_start: string | null;
+  time_window_end: string | null;
+  duration_minutes: number | null;
+  energy_required: 'low' | 'medium' | 'high';
+  is_milepost: boolean;
+  task_ref_id: string | null;
+  task_ref_type: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateScheduleTemplateRequest {
+  task_type: string;
+  title: string;
+  recurrence: string;
+  recurrence_rule?: string;
+  time_window_start?: string;
+  time_window_end?: string;
+  duration_minutes?: number;
+  energy_required?: string;
+  is_milepost?: boolean;
+  task_ref_id?: string;
+  task_ref_type?: string;
+}
+
+const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
+
+/**
+ * Translates a recurrence type to an RRULE string for storage in recurrence_rule.
+ * weekDay uses the same 0=Sun…6=Sat convention as UserPreferences.week_start_day.
+ */
+export function rruleFromRecurrence(
+  recurrence: string,
+  weekDay?: number,
+  customRule?: string
+): string {
+  switch (recurrence) {
+    case 'daily':    return 'FREQ=DAILY';
+    case 'weekdays': return 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR';
+    case 'weekly':   return `FREQ=WEEKLY;BYDAY=${RRULE_DAYS[weekDay ?? 1]}`;
+    case 'custom':   return customRule ?? '';
+    default:         return '';
+  }
+}
