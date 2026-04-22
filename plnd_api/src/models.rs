@@ -181,7 +181,14 @@ pub struct MealPlanState {
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MealPlanRequest {
-    pub week_start: NaiveDate,
+    /// First day (inclusive) of the planning period.
+    /// Accepts `week_start` as a backward-compatible alias; when only the alias is
+    /// supplied, `plan_end` defaults to `plan_start + 6` in the handler (7-day week).
+    #[serde(alias = "week_start")]
+    pub plan_start: NaiveDate,
+    /// Last day (inclusive) of the planning period.
+    /// Omit to keep weekly behaviour (`plan_start + 6`).
+    pub plan_end: Option<NaiveDate>,
     pub current_state: MealPlanState,
 }
 
@@ -231,12 +238,12 @@ mod meal_plan_tests {
             "current_state": { "approved": [], "skipped": [], "custom": [] }
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.week_start.to_string(), "2026-04-21");
+        assert_eq!(req.plan_start.to_string(), "2026-04-21");
         assert!(req.current_state.approved.is_empty());
     }
 
     #[test]
-    fn meal_plan_request_rejects_missing_week_start() {
+    fn meal_plan_request_rejects_missing_plan_start() {
         let json = r#"{ "current_state": { "approved": [], "skipped": [], "custom": [] } }"#;
         let result: Result<MealPlanRequest, _> = serde_json::from_str(json);
         assert!(result.is_err());
