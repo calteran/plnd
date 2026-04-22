@@ -60,7 +60,7 @@ export interface MealEntry {
 }
 
 export interface MealPlanResponse {
-  week: string;
+  plan_start: string;
   meals: MealEntry[];
   nutrition_summary?: { daily_avg_calories?: number };
 }

@@ -497,13 +497,13 @@ impl Tool for ProposeMealPlanTool {
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
-            "required": ["week", "meals"],
+            "required": ["plan_start", "meals"],
             "additionalProperties": false,
             "properties": {
-                "week": {
+                "plan_start": {
                     "type": "string",
                     "format": "date",
-                    "description": "ISO date of the Monday starting this plan week"
+                    "description": "ISO date of the first day of the planning period"
                 },
                 "meals": {
                     "type": "array",
@@ -590,13 +590,13 @@ impl Tool for RebalanceMealPlanTool {
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
-            "required": ["week", "meals"],
+            "required": ["plan_start", "meals"],
             "additionalProperties": false,
             "properties": {
-                "week": {
+                "plan_start": {
                     "type": "string",
                     "format": "date",
-                    "description": "ISO date of the Monday starting this plan week"
+                    "description": "ISO date of the first day of the planning period"
                 },
                 "meals": {
                     "type": "array",
@@ -1309,7 +1309,7 @@ mod tests {
         assert_eq!(tool.name(), "rebalance_meal_plan");
 
         let input = serde_json::json!({
-            "week": "2026-04-21",
+            "plan_start": "2026-04-21",
             "meals": [
                 {
                     "date": "2026-04-21",
@@ -1329,7 +1329,7 @@ mod tests {
         };
         let output = tool.execute(&ctx, input.clone()).await.unwrap();
 
-        assert_eq!(output["week"], "2026-04-21");
+        assert_eq!(output["plan_start"], "2026-04-21");
         assert_eq!(
             output["meals"][0]["meal_ref"]["id"],
             "00000000-0000-0000-0000-000000000001"
@@ -1426,7 +1426,7 @@ mod tests {
     #[tokio::test]
     async fn propose_meal_plan_returns_input_verbatim() {
         let input = serde_json::json!({
-            "week": "2026-04-21",
+            "plan_start": "2026-04-21",
             "meals": [
                 {
                     "date": "2026-04-21",
@@ -1442,7 +1442,7 @@ mod tests {
             .execute(&ctx, input.clone())
             .await
             .unwrap();
-        assert_eq!(result["week"], "2026-04-21");
+        assert_eq!(result["plan_start"], "2026-04-21");
         assert_eq!(result["meals"].as_array().unwrap().len(), 1);
     }
 
