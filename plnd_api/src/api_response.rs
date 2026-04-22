@@ -469,6 +469,48 @@ impl From<PostSchedulePlanResponse> for PostSchedulePlanApiResponse {
     }
 }
 
+/// API response wrapper for `plnd_data::models::ScheduleTemplate`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct ScheduleTemplateResponse {
+    pub template_id: Uuid,
+    pub user_id: Uuid,
+    pub task_type: String,
+    pub title: String,
+    pub recurrence: String,
+    pub recurrence_rule: Option<String>,
+    pub time_window_start: Option<NaiveTime>,
+    pub time_window_end: Option<NaiveTime>,
+    pub duration_minutes: Option<i32>,
+    pub energy_required: String,
+    pub is_milepost: bool,
+    pub task_ref_id: Option<Uuid>,
+    pub task_ref_type: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<ScheduleTemplate> for ScheduleTemplateResponse {
+    fn from(t: ScheduleTemplate) -> Self {
+        Self {
+            template_id: t.template_id,
+            user_id: t.user_id,
+            task_type: t.task_type,
+            title: t.title,
+            recurrence: t.recurrence,
+            recurrence_rule: t.recurrence_rule,
+            time_window_start: t.time_window_start,
+            time_window_end: t.time_window_end,
+            duration_minutes: t.duration_minutes,
+            energy_required: t.energy_required,
+            is_milepost: t.is_milepost,
+            task_ref_id: t.task_ref_id,
+            task_ref_type: t.task_ref_type,
+            created_at: t.created_at,
+            updated_at: t.updated_at,
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // User library preference response types
 // ---------------------------------------------------------------------------
@@ -578,47 +620,6 @@ impl From<UserMealPrefDetail> for UserMealPrefDetailResponse {
             has_personal_recipe: m.has_personal_recipe,
             origin_external_source: m.origin_external_source,
             nutrition_estimated: m.nutrition_estimated,
-        }
-    }
-}
-
-#[derive(Debug, serde::Serialize, utoipa::ToSchema)]
-pub struct ScheduleTemplateResponse {
-    pub template_id: uuid::Uuid,
-    pub user_id: uuid::Uuid,
-    pub task_type: String,
-    pub title: String,
-    pub recurrence: String,
-    pub recurrence_rule: Option<String>,
-    pub time_window_start: Option<NaiveTime>,
-    pub time_window_end: Option<NaiveTime>,
-    pub duration_minutes: Option<i32>,
-    pub energy_required: String,
-    pub is_milepost: bool,
-    pub task_ref_id: Option<uuid::Uuid>,
-    pub task_ref_type: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-impl From<ScheduleTemplate> for ScheduleTemplateResponse {
-    fn from(t: ScheduleTemplate) -> Self {
-        Self {
-            template_id: t.template_id,
-            user_id: t.user_id,
-            task_type: t.task_type,
-            title: t.title,
-            recurrence: t.recurrence,
-            recurrence_rule: t.recurrence_rule,
-            time_window_start: t.time_window_start,
-            time_window_end: t.time_window_end,
-            duration_minutes: t.duration_minutes,
-            energy_required: t.energy_required,
-            is_milepost: t.is_milepost,
-            task_ref_id: t.task_ref_id,
-            task_ref_type: t.task_ref_type,
-            created_at: t.created_at,
-            updated_at: t.updated_at,
         }
     }
 }

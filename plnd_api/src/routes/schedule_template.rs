@@ -1,6 +1,7 @@
 use crate::api_response::ScheduleTemplateResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
+use plnd_data::Error;
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
@@ -113,9 +114,13 @@ pub async fn create_template(
         )
         .await
         .map(|t| (StatusCode::CREATED, Json(ScheduleTemplateResponse::from(t))))
-        .map_err(|e| {
-            tracing::error!(error = %e, "create_template DB error");
-            StatusCode::INTERNAL_SERVER_ERROR
+        .map_err(|e| match e {
+            Error::Conflict => StatusCode::CONFLICT,
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            e => {
+                tracing::error!(error = %e, "create_template DB error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         })
 }
 
