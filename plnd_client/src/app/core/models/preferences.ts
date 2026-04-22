@@ -12,4 +12,5 @@ export interface UpdatePreferencesRequest {
   week_start_day?: number;
   planning_trigger_offset?: number;
   default_plan_length_days?: number;
+  wake_time?: string;
 }
