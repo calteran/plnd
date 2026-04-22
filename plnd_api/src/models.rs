@@ -192,6 +192,14 @@ pub struct MealPlanRequest {
     pub current_state: MealPlanState,
 }
 
+impl MealPlanRequest {
+    /// Effective last day: explicit `plan_end` if provided, else `plan_start + 6` (7-day week).
+    pub fn plan_end_effective(&self) -> NaiveDate {
+        self.plan_end
+            .unwrap_or(self.plan_start + chrono::Days::new(6))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct NutritionSummary {
     pub avg_kcal: Option<f64>,

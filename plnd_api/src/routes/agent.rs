@@ -108,7 +108,8 @@ pub async fn post_task(
     security(("bearer_auth" = [])),
     request_body = MealPlanRequest,
     responses(
-        (status = 200, description = "Week plan proposal", body = MealPlanResponse),
+        (status = 200, description = "Meal plan proposal for period", body = MealPlanResponse),
+        (status = 400, description = "plan_end must be >= plan_start"),
         (status = 401, description = "Unauthorized"),
         (status = 422, description = "Agent response failed schema validation"),
         (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
@@ -129,7 +130,10 @@ pub async fn post_meal_plan(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let plan_start = body.plan_start;
-    let plan_end = body.plan_end.unwrap_or(plan_start + chrono::Days::new(6));
+    let plan_end = body.plan_end_effective();
+    if plan_end < plan_start {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     let current_state_json = serde_json::to_value(&body.current_state).map_err(|e| {
         tracing::error!(error = %e, "failed to serialize current_state");
         StatusCode::INTERNAL_SERVER_ERROR
@@ -171,7 +175,8 @@ pub async fn post_meal_plan(
     security(("bearer_auth" = [])),
     request_body = MealPlanRequest,
     responses(
-        (status = 200, description = "Rebalanced week plan", body = MealPlanResponse),
+        (status = 200, description = "Rebalanced meal plan for period", body = MealPlanResponse),
+        (status = 400, description = "plan_end must be >= plan_start"),
         (status = 401, description = "Unauthorized"),
         (status = 422, description = "Agent response failed schema validation"),
         (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
@@ -192,7 +197,10 @@ pub async fn post_meal_plan_rebalance(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let plan_start = body.plan_start;
-    let plan_end = body.plan_end.unwrap_or(plan_start + chrono::Days::new(6));
+    let plan_end = body.plan_end_effective();
+    if plan_end < plan_start {
+        return Err(StatusCode::BAD_REQUEST);
+    }
     let current_state_json = serde_json::to_value(&body.current_state).map_err(|e| {
         tracing::error!(error = %e, "failed to serialize current_state");
         StatusCode::INTERNAL_SERVER_ERROR
@@ -448,10 +456,10 @@ mod tests {
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.plan_end, None);
-        let effective_end = req
-            .plan_end
-            .unwrap_or(req.plan_start + chrono::Days::new(6));
-        assert_eq!(effective_end, NaiveDate::from_ymd_opt(2026, 4, 28).unwrap());
+        assert_eq!(
+            req.plan_end_effective(),
+            NaiveDate::from_ymd_opt(2026, 4, 28).unwrap()
+        );
     }
 
     #[test]
