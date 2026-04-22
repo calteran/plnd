@@ -63,6 +63,30 @@ describe('ScheduleTemplatesService', () => {
     expect(service.templates()).toEqual([MOCK_TEMPLATE_A]);
   });
 
+  it('load() still fetches after create() pre-populates the signal', () => {
+    service.create({ task_type: 'custom', title: 'Morning walk', recurrence: 'daily' }).subscribe();
+    httpMock.expectOne(r => r.method === 'POST').flush(MOCK_TEMPLATE_A);
+
+    // Signal is non-null now, but load() should still fetch (loaded flag is still false)
+    service.load();
+    const req = httpMock.expectOne(r => r.url.endsWith('/schedule/templates') && r.method === 'GET');
+    req.flush([MOCK_TEMPLATE_A, MOCK_TEMPLATE_B]);
+
+    expect(service.templates()).toEqual([MOCK_TEMPLATE_A, MOCK_TEMPLATE_B]);
+  });
+
+  it('clear() allows load() to fetch again', () => {
+    service.load();
+    httpMock.expectOne(r => r.method === 'GET').flush([MOCK_TEMPLATE_A]);
+
+    service.clear();
+    expect(service.templates()).toBeNull();
+
+    service.load();
+    httpMock.expectOne(r => r.url.endsWith('/schedule/templates') && r.method === 'GET').flush([MOCK_TEMPLATE_B]);
+    expect(service.templates()).toEqual([MOCK_TEMPLATE_B]);
+  });
+
   it('create() posts and appends item to signal', () => {
     service.load();
     httpMock.expectOne(r => r.method === 'GET').flush([MOCK_TEMPLATE_A]);

@@ -48,7 +48,7 @@ export function rruleFromRecurrence(
   switch (recurrence) {
     case 'daily':    return 'FREQ=DAILY';
     case 'weekdays': return 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR';
-    case 'weekly':   return `FREQ=WEEKLY;BYDAY=${RRULE_DAYS[weekDay ?? 1]}`;
+    case 'weekly': { const day = RRULE_DAYS[weekDay ?? 1] ?? 'MO'; return `FREQ=WEEKLY;BYDAY=${day}`; }
     case 'custom':   return customRule ?? '';
     default:         return '';
   }

@@ -28,4 +28,8 @@ describe('rruleFromRecurrence', () => {
   it('custom with no rule returns empty string', () => {
     expect(rruleFromRecurrence('custom')).toBe('');
   });
+
+  it('weekly with out-of-range weekDay falls back to MO', () => {
+    expect(rruleFromRecurrence('weekly', 99)).toBe('FREQ=WEEKLY;BYDAY=MO');
+  });
 });

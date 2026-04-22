@@ -10,18 +10,23 @@ export class ScheduleTemplatesService {
   private readonly config = inject(ConfigService);
 
   private readonly templatesSignal = signal<ScheduleTemplate[] | null>(null);
+  private loaded = false;
 
   /** The current schedule templates — null until load() succeeds */
   readonly templates = this.templatesSignal.asReadonly();
 
   /** Fetch templates from the API and cache in the signal. No-ops if already loaded. */
   load(): void {
-    if (this.templatesSignal() !== null) return;
+    if (this.loaded) return;
+    this.loaded = true;
 
     const apiBase = this.config.getConfig().api.baseUrl;
     this.http.get<ScheduleTemplate[]>(`${apiBase}/schedule/templates`).subscribe({
       next: items => this.templatesSignal.set(items),
-      error: err => console.error('Failed to load schedule templates', err)
+      error: err => {
+        this.loaded = false;
+        console.error('Failed to load schedule templates', err);
+      }
     });
   }
 
@@ -50,5 +55,6 @@ export class ScheduleTemplatesService {
   /** Reset the templates signal (called on logout) */
   clear(): void {
     this.templatesSignal.set(null);
+    this.loaded = false;
   }
 }
