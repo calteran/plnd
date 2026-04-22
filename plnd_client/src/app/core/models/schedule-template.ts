@@ -1,14 +1,18 @@
+export type TaskType = 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'custom';
+export type RecurrenceType = 'daily' | 'weekdays' | 'weekly' | 'custom';
+export type EnergyLevel = 'low' | 'medium' | 'high';
+
 export interface ScheduleTemplate {
   template_id: string;
   user_id: string;
-  task_type: 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'custom';
+  task_type: TaskType;
   title: string;
-  recurrence: 'daily' | 'weekdays' | 'weekly' | 'custom';
+  recurrence: RecurrenceType;
   recurrence_rule: string | null;
   time_window_start: string | null;
   time_window_end: string | null;
   duration_minutes: number | null;
-  energy_required: 'low' | 'medium' | 'high';
+  energy_required: EnergyLevel;
   is_milepost: boolean;
   task_ref_id: string | null;
   task_ref_type: string | null;
@@ -17,14 +21,14 @@ export interface ScheduleTemplate {
 }
 
 export interface CreateScheduleTemplateRequest {
-  task_type: string;
+  task_type: TaskType;
   title: string;
-  recurrence: string;
+  recurrence: RecurrenceType;
   recurrence_rule?: string;
   time_window_start?: string;
   time_window_end?: string;
   duration_minutes?: number;
-  energy_required?: string;
+  energy_required?: EnergyLevel;
   is_milepost?: boolean;
   task_ref_id?: string;
   task_ref_type?: string;
@@ -37,7 +41,7 @@ const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
  * weekDay uses the same 0=Sun…6=Sat convention as UserPreferences.week_start_day.
  */
 export function rruleFromRecurrence(
-  recurrence: string,
+  recurrence: RecurrenceType,
   weekDay?: number,
   customRule?: string
 ): string {
