@@ -117,4 +117,13 @@ describe('computeFirstPlanPeriod', () => {
     expect(result.start).toBe('2026-04-22');
     expect(result.end).toBe('2026-05-06');
   });
+
+  it('clamps planEnd to firstPeriodEnd when |offset| > planLength (offset=-10, planLength=7)', () => {
+    // trigger fires on day -3 → ratio -3/7 < 0.15 → extension branch
+    // secondPeriodEnd = today+14, secondTrigger = today+4 which is before firstPeriodEnd (today+7)
+    // clamp applies → planEnd = today+7 = 2026-04-29
+    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -10 });
+    expect(result.start).toBe('2026-04-22');
+    expect(result.end).toBe('2026-04-29');
+  });
 });
