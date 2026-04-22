@@ -351,5 +351,23 @@ describe('PlanMealsStepComponent', () => {
       TestBed.createComponent(PlanMealsStepComponent).detectChanges();
       expect(agentSpy.generateWeek).toHaveBeenCalledWith('2026-03-23', jasmine.any(Object));
     });
+
+    it('should pass planStart input to rebalance when refresh modal is confirmed', () => {
+      service.clear();
+      service.initSession('2026-03-23', '2026-03-27');
+      generateWeek$ = new Subject();
+      agentSpy.generateWeek.and.returnValue(generateWeek$);
+      agentSpy.rebalance.and.returnValue(generateWeek$);
+
+      const f = TestBed.createComponent(PlanMealsStepComponent);
+      f.componentRef.setInput('planStart', '2026-04-01');
+      f.componentRef.setInput('planEnd',   '2026-04-03');
+      f.detectChanges();
+
+      f.componentInstance.openRefreshModal();
+      f.componentInstance.confirmRebalance();
+
+      expect(agentSpy.rebalance).toHaveBeenCalledWith('2026-04-01', jasmine.any(Object));
+    });
   });
 });

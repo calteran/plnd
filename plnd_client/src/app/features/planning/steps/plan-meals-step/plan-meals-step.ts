@@ -504,7 +504,8 @@ export class PlanMealsStepComponent implements OnInit {
     this.showRefreshModal.set(false);
     this.runAgentPlan(
       this.mealPlannerAgentService.rebalance(
-        this.weekPlanService.planStart(), this.weekPlanService.currentState(),
+        this.planStart() ?? this.weekPlanService.planStart(),
+        this.weekPlanService.currentState(),
       ),
     );
   }
