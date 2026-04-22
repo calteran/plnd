@@ -27,9 +27,6 @@ pub trait ScheduleTemplateRepository: Send + Sync {
         task_ref_type: Option<&str>,
     ) -> Result<ScheduleTemplate, crate::Error>;
 
-    async fn delete_template(
-        &self,
-        user_id: Uuid,
-        template_id: Uuid,
-    ) -> Result<bool, crate::Error>;
+    async fn delete_template(&self, user_id: Uuid, template_id: Uuid)
+        -> Result<bool, crate::Error>;
 }

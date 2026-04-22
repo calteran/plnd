@@ -74,15 +74,13 @@ pub async fn delete(
     template_id: Uuid,
     user_id: Uuid,
 ) -> Result<bool, DatabaseError> {
-    sqlx::query(
-        "DELETE FROM schedule_templates WHERE template_id = $1 AND user_id = $2",
-    )
-    .bind(template_id)
-    .bind(user_id)
-    .execute(pool)
-    .await
-    .map(|r| r.rows_affected() > 0)
-    .map_err(DatabaseError::from)
+    sqlx::query("DELETE FROM schedule_templates WHERE template_id = $1 AND user_id = $2")
+        .bind(template_id)
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map(|r| r.rows_affected() > 0)
+        .map_err(DatabaseError::from)
 }
 
 // ---------------------------------------------------------------------------
@@ -156,14 +154,25 @@ mod tests {
         let uid = new_user(&pool).await;
 
         create(
-            &pool, uid, "meal", "Breakfast", "daily", None, None, None, None, "medium", false,
-            None, None,
+            &pool,
+            uid,
+            "meal",
+            "Breakfast",
+            "daily",
+            None,
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
         )
         .await
         .unwrap();
         create(
-            &pool, uid, "exercise", "Walk", "weekdays", None, None, None, None, "low", false,
-            None, None,
+            &pool, uid, "exercise", "Walk", "weekdays", None, None, None, None, "low", false, None,
+            None,
         )
         .await
         .unwrap();
@@ -181,8 +190,19 @@ mod tests {
     async fn delete_returns_true(pool: PgPool) {
         let uid = new_user(&pool).await;
         let t = create(
-            &pool, uid, "meal", "Breakfast", "daily", None, None, None, None, "medium", false,
-            None, None,
+            &pool,
+            uid,
+            "meal",
+            "Breakfast",
+            "daily",
+            None,
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
         )
         .await
         .unwrap();
@@ -203,8 +223,19 @@ mod tests {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
         let t = create(
-            &pool, uid_a, "meal", "Breakfast", "daily", None, None, None, None, "medium",
-            false, None, None,
+            &pool,
+            uid_a,
+            "meal",
+            "Breakfast",
+            "daily",
+            None,
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
         )
         .await
         .unwrap();

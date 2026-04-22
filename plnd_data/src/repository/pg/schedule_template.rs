@@ -4,8 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    db::schedule_template as db,
-    models::ScheduleTemplate,
+    db::schedule_template as db, models::ScheduleTemplate,
     repository::schedule_template::ScheduleTemplateRepository,
 };
 

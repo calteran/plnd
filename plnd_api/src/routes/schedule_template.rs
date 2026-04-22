@@ -1,18 +1,24 @@
 use crate::api_response::ScheduleTemplateResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::Error;
 use axum::{
     extract::{Extension, Path, State},
     http::StatusCode,
     Json,
 };
 use chrono::NaiveTime;
+use plnd_data::Error;
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub const VALID_TASK_TYPES: &[&str] = &[
-    "meal", "exercise", "work", "leisure", "appointment", "medication", "custom",
+    "meal",
+    "exercise",
+    "work",
+    "leisure",
+    "appointment",
+    "medication",
+    "custom",
 ];
 pub const VALID_RECURRENCES: &[&str] = &["daily", "weekdays", "weekly", "custom"];
 pub const VALID_ENERGIES: &[&str] = &["low", "medium", "high"];
@@ -167,7 +173,15 @@ mod tests {
 
     #[test]
     fn valid_task_types_matches_db_check_constraint() {
-        for t in &["meal", "exercise", "work", "leisure", "appointment", "medication", "custom"] {
+        for t in &[
+            "meal",
+            "exercise",
+            "work",
+            "leisure",
+            "appointment",
+            "medication",
+            "custom",
+        ] {
             assert!(VALID_TASK_TYPES.contains(t), "missing task_type: {t}");
         }
         assert!(!VALID_TASK_TYPES.contains(&"invalid"));

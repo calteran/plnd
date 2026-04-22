@@ -82,9 +82,9 @@ impl Repositories {
             memory: Arc::new(pg::memory::PgMemoryRepository::new(pool.clone())),
             preferences: Arc::new(pg::preferences::PgPreferencesRepository::new(pool.clone())),
             schedule: Arc::new(pg::schedule::PgScheduleRepository::new(pool.clone())),
-            schedule_template: Arc::new(
-                pg::schedule_template::PgScheduleTemplateRepository::new(pool.clone()),
-            ),
+            schedule_template: Arc::new(pg::schedule_template::PgScheduleTemplateRepository::new(
+                pool.clone(),
+            )),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),
             task: Arc::new(pg::task::PgTaskRepository::new(pool.clone())),
             user: Arc::new(pg::user::PgUserRepository::new(pool.clone())),
