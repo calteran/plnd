@@ -78,13 +78,14 @@ pub struct UserMealPrefDetail {
     pub nutrition_estimated: bool,
 }
 
-/// User preference for a catalog ingredient (blocked/notes only — no fork concept for ingredients).
+/// User preference for a catalog ingredient.
+/// preference_score: −2=refuse, −1=tolerate, 0=neutral, +1=enjoy, +2=strongly prefer
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct UserIngredientPref {
     pub user_ingredient_pref_id: Uuid,
     pub user_id: Uuid,
     pub catalog_ingredient_id: Uuid,
-    pub is_blocked: bool,
+    pub preference_score: i16,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
