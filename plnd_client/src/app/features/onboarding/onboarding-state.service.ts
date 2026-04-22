@@ -24,10 +24,9 @@ export class OnboardingStateService {
   readonly planPeriod = this.planPeriodSignal.asReadonly();
   readonly enjoyedIngredients = this.enjoyedIngredientsSignal.asReadonly();
 
-  readonly allSectionsComplete = computed(() => {
-    const s = this.statusSignal();
-    return s.account === 'complete' && s.tasks === 'complete' && s.food === 'complete';
-  });
+  readonly allSectionsComplete = computed(() =>
+    Object.values(this.statusSignal()).every(status => status === 'complete')
+  );
 
   markComplete(section: SectionId): void {
     this.statusSignal.update(s => ({ ...s, [section]: 'complete' }));
