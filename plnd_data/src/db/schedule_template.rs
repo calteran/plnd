@@ -12,7 +12,10 @@ pub async fn list_for_user(
     user_id: Uuid,
 ) -> Result<Vec<ScheduleTemplate>, DatabaseError> {
     sqlx::query_as::<_, ScheduleTemplate>(
-        "SELECT * FROM schedule_templates WHERE user_id = $1 ORDER BY created_at ASC",
+        "SELECT template_id, user_id, task_type, title, recurrence, recurrence_rule,
+            time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
+            task_ref_id, task_ref_type, created_at, updated_at
+         FROM schedule_templates WHERE user_id = $1 ORDER BY created_at ASC",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -43,7 +46,9 @@ pub async fn create(
             time_window_start, time_window_end, duration_minutes,
             energy_required, is_milepost, task_ref_id, task_ref_type
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        RETURNING *",
+        RETURNING template_id, user_id, task_type, title, recurrence, recurrence_rule,
+            time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
+            task_ref_id, task_ref_type, created_at, updated_at",
     )
     .bind(user_id)
     .bind(task_type)
@@ -66,8 +71,8 @@ pub async fn create(
 #[tracing::instrument(skip(pool), fields(table = "schedule_templates", op = "delete"))]
 pub async fn delete(
     pool: &PgPool,
-    user_id: Uuid,
     template_id: Uuid,
+    user_id: Uuid,
 ) -> Result<bool, DatabaseError> {
     sqlx::query(
         "DELETE FROM schedule_templates WHERE template_id = $1 AND user_id = $2",
@@ -182,14 +187,14 @@ mod tests {
         .await
         .unwrap();
 
-        let deleted = delete(&pool, uid, t.template_id).await.unwrap();
+        let deleted = delete(&pool, t.template_id, uid).await.unwrap();
         assert!(deleted);
     }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn delete_returns_false_for_unknown(pool: PgPool) {
         let uid = new_user(&pool).await;
-        let deleted = delete(&pool, uid, Uuid::new_v4()).await.unwrap();
+        let deleted = delete(&pool, Uuid::new_v4(), uid).await.unwrap();
         assert!(!deleted);
     }
 
@@ -205,7 +210,7 @@ mod tests {
         .unwrap();
 
         // uid_b cannot delete uid_a's template
-        let deleted = delete(&pool, uid_b, t.template_id).await.unwrap();
+        let deleted = delete(&pool, t.template_id, uid_b).await.unwrap();
         assert!(!deleted);
 
         // Record must still exist for uid_a
