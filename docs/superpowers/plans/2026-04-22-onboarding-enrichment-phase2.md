@@ -71,8 +71,10 @@ The following open sub-issues are superseded by design changes and must be close
 
 | Action | Path | Purpose |
 |---|---|---|
-| Create migration | `plnd_data/migrations/YYYYMMDD_create_user_schedule_types.sql` | New table: `id, user_id, name, days_bitmask (INT), wake_time TIME, bed_time TIME, is_cycle BOOL, cycle_length INT` |
+| Create migration | `plnd_data/migrations/YYYYMMDD_create_user_schedule_types.sql` | New table: `id, user_id, name, days_bitmask (INT), wake_time TIME, bed_time TIME, is_cycle BOOL, cycle_length INT, anchor_date DATE` |
 | Create migration | `plnd_data/migrations/YYYYMMDD_add_meal_windows_to_preferences.sql` | Add `breakfast_window_start/end`, `lunch_window_start/end`, `dinner_window_start/end` (all `TIME NULL`) to `user_preferences` |
+| Create migration | `plnd_data/migrations/YYYYMMDD_add_notification_prefs_to_preferences.sql` | Add `email_notifications_enabled BOOL DEFAULT false`, `sms_notifications_enabled BOOL DEFAULT false`, `push_notifications_enabled BOOL DEFAULT false`, `phone_number TEXT` to `user_preferences` |
+| Create migration | `plnd_data/migrations/YYYYMMDD_extend_dietary_restriction_type_constraint.sql` | Extend check constraint on `restriction_type` to include `cultural_religious` (currently only `allergy`, `intolerance`, `preference`) |
 | Create migration | `plnd_data/migrations/YYYYMMDD_create_user_meal_habits.sql` | New table: `id, user_id, meal_name, slot (breakfast/lunch/dinner), recurrence_rule TEXT` |
 | Create | `plnd_data/src/repository/schedule_types.rs` | `ScheduleTypeRepository` trait + `PgScheduleTypeRepository` impl |
 | Modify | `plnd_data/src/repository/mod.rs` | Re-export `ScheduleTypeRepository` |
@@ -83,7 +85,9 @@ The following open sub-issues are superseded by design changes and must be close
 | Create | `plnd_api/src/routes/schedule_types.rs` | `GET /schedule/types`, `POST /schedule/types`, `PUT /schedule/types/{id}`, `DELETE /schedule/types/{id}` |
 | Create | `plnd_api/src/routes/meal_habits.rs` | `GET /meal-habits`, `POST /meal-habits`, `DELETE /meal-habits/{id}` |
 | Create | `plnd_api/src/routes/agent/place_tasks.rs` | `POST /agent/place-tasks` — accepts `{ task_names: string[], plan_start, plan_end }`, returns `PlanEntryRequest[]` |
+| Modify | `plnd_agent/src/context/mod.rs` | Add `TaskPlacement` variant to `UseCase` enum with its prompt template and response validator |
 | Modify | `plnd_api/src/routes/mod.rs` | Wire new route modules |
+| Modify | `plnd_api/src/routes/preferences.rs` | Expose new meal window fields and notification preference fields in `patch_preferences` handler and its request model |
 | Modify | `plnd_api/src/routes/schedule/plan.rs` | Extend `POST /schedule/plan` body to accept `schedule_type_ids: Vec<Uuid>`, `placed_tasks: Vec<PlanEntryRequest>`, `meal_habit_ids: Vec<Uuid>` alongside existing meal plan |
 
 ### Frontend (`plnd_client`)
@@ -148,12 +152,12 @@ Files:
 - Modify: `plnd_api/src/routes/mod.rs`
 
 Steps:
-- [ ] Write failing sqlx integration test for `create_schedule_type` + `list_schedule_types_for_user` + `delete_schedule_type`
-- [ ] Write the DB migration (`user_schedule_types` table)
+- [ ] Write failing sqlx integration tests for `create_schedule_type` + `list_schedule_types_for_user` + `update_schedule_type` + `delete_schedule_type`
+- [ ] Write the DB migration (`user_schedule_types` table; include `anchor_date DATE NULL` for cycle mode)
 - [ ] Implement `ScheduleTypeRepository` trait + `PgScheduleTypeRepository`
 - [ ] Make integration tests pass; run `just verify`
 - [ ] Add `ScheduleTypeRequest` and `ScheduleTypeResponse` to `plnd_api/src/models.rs`
-- [ ] Implement route handlers + wire into router
+- [ ] Implement route handlers (GET, POST, PUT, DELETE) + wire into router
 - [ ] Run `just verify`; commit
 
 ---
@@ -164,15 +168,20 @@ Steps:
 
 Files:
 - Create: `plnd_data/migrations/YYYYMMDD_add_meal_windows_to_preferences.sql`
+- Create: `plnd_data/migrations/YYYYMMDD_add_notification_prefs_to_preferences.sql`
+- Create: `plnd_data/migrations/YYYYMMDD_extend_dietary_restriction_type_constraint.sql`
 - Create: `plnd_data/migrations/YYYYMMDD_create_user_meal_habits.sql`
 - Modify: `plnd_data/src/repository/preferences.rs`
 - Create: `plnd_data/src/repository/meal_habits.rs`
 - Modify: `plnd_api/src/models.rs`
+- Modify: `plnd_api/src/routes/preferences.rs` — expose meal window + notification preference fields in `patch_preferences` handler
 - Create: `plnd_api/src/routes/meal_habits.rs`
 
 Steps:
 - [ ] Write failing tests for `update_meal_windows` on `PreferencesRepository`
 - [ ] Write meal window migration; implement `update_meal_windows`; pass tests
+- [ ] Write notification prefs migration; extend `patch_preferences` handler + request model in `plnd_api/src/routes/preferences.rs`
+- [ ] Write dietary restriction type constraint migration (add `cultural_religious` to check constraint)
 - [ ] Write failing tests for `MealHabitRepository` (create, list, delete)
 - [ ] Write meal habits migration; implement `PgMealHabitRepository`; pass tests
 - [ ] Add request/response models to `plnd_api/src/models.rs`
@@ -188,13 +197,15 @@ Steps:
 Files:
 - Modify: `plnd_api/src/models.rs` — add `PlaceTasksRequest`, extend `PlanEntryRequest` with `duration_minutes?` + `energy_required?`
 - Modify: `plnd_client/src/app/core/models/week-plan.ts` — mirror TS-side
+- Modify: `plnd_agent/src/context/mod.rs` — add `TaskPlacement` variant to `UseCase` enum, its prompt template, and response validator
 - Create: `plnd_api/src/routes/agent/place_tasks.rs`
 - Modify: `plnd_api/src/routes/mod.rs`
 
 Steps:
 - [ ] Add `duration_minutes?: u32` and `energy_required?: EnergyLevel` to Rust `PlanEntryRequest` (models.rs)
+- [ ] Add `UseCase::TaskPlacement` to `plnd_agent/src/context/mod.rs` with prompt template and validator (follow the pattern of the existing `MealPlan` use case)
 - [ ] Write integration test for `POST /agent/place-tasks` with mock LLM (or real if CI config allows)
-- [ ] Implement handler: call LLM with task names + plan period; parse placements; return `Vec<PlanEntryRequest>`
+- [ ] Implement handler: call LLM via `UseCase::TaskPlacement`; parse placements; return `Vec<PlanEntryRequest>`
 - [ ] Wire route; run `just verify`; commit
 - [ ] Mirror TS: add `duration_minutes?: number` and `energy_required?: EnergyLevel` to `PlanEntryRequest` in `core/models/week-plan.ts`
 
@@ -387,7 +398,7 @@ SpokeChromeComponent: `totalSteps = planningPrefsComplete ? 5 : 6`. Final dot re
 - Banner: "Your choices here reflect your tastes and practices…"
 - Lifestyle section (collapsible): grouped chips with hover tooltips; + Add your own text input
 - Ingredient Ratings: text input + 5-emoji scale (😖😕😐🙂😍); rated rows with ✕; color on selected only
-- Meal Ratings: same pattern as Ingredient Ratings; saves to new endpoint or service
+- Meal Ratings: same visual pattern as Ingredient Ratings; saves via `PUT /my/meal-prefs/{mealId}` (check whether `UserMealPref` / `UserDishPref` endpoint already exists — see architecture spec note on `UserMealPref` pattern; if not, a new endpoint is needed and should be tracked as a backend sub-task)
 - Lifestyle saves as `DietaryRestriction` with `restriction_type = 'preference'`
 - Ingredient ratings save via `PUT /my/ingredient-prefs/{catalogIngredientId}`
 
