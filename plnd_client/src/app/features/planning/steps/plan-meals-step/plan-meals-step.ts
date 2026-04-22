@@ -15,6 +15,12 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
   standalone: true,
   imports: [],
   template: `
+    @if (firstRun()) {
+      <div class="first-run-callout">
+        Here's a suggested meal plan for your first week — approve, edit, or skip anything you like.
+      </div>
+    }
+
     <div class="plan-meals-wrapper">
 
       @if (firstRun()) {
@@ -132,6 +138,13 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
   `,
   styles: [`
     :host { display: block; }
+
+    .first-run-callout {
+      background: var(--color-accent-light);
+      border: 1px solid var(--color-accent-border);
+      border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+      font-size: 13px; color: var(--color-accent-dark); line-height: 1.4;
+    }
 
     .plan-meals-wrapper { overflow-x: auto; padding-bottom: 8px; }
 
@@ -334,6 +347,8 @@ export class PlanMealsStepComponent implements OnInit {
   private readonly weekPlanService         = inject(WeekPlanService);
   private readonly mealPlannerAgentService = inject(MealPlannerAgentService);
   private readonly destroyRef              = inject(DestroyRef);
+
+  readonly firstRun     = input(false);
 
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
 
