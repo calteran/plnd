@@ -9,6 +9,7 @@ pub(crate) mod memory;
 pub(crate) use memory::register_memory_tools;
 
 pub(crate) mod schedule;
+pub(crate) use schedule::register_place_tasks_tools;
 pub(crate) use schedule::register_schedule_tools;
 
 use std::collections::HashMap;
@@ -192,6 +193,9 @@ pub(crate) fn build_tool_registry(
                 Arc::clone(&repos.user_meal_pref),
             );
             register_meal_adhoc_resolve_tools(&mut registry, Arc::clone(&repos.user_meal_pref));
+        }
+        UseCase::PlaceTasks => {
+            register_place_tasks_tools(&mut registry);
         }
     }
     registry

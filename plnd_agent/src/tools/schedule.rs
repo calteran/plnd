@@ -437,6 +437,98 @@ fn request_clarification_schema() -> serde_json::Value {
     })
 }
 
+// ── PlaceTasksTool ────────────────────────────────────────────────────────────
+
+/// Terminal tool: the LLM calls this with the full array of scheduled task
+/// placements. The input is returned verbatim as the agent's final output.
+/// Schema validation in `AgentService::run` enforces the response contract.
+/// No DB writes occur here.
+///
+/// The outer `{"entries": [...]}` wrapper exists because the Anthropic API
+/// requires tool input schemas to be `type: object`.
+pub(crate) struct PlaceTasksTool;
+
+#[async_trait::async_trait]
+impl Tool for PlaceTasksTool {
+    fn name(&self) -> &str {
+        "place_tasks"
+    }
+
+    fn description(&self) -> &str {
+        "Submit the complete set of scheduled task placements. Call this as your \
+         final action once every task from the input list has been assigned a date, \
+         time window, duration, and energy level. Pass the full entries array — \
+         never omit a task."
+    }
+
+    fn schema(&self) -> serde_json::Value {
+        serde_json::json!({
+            "type": "object",
+            "required": ["entries"],
+            "additionalProperties": false,
+            "properties": {
+                "entries": {
+                    "type": "array",
+                    "description": "One entry per task from the input list",
+                    "items": {
+                        "type": "object",
+                        "required": ["title", "scheduled_date", "time_window_start",
+                                     "duration_minutes", "energy_required", "task_type"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "title": {
+                                "type": "string",
+                                "description": "Exact task name — do not alter it"
+                            },
+                            "scheduled_date": {
+                                "type": "string",
+                                "format": "date",
+                                "description": "ISO date within the plan period"
+                            },
+                            "time_window_start": {
+                                "type": "string",
+                                "description": "Wall-clock start time as HH:MM"
+                            },
+                            "duration_minutes": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 480,
+                                "description": "Estimated duration in minutes"
+                            },
+                            "energy_required": {
+                                "type": "string",
+                                "enum": ["low", "medium", "high"],
+                                "description": "Cognitive/physical energy demand"
+                            },
+                            "task_type": {
+                                "type": "string",
+                                "description": "floating (can shift) or fixed (must be at exact time)"
+                            }
+                        }
+                    }
+                }
+            }
+        })
+    }
+
+    fn is_terminal(&self) -> bool {
+        true
+    }
+
+    async fn execute(
+        &self,
+        _ctx: &ToolContext,
+        input: serde_json::Value,
+    ) -> Result<serde_json::Value, ToolError> {
+        Ok(input)
+    }
+}
+
+/// Registers the terminal tool for the `PlaceTasks` use case.
+pub(crate) fn register_place_tasks_tools(registry: &mut ToolRegistry) {
+    registry.register(Arc::new(PlaceTasksTool));
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -593,5 +685,35 @@ mod tests {
             .get("properties")
             .and_then(|p| p.get("date"))
             .is_some());
+    }
+
+    #[test]
+    fn place_tasks_tool_is_terminal() {
+        assert!(PlaceTasksTool.is_terminal());
+    }
+
+    #[test]
+    fn place_tasks_tool_name() {
+        assert_eq!(PlaceTasksTool.name(), "place_tasks");
+    }
+
+    #[tokio::test]
+    async fn place_tasks_tool_returns_input_verbatim() {
+        let tool = PlaceTasksTool;
+        let ctx = ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
+        let input = serde_json::json!({
+            "entries": [{
+                "title": "Call dentist",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "10:00",
+                "duration_minutes": 30,
+                "energy_required": "low",
+                "task_type": "floating"
+            }]
+        });
+        let result = tool.execute(&ctx, input.clone()).await.unwrap();
+        assert_eq!(result, input);
     }
 }
