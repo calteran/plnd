@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@angular/router';
 import { firstValueFrom, isObservable } from 'rxjs';
@@ -42,7 +43,8 @@ describe('onboardingNotCompletedGuard', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule, RouterTestingModule]
+      imports: [RouterTestingModule],
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     });
     userService = TestBed.inject(UserService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -90,7 +92,8 @@ describe('onboardingCompletedGuard', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule, RouterTestingModule]
+      imports: [RouterTestingModule],
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     });
     userService = TestBed.inject(UserService);
     httpMock = TestBed.inject(HttpTestingController);

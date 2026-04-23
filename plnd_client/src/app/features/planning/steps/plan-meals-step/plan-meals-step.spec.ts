@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
 import { PlanMealsStepComponent } from './plan-meals-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
@@ -37,8 +38,10 @@ describe('PlanMealsStepComponent', () => {
     agentSpy.suggestSlot.and.returnValue(suggestSlot$);
 
     await TestBed.configureTestingModule({
-      imports: [PlanMealsStepComponent, HttpClientTestingModule],
+      imports: [PlanMealsStepComponent],
       providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
         { provide: MealPlannerAgentService, useValue: agentSpy },
       ],
     }).compileComponents();

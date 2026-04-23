@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { PlanningWizardComponent } from './planning-wizard';
 
@@ -9,7 +10,8 @@ describe('PlanningWizardComponent', () => {
   beforeEach(async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
-      imports: [PlanningWizardComponent, HttpClientTestingModule, RouterTestingModule]
+      imports: [PlanningWizardComponent, RouterTestingModule],
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     }).compileComponents();
     fixture = TestBed.createComponent(PlanningWizardComponent);
     fixture.detectChanges();

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { PlanReviewStepComponent } from './plan-review-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 
@@ -16,7 +17,8 @@ describe('PlanReviewStepComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PlanReviewStepComponent, HttpClientTestingModule]
+      imports: [PlanReviewStepComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
     service.initSession('2026-03-24', '2026-03-30');
