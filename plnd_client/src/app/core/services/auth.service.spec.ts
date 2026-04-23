@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { Router } from '@angular/router';
-import { RouterTestingModule } from '@angular/router/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { AuthService } from './auth.service';
 import { SessionStateService } from './session-state.service';
@@ -28,9 +28,11 @@ describe('AuthService', () => {
     mockOauthService = buildOAuthMock();
 
     TestBed.configureTestingModule({
-      imports: [RouterTestingModule, HttpClientTestingModule],
       providers: [
-        { provide: OAuthService, useValue: mockOauthService }
+        { provide: OAuthService, useValue: mockOauthService },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
       ]
     });
 
@@ -147,9 +149,11 @@ describe('AuthService', () => {
       localStorage.setItem('auth_token', 'pre-existing-token');
       mockOauthService = buildOAuthMock();
       TestBed.configureTestingModule({
-        imports: [RouterTestingModule, HttpClientTestingModule],
         providers: [
-          { provide: OAuthService, useValue: mockOauthService }
+          { provide: OAuthService, useValue: mockOauthService },
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          provideRouter([]),
         ]
       });
     });

@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { Router } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
 import { SettingsComponent } from './settings';
 
 const MOCK_PREFS = {
@@ -19,7 +19,12 @@ describe('SettingsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [SettingsComponent, RouterTestingModule, HttpClientTestingModule]
+      imports: [SettingsComponent],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+      ]
     }).compileComponents();
 
     httpMock = TestBed.inject(HttpTestingController);
