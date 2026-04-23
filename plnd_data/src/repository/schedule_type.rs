@@ -4,6 +4,13 @@ use uuid::Uuid;
 
 use crate::models::ScheduleType;
 
+/// Outcome of an atomic schedule-type delete operation.
+pub enum DeleteScheduleTypeOutcome {
+    Deleted,
+    NotFound,
+    LastType,
+}
+
 #[async_trait]
 pub trait ScheduleTypeRepository: Send + Sync {
     async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<ScheduleType>, crate::Error>;
@@ -43,5 +50,9 @@ pub trait ScheduleTypeRepository: Send + Sync {
 
     async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error>;
 
-    async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<bool, crate::Error>;
+    async fn delete(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<DeleteScheduleTypeOutcome, crate::Error>;
 }

@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::models::ScheduleType;
+use crate::repository::schedule_type::DeleteScheduleTypeOutcome;
 
 const COLUMNS: &str =
     "id, user_id, name, days_bitmask, wake_time, bed_time, is_cycle, cycle_length, anchor_date, created_at";
@@ -119,16 +120,49 @@ pub async fn count_for_user(pool: &PgPool, user_id: Uuid) -> Result<i64, Databas
         .map_err(DatabaseError::from)
 }
 
-/// Delete a schedule type. Returns `true` if a row was deleted, `false` if not found.
+/// Atomically delete a schedule type, enforcing the "user must keep at least one" invariant.
+///
+/// The count check is embedded in the DELETE predicate so concurrent deletes cannot both
+/// pass the guard and leave the user with zero schedule types.  When `rows_affected == 0`
+/// a follow-up EXISTS query determines whether the id was simply not found or whether it
+/// was the last type for this user.
 #[tracing::instrument(skip(pool), fields(table = "user_schedule_types", op = "delete"))]
-pub async fn delete(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<bool, DatabaseError> {
-    sqlx::query("DELETE FROM user_schedule_types WHERE id = $1 AND user_id = $2")
-        .bind(id)
-        .bind(user_id)
-        .execute(pool)
-        .await
-        .map(|r| r.rows_affected() > 0)
-        .map_err(DatabaseError::from)
+pub async fn delete(
+    pool: &PgPool,
+    id: Uuid,
+    user_id: Uuid,
+) -> Result<DeleteScheduleTypeOutcome, DatabaseError> {
+    let result = sqlx::query(
+        "DELETE FROM user_schedule_types
+         WHERE id = $1
+           AND user_id = $2
+           AND (SELECT COUNT(*) FROM user_schedule_types WHERE user_id = $2) > 1",
+    )
+    .bind(id)
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    if result.rows_affected() > 0 {
+        return Ok(DeleteScheduleTypeOutcome::Deleted);
+    }
+
+    // rows_affected == 0: distinguish NotFound from LastType
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM user_schedule_types WHERE id = $1 AND user_id = $2)",
+    )
+    .bind(id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    if exists {
+        Ok(DeleteScheduleTypeOutcome::LastType)
+    } else {
+        Ok(DeleteScheduleTypeOutcome::NotFound)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -386,16 +420,34 @@ mod tests {
     // -----------------------------------------------------------------------
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn delete_returns_true(pool: PgPool) {
+    async fn delete_returns_deleted_when_multiple_exist(pool: PgPool) {
         let uid = new_user(&pool).await;
         let st = make_type(&pool, uid).await;
-        assert!(delete(&pool, st.id, uid).await.unwrap());
+        create(&pool, uid, "Weekends", 65, wake(), bed(), false, None, None)
+            .await
+            .unwrap();
+
+        let outcome = delete(&pool, st.id, uid).await.unwrap();
+        assert!(matches!(outcome, DeleteScheduleTypeOutcome::Deleted));
+        assert_eq!(list_for_user(&pool, uid).await.unwrap().len(), 1);
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn delete_returns_false_for_unknown(pool: PgPool) {
+    async fn delete_returns_last_type_when_only_one(pool: PgPool) {
         let uid = new_user(&pool).await;
-        assert!(!delete(&pool, Uuid::new_v4(), uid).await.unwrap());
+        let st = make_type(&pool, uid).await;
+
+        let outcome = delete(&pool, st.id, uid).await.unwrap();
+        assert!(matches!(outcome, DeleteScheduleTypeOutcome::LastType));
+        // Record must still exist — the delete was rejected
+        assert_eq!(list_for_user(&pool, uid).await.unwrap().len(), 1);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn delete_returns_not_found_for_unknown(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let outcome = delete(&pool, Uuid::new_v4(), uid).await.unwrap();
+        assert!(matches!(outcome, DeleteScheduleTypeOutcome::NotFound));
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -404,8 +456,9 @@ mod tests {
         let uid_b = new_user(&pool).await;
         let st = make_type(&pool, uid_a).await;
 
-        // uid_b cannot delete uid_a's record
-        assert!(!delete(&pool, st.id, uid_b).await.unwrap());
+        // uid_b cannot delete uid_a's record — returns NotFound (not visible to uid_b)
+        let outcome = delete(&pool, st.id, uid_b).await.unwrap();
+        assert!(matches!(outcome, DeleteScheduleTypeOutcome::NotFound));
 
         // Record still exists for uid_a
         assert_eq!(list_for_user(&pool, uid_a).await.unwrap().len(), 1);
