@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
@@ -119,10 +119,6 @@ import { OnboardingStateService } from '../onboarding-state.service';
   `,
   styles: [`
     :host {
-      --color-accent: #d97706;
-      --color-accent-dark: #78350f;
-      --color-accent-light: #fef3c7;
-      --color-accent-border: #fde68a;
       display: block;
       height: 100%;
     }
@@ -295,26 +291,34 @@ export class OnboardingAccountComponent implements OnInit {
   readonly pushNotifications = signal(false);
   readonly saveError = signal(false);
 
+  constructor() {
+    effect(() => {
+      const user = this.userService.user();
+      if (user) {
+        this.displayName.set(user.display_name ?? '');
+        this.email.set(user.email);
+      }
+    });
+
+    effect(() => {
+      const prefs = this.preferencesService.preferences();
+      if (prefs) {
+        this.emailNotifications.set(prefs.email_notifications_enabled);
+        this.smsNotifications.set(prefs.sms_notifications_enabled);
+        this.pushNotifications.set(prefs.push_notifications_enabled);
+        this.phoneNumber.set(prefs.phone_number ?? '');
+      }
+    });
+  }
+
   ngOnInit(): void {
     this.userService.loadUser();
     this.preferencesService.loadPreferences();
-
-    const user = this.userService.user();
-    this.displayName.set(user?.display_name ?? '');
-    this.email.set(user?.email ?? '');
-
-    const prefs = this.preferencesService.preferences();
-    if (prefs) {
-      this.emailNotifications.set(prefs.email_notifications_enabled);
-      this.smsNotifications.set(prefs.sms_notifications_enabled);
-      this.pushNotifications.set(prefs.push_notifications_enabled);
-      this.phoneNumber.set(prefs.phone_number ?? '');
-    }
+    // Pre-fill is handled reactively by effects in the constructor
   }
 
   onSmsToggle(checked: boolean): void {
     this.smsNotifications.set(checked);
-    if (!checked) this.phoneNumber.set('');
   }
 
   onPushToggle(checked: boolean): void {
