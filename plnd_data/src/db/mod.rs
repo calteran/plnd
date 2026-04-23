@@ -10,6 +10,7 @@ pub(crate) mod memories;
 pub(crate) mod preferences;
 pub(crate) mod schedule;
 pub(crate) mod schedule_template;
+pub(crate) mod schedule_type;
 pub(crate) mod search;
 pub(crate) mod sessions;
 pub(crate) mod tasks;
