@@ -9,6 +9,7 @@ export class MealHabitsService {
   private readonly http = inject(HttpClient);
   private readonly config = inject(ConfigService);
 
+  // [] initial value intentional — consumers render an empty list before load resolves; loaded flag is the gate
   private readonly habitsSignal = signal<MealHabitResponse[]>([]);
   private loaded = false;
 

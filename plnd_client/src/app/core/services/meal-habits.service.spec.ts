@@ -42,16 +42,22 @@ describe('MealHabitsService', () => {
     http.expectNone('http://api/meal-habits');
   });
 
-  it('create() POSTs and appends to signal', () => {
+  it('create() POSTs and appends to signal without removing existing', () => {
+    const existing: MealHabitResponse = {
+      id: 'h1', user_id: 'u1', meal_name: 'Oatmeal',
+      slot: 'breakfast', recurrence_rule: 'FREQ=DAILY', created_at: '2026-01-01T00:00:00Z',
+    };
     service.load();
-    http.expectOne('http://api/meal-habits').flush([]);
+    http.expectOne('http://api/meal-habits').flush([existing]);
+
     const req: CreateMealHabitRequest = { meal_name: 'Eggs', slot: 'breakfast', recurrence_rule: 'FREQ=DAILY' };
     const created: MealHabitResponse = { id: 'h2', user_id: 'u1', ...req, created_at: '2026-01-01T00:00:00Z' };
     let result: MealHabitResponse | undefined;
-    service.create(req).subscribe((r: MealHabitResponse) => result = r);
+    service.create(req).subscribe(r => result = r);
     http.expectOne('http://api/meal-habits').flush(created);
     expect(result).toEqual(created);
     expect(service.habits()).toContain(created);
+    expect(service.habits()).toContain(existing); // original still present
   });
 
   it('delete() DELETEs and removes from signal', () => {
@@ -64,12 +70,19 @@ describe('MealHabitsService', () => {
     expect(service.habits()).not.toContain(habit);
   });
 
-  it('clear() resets signal and loaded flag', () => {
+  it('clear() resets signal to empty and allows re-fetch', () => {
+    const habit: MealHabitResponse = {
+      id: 'h5', user_id: 'u1', meal_name: 'Toast',
+      slot: 'breakfast', recurrence_rule: 'FREQ=DAILY', created_at: '2026-01-01T00:00:00Z',
+    };
     service.load();
-    http.expectOne('http://api/meal-habits').flush([]);
+    http.expectOne('http://api/meal-habits').flush([habit]);
+    expect(service.habits().length).toBe(1); // data is present
+
     service.clear();
-    expect(service.habits()).toEqual([]);
+    expect(service.habits()).toEqual([]); // signal reset
     service.load(); // should fetch again after clear
     http.expectOne('http://api/meal-habits').flush([]);
+    expect(service.habits()).toEqual([]);
   });
 });
