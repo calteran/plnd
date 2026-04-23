@@ -13,7 +13,8 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
   beforeEach(async () => {
     mealsSvc = jasmine.createSpyObj('UserMealsService', ['createFromScratch', 'updateMetadata']);
-    restrictionsSvc = jasmine.createSpyObj('DietaryRestrictionsService', ['create']);
+    restrictionsSvc = jasmine.createSpyObj('DietaryRestrictionsService', ['create', 'load', 'restrictions']);
+    restrictionsSvc.restrictions.and.returnValue(null);
 
     await TestBed.configureTestingModule({
       imports: [DietaryPreferencesSubstepComponent],

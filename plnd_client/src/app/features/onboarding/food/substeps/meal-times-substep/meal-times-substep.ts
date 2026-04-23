@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
 import { PreferencesService } from '../../../../../core/services/preferences.service';
 
 interface MealWindow {
@@ -8,6 +8,12 @@ interface MealWindow {
 
 function timeToApi(t: string): string {
   return t.includes(':') && t.split(':').length === 2 ? `${t}:00` : t;
+}
+
+function toHHMM(t: string | undefined): string | null {
+  if (!t) return null;
+  const parts = t.split(':');
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : null;
 }
 
 @Component({
@@ -59,7 +65,7 @@ function timeToApi(t: string): string {
     .error { color: #dc2626; font-size: 12px; margin: 4px 0 0; }
   `],
 })
-export class MealTimesSubstepComponent {
+export class MealTimesSubstepComponent implements OnInit {
   @Output() complete = new EventEmitter<void>();
 
   private readonly preferencesService = inject(PreferencesService);
@@ -74,6 +80,23 @@ export class MealTimesSubstepComponent {
     { key: 'lunch', label: 'Lunch', window: this.lunch },
     { key: 'dinner', label: 'Dinner', window: this.dinner },
   ];
+
+  ngOnInit(): void {
+    const prefs = this.preferencesService.preferences();
+    if (!prefs) return;
+    const bfs = toHHMM(prefs.breakfast_window_start);
+    const bfe = toHHMM(prefs.breakfast_window_end);
+    const ls  = toHHMM(prefs.lunch_window_start);
+    const le  = toHHMM(prefs.lunch_window_end);
+    const ds  = toHHMM(prefs.dinner_window_start);
+    const de  = toHHMM(prefs.dinner_window_end);
+    if (bfs) this.breakfast.from.set(bfs);
+    if (bfe) this.breakfast.to.set(bfe);
+    if (ls)  this.lunch.from.set(ls);
+    if (le)  this.lunch.to.set(le);
+    if (ds)  this.dinner.from.set(ds);
+    if (de)  this.dinner.to.set(de);
+  }
 
   protected asTime(event: Event): string {
     return (event.target as HTMLInputElement).value;

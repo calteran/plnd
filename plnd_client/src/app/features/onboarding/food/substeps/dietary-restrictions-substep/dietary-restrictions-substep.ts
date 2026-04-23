@@ -61,8 +61,7 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: 
           >
             @if (editingId() === r.restriction_id) {
               <div class="card-edit">
-                <input class="name-input" type="text" [value]="editName()"
-                  (input)="editName.set(asText($event))" />
+                <p class="edit-name-readonly">{{ editName() }}</p>
                 <textarea class="note-input" [value]="editNote()"
                   (input)="editNote.set(asText($event))" placeholder="Optional note"></textarea>
                 <div class="edit-actions">
@@ -109,6 +108,7 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: 
     .btn-remove { position: absolute; top: 8px; right: 8px; background: none; border: none; font-size: 13px; color: #9ca3af; cursor: pointer; line-height: 1; }
     .btn-remove:hover { color: #dc2626; }
     .card-edit { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .edit-name-readonly { font-size: 13px; font-weight: 600; color: #1f2937; margin: 0; }
     .edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
     .btn-cancel { background: none; border: 1.5px solid #d1d5db; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
     .btn-save { background: var(--color-accent,#d97706); color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }

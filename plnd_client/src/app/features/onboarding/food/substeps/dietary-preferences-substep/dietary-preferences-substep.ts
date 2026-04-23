@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
 import { from, mergeMap } from 'rxjs';
 import { switchMap } from 'rxjs/operators';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
@@ -204,7 +204,7 @@ const LIFESTYLE_GROUPS: { group: string; items: { key: string; emoji: string; la
     .error { color: #dc2626; font-size: 12px; margin: 0; }
   `],
 })
-export class DietaryPreferencesSubstepComponent {
+export class DietaryPreferencesSubstepComponent implements OnInit {
   @Output() complete = new EventEmitter<void>();
 
   private readonly dietaryService = inject(DietaryRestrictionsService);
@@ -228,6 +228,17 @@ export class DietaryPreferencesSubstepComponent {
 
   readonly emojis = EMOJIS;
   readonly lifestyleGroups = LIFESTYLE_GROUPS;
+
+  ngOnInit(): void {
+    this.dietaryService.load();
+    const existing = this.dietaryService.restrictions();
+    if (existing) {
+      const keys = existing
+        .filter(r => r.restriction_type === 'preference')
+        .map(r => r.name);
+      if (keys.length) this.selectedLifestyles.set(keys);
+    }
+  }
 
   protected asText(e: Event): string {
     return (e.target as HTMLInputElement).value;
@@ -297,7 +308,17 @@ export class DietaryPreferencesSubstepComponent {
       this.complete.emit();
       return;
     }
-    from(lifestyles)
+    const existingNames = new Set(
+      (this.dietaryService.restrictions() ?? [])
+        .filter(r => r.restriction_type === 'preference')
+        .map(r => r.name)
+    );
+    const toCreate = lifestyles.filter(key => !existingNames.has(key));
+    if (!toCreate.length) {
+      this.complete.emit();
+      return;
+    }
+    from(toCreate)
       .pipe(mergeMap(key => this.dietaryService.create({ restriction_type: 'preference', name: key })))
       .subscribe({
         error: () => this.saveError.set(true),
