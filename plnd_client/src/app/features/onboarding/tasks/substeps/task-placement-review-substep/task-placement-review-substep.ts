@@ -8,9 +8,8 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
-import { ConfigService } from '../../../../../core/services/config.service';
+import { AgentService } from '../../../../../core/services/agent.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import {
   PlaceTasksRequest,
@@ -578,8 +577,7 @@ function buildDayCards(entries: PlaceTasksEntry[], start: string, end: string): 
 export class TaskPlacementReviewSubstepComponent implements OnInit {
   @Output() complete = new EventEmitter<void>();
 
-  private readonly http = inject(HttpClient);
-  private readonly config = inject(ConfigService);
+  private readonly agentService = inject(AgentService);
   private readonly stateService = inject(OnboardingStateService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -622,14 +620,13 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     this.hasError.set(false);
     this.editState.set(null);
 
-    const apiBase = this.config.getConfig().api.baseUrl;
     const body: PlaceTasksRequest = {
       task_names: taskNames,
       plan_start: period.start,
       plan_end: period.end,
     };
 
-    this.http.post<PlaceTasksEntry[]>(`${apiBase}/agent/place-tasks`, body)
+    this.agentService.placeTasks(body)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
       next: (result) => {

@@ -292,4 +292,47 @@ describe('ScheduleTypesSubstepComponent', () => {
     expect(errorEl).not.toBeNull();
     expect(errorEl.textContent).toContain('Failed to save schedule types');
   });
+
+  // ── 13. onRemoveClick: server delete for existing cards ──────────────────────
+
+  it('onRemoveClick() calls delete() and removes card on success when card has an id', async () => {
+    const stored: ScheduleTypeResponse[] = [
+      { ...MOCK_RESPONSE, id: 'del-id', name: 'To Delete', days_bitmask: 0 },
+    ];
+    const { component, svcMock } = await setup(stored);
+    svcMock.delete.and.returnValue(of(undefined));
+    component.ngOnInit();
+
+    expect(component.cards().length).toBe(1);
+    component.onRemoveClick(0);
+    expect(svcMock.delete).toHaveBeenCalledWith('del-id');
+    expect(component.cards().length).toBe(0);
+  });
+
+  it('onRemoveClick() shows deleteError when server delete fails', async () => {
+    const stored: ScheduleTypeResponse[] = [
+      { ...MOCK_RESPONSE, id: 'del-id', name: 'To Delete', days_bitmask: 0 },
+    ];
+    const { fixture, component, svcMock } = await setup(stored);
+    svcMock.delete.and.returnValue(throwError(() => new Error('Network error')));
+    fixture.detectChanges();
+
+    component.onRemoveClick(0);
+    fixture.detectChanges();
+
+    expect(component.deleteError()).toBeTrue();
+    expect(component.cards().length).toBe(1); // card not removed on error
+  });
+
+  it('onRemoveClick() removes client-only card immediately (no server call)', async () => {
+    const { component, svcMock } = await setup();
+    component.ngOnInit();
+    // Default cards have id=null; clear bitmask to enable removal
+    component.updateCard(0, { days_bitmask: 0 });
+
+    expect(component.cards().length).toBe(2);
+    component.onRemoveClick(0);
+    expect(svcMock.delete).not.toHaveBeenCalled();
+    expect(component.cards().length).toBe(1);
+  });
 });

@@ -1,5 +1,6 @@
 import {
   Component,
+  DestroyRef,
   EventEmitter,
   OnDestroy,
   OnInit,
@@ -7,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
 import { ScheduleTypesService } from '../../../../../core/services/schedule-types.service';
 import { ScheduleTypeResponse } from '../../../../../core/models/schedule-type';
@@ -232,6 +234,11 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
         <p class="save-error">{{ validationError() }}</p>
       }
 
+      <!-- Delete error -->
+      @if (deleteError()) {
+        <p class="save-error">Failed to remove schedule type. Please try again.</p>
+      }
+
       <!-- Save error -->
       @if (saveError()) {
         <p class="save-error">Failed to save schedule types. Please try again.</p>
@@ -438,9 +445,11 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
 
   private readonly scheduleTypesService = inject(ScheduleTypesService);
   private readonly stateService = inject(OnboardingStateService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly cards = signal<ScheduleCard[]>([]);
   readonly saveError = signal(false);
+  readonly deleteError = signal(false);
   readonly validationError = signal('');
   readonly isSaving = signal(false);
 
@@ -509,7 +518,21 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
         this.updateCard(index, { showRemoveHint: false });
         this.removeHintTimer = null;
       }, 3000);
+    } else if (card.id) {
+      // Existing server record — delete before removing from local list
+      this.deleteError.set(false);
+      this.scheduleTypesService.delete(card.id)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: () => {
+            this.cards.update(list => list.filter((_, i) => i !== index));
+          },
+          error: () => {
+            this.deleteError.set(true);
+          },
+        });
     } else {
+      // Client-only card (never saved) — remove immediately
       this.cards.update(list => list.filter((_, i) => i !== index));
     }
   }
