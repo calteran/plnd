@@ -26,7 +26,11 @@ pub async fn patch_preferences(
                wake_time                = COALESCE($5, user_preferences.wake_time),
                updated_at               = NOW()
          RETURNING user_id, week_start_day, planning_trigger_offset,
-                   default_plan_length_days, wake_time, created_at, updated_at",
+                   default_plan_length_days, wake_time,
+                   breakfast_window_start, breakfast_window_end,
+                   lunch_window_start, lunch_window_end,
+                   dinner_window_start, dinner_window_end,
+                   created_at, updated_at",
     )
     .bind(user_id)
     .bind(week_start_day)
@@ -47,9 +51,55 @@ pub async fn get_or_create(pool: &PgPool, user_id: Uuid) -> Result<UserPreferenc
          ON CONFLICT (user_id) DO UPDATE
            SET updated_at = user_preferences.updated_at
          RETURNING user_id, week_start_day, planning_trigger_offset,
-                   default_plan_length_days, wake_time, created_at, updated_at",
+                   default_plan_length_days, wake_time,
+                   breakfast_window_start, breakfast_window_end,
+                   lunch_window_start, lunch_window_end,
+                   dinner_window_start, dinner_window_end,
+                   created_at, updated_at",
     )
     .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
+/// Upsert meal window time ranges on the user's preferences row.
+#[tracing::instrument(skip(pool), fields(table = "preferences", op = "update_meal_windows"))]
+pub async fn update_meal_windows(
+    pool: &PgPool,
+    user_id: Uuid,
+    breakfast_window_start: Option<NaiveTime>,
+    breakfast_window_end: Option<NaiveTime>,
+    lunch_window_start: Option<NaiveTime>,
+    lunch_window_end: Option<NaiveTime>,
+    dinner_window_start: Option<NaiveTime>,
+    dinner_window_end: Option<NaiveTime>,
+) -> Result<UserPreferences, DatabaseError> {
+    sqlx::query_as::<_, UserPreferences>(
+        "INSERT INTO user_preferences (user_id)
+         VALUES ($1)
+         ON CONFLICT (user_id) DO UPDATE
+           SET breakfast_window_start = COALESCE($2, user_preferences.breakfast_window_start),
+               breakfast_window_end   = COALESCE($3, user_preferences.breakfast_window_end),
+               lunch_window_start     = COALESCE($4, user_preferences.lunch_window_start),
+               lunch_window_end       = COALESCE($5, user_preferences.lunch_window_end),
+               dinner_window_start    = COALESCE($6, user_preferences.dinner_window_start),
+               dinner_window_end      = COALESCE($7, user_preferences.dinner_window_end),
+               updated_at             = NOW()
+         RETURNING user_id, week_start_day, planning_trigger_offset,
+                   default_plan_length_days, wake_time,
+                   breakfast_window_start, breakfast_window_end,
+                   lunch_window_start, lunch_window_end,
+                   dinner_window_start, dinner_window_end,
+                   created_at, updated_at",
+    )
+    .bind(user_id)
+    .bind(breakfast_window_start)
+    .bind(breakfast_window_end)
+    .bind(lunch_window_start)
+    .bind(lunch_window_end)
+    .bind(dinner_window_start)
+    .bind(dinner_window_end)
     .fetch_one(pool)
     .await
     .map_err(DatabaseError::from)
@@ -174,5 +224,99 @@ mod tests {
         // User A's preference must be unaffected by user B's patch
         let a_prefs = get_or_create(&pool, uid_a).await.unwrap();
         assert_eq!(a_prefs.week_start_day, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // update_meal_windows
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_meal_windows_sets_values(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
+        let end = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
+
+        let prefs = update_meal_windows(
+            &pool,
+            uid,
+            Some(start),
+            Some(end),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(prefs.breakfast_window_start, Some(start));
+        assert_eq!(prefs.breakfast_window_end, Some(end));
+        assert_eq!(prefs.lunch_window_start, None);
+        assert_eq!(prefs.lunch_window_end, None);
+        assert_eq!(prefs.dinner_window_start, None);
+        assert_eq!(prefs.dinner_window_end, None);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_meal_windows_partial_preserves_existing(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let b_start = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
+        let b_end = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
+        let l_start = NaiveTime::from_hms_opt(12, 0, 0).unwrap();
+        let l_end = NaiveTime::from_hms_opt(13, 0, 0).unwrap();
+
+        // Set breakfast and lunch windows
+        update_meal_windows(
+            &pool,
+            uid,
+            Some(b_start),
+            Some(b_end),
+            Some(l_start),
+            Some(l_end),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        // Now only update breakfast — lunch must be preserved
+        let new_b_start = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        let prefs = update_meal_windows(
+            &pool,
+            uid,
+            Some(new_b_start),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(prefs.breakfast_window_start, Some(new_b_start));
+        assert_eq!(prefs.breakfast_window_end, Some(b_end));
+        assert_eq!(prefs.lunch_window_start, Some(l_start));
+        assert_eq!(prefs.lunch_window_end, Some(l_end));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_meal_windows_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+
+        let a_start = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
+        let b_start = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
+
+        update_meal_windows(&pool, uid_a, Some(a_start), None, None, None, None, None)
+            .await
+            .unwrap();
+        update_meal_windows(&pool, uid_b, Some(b_start), None, None, None, None, None)
+            .await
+            .unwrap();
+
+        // User A's windows must be unaffected by user B's update
+        let a_prefs = get_or_create(&pool, uid_a).await.unwrap();
+        assert_eq!(a_prefs.breakfast_window_start, Some(a_start));
     }
 }
