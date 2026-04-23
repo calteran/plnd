@@ -58,7 +58,7 @@ export class OnboardingTasksComponent {
    * "Save & Continue →" button drives this for the planning-prefs step.
    * For all other substeps the substep has its own save button, so onContinue()
    * is a no-op there (the chrome footer button appears but is functionally
-   * redundant — tracked for cleanup in a follow-up issue).
+   * redundant — tracked in #563).
    */
   @ViewChild('planningPrefsSubstep')
   planningPrefsSubstep?: PlanningPrefsSubstepComponent;

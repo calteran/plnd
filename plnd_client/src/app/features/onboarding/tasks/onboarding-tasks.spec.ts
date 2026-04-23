@@ -231,6 +231,29 @@ describe('OnboardingTasksComponent', () => {
     expect(el).toBeTruthy();
   });
 
+  // ── onContinue() ────────────────────────────────────────────────────────────
+
+  it('onContinue() calls save() on planningPrefsSubstep when active step is planning-prefs', async () => {
+    const { component, fixture } = await setup(false);
+    expect(component.activeSubstep()).toBe('planning-prefs');
+    fixture.detectChanges();
+    const stub = component.planningPrefsSubstep as unknown as PlanningPrefsStub;
+    spyOn(stub, 'save');
+    component.onContinue();
+    expect(stub.save).toHaveBeenCalled();
+  });
+
+  it('onContinue() does not call save() when active step is not planning-prefs', async () => {
+    const { component, fixture } = await setup(false);
+    component.activeSubstep.set('schedule-types');
+    fixture.detectChanges();
+    // planningPrefsSubstep ViewChild is undefined when schedule-types is rendered
+    const saveSpy = jasmine.createSpy('save');
+    (component as unknown as { planningPrefsSubstep: { save: jasmine.Spy } }).planningPrefsSubstep = { save: saveSpy };
+    component.onContinue();
+    expect(saveSpy).not.toHaveBeenCalled();
+  });
+
   // ── Additional onBack() navigation tests ────────────────────────────────────
 
   it('onBack() on routines-tasks goes to schedule-types', async () => {
