@@ -71,8 +71,15 @@ describe('DietaryRestrictionsSubstepComponent', () => {
     expect(completed).toBe(true);
   });
 
-  it('sets editingId when set directly', () => {
-    component.editingId.set('some-id');
-    expect(component.editingId()).toBe('some-id');
+  it('add() does not call create() when newName is empty', () => {
+    component.newName.set('');
+    component.add();
+    expect(restrictionsSvc.create).not.toHaveBeenCalled();
+  });
+
+  it('displayTypeFor() maps API types to display types correctly', () => {
+    expect(component.displayTypeFor('allergy')).toBe('allergy');
+    expect(component.displayTypeFor('intolerance')).toBe('intolerance');
+    expect(component.displayTypeFor('preference')).toBe('cultural_religious');
   });
 });

@@ -61,15 +61,6 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: 
           >
             @if (editingId() === r.restriction_id) {
               <div class="card-edit">
-                <div class="type-row">
-                  @for (dt of displayTypes; track dt) {
-                    <button type="button" class="type-btn"
-                      [class.type-btn--active]="editDisplayType() === dt"
-                      [style.border-color]="typeConfig[dt].borderColor"
-                      (click)="editDisplayType.set(dt)"
-                    >{{ typeConfig[dt].label }}</button>
-                  }
-                </div>
                 <input class="name-input" type="text" [value]="editName()"
                   (input)="editName.set(asText($event))" />
                 <textarea class="note-input" [value]="editNote()"
@@ -126,7 +117,7 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: 
 export class DietaryRestrictionsSubstepComponent implements OnInit {
   @Output() complete = new EventEmitter<void>();
 
-  readonly restrictionsService = inject(DietaryRestrictionsService);
+  protected readonly restrictionsService = inject(DietaryRestrictionsService);
 
   readonly selectedDisplayType = signal<DisplayRestrictionType>('allergy');
   readonly newName = signal('');
@@ -134,7 +125,6 @@ export class DietaryRestrictionsSubstepComponent implements OnInit {
   readonly showNote = signal(false);
   readonly addError = signal(false);
   readonly editingId = signal<string | null>(null);
-  readonly editDisplayType = signal<DisplayRestrictionType>('allergy');
   readonly editName = signal('');
   readonly editNote = signal('');
 
@@ -175,7 +165,6 @@ export class DietaryRestrictionsSubstepComponent implements OnInit {
 
   startEdit(r: { restriction_id: string; restriction_type: RestrictionType; name: string; notes: string | null }): void {
     this.editingId.set(r.restriction_id);
-    this.editDisplayType.set(this.displayTypeFor(r.restriction_type));
     this.editName.set(r.name);
     this.editNote.set(r.notes ?? '');
   }
