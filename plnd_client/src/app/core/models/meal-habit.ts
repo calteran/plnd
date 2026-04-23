@@ -1,21 +1,20 @@
-// Frontend-first model anticipating backend issue #517.
-// Fields reflect the UI spec; align with backend response shape when #517 ships.
-import { MealRef, MealSlot } from './week-plan';
+// plnd_client/src/app/core/models/meal-habit.ts
+// Aligned with backend MealHabitResponse (plnd_api/src/api_response.rs).
+// Slot is 'breakfast' | 'lunch' | 'dinner' (snack excluded per API constraint).
+
+export type MealHabitSlot = 'breakfast' | 'lunch' | 'dinner';
 
 export interface MealHabitResponse {
-  habit_id: string;
+  id: string;
   user_id: string;
-  meal_slot: MealSlot;
-  recurrence_rule: string;  // RRULE string, e.g. "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
-  meal_ref: MealRef | null;
-  title: string;
+  meal_name: string;
+  slot: MealHabitSlot;
+  recurrence_rule: string;
   created_at: string;
-  updated_at: string;
 }
 
 export interface CreateMealHabitRequest {
-  meal_slot: MealSlot;
+  meal_name: string;
+  slot: MealHabitSlot;
   recurrence_rule: string;
-  meal_ref?: MealRef;
-  title?: string;
 }

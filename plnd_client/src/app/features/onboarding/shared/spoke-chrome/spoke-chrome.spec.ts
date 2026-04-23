@@ -121,4 +121,24 @@ describe('SpokeChromeComponent', () => {
     const progressbar: HTMLElement = fixture.nativeElement.querySelector('.dot-row');
     expect(progressbar.getAttribute('aria-label')).toBe('Step 2 of 3');
   });
+
+  it('disables continue button when continueDisabled is true', () => {
+    const fixture = TestBed.createComponent(SpokeChromeComponent);
+    fixture.componentRef.setInput('title', 'Test Section');
+    fixture.componentRef.setInput('totalSteps', 3);
+    fixture.componentRef.setInput('currentStep', 1);
+    fixture.componentRef.setInput('continueDisabled', true);
+    fixture.detectChanges();
+    const btn = fixture.nativeElement.querySelector('.btn-continue');
+    expect(btn.disabled).toBe(true);
+    expect(btn.style.opacity).toBe('0.4');
+    expect(btn.style.cursor).toBe('not-allowed');
+  });
+
+  it('enables continue button when continueDisabled is false (default)', () => {
+    const fixture = setup(3, 1);
+    fixture.detectChanges();
+    const btn = fixture.nativeElement.querySelector('.btn-continue');
+    expect(btn.disabled).toBe(false);
+  });
 });
