@@ -215,7 +215,7 @@ export class DietaryPreferencesSubstepComponent {
   readonly customLifestyleInput = signal('');
 
   // Ingredient ratings are local-only; persistence requires catalog ID resolution.
-  // Backend tracking issue to be opened in Task 9 of this implementation plan.
+  // Tracked in https://github.com/calteran/plnd/issues/560
   readonly ingredientInput = signal('');
   readonly pendingIngredientScore = signal<number | null>(null);
   readonly ingredientRatings = signal<{ name: string; score: number }[]>([]);

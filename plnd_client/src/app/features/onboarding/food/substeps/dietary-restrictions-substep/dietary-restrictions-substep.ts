@@ -3,8 +3,8 @@ import { DietaryRestrictionsService } from '../../../../../core/services/dietary
 import { RestrictionType } from '../../../../../core/models/dietary-restriction';
 
 // Display-only union — 'cultural_religious' maps to 'preference' for the API.
-// Backend migration to add 'cultural_religious' to DB constraint is tracked in a GitHub issue
-// (to be opened in Task 9 of this implementation plan).
+// Backend migration to add 'cultural_religious' to DB constraint is tracked in
+// https://github.com/calteran/plnd/issues/559
 type DisplayRestrictionType = 'allergy' | 'intolerance' | 'cultural_religious';
 
 const API_TYPE_MAP: Record<DisplayRestrictionType, RestrictionType> = {
