@@ -65,6 +65,7 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
             <input
               type="time"
               class="time-input"
+              aria-label="Planning time"
               [value]="planningTime()"
               (change)="onTimeChange($event)"
             />
@@ -242,7 +243,8 @@ export class PlanningPrefsSubstepComponent implements OnInit {
       })
       .subscribe({
         next: () => {
-          const today = new Date().toISOString().slice(0, 10);
+          const d = new Date();
+          const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           this.state.setPlanningPrefsComplete();
           this.state.computeAndSetPlanPeriod(today);
           this.complete.emit();

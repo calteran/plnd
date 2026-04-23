@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Output, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 type DotState = 'completed' | 'current' | 'ahead';
@@ -11,16 +11,16 @@ type DotState = 'completed' | 'current' | 'ahead';
     <div class="spoke-chrome">
       <header class="spoke-header">
         <a routerLink="/onboarding" class="hub-link">← Hub</a>
-        <h2 class="spoke-title">{{ title }}</h2>
+        <h2 class="spoke-title">{{ title() }}</h2>
         <div
           class="dot-row"
           role="progressbar"
-          [attr.aria-label]="'Step ' + currentStep + ' of ' + totalSteps"
+          [attr.aria-label]="'Step ' + currentStep() + ' of ' + totalSteps()"
           [attr.aria-valuemin]="1"
-          [attr.aria-valuenow]="currentStep"
-          [attr.aria-valuemax]="totalSteps"
+          [attr.aria-valuenow]="currentStep()"
+          [attr.aria-valuemax]="totalSteps()"
         >
-          @for (dot of dots; track $index) {
+          @for (dot of dots(); track $index) {
             <span
               class="dot"
               [class.dot--completed]="dot.state === 'completed'"
@@ -36,7 +36,7 @@ type DotState = 'completed' | 'current' | 'ahead';
       </div>
 
       <footer class="spoke-footer">
-        @if (currentStep > 1) {
+        @if (currentStep() > 1) {
           <button type="button" class="btn-back" (click)="backClick.emit()">← Back</button>
         } @else {
           <span class="footer-spacer"></span>
@@ -153,19 +153,19 @@ type DotState = 'completed' | 'current' | 'ahead';
   `],
 })
 export class SpokeChromeComponent {
-  @Input() title = '';
-  @Input() totalSteps = 1;
-  @Input() currentStep = 1;
+  readonly title = input('');
+  readonly totalSteps = input(1);
+  readonly currentStep = input(1);
   @Output() backClick = new EventEmitter<void>();
   @Output() continueClick = new EventEmitter<void>();
 
-  get dots(): { state: DotState }[] {
-    return Array.from({ length: this.totalSteps }, (_, i) => ({
-      state: (i + 1 < this.currentStep
+  readonly dots = computed(() =>
+    Array.from({ length: this.totalSteps() }, (_, i) => ({
+      state: (i + 1 < this.currentStep()
         ? 'completed'
-        : i + 1 === this.currentStep
+        : i + 1 === this.currentStep()
         ? 'current'
         : 'ahead') as DotState,
-    }));
-  }
+    }))
+  );
 }

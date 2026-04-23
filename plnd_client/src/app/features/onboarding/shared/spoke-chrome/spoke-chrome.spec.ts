@@ -5,9 +5,9 @@ import { SpokeChromeComponent } from './spoke-chrome';
 describe('SpokeChromeComponent', () => {
   function setup(totalSteps: number, currentStep: number): ComponentFixture<SpokeChromeComponent> {
     const fixture = TestBed.createComponent(SpokeChromeComponent);
-    fixture.componentInstance.title = 'Test Section';
-    fixture.componentInstance.totalSteps = totalSteps;
-    fixture.componentInstance.currentStep = currentStep;
+    fixture.componentRef.setInput('title', 'Test Section');
+    fixture.componentRef.setInput('totalSteps', totalSteps);
+    fixture.componentRef.setInput('currentStep', currentStep);
     fixture.detectChanges();
     return fixture;
   }
