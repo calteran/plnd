@@ -419,7 +419,7 @@ pub async fn post_place_tasks(
     let ctx = AgentContext {
         user_id,
         use_case: UseCase::PlaceTasks,
-        input: body.task_names.join(", "),
+        input: body.task_names.join("\n"),
         prior_context: Some(format!("[Period: {plan_start} through {plan_end}]\n")),
         extra: None,
     };
