@@ -139,10 +139,9 @@ describe('OnboardingStateService', () => {
   it('setMealHabits stores meal habit records', () => {
     const habits: MealHabitResponse[] = [
       {
-        habit_id: 'mh-1', user_id: 'u1', meal_slot: 'breakfast',
-        recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
-        meal_ref: null, title: 'Oatmeal',
-        created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
+        id: 'mh-1', user_id: 'u1', meal_name: 'Oatmeal',
+        slot: 'breakfast', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+        created_at: '2026-04-22T00:00:00Z',
       },
     ];
     service.setMealHabits(habits);
