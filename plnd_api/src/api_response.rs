@@ -56,6 +56,7 @@ pub struct UserPreferencesResponse {
     pub lunch_window_end: Option<NaiveTime>,
     pub dinner_window_start: Option<NaiveTime>,
     pub dinner_window_end: Option<NaiveTime>,
+    pub planning_time: Option<NaiveTime>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -74,6 +75,7 @@ impl From<UserPreferences> for UserPreferencesResponse {
             lunch_window_end: p.lunch_window_end,
             dinner_window_start: p.dinner_window_start,
             dinner_window_end: p.dinner_window_end,
+            planning_time: p.planning_time,
             created_at: p.created_at,
             updated_at: p.updated_at,
         }

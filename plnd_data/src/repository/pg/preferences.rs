@@ -32,6 +32,7 @@ impl PreferencesRepository for PgPreferencesRepository {
         planning_trigger_offset: Option<i16>,
         default_plan_length_days: Option<i16>,
         wake_time: Option<NaiveTime>,
+        planning_time: Option<NaiveTime>,
     ) -> Result<UserPreferences, crate::Error> {
         preferences::patch_preferences(
             &self.pool,
@@ -40,6 +41,7 @@ impl PreferencesRepository for PgPreferencesRepository {
             planning_trigger_offset,
             default_plan_length_days,
             wake_time,
+            planning_time,
         )
         .await
         .map_err(Into::into)
