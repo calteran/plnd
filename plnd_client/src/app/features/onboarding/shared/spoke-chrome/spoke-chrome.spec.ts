@@ -115,4 +115,10 @@ describe('SpokeChromeComponent', () => {
       expect(dot.getAttribute('title')).toBe(`Step ${i + 1}`);
     });
   });
+
+  it('progressbar has aria-label reflecting current step and total', () => {
+    const fixture = setup(3, 2);
+    const progressbar: HTMLElement = fixture.nativeElement.querySelector('.dot-row');
+    expect(progressbar.getAttribute('aria-label')).toBe('Step 2 of 3');
+  });
 });

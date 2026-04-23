@@ -15,6 +15,7 @@ type DotState = 'completed' | 'current' | 'ahead';
         <div
           class="dot-row"
           role="progressbar"
+          [attr.aria-label]="'Step ' + currentStep + ' of ' + totalSteps"
           [attr.aria-valuemin]="1"
           [attr.aria-valuenow]="currentStep"
           [attr.aria-valuemax]="totalSteps"
