@@ -141,6 +141,8 @@ pub async fn post_plan(
             title: e.title,
             scheduled_start: e.scheduled_start,
             after_milepost: e.after_milepost,
+            duration_minutes: e.duration_minutes.map(|d| d as i32),
+            energy_required: e.energy_required,
         })
         .collect();
 

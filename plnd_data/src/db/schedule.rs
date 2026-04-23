@@ -9,7 +9,8 @@ use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, ScheduleP
 const ENTRY_COLS: &str =
     "entry_id, user_id, template_id, task_type, task_ref_id, task_ref_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
-     family_meal_id, after_milepost, after_entry_id, deviation_note, created_at, updated_at";
+     family_meal_id, after_milepost, after_entry_id, deviation_note,
+     duration_minutes, energy_required, created_at, updated_at";
 
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_period"))]
 pub async fn get_period(
@@ -154,6 +155,8 @@ pub async fn commit_plan(
     let mut dates: Vec<NaiveDate> = Vec::new();
     let mut scheduled_starts: Vec<Option<DateTime<Utc>>> = Vec::new();
     let mut after_mileposts: Vec<Option<String>> = Vec::new();
+    let mut duration_minutes_vals: Vec<Option<i32>> = Vec::new();
+    let mut energy_required_vals: Vec<Option<String>> = Vec::new();
 
     for entry in &req.entries {
         let scheduled_start = entry
@@ -166,6 +169,8 @@ pub async fn commit_plan(
         dates.push(entry.date);
         scheduled_starts.push(scheduled_start);
         after_mileposts.push(entry.after_milepost.clone());
+        duration_minutes_vals.push(entry.duration_minutes);
+        energy_required_vals.push(entry.energy_required.clone());
     }
 
     let committed = task_types.len() as i64;
@@ -174,10 +179,12 @@ pub async fn commit_plan(
         sqlx::query(
             "INSERT INTO schedule_entries
                (user_id, task_type, task_ref_id, task_ref_type, title,
-                date, scheduled_start, status, after_milepost)
+                date, scheduled_start, status, after_milepost,
+                duration_minutes, energy_required)
              SELECT $1, unnest($2::text[]), unnest($3::uuid[]), unnest($4::text[]),
                     unnest($5::text[]), unnest($6::date[]), unnest($7::timestamptz[]),
-                    'planned', unnest($8::text[])",
+                    'planned', unnest($8::text[]),
+                    unnest($9::int4[]), unnest($10::text[])",
         )
         .bind(user_id)
         .bind(&task_types)
@@ -187,6 +194,8 @@ pub async fn commit_plan(
         .bind(&dates)
         .bind(&scheduled_starts)
         .bind(&after_mileposts)
+        .bind(&duration_minutes_vals)
+        .bind(&energy_required_vals)
         .execute(&mut *tx)
         .await
         .map_err(DatabaseError::from)?;
@@ -301,6 +310,8 @@ mod tests {
             title: Some("Test task".to_string()),
             scheduled_start: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
             after_milepost: None,
+            duration_minutes: None,
+            energy_required: None,
         }
     }
 
@@ -512,6 +523,8 @@ mod tests {
             title: None,
             scheduled_start: Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
             after_milepost: None,
+            duration_minutes: None,
+            energy_required: None,
         };
         let bad_req = CommitPlanInput {
             plan_start: start,
@@ -560,6 +573,8 @@ mod tests {
             title: Some("Bucket task".to_string()),
             scheduled_start: None,
             after_milepost: Some("lunch".to_string()),
+            duration_minutes: None,
+            energy_required: None,
         };
 
         let req = CommitPlanInput {
@@ -583,6 +598,50 @@ mod tests {
             period.entries[0].after_milepost,
             Some("lunch".to_string()),
             "after_milepost must be preserved"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_persists_duration_and_energy(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let entry = PlanEntryInput {
+            date: start,
+            task_type: "work".to_string(),
+            task_ref_id: None,
+            task_ref_type: None,
+            title: Some("Timed task".to_string()),
+            scheduled_start: Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
+            after_milepost: None,
+            duration_minutes: Some(45),
+            energy_required: Some("medium".to_string()),
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![entry],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+        };
+
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let period = get_period(&pool, uid, start, end).await.unwrap();
+        assert_eq!(period.entries.len(), 1);
+        assert_eq!(
+            period.entries[0].duration_minutes,
+            Some(45),
+            "duration_minutes must roundtrip through commit_plan"
+        );
+        assert_eq!(
+            period.entries[0].energy_required.as_deref(),
+            Some("medium"),
+            "energy_required must roundtrip through commit_plan"
         );
     }
 }

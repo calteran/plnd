@@ -53,6 +53,8 @@ pub struct ScheduleEntry {
     pub after_milepost: Option<String>, // 'breakfast' | 'lunch' | 'dinner' — temporal ordering anchor
     pub after_entry_id: Option<Uuid>,   // explicit sequencing link
     pub deviation_note: Option<String>,
+    pub duration_minutes: Option<i32>,
+    pub energy_required: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -93,4 +95,6 @@ pub struct PlanEntryInput {
     pub title: Option<String>,
     pub scheduled_start: Option<NaiveTime>,
     pub after_milepost: Option<String>,
+    pub duration_minutes: Option<i32>,
+    pub energy_required: Option<String>,
 }
