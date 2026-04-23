@@ -309,15 +309,15 @@ describe('WeekPlanService', () => {
 
   describe('applyAgentMeals()', () => {
     const AGENT_MEALS = [
-      { date: '2026-03-24', occasion: 'breakfast' as const, meal_ref: null, title: 'Agent breakfast' },
-      { date: '2026-03-24', occasion: 'lunch'     as const, meal_ref: null, title: 'Agent lunch'     },
+      { date: '2026-03-24', occasion: 'breakfast' as const, meal_ref: null },
+      { date: '2026-03-24', occasion: 'lunch'     as const, meal_ref: null },
     ];
 
     it('should overwrite a proposed cell with the agent result', () => {
       service.initSession('2026-03-24', '2026-03-24');
       service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Old title' });
       service.applyAgentMeals(AGENT_MEALS);
-      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('Agent breakfast');
+      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('');
     });
 
     it('should NOT overwrite an approved cell', () => {
@@ -339,6 +339,12 @@ describe('WeekPlanService', () => {
       service.setGenerating(true);
       service.applyAgentMeals([]);
       expect(service.isGenerating()).toBeFalse();
+    });
+
+    it('should default title to empty string when entry has no title', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.applyAgentMeals([{ date: '2026-03-24', occasion: 'breakfast' as const, meal_ref: null }]);
+      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('');
     });
   });
 

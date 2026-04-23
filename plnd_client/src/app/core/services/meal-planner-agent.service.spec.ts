@@ -53,7 +53,7 @@ describe('MealPlannerAgentService', () => {
 
     const req = httpMock.expectOne(r => r.url.endsWith('/agent/meal-plan/suggest') && r.method === 'POST');
     expect(req.request.body).toEqual({ date: '2026-03-24', occasion: 'lunch' });
-    const mockEntry = { date: '2026-03-24', occasion: 'lunch', meal_ref: null, title: 'Salad' };
+    const mockEntry = { date: '2026-03-24', occasion: 'lunch', meal_ref: null };
     req.flush(mockEntry);
     expect(result).toEqual(mockEntry);
   });
@@ -63,7 +63,7 @@ describe('MealPlannerAgentService', () => {
 
     const req = httpMock.expectOne(r => r.url.endsWith('/agent/meal-plan/suggest') && r.method === 'POST');
     expect(req.request.body.context).toEqual({ avoid_meal_refs: [{ type: 'user', id: 'u1' }] });
-    req.flush({ date: '2026-03-24', occasion: 'dinner', meal_ref: null, title: 'Pasta' });
+    req.flush({ date: '2026-03-24', occasion: 'dinner', meal_ref: null });
   });
 
   it('resolveText posts to /agent/meal-plan/resolve with correct body', () => {
