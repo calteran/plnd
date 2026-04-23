@@ -15,7 +15,7 @@ import { OnboardingStateService } from '../../../onboarding-state.service';
 // ── Recurrence dropdown option ───────────────────────────────────────────────
 
 interface RecurrenceOption {
-  value: string;  // rrule string or 'CUSTOM'
+  value: string;  // rrule string
   label: string;
 }
 
@@ -24,7 +24,6 @@ const RECURRENCE_OPTIONS: RecurrenceOption[] = [
   { value: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',      label: 'Weekdays' },
   { value: 'FREQ=WEEKLY;BYDAY=SA,SU',                label: 'Weekends' },
   { value: 'FREQ=WEEKLY;BYDAY=',                     label: 'Weekly…' },
-  { value: 'CUSTOM',                                 label: 'Custom…' },
 ];
 
 // ── Day-of-week pills for "Weekly…" selector ─────────────────────────────────
@@ -79,7 +78,6 @@ export function rruleToHumanLabel(rrule: string): string {
     }
     return 'weekly';
   }
-  if (rrule === 'CUSTOM') return 'custom';
   return rrule;
 }
 
@@ -125,7 +123,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
             </select>
           </div>
 
-          @if (isWeeklySelected()) {
+          @if (isWeeklySelected) {
             <div class="day-row" role="group" aria-label="Day of week">
               @for (day of dayOptions; track day.byday) {
                 <button
@@ -143,9 +141,13 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
           <button
             type="button"
             class="add-btn"
-            [disabled]="!routineName.trim()"
+            [disabled]="!routineName.trim() || isAdding()"
             (click)="addRoutine()"
           >+ Add</button>
+
+          @if (addError()) {
+            <p class="add-error" role="alert">{{ addError() }}</p>
+          }
         </div>
 
         <!-- Inspiration chips -->
@@ -213,13 +215,13 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
         <!-- Added tasks -->
         @if (taskNames().length > 0) {
           <div class="added-chips" aria-label="Added tasks">
-            @for (name of taskNames(); track name) {
+            @for (name of taskNames(); track $index; let i = $index) {
               <span class="routine-chip">
                 <span class="chip-body" role="note">{{ name }}</span>
                 <button
                   type="button"
                   class="chip-remove"
-                  (click)="removeTask(name)"
+                  (click)="removeTask(i)"
                   [attr.aria-label]="'Remove ' + name"
                 >✕</button>
               </span>
@@ -347,6 +349,12 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       opacity: 0.6;
     }
 
+    .add-error {
+      margin: 0;
+      font-size: 12px;
+      color: #dc2626;
+    }
+
     .inspiration-block {
       display: flex;
       flex-direction: column;
@@ -458,7 +466,13 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   selectedRrule = 'FREQ=DAILY';
   selectedWeekDay = 'MO';
 
-  readonly isWeeklySelected = computed(() => this.selectedRrule === 'FREQ=WEEKLY;BYDAY=');
+  get isWeeklySelected(): boolean {
+    return this.selectedRrule === 'FREQ=WEEKLY;BYDAY=';
+  }
+
+  // ── Loading / error state ─────────────────────────────────────────────────
+  readonly isAdding = signal(false);
+  readonly addError = signal('');
 
   // ── Task form state ───────────────────────────────────────────────────────
   taskName = '';
@@ -503,6 +517,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   addRoutine(): void {
+    if (this.isAdding()) return;
     const name = this.routineName.trim();
     if (!name) return;
 
@@ -515,21 +530,26 @@ export class RoutinesTasksSubstepComponent implements OnInit {
       recurrence_rule: rrule,
     };
 
+    this.isAdding.set(true);
+    this.addError.set('');
     this.templatesService.create(req).subscribe({
       next: (template: ScheduleTemplate) => {
         this.routines.update(list => [
           ...list,
           { localId: crypto.randomUUID(), name: template.title, rrule: template.recurrence_rule ?? rrule, templateId: template.template_id },
         ]);
+        this.routineName = '';
+        this.isAdding.set(false);
+      },
+      error: () => {
+        this.addError.set('Failed to add routine. Please try again.');
+        this.isAdding.set(false);
       },
     });
-
-    this.routineName = '';
   }
 
   addInspirationChip(chip: InspirationChip): void {
-    // Mark chip as used immediately so it disappears from the inspiration list
-    this.usedInspirationIds.update(set => new Set([...set, chip.id]));
+    if (this.isAdding()) return;
 
     const req: CreateScheduleTemplateRequest = {
       task_type: 'custom',
@@ -538,12 +558,20 @@ export class RoutinesTasksSubstepComponent implements OnInit {
       recurrence_rule: chip.rrule,
     };
 
+    this.isAdding.set(true);
+    this.addError.set('');
     this.templatesService.create(req).subscribe({
       next: (template: ScheduleTemplate) => {
+        this.usedInspirationIds.update(set => new Set([...set, chip.id]));
         this.routines.update(list => [
           ...list,
           { localId: crypto.randomUUID(), name: template.title, rrule: template.recurrence_rule ?? chip.rrule, templateId: template.template_id },
         ]);
+        this.isAdding.set(false);
+      },
+      error: () => {
+        this.addError.set('Failed to add routine. Please try again.');
+        this.isAdding.set(false);
       },
     });
   }
@@ -568,8 +596,8 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     this.taskName = '';
   }
 
-  removeTask(name: string): void {
-    this.taskNames.update(list => list.filter(n => n !== name));
+  removeTask(index: number): void {
+    this.taskNames.update(names => names.filter((_, i) => i !== index));
   }
 
   save(): void {

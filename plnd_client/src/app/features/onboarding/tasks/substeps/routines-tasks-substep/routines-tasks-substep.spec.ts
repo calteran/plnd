@@ -210,7 +210,8 @@ describe('RoutinesTasksSubstepComponent', () => {
 
     expect(component.taskNames()).toContain('Buy groceries');
 
-    component.removeTask('Buy groceries');
+    // Remove by index (0 is the only task)
+    component.removeTask(0);
     fixture.detectChanges();
 
     expect(component.taskNames()).not.toContain('Buy groceries');
@@ -254,5 +255,23 @@ describe('RoutinesTasksSubstepComponent', () => {
     expect(stateMock.setScheduleTemplates).toHaveBeenCalledTimes(1);
     expect(stateMock.setUpcomingTaskNames).toHaveBeenCalledWith([]);
     expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+  });
+
+  // ── 10. Day picker shows when "Weekly…" recurrence is selected ───────────────
+
+  it('shows day picker when "Weekly…" recurrence is selected', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+
+    // Day picker should not be visible with the default 'FREQ=DAILY' selection
+    let dayRow: HTMLElement | null = fixture.nativeElement.querySelector('.day-row');
+    expect(dayRow).toBeNull();
+
+    // Select "Weekly…"
+    component.selectedRrule = 'FREQ=WEEKLY;BYDAY=';
+    fixture.detectChanges();
+
+    dayRow = fixture.nativeElement.querySelector('.day-row');
+    expect(dayRow).not.toBeNull();
   });
 });
