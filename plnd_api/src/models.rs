@@ -101,6 +101,12 @@ pub struct PostSchedulePlanRequest {
     pub replace: Option<bool>,
     #[serde(default)]
     pub carryover_decisions: HashMap<Uuid, CarryoverDecision>,
+    /// AI-placed one-off tasks from the Task Placement Review step.
+    #[serde(default)]
+    pub placed_tasks: Vec<PlanEntryRequest>,
+    /// Meal habit IDs to expand into recurring meal entries across plan_start–plan_end.
+    #[serde(default)]
+    pub meal_habit_ids: Vec<Uuid>,
 }
 
 // ---------------------------------------------------------------------------

@@ -644,4 +644,51 @@ mod tests {
             "energy_required must roundtrip through commit_plan"
         );
     }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_with_meal_type_entry_inserts_correctly(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        // Simulate an expanded meal habit entry (e.g., "Oatmeal every breakfast")
+        let meal_entry = PlanEntryInput {
+            date: start,
+            task_type: "meal".to_string(),
+            task_ref_id: None,
+            task_ref_type: None,
+            title: Some("Oatmeal".to_string()),
+            scheduled_start: None,
+            after_milepost: Some("breakfast".to_string()),
+            duration_minutes: None,
+            energy_required: None,
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![meal_entry],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+        };
+
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let period = get_period(&pool, uid, start, end).await.unwrap();
+        assert_eq!(period.entries.len(), 1);
+        let e = &period.entries[0];
+        assert_eq!(e.task_type, "meal", "task_type must be 'meal'");
+        assert_eq!(e.title.as_deref(), Some("Oatmeal"), "title must roundtrip");
+        assert_eq!(
+            e.after_milepost.as_deref(),
+            Some("breakfast"),
+            "after_milepost must roundtrip"
+        );
+        assert!(
+            e.scheduled_start.is_none(),
+            "meal habit entry has no scheduled_start"
+        );
+    }
 }
