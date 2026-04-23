@@ -41,7 +41,14 @@ type DotState = 'completed' | 'current' | 'ahead';
         } @else {
           <span class="footer-spacer"></span>
         }
-        <button type="button" class="btn-continue" (click)="continueClick.emit()">
+        <button
+          type="button"
+          class="btn-continue"
+          [disabled]="continueDisabled()"
+          [style.opacity]="continueDisabled() ? '0.4' : '1'"
+          [style.cursor]="continueDisabled() ? 'not-allowed' : 'pointer'"
+          (click)="!continueDisabled() && continueClick.emit()"
+        >
           Save &amp; Continue →
         </button>
       </footer>
@@ -156,6 +163,7 @@ export class SpokeChromeComponent {
   readonly title = input('');
   readonly totalSteps = input(1);
   readonly currentStep = input(1);
+  readonly continueDisabled = input(false);
   @Output() backClick = new EventEmitter<void>();
   @Output() continueClick = new EventEmitter<void>();
 
