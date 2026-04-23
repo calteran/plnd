@@ -77,8 +77,11 @@ pub async fn update_meal_windows(
     dinner_window_end: Option<NaiveTime>,
 ) -> Result<UserPreferences, DatabaseError> {
     sqlx::query_as::<_, UserPreferences>(
-        "INSERT INTO user_preferences (user_id)
-         VALUES ($1)
+        "INSERT INTO user_preferences
+           (user_id, breakfast_window_start, breakfast_window_end,
+            lunch_window_start, lunch_window_end,
+            dinner_window_start, dinner_window_end)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (user_id) DO UPDATE
            SET breakfast_window_start = COALESCE($2, user_preferences.breakfast_window_start),
                breakfast_window_end   = COALESCE($3, user_preferences.breakfast_window_end),
