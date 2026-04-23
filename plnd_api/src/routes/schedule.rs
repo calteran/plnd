@@ -3,20 +3,23 @@ use crate::api_response::{
 };
 use crate::auth::jwt::Claims;
 use crate::models::{
-    CarryoverDecision as HttpCarryoverDecision, PatchEntryStatusRequest, PostSchedulePlanRequest,
+    CarryoverDecision as HttpCarryoverDecision, PatchEntryStatusRequest, PlanEntryRequest,
+    PostSchedulePlanRequest,
 };
-use crate::routes::domain_constants::VALID_ENERGY_LEVELS;
+use crate::routes::domain_constants::{
+    VALID_AFTER_MILEPOSTS, VALID_ENERGY_LEVELS, VALID_TASK_TYPES,
+};
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
     Json,
 };
-use chrono::NaiveDate;
-use plnd_data::models::{CarryoverDecision, CommitPlanInput, PlanEntryInput};
+use chrono::{Datelike, NaiveDate, Weekday};
+use plnd_data::models::{CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput};
 use plnd_data::Error;
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -25,6 +28,136 @@ pub struct PeriodQuery {
     pub start: NaiveDate,
     pub end: NaiveDate,
 }
+
+// ---------------------------------------------------------------------------
+// Entry mapping helper — shared by `entries` and `placed_tasks` fields
+// ---------------------------------------------------------------------------
+
+fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
+    if !VALID_TASK_TYPES.contains(&e.task_type.as_str()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if let Some(ref mp) = e.after_milepost {
+        if !VALID_AFTER_MILEPOSTS.contains(&mp.as_str()) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+    Ok(PlanEntryInput {
+        date: e.date,
+        task_type: e.task_type,
+        task_ref_id: e.task_ref_id,
+        task_ref_type: e.task_ref_type,
+        title: e.title,
+        scheduled_start: e.scheduled_start,
+        after_milepost: e.after_milepost,
+        duration_minutes: e
+            .duration_minutes
+            .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
+            .transpose()?,
+        energy_required: {
+            if let Some(ref level) = e.energy_required {
+                if !VALID_ENERGY_LEVELS.contains(&level.as_str()) {
+                    return Err(StatusCode::BAD_REQUEST);
+                }
+            }
+            e.energy_required
+        },
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Meal habit expansion helpers
+// ---------------------------------------------------------------------------
+
+/// Returns true if `date` matches the given `recurrence_rule`.
+///
+/// Supported patterns (case-insensitive):
+/// - `"daily"` — every day
+/// - `"weekdays"` — Monday–Friday
+/// - `"weekends"` — Saturday–Sunday
+/// - RRULE-style with `BYDAY=` (e.g. `"FREQ=WEEKLY;BYDAY=MO"`) — specific weekday(s)
+///
+/// Unknown patterns return false. Callers should pre-screen with `is_recognised_recurrence`
+/// to log a single warning rather than one per date.
+fn date_matches_recurrence(date: NaiveDate, rule: &str) -> bool {
+    let rule_lc = rule.to_lowercase();
+    match rule_lc.as_str() {
+        "daily" => true,
+        "weekdays" => date.weekday().num_days_from_monday() < 5,
+        "weekends" => date.weekday().num_days_from_monday() >= 5,
+        _ => {
+            // Parse RRULE-style BYDAY token: "FREQ=WEEKLY;BYDAY=MO,WE"
+            if let Some(byday_start) = rule_lc.find("byday=") {
+                let after = &rule_lc[byday_start + 6..];
+                let byday_value = after.split(';').next().unwrap_or(after);
+                let target_weekday = date.weekday();
+                return byday_value
+                    .split(',')
+                    .any(|abbrev| weekday_from_abbrev(abbrev.trim()) == Some(target_weekday));
+            }
+            false
+        }
+    }
+}
+
+fn weekday_from_abbrev(abbrev: &str) -> Option<Weekday> {
+    match abbrev {
+        "mo" => Some(Weekday::Mon),
+        "tu" => Some(Weekday::Tue),
+        "we" => Some(Weekday::Wed),
+        "th" => Some(Weekday::Thu),
+        "fr" => Some(Weekday::Fri),
+        "sa" => Some(Weekday::Sat),
+        "su" => Some(Weekday::Sun),
+        _ => None,
+    }
+}
+
+fn is_recognised_recurrence(rule: &str) -> bool {
+    let rule_lc = rule.to_lowercase();
+    matches!(rule_lc.as_str(), "daily" | "weekdays" | "weekends") || rule_lc.contains("byday=")
+}
+
+/// Expands a single meal habit into one `PlanEntryInput` per matching date in [plan_start, plan_end].
+/// Caller must guarantee that `plan_end - plan_start <= 366 days` (enforced in `post_plan`).
+fn expand_habit_to_entries(
+    habit: &MealHabit,
+    plan_start: NaiveDate,
+    plan_end: NaiveDate,
+) -> Vec<PlanEntryInput> {
+    if !is_recognised_recurrence(&habit.recurrence_rule) {
+        tracing::warn!(
+            rule = %habit.recurrence_rule,
+            "unrecognised meal habit recurrence_rule — skipping expansion"
+        );
+        return Vec::new();
+    }
+
+    let mut entries = Vec::new();
+    let mut date = plan_start;
+    while date <= plan_end {
+        if date_matches_recurrence(date, &habit.recurrence_rule) {
+            entries.push(PlanEntryInput {
+                date,
+                task_type: "meal".to_string(),
+                title: Some(habit.meal_name.clone()),
+                after_milepost: Some(habit.slot.clone()),
+                scheduled_start: None,
+                task_ref_id: None,
+                task_ref_type: None,
+                duration_minutes: None,
+                energy_required: None,
+            });
+        }
+        // Safe: post_plan validates plan_end - plan_start <= 366, so we never reach NaiveDate::MAX.
+        date = date.succ_opt().unwrap_or(plan_end);
+    }
+    entries
+}
+
+// ---------------------------------------------------------------------------
+// Route handlers
+// ---------------------------------------------------------------------------
 
 #[utoipa::path(
     get,
@@ -125,39 +258,49 @@ pub async fn post_plan(
     Extension(claims): Extension<Claims>,
     Json(body): Json<PostSchedulePlanRequest>,
 ) -> Result<Json<PostSchedulePlanApiResponse>, StatusCode> {
-    if body.plan_end < body.plan_start {
+    if body.plan_end < body.plan_start || (body.plan_end - body.plan_start).num_days() > 366 {
         return Err(StatusCode::BAD_REQUEST);
     }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    // Map from HTTP request type to DB-layer input type
-    let entries = body
+    // Map meal plan entries (AI-suggested meals)
+    let mut entries = body
         .entries
         .into_iter()
-        .map(|e| -> Result<PlanEntryInput, StatusCode> {
-            Ok(PlanEntryInput {
-                date: e.date,
-                task_type: e.task_type,
-                task_ref_id: e.task_ref_id,
-                task_ref_type: e.task_ref_type,
-                title: e.title,
-                scheduled_start: e.scheduled_start,
-                after_milepost: e.after_milepost,
-                duration_minutes: e
-                    .duration_minutes
-                    .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
-                    .transpose()?,
-                energy_required: {
-                    if let Some(ref level) = e.energy_required {
-                        if !VALID_ENERGY_LEVELS.contains(&level.as_str()) {
-                            return Err(StatusCode::BAD_REQUEST);
-                        }
-                    }
-                    e.energy_required
-                },
-            })
-        })
+        .map(map_entry)
         .collect::<Result<Vec<_>, _>>()?;
+
+    // Merge AI-placed one-off tasks from the Task Placement Review step
+    let placed = body
+        .placed_tasks
+        .into_iter()
+        .map(map_entry)
+        .collect::<Result<Vec<_>, _>>()?;
+    entries.extend(placed);
+
+    // Expand meal habits into recurring meal entries across the plan period
+    if !body.meal_habit_ids.is_empty() {
+        let habit_id_set: HashSet<Uuid> = body.meal_habit_ids.into_iter().collect();
+        let all_habits = state
+            .repos
+            .meal_habit
+            .list_for_user(user_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "meal_habit list_for_user error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+        for habit in all_habits
+            .into_iter()
+            .filter(|h| habit_id_set.contains(&h.id))
+        {
+            entries.extend(expand_habit_to_entries(
+                &habit,
+                body.plan_start,
+                body.plan_end,
+            ));
+        }
+    }
 
     let carryover_decisions: HashMap<Uuid, CarryoverDecision> = body
         .carryover_decisions
@@ -240,4 +383,218 @@ pub async fn patch_entry_status(
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests for recurrence expansion helpers (no DB needed)
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::NaiveDate;
+
+    fn date(y: i32, m: u32, d: u32) -> NaiveDate {
+        NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    // -----------------------------------------------------------------------
+    // date_matches_recurrence
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn daily_matches_every_day() {
+        assert!(date_matches_recurrence(date(2026, 4, 27), "daily")); // Monday
+        assert!(date_matches_recurrence(date(2026, 4, 28), "daily")); // Tuesday
+        assert!(date_matches_recurrence(date(2026, 5, 2), "daily")); // Saturday
+        assert!(date_matches_recurrence(date(2026, 5, 3), "daily")); // Sunday
+    }
+
+    #[test]
+    fn weekdays_matches_mon_to_fri_only() {
+        assert!(date_matches_recurrence(date(2026, 4, 27), "weekdays")); // Monday
+        assert!(date_matches_recurrence(date(2026, 4, 28), "weekdays")); // Tuesday
+        assert!(date_matches_recurrence(date(2026, 5, 1), "weekdays")); // Friday
+        assert!(!date_matches_recurrence(date(2026, 5, 2), "weekdays")); // Saturday
+        assert!(!date_matches_recurrence(date(2026, 5, 3), "weekdays")); // Sunday
+    }
+
+    #[test]
+    fn weekends_matches_sat_and_sun_only() {
+        assert!(date_matches_recurrence(date(2026, 5, 2), "weekends")); // Saturday
+        assert!(date_matches_recurrence(date(2026, 5, 3), "weekends")); // Sunday
+        assert!(!date_matches_recurrence(date(2026, 4, 27), "weekends")); // Monday
+        assert!(!date_matches_recurrence(date(2026, 5, 1), "weekends")); // Friday
+    }
+
+    #[test]
+    fn rrule_byday_mo_matches_mondays_only() {
+        assert!(date_matches_recurrence(
+            date(2026, 4, 27),
+            "FREQ=WEEKLY;BYDAY=MO"
+        )); // Monday
+        assert!(!date_matches_recurrence(
+            date(2026, 4, 28),
+            "FREQ=WEEKLY;BYDAY=MO"
+        )); // Tuesday
+        assert!(!date_matches_recurrence(
+            date(2026, 5, 2),
+            "FREQ=WEEKLY;BYDAY=MO"
+        )); // Saturday
+    }
+
+    #[test]
+    fn rrule_byday_multi_day() {
+        // BYDAY=MO,WE,FR → Mon, Wed, Fri
+        let rule = "FREQ=WEEKLY;BYDAY=MO,WE,FR";
+        assert!(date_matches_recurrence(date(2026, 4, 27), rule)); // Monday
+        assert!(!date_matches_recurrence(date(2026, 4, 28), rule)); // Tuesday
+        assert!(date_matches_recurrence(date(2026, 4, 29), rule)); // Wednesday
+        assert!(!date_matches_recurrence(date(2026, 4, 30), rule)); // Thursday
+        assert!(date_matches_recurrence(date(2026, 5, 1), rule)); // Friday
+    }
+
+    #[test]
+    fn unknown_recurrence_returns_false() {
+        assert!(!date_matches_recurrence(date(2026, 4, 27), "quarterly"));
+        assert!(!date_matches_recurrence(date(2026, 4, 27), ""));
+    }
+
+    // -----------------------------------------------------------------------
+    // expand_habit_to_entries
+    // -----------------------------------------------------------------------
+
+    fn make_habit(meal_name: &str, slot: &str, recurrence_rule: &str) -> MealHabit {
+        MealHabit {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            meal_name: meal_name.to_string(),
+            slot: slot.to_string(),
+            recurrence_rule: recurrence_rule.to_string(),
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn expand_daily_fills_entire_range() {
+        let habit = make_habit("Oatmeal", "breakfast", "daily");
+        let start = date(2026, 4, 27);
+        let end = date(2026, 4, 29); // 3 days
+        let entries = expand_habit_to_entries(&habit, start, end);
+        assert_eq!(entries.len(), 3);
+        assert!(entries.iter().all(|e| e.task_type == "meal"));
+        assert!(entries
+            .iter()
+            .all(|e| e.title == Some("Oatmeal".to_string())));
+        assert!(entries
+            .iter()
+            .all(|e| e.after_milepost == Some("breakfast".to_string())));
+        assert!(entries.iter().all(|e| e.scheduled_start.is_none()));
+    }
+
+    #[test]
+    fn expand_weekdays_skips_weekend() {
+        // Mon 27 Apr – Sun 3 May 2026 = 7 days, 5 weekdays
+        let habit = make_habit("Salad", "lunch", "weekdays");
+        let start = date(2026, 4, 27); // Monday
+        let end = date(2026, 5, 3); // Sunday
+        let entries = expand_habit_to_entries(&habit, start, end);
+        assert_eq!(entries.len(), 5);
+    }
+
+    #[test]
+    fn expand_weekends_skips_weekdays() {
+        // Mon 27 Apr – Sun 3 May 2026 = 7 days, 2 weekend days
+        let habit = make_habit("Pancakes", "breakfast", "weekends");
+        let start = date(2026, 4, 27); // Monday
+        let end = date(2026, 5, 3); // Sunday
+        let entries = expand_habit_to_entries(&habit, start, end);
+        assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn expand_weekly_byday_mo_gives_only_mondays() {
+        // 2 weeks starting Mon 27 Apr 2026
+        let habit = make_habit("Pasta", "dinner", "FREQ=WEEKLY;BYDAY=MO");
+        let start = date(2026, 4, 27); // Monday
+        let end = date(2026, 5, 10); // Sunday of week 2 (14 days)
+        let entries = expand_habit_to_entries(&habit, start, end);
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].date, date(2026, 4, 27));
+        assert_eq!(entries[1].date, date(2026, 5, 4));
+    }
+
+    #[test]
+    fn expand_unknown_recurrence_returns_empty() {
+        let habit = make_habit("Mystery meal", "dinner", "quarterly");
+        let start = date(2026, 4, 27);
+        let end = date(2026, 5, 10);
+        let entries = expand_habit_to_entries(&habit, start, end);
+        assert_eq!(entries.len(), 0);
+    }
+
+    #[test]
+    fn expand_single_day_range() {
+        let habit = make_habit("Toast", "breakfast", "daily");
+        let start = date(2026, 4, 27);
+        let entries = expand_habit_to_entries(&habit, start, start);
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].date, start);
+    }
+
+    // -----------------------------------------------------------------------
+    // map_entry validation
+    // -----------------------------------------------------------------------
+
+    fn base_entry() -> PlanEntryRequest {
+        PlanEntryRequest {
+            date: date(2026, 4, 27),
+            task_type: "work".to_string(),
+            task_ref_id: None,
+            task_ref_type: None,
+            title: Some("Test".to_string()),
+            scheduled_start: None,
+            after_milepost: None,
+            duration_minutes: None,
+            energy_required: None,
+        }
+    }
+
+    #[test]
+    fn map_entry_rejects_invalid_task_type() {
+        let e = PlanEntryRequest {
+            task_type: "invalid_type".to_string(),
+            ..base_entry()
+        };
+        assert_eq!(map_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn map_entry_rejects_invalid_after_milepost() {
+        let e = PlanEntryRequest {
+            after_milepost: Some("brunch".to_string()),
+            ..base_entry()
+        };
+        assert_eq!(map_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn map_entry_rejects_invalid_energy_required() {
+        let e = PlanEntryRequest {
+            energy_required: Some("extreme".to_string()),
+            ..base_entry()
+        };
+        assert_eq!(map_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn map_entry_accepts_valid_entry() {
+        let e = PlanEntryRequest {
+            task_type: "meal".to_string(),
+            after_milepost: Some("lunch".to_string()),
+            energy_required: Some("low".to_string()),
+            ..base_entry()
+        };
+        assert!(map_entry(e).is_ok());
+    }
 }
