@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Output, inject, signal } from '@angular/core';
 import { from, mergeMap } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { UserMealsService } from '../../../../../core/services/user-meals.service';
 
@@ -232,7 +233,7 @@ export class DietaryPreferencesSubstepComponent {
     return (e.target as HTMLInputElement).value;
   }
 
-  labelFor(key: string): string {
+  protected labelFor(key: string): string {
     for (const grp of LIFESTYLE_GROUPS) {
       const item = grp.items.find(i => i.key === key);
       if (item) return `${item.emoji} ${item.label}`;
@@ -275,18 +276,15 @@ export class DietaryPreferencesSubstepComponent {
     const score = this.pendingMealScore();
     if (!name || score === null || this.savingMeal()) return;
     this.savingMeal.set(true);
-    this.mealsService.createFromScratch({ name }).subscribe({
-      next: meal => {
-        const rating = score + 1; // emoji index 0–4 → API rating 1–5
-        this.mealsService.updateMetadata(meal.user_meal_pref_id, { rating }).subscribe({
-          next: () => {
-            this.mealRatings.update(r => [...r, { name, score }]);
-            this.mealInput.set('');
-            this.pendingMealScore.set(null);
-            this.savingMeal.set(false);
-          },
-          error: () => this.savingMeal.set(false),
-        });
+    const rating = score + 1; // emoji index 0-4 → API rating 1-5
+    this.mealsService.createFromScratch({ name }).pipe(
+      switchMap(meal => this.mealsService.updateMetadata(meal.user_meal_pref_id, { rating }))
+    ).subscribe({
+      next: () => {
+        this.mealRatings.update(r => [...r, { name, score }]);
+        this.mealInput.set('');
+        this.pendingMealScore.set(null);
+        this.savingMeal.set(false);
       },
       error: () => this.savingMeal.set(false),
     });
