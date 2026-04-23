@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { MealHabitsService } from '../../../../../core/services/meal-habits.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { MealHabitSlot } from '../../../../../core/models/meal-habit';
@@ -110,13 +110,13 @@ export class MealHabitsSubstepComponent implements OnInit {
   readonly recurrenceOptions: RecurrenceOption[] = ['Every day', 'Weekdays', 'Weekends', 'Weekly…'];
   readonly dayAbbrevs = DAY_ABBREVS;
 
-  conflictWarning(): string | null {
+  readonly conflictWarning = computed((): string | null => {
     const rrule = buildRrule(this.recurrence(), this.weeklyDay());
     const slot = this.slot();
     const existing = this.habitsService.habits().find(h => h.slot === slot && h.recurrence_rule === rrule);
     if (!existing) return null;
     return `${existing.meal_name} already fills ${this.capitalize(slot)} ${this.recurrence()}. Adding ${this.mealName() || 'this meal'} will give you two options — the planner will alternate between them.`;
-  }
+  });
 
   ngOnInit(): void {
     this.habitsService.load();

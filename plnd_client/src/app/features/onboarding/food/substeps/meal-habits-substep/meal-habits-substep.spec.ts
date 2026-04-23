@@ -1,5 +1,6 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ComponentFixture } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { MealHabitsSubstepComponent } from './meal-habits-substep';
 import { MealHabitsService } from '../../../../../core/services/meal-habits.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
@@ -16,11 +17,12 @@ describe('MealHabitsSubstepComponent', () => {
   let fixture: ComponentFixture<MealHabitsSubstepComponent>;
   let habitsSvc: jasmine.SpyObj<MealHabitsService>;
   let stateSvc: jasmine.SpyObj<OnboardingStateService>;
+  let habitsData: ReturnType<typeof signal<MealHabitResponse[]>>;
 
   beforeEach(async () => {
-    habitsSvc = jasmine.createSpyObj('MealHabitsService', ['load', 'create', 'delete'], {
-      habits: jasmine.createSpy().and.returnValue([]),
-    });
+    habitsData = signal<MealHabitResponse[]>([]);
+    habitsSvc = jasmine.createSpyObj('MealHabitsService', ['load', 'create', 'delete']);
+    (habitsSvc as any).habits = habitsData.asReadonly();
     stateSvc = jasmine.createSpyObj('OnboardingStateService', ['setMealHabits']);
 
     await TestBed.configureTestingModule({
@@ -68,7 +70,7 @@ describe('MealHabitsSubstepComponent', () => {
     component.add();
     tick();
     // habits() spy now returns the habit
-    (habitsSvc.habits as jasmine.Spy).and.returnValue([mockHabit]);
+    habitsData.set([mockHabit]);
 
     // Second attempt: same slot + recurrence = conflict
     component.mealName.set('Granola');
