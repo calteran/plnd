@@ -5,6 +5,10 @@ export interface UserPreferences {
   default_plan_length_days: number; // 1–90
   wake_time: string;                // "HH:MM:SS" — used by Phase 5 push scheduler
   planning_time?: string;           // "HH:MM:SS" — weekly planning reminder time
+  email_notifications_enabled: boolean;
+  sms_notifications_enabled: boolean;
+  push_notifications_enabled: boolean;
+  phone_number: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -15,4 +19,8 @@ export interface UpdatePreferencesRequest {
   default_plan_length_days?: number;
   wake_time?: string;
   planning_time?: string;
+  email_notifications_enabled?: boolean;
+  sms_notifications_enabled?: boolean;
+  push_notifications_enabled?: boolean;
+  phone_number?: string | null;
 }

@@ -12,6 +12,10 @@ const MOCK_PREFS: UserPreferences = {
   planning_trigger_offset: -1,
   default_plan_length_days: 14,
   wake_time: '07:00:00',
+  email_notifications_enabled: false,
+  sms_notifications_enabled: false,
+  push_notifications_enabled: false,
+  phone_number: null,
   created_at: '',
   updated_at: '',
 };
