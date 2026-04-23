@@ -54,8 +54,9 @@ export class OnboardingStateService {
   readonly totalRoutines = computed(() => this.scheduleTemplatesSignal().length);
   readonly totalTasks = computed(() => this.placedTasksSignal().length);
   // Server contract: MealPlanResponse.meals never includes skipped entries — MealEntry has
-  // no skipped field and MEAL_PLAN_RESPONSE_SCHEMA (plnd_agent) uses additionalProperties:false,
-  // so any skipped field in an LLM response fails validation (→ 422) before reaching here.
+  // no skipped field and MEAL_PLAN_RESPONSE_SCHEMA in plnd_agent/src/context/mod.rs uses
+  // additionalProperties:false, so any skipped field in an LLM response fails validation
+  // (→ 422) before reaching here.
   // Caller contract: the food spoke's Meal Plan Review substep must filter out client-side
   // skipped slots before calling setMealPlan(). Pass only committed (non-skipped) entries.
   readonly totalMeals = computed(() => this.mealPlanSignal()?.meals.length ?? 0);
