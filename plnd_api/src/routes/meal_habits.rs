@@ -53,7 +53,6 @@ pub async fn list_meal_habits(
     responses(
         (status = 201, description = "Meal habit created", body = MealHabitResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 409, description = "Duplicate meal habit"),
         (status = 422, description = "Validation error"),
     )
 )]
@@ -69,12 +68,12 @@ pub async fn create_meal_habit(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    let meal_name = body.meal_name.trim().to_string();
+    let meal_name = body.meal_name.trim();
     if meal_name.is_empty() || meal_name.len() > MAX_MEAL_NAME_LEN {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    let recurrence_rule = body.recurrence_rule.trim().to_string();
+    let recurrence_rule = body.recurrence_rule.trim();
     if recurrence_rule.is_empty() || recurrence_rule.len() > MAX_RRULE_LEN {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
@@ -82,11 +81,10 @@ pub async fn create_meal_habit(
     state
         .repos
         .meal_habit
-        .create(user_id, &meal_name, &body.slot, &recurrence_rule)
+        .create(user_id, meal_name, &body.slot, recurrence_rule)
         .await
         .map(|h| (StatusCode::CREATED, Json(MealHabitResponse::from(h))))
         .map_err(|e| match e {
-            Error::Conflict => StatusCode::CONFLICT,
             Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             e => {
                 tracing::error!(error = %e, "create_meal_habit DB error");

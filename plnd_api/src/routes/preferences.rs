@@ -66,24 +66,6 @@ pub async fn patch_preferences(
         || body.default_plan_length_days.is_some()
         || body.wake_time.is_some();
 
-    if any_scheduling {
-        state
-            .repos
-            .preferences
-            .patch_preferences(
-                user_id,
-                body.week_start_day,
-                body.planning_trigger_offset,
-                body.default_plan_length_days,
-                body.wake_time,
-            )
-            .await
-            .map_err(|e| {
-                tracing::error!(error = %e, "patch_preferences error");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-    }
-
     let any_window = body.breakfast_window_start.is_some()
         || body.breakfast_window_end.is_some()
         || body.lunch_window_start.is_some()
@@ -91,7 +73,24 @@ pub async fn patch_preferences(
         || body.dinner_window_start.is_some()
         || body.dinner_window_end.is_some();
 
-    if any_window {
+    let prefs = if any_window {
+        if any_scheduling {
+            state
+                .repos
+                .preferences
+                .patch_preferences(
+                    user_id,
+                    body.week_start_day,
+                    body.planning_trigger_offset,
+                    body.default_plan_length_days,
+                    body.wake_time,
+                )
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "patch_preferences error");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+        }
         state
             .repos
             .preferences
@@ -108,19 +107,36 @@ pub async fn patch_preferences(
             .map_err(|e| {
                 tracing::error!(error = %e, "update_meal_windows error");
                 StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-    }
+            })?
+    } else if any_scheduling {
+        state
+            .repos
+            .preferences
+            .patch_preferences(
+                user_id,
+                body.week_start_day,
+                body.planning_trigger_offset,
+                body.default_plan_length_days,
+                body.wake_time,
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "patch_preferences error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+    } else {
+        state
+            .repos
+            .preferences
+            .get_or_create(user_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "get_or_create preferences error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+    };
 
-    state
-        .repos
-        .preferences
-        .get_or_create(user_id)
-        .await
-        .map(|p| Json(UserPreferencesResponse::from(p)))
-        .map_err(|e| {
-            tracing::error!(error = %e, "get_or_create preferences error");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
+    Ok(Json(UserPreferencesResponse::from(prefs)))
 }
 
 #[utoipa::path(
