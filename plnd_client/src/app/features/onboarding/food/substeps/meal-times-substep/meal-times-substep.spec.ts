@@ -1,4 +1,4 @@
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick, ComponentFixture } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { MealTimesSubstepComponent } from './meal-times-substep';
@@ -8,7 +8,7 @@ const mockConfig = { getConfig: () => ({ api: { baseUrl: 'http://api' } }) };
 
 describe('MealTimesSubstepComponent', () => {
   let component: MealTimesSubstepComponent;
-  let fixture: any;
+  let fixture: ComponentFixture<MealTimesSubstepComponent>;
   let http: HttpTestingController;
 
   beforeEach(async () => {
@@ -65,7 +65,7 @@ describe('MealTimesSubstepComponent', () => {
 
   it('save() sets saveError on HTTP failure', fakeAsync(() => {
     component.save();
-    http.expectOne('http://api/preferences/me').error(new ErrorEvent('network'));
+    http.expectOne('http://api/preferences/me').error(new ProgressEvent('error'));
     tick();
     expect(component.saveError()).toBe(true);
   }));

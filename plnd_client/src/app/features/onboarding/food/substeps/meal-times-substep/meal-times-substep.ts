@@ -75,7 +75,7 @@ export class MealTimesSubstepComponent {
     { key: 'dinner', label: 'Dinner', window: this.dinner },
   ];
 
-  asTime(event: Event): string {
+  protected asTime(event: Event): string {
     return (event.target as HTMLInputElement).value;
   }
 
