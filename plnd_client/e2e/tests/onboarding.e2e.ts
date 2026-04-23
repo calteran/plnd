@@ -72,6 +72,9 @@ test.describe('Onboarding', () => {
     await page.route(`${API_BASE}/users/me`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
     );
+    await page.route(`${API_BASE}/preferences/me`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
+    );
     await page.route(`${API_BASE}/dietary-restrictions`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
     );
@@ -81,6 +84,6 @@ test.describe('Onboarding', () => {
     });
     await page.goto('/onboarding/account');
     await expect(page).toHaveURL(/\/onboarding\/account/);
-    await expect(page.locator('h1')).toHaveText('Account');
+    await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
   });
 });

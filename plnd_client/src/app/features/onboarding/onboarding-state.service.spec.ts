@@ -73,6 +73,10 @@ describe('OnboardingStateService', () => {
       planning_trigger_offset: -3,
       default_plan_length_days: 7,
       wake_time: '07:00:00',
+      email_notifications_enabled: false,
+      sms_notifications_enabled: false,
+      push_notifications_enabled: false,
+      phone_number: null,
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     });
@@ -232,6 +236,8 @@ describe('OnboardingStateService', () => {
       user_id: 'u1', week_start_day: 1,
       planning_trigger_offset: -3, default_plan_length_days: 7,
       wake_time: '07:00:00',
+      email_notifications_enabled: false, sms_notifications_enabled: false,
+      push_notifications_enabled: false, phone_number: null,
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     });
     service.computeAndSetPlanPeriod('2026-04-22');
@@ -244,6 +250,8 @@ describe('OnboardingStateService', () => {
       user_id: 'u1', week_start_day: 1,
       planning_trigger_offset: -2, default_plan_length_days: 14,
       wake_time: '07:00:00',
+      email_notifications_enabled: false, sms_notifications_enabled: false,
+      push_notifications_enabled: false, phone_number: null,
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     });
     service.computeAndSetPlanPeriod('2026-04-22');
@@ -256,6 +264,8 @@ describe('OnboardingStateService', () => {
       user_id: 'u1', week_start_day: 1,
       planning_trigger_offset: -2, default_plan_length_days: 28,
       wake_time: '07:00:00',
+      email_notifications_enabled: false, sms_notifications_enabled: false,
+      push_notifications_enabled: false, phone_number: null,
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     });
     service.computeAndSetPlanPeriod('2026-04-22');
