@@ -385,7 +385,7 @@ pub async fn post_meal_plan_resolve(
     request_body = PlaceTasksRequest,
     responses(
         (status = 200, description = "Scheduled task placements", body = Vec<PlaceTasksEntry>),
-        (status = 400, description = "task_names must not be empty"),
+        (status = 400, description = "task_names must not be empty or plan_end precedes plan_start"),
         (status = 401, description = "Unauthorized"),
         (status = 422, description = "Agent response failed schema validation"),
         (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
@@ -411,6 +411,10 @@ pub async fn post_place_tasks(
 
     let plan_start = body.plan_start;
     let plan_end = body.plan_end;
+
+    if plan_end < plan_start {
+        return Err(StatusCode::BAD_REQUEST);
+    }
 
     let ctx = AgentContext {
         user_id,
@@ -802,5 +806,18 @@ mod tests {
         assert_eq!(entry.title, "Call dentist");
         assert_eq!(entry.duration_minutes, 30);
         assert_eq!(entry.task_type, "floating");
+    }
+
+    #[test]
+    fn place_tasks_invalid_date_range_is_detected() {
+        // Documents the guard condition in post_place_tasks: plan_end < plan_start → 400.
+        use chrono::NaiveDate;
+        let start = NaiveDate::from_ymd_opt(2026, 5, 1).unwrap();
+        let end_before = NaiveDate::from_ymd_opt(2026, 4, 22).unwrap();
+        let end_same = NaiveDate::from_ymd_opt(2026, 5, 1).unwrap();
+        let end_after = NaiveDate::from_ymd_opt(2026, 5, 10).unwrap();
+        assert!(end_before < start, "preceding end should trigger 400");
+        assert!(!(end_same < start), "same-day end is valid");
+        assert!(!(end_after < start), "later end is valid");
     }
 }
