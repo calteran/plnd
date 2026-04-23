@@ -8,9 +8,15 @@ use uuid::Uuid;
 use crate::auth::jwt::Claims;
 use crate::models::{
     MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealPlanRequest,
-    MealPlanResponse, MealSuggestRequest, TaskEntryRequest, TaskEntryResponse,
+    MealPlanResponse, MealSuggestRequest, PlaceTasksEntry, PlaceTasksRequest, TaskEntryRequest,
+    TaskEntryResponse,
 };
 use crate::state::AppState;
+
+#[derive(serde::Deserialize)]
+struct PlaceTasksOutput {
+    entries: Vec<PlaceTasksEntry>,
+}
 
 fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> String {
     match context {
@@ -366,6 +372,74 @@ pub async fn post_meal_plan_resolve(
     Ok(Json(response))
 }
 
+/// POST /agent/place-tasks — schedule a list of one-off task names across a plan period.
+///
+/// The client POSTs task names collected during onboarding. The agent assigns each
+/// a concrete date, time window, duration, and energy level. Returns a flat array;
+/// no DB writes here. The client commits the approved schedule via `POST /schedule/plan`.
+#[utoipa::path(
+    post,
+    path = "/agent/place-tasks",
+    tag = "Agent",
+    security(("bearer_auth" = [])),
+    request_body = PlaceTasksRequest,
+    responses(
+        (status = 200, description = "Scheduled task placements", body = Vec<PlaceTasksEntry>),
+        (status = 400, description = "task_names must not be empty or plan_end precedes plan_start"),
+        (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Agent response failed schema validation"),
+        (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
+        (status = 500, description = "LLM provider failure or infrastructure error"),
+    )
+)]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+pub async fn post_place_tasks(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(body): Json<PlaceTasksRequest>,
+) -> Result<Json<Vec<PlaceTasksEntry>>, StatusCode> {
+    if state.agent_task_limiter.check_key(&claims.sub).is_err() {
+        tracing::warn!(user_id = %claims.sub, "agent place-tasks rate limit exceeded");
+        return Err(StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    if body.task_names.is_empty() {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let plan_start = body.plan_start;
+    let plan_end = body.plan_end;
+
+    if plan_end < plan_start {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let ctx = AgentContext {
+        user_id,
+        use_case: UseCase::PlaceTasks,
+        input: body.task_names.join("\n"),
+        prior_context: Some(format!("[Period: {plan_start} through {plan_end}]\n")),
+        extra: None,
+    };
+
+    let output = state.agent.run(&ctx).await.map_err(|e| match &e {
+        AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        _ => {
+            tracing::error!(error = %e, "agent place-tasks run failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+
+    let wrapper: PlaceTasksOutput = serde_json::from_str(&output.content).map_err(|e| {
+        tracing::error!(error = %e, content = %output.content, "failed to parse place-tasks output");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    Ok(Json(wrapper.entries))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::models::{ActionTaken, Occasion, TaskEntryRequest, TaskEntryResponse};
@@ -695,5 +769,55 @@ mod tests {
         assert!(result.contains("&lt;/signals&gt;"));
         assert!(result.starts_with("<prior_context>"));
         assert!(result.ends_with("</prior_context>\n"));
+    }
+
+    #[test]
+    fn place_tasks_request_deserializes() {
+        use crate::models::PlaceTasksRequest;
+        let json = r#"{
+            "task_names": ["Call dentist", "Finish quarterly report"],
+            "plan_start": "2026-04-22",
+            "plan_end": "2026-05-05"
+        }"#;
+        let req: PlaceTasksRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.task_names.len(), 2);
+        assert_eq!(req.task_names[0], "Call dentist");
+    }
+
+    #[test]
+    fn place_tasks_request_rejects_missing_fields() {
+        use crate::models::PlaceTasksRequest;
+        let result: Result<PlaceTasksRequest, _> = serde_json::from_str(r#"{}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn place_tasks_entry_deserializes() {
+        use crate::models::PlaceTasksEntry;
+        let json = r#"{
+            "title": "Call dentist",
+            "scheduled_date": "2026-04-23",
+            "time_window_start": "10:00",
+            "duration_minutes": 30,
+            "energy_required": "low",
+            "task_type": "floating"
+        }"#;
+        let entry: PlaceTasksEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.title, "Call dentist");
+        assert_eq!(entry.duration_minutes, 30);
+        assert_eq!(entry.task_type, "floating");
+    }
+
+    #[test]
+    fn place_tasks_invalid_date_range_is_detected() {
+        // Documents the guard condition in post_place_tasks: plan_end < plan_start → 400.
+        use chrono::NaiveDate;
+        let start = NaiveDate::from_ymd_opt(2026, 5, 1).unwrap();
+        let end_before = NaiveDate::from_ymd_opt(2026, 4, 22).unwrap();
+        let end_same = NaiveDate::from_ymd_opt(2026, 5, 1).unwrap();
+        let end_after = NaiveDate::from_ymd_opt(2026, 5, 10).unwrap();
+        assert!(end_before < start, "preceding end should trigger 400");
+        assert!(end_same >= start, "same-day end is valid");
+        assert!(end_after >= start, "later end is valid");
     }
 }

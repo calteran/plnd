@@ -9,6 +9,7 @@ const MEAL_PLANNING_PROMPT: &str = include_str!("../prompts/meal_planning.md");
 const MEAL_REBALANCE_PROMPT: &str = include_str!("../prompts/meal_rebalance.md");
 const MEAL_SUGGEST_SLOT_PROMPT: &str = include_str!("../prompts/meal_suggest_slot.md");
 const MEAL_ADHOC_RESOLVE_PROMPT: &str = include_str!("../prompts/meal_adhoc_resolve.md");
+const PLACE_TASKS_PROMPT: &str = include_str!("../prompts/place_tasks.md");
 
 // ── Response schemas ─────────────────────────────────────────────────────────
 
@@ -239,6 +240,53 @@ static RESOLVE_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
         .expect("BUG: failed to compile RESOLVE_RESPONSE_SCHEMA")
 });
 
+/// JSON Schema (Draft 7) for the `PlaceTasksResponse` type.
+///
+/// The agent's `place_tasks` terminal tool wraps entries in `{"entries": [...]}`
+/// because the Anthropic API requires tool input schemas to be `type: object`.
+/// This schema validates that exact shape; the handler unwraps `entries` before
+/// returning the flat array to the client.
+const PLACE_TASKS_RESPONSE_SCHEMA: &str = r##"{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PlaceTasksResponse",
+  "type": "object",
+  "required": ["entries"],
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/PlacedTask" }
+    }
+  },
+  "definitions": {
+    "PlacedTask": {
+      "type": "object",
+      "required": ["title", "scheduled_date", "time_window_start",
+                   "duration_minutes", "energy_required", "task_type"],
+      "additionalProperties": false,
+      "properties": {
+        "title":             { "type": "string" },
+        "scheduled_date":    { "type": "string", "format": "date" },
+        "time_window_start": { "type": "string" },
+        "duration_minutes":  { "type": "integer", "minimum": 1, "maximum": 480 },
+        "energy_required":   { "type": "string", "enum": ["low", "medium", "high"] },
+        "task_type":         { "type": "string" }
+      }
+    }
+  }
+}"##;
+
+/// Pre-compiled validator for [`PLACE_TASKS_RESPONSE_SCHEMA`].
+static PLACE_TASKS_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
+    let schema: serde_json::Value = serde_json::from_str(PLACE_TASKS_RESPONSE_SCHEMA)
+        .expect("BUG: PLACE_TASKS_RESPONSE_SCHEMA is not valid JSON");
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft7)
+        .should_validate_formats(true)
+        .build(&schema)
+        .expect("BUG: failed to compile PLACE_TASKS_RESPONSE_SCHEMA")
+});
+
 /// Identifies the type of agentic interaction.
 ///
 /// Each variant maps to a system prompt and a [`ProviderTier`]. The tool
@@ -262,6 +310,10 @@ pub enum UseCase {
     MealSuggestSlot,
     /// Agent resolves an ad-hoc meal the user described (not in their plan).
     MealAdhocResolve,
+    /// Agent receives comma-separated task names + date range and returns one
+    /// scheduled placement per task (date, time, duration, energy level).
+    /// No DB writes; the client commits via `POST /schedule/plan`.
+    PlaceTasks,
 }
 
 impl UseCase {
@@ -273,6 +325,7 @@ impl UseCase {
             UseCase::MealRebalance => MEAL_REBALANCE_PROMPT,
             UseCase::MealSuggestSlot => MEAL_SUGGEST_SLOT_PROMPT,
             UseCase::MealAdhocResolve => MEAL_ADHOC_RESOLVE_PROMPT,
+            UseCase::PlaceTasks => PLACE_TASKS_PROMPT,
         }
     }
 
@@ -287,6 +340,7 @@ impl UseCase {
             | UseCase::MealRebalance
             | UseCase::MealSuggestSlot
             | UseCase::MealAdhocResolve => &["food", "habits"],
+            UseCase::PlaceTasks => &["habits", "schedule", "energy"],
         }
     }
 
@@ -301,7 +355,8 @@ impl UseCase {
             | UseCase::MealPlanning
             | UseCase::MealRebalance
             | UseCase::MealSuggestSlot
-            | UseCase::MealAdhocResolve => ProviderTier::Capable,
+            | UseCase::MealAdhocResolve
+            | UseCase::PlaceTasks => ProviderTier::Capable,
         }
     }
 
@@ -319,6 +374,7 @@ impl UseCase {
             UseCase::MealPlanning | UseCase::MealRebalance => Some(&MEAL_PLAN_VALIDATOR),
             UseCase::MealSuggestSlot => Some(&SUGGEST_SLOT_VALIDATOR),
             UseCase::MealAdhocResolve => Some(&RESOLVE_VALIDATOR),
+            UseCase::PlaceTasks => Some(&PLACE_TASKS_VALIDATOR),
         }
     }
 }
@@ -356,6 +412,7 @@ mod tests {
             UseCase::MealRebalance,
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
+            UseCase::PlaceTasks,
         ] {
             assert!(
                 !case.system_prompt().is_empty(),
@@ -372,6 +429,7 @@ mod tests {
             UseCase::MealRebalance,
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
+            UseCase::PlaceTasks,
         ] {
             assert!(
                 case.system_prompt().contains("<user_input>"),
@@ -688,6 +746,7 @@ mod tests {
             UseCase::MealRebalance,
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
+            UseCase::PlaceTasks,
         ] {
             assert_eq!(
                 case.provider_tier(),
@@ -695,5 +754,97 @@ mod tests {
                 "{case:?} should use Capable tier"
             );
         }
+    }
+
+    #[test]
+    fn place_tasks_has_response_validator() {
+        assert!(UseCase::PlaceTasks.response_validator().is_some());
+    }
+
+    #[test]
+    fn place_tasks_validator_accepts_valid_entry() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "entries": [{
+                "title": "Call dentist",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "10:00",
+                "duration_minutes": 30,
+                "energy_required": "low",
+                "task_type": "floating"
+            }]
+        });
+        assert!(v.is_valid(&ok));
+    }
+
+    #[test]
+    fn place_tasks_validator_accepts_empty_entries() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let ok = serde_json::json!({ "entries": [] });
+        assert!(v.is_valid(&ok));
+    }
+
+    #[test]
+    fn place_tasks_validator_rejects_invalid_energy_level() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "entries": [{
+                "title": "Task",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "10:00",
+                "duration_minutes": 30,
+                "energy_required": "extreme",
+                "task_type": "floating"
+            }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn place_tasks_validator_rejects_duration_zero() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "entries": [{
+                "title": "Task",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "10:00",
+                "duration_minutes": 0,
+                "energy_required": "low",
+                "task_type": "floating"
+            }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn place_tasks_validator_rejects_missing_time_window() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "entries": [{
+                "title": "Task",
+                "scheduled_date": "2026-04-23",
+                "duration_minutes": 30,
+                "energy_required": "low",
+                "task_type": "floating"
+            }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn place_tasks_validator_rejects_extra_properties() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "entries": [{
+                "title": "Task",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "10:00",
+                "duration_minutes": 30,
+                "energy_required": "low",
+                "task_type": "floating",
+                "surprise": "boom"
+            }]
+        });
+        assert!(!v.is_valid(&bad));
     }
 }

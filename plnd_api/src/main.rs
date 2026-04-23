@@ -380,6 +380,7 @@ async fn main() {
             "/agent/meal-plan/resolve",
             post(agent::post_meal_plan_resolve),
         )
+        .route("/agent/place-tasks", post(agent::post_place_tasks))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

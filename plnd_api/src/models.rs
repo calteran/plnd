@@ -56,6 +56,8 @@ pub struct PlanEntryRequest {
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub scheduled_start: Option<NaiveTime>,
     pub after_milepost: Option<String>,
+    pub duration_minutes: Option<u32>,
+    pub energy_required: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -233,6 +235,104 @@ pub struct MealAdhocResolveResponse {
     pub meal_ref: MealRef,
     pub estimated_nutrition: Option<Nutrition>,
     pub confirmation: String,
+}
+
+// ---------------------------------------------------------------------------
+// Agent — Task Placement
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct PlaceTasksRequest {
+    pub task_names: Vec<String>,
+    pub plan_start: NaiveDate,
+    pub plan_end: NaiveDate,
+}
+
+/// One scheduled task entry returned by `POST /agent/place-tasks`.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct PlaceTasksEntry {
+    pub title: String,
+    pub scheduled_date: NaiveDate,
+    /// Wall-clock start time as "HH:MM"
+    pub time_window_start: String,
+    pub duration_minutes: u32,
+    pub energy_required: String,
+    pub task_type: String,
+}
+
+#[cfg(test)]
+mod place_tasks_tests {
+    use super::*;
+
+    #[test]
+    fn plan_entry_request_accepts_optional_duration_and_energy() {
+        let json = r#"{
+            "date": "2026-04-22",
+            "task_type": "floating",
+            "duration_minutes": 30,
+            "energy_required": "low"
+        }"#;
+        let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.duration_minutes, Some(30));
+        assert_eq!(req.energy_required.as_deref(), Some("low"));
+    }
+
+    #[test]
+    fn plan_entry_request_duration_and_energy_default_to_none() {
+        let json = r#"{"date": "2026-04-22", "task_type": "floating"}"#;
+        let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
+        assert!(req.duration_minutes.is_none());
+        assert!(req.energy_required.is_none());
+    }
+
+    #[test]
+    fn place_tasks_request_deserializes() {
+        let json = r#"{
+            "task_names": ["Call dentist", "Finish report"],
+            "plan_start": "2026-04-22",
+            "plan_end": "2026-05-05"
+        }"#;
+        let req: PlaceTasksRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.task_names.len(), 2);
+        assert_eq!(req.task_names[0], "Call dentist");
+    }
+
+    #[test]
+    fn place_tasks_request_rejects_missing_task_names() {
+        let json = r#"{"plan_start": "2026-04-22", "plan_end": "2026-05-05"}"#;
+        let result: Result<PlaceTasksRequest, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn place_tasks_entry_deserializes() {
+        let json = r#"{
+            "title": "Call dentist",
+            "scheduled_date": "2026-04-23",
+            "time_window_start": "10:00",
+            "duration_minutes": 30,
+            "energy_required": "low",
+            "task_type": "floating"
+        }"#;
+        let entry: PlaceTasksEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.title, "Call dentist");
+        assert_eq!(entry.duration_minutes, 30);
+        assert_eq!(entry.energy_required, "low");
+    }
+
+    #[test]
+    fn place_tasks_entry_serializes_date_as_iso() {
+        let entry = PlaceTasksEntry {
+            title: "Call dentist".to_string(),
+            scheduled_date: chrono::NaiveDate::from_ymd_opt(2026, 4, 23).unwrap(),
+            time_window_start: "10:00".to_string(),
+            duration_minutes: 30,
+            energy_required: "low".to_string(),
+            task_type: "floating".to_string(),
+        };
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("\"scheduled_date\":\"2026-04-23\""));
+    }
 }
 
 #[cfg(test)]

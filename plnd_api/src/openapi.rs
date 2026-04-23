@@ -12,8 +12,9 @@ use crate::api_response::{
 use crate::models::{
     CarryoverDecision, ConversationTurn, MealAdhocResolveRequest, MealAdhocResolveResponse,
     MealEntry, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef, MealSuggestRequest,
-    Nutrition, NutritionSummary, Occasion, PatchEntryStatusRequest, PlanEntryRequest,
-    PostSchedulePlanRequest, ReadyStatus, SlotRef, TaskEntryRequest, TaskEntryResponse,
+    Nutrition, NutritionSummary, Occasion, PatchEntryStatusRequest, PlaceTasksEntry,
+    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef,
+    TaskEntryRequest, TaskEntryResponse,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
@@ -129,6 +130,7 @@ impl Modify for BearerSecurityAddon {
         crate::routes::agent::post_meal_plan_rebalance,
         crate::routes::agent::post_meal_plan_suggest,
         crate::routes::agent::post_meal_plan_resolve,
+        crate::routes::agent::post_place_tasks,
     ),
     components(schemas(
         // Existing
@@ -202,6 +204,9 @@ impl Modify for BearerSecurityAddon {
         MealSuggestRequest,
         MealAdhocResolveRequest,
         MealAdhocResolveResponse,
+        // Task Placement
+        PlaceTasksRequest,
+        PlaceTasksEntry,
     )),
     modifiers(&BearerSecurityAddon),
     tags(
