@@ -340,6 +340,12 @@ describe('WeekPlanService', () => {
       service.applyAgentMeals([]);
       expect(service.isGenerating()).toBeFalse();
     });
+
+    it('should default title to empty string when entry has no title', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.applyAgentMeals([{ date: '2026-03-24', occasion: 'breakfast', meal_ref: null }]);
+      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('');
+    });
   });
 
   describe('currentState()', () => {
