@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
-import { RouterTestingModule } from '@angular/router/testing';
+import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { NavbarAvatarComponent } from './navbar-avatar';
@@ -48,13 +47,14 @@ describe('NavbarAvatarComponent', () => {
     });
 
     await TestBed.configureTestingModule({
-      imports: [NavbarAvatarComponent, RouterTestingModule],
+      imports: [NavbarAvatarComponent],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: UserService, useValue: userServiceMock },
         { provide: AuthService, useValue: authServiceMock },
-        { provide: ThemeService, useValue: themeServiceSpy }
+        { provide: ThemeService, useValue: themeServiceSpy },
+        provideRouter([])
       ]
     }).compileComponents();
 

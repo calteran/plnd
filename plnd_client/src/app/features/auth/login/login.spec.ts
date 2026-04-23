@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { ActivatedRoute } from '@angular/router';
-import { RouterTestingModule } from '@angular/router/testing';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { LoginComponent } from './login';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -9,8 +8,9 @@ function createFixture(queryParams: Record<string, string> = {}): ComponentFixtu
   const paramMap = { get: (key: string) => queryParams[key] ?? null };
 
   TestBed.configureTestingModule({
-    imports: [LoginComponent, RouterTestingModule],
+    imports: [LoginComponent],
     providers: [
+      provideRouter([]),
       { provide: AuthService, useValue: spy },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: paramMap } } }
     ]

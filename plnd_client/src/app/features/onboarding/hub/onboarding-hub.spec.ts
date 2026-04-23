@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
-import { Router } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { OnboardingHubComponent } from './onboarding-hub';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
@@ -33,9 +32,10 @@ describe('OnboardingHubComponent', () => {
   beforeEach(async () => {
     stateMock = makeStateMock();
     await TestBed.configureTestingModule({
-      imports: [OnboardingHubComponent, RouterTestingModule],
+      imports: [OnboardingHubComponent],
       providers: [
         { provide: OnboardingStateService, useValue: stateMock },
+        provideRouter([]),
       ],
     }).compileComponents();
 

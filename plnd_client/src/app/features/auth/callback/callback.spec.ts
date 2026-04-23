@@ -1,5 +1,5 @@
 import { TestBed, fakeAsync, flushMicrotasks } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
+import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { AuthCallbackComponent } from './callback';
@@ -27,10 +27,11 @@ describe('AuthCallbackComponent', () => {
     );
 
     TestBed.configureTestingModule({
-      imports: [AuthCallbackComponent, RouterTestingModule],
+      imports: [AuthCallbackComponent],
       providers: [
         { provide: OAuthService, useValue: oauthServiceMock },
-        { provide: AuthService, useValue: authServiceMock }
+        { provide: AuthService, useValue: authServiceMock },
+        provideRouter([])
       ]
     });
 

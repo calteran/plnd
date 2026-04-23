@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
+import { provideRouter } from '@angular/router';
 import { OnboardingComponent } from './onboarding';
 import { OnboardingStateService } from './onboarding-state.service';
 import { PreferencesService } from '../../core/services/preferences.service';
@@ -8,9 +8,10 @@ import { signal } from '@angular/core';
 describe('OnboardingComponent (shell)', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [OnboardingComponent, RouterTestingModule],
+      imports: [OnboardingComponent],
       providers: [
-        { provide: PreferencesService, useValue: { preferences: signal(null) } }
+        { provide: PreferencesService, useValue: { preferences: signal(null) } },
+        provideRouter([])
       ]
     }).compileComponents();
   });
