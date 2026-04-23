@@ -16,4 +16,16 @@ pub trait PreferencesRepository: Send + Sync {
         default_plan_length_days: Option<i16>,
         wake_time: Option<NaiveTime>,
     ) -> Result<UserPreferences, crate::Error>;
+
+    #[allow(clippy::too_many_arguments)]
+    async fn update_meal_windows(
+        &self,
+        user_id: Uuid,
+        breakfast_window_start: Option<NaiveTime>,
+        breakfast_window_end: Option<NaiveTime>,
+        lunch_window_start: Option<NaiveTime>,
+        lunch_window_end: Option<NaiveTime>,
+        dinner_window_start: Option<NaiveTime>,
+        dinner_window_end: Option<NaiveTime>,
+    ) -> Result<UserPreferences, crate::Error>;
 }

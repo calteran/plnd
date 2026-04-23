@@ -2,6 +2,7 @@ pub mod briefing;
 pub mod catalog_ingest;
 pub mod exercise;
 pub mod meal;
+pub mod meal_habit;
 pub mod meal_search;
 pub mod meal_suggestion;
 pub mod memory;

@@ -45,24 +45,98 @@ pub async fn patch_preferences(
         }
     }
 
+    // Cross-field: when both window bounds are provided, start must precede end
+    let window_pairs = [
+        (body.breakfast_window_start, body.breakfast_window_end),
+        (body.lunch_window_start, body.lunch_window_end),
+        (body.dinner_window_start, body.dinner_window_end),
+    ];
+    for (start, end) in window_pairs {
+        if let (Some(s), Some(e)) = (start, end) {
+            if s >= e {
+                return Err(StatusCode::UNPROCESSABLE_ENTITY);
+            }
+        }
+    }
+
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    state
-        .repos
-        .preferences
-        .patch_preferences(
-            user_id,
-            body.week_start_day,
-            body.planning_trigger_offset,
-            body.default_plan_length_days,
-            body.wake_time,
-        )
-        .await
-        .map(|p| Json(UserPreferencesResponse::from(p)))
-        .map_err(|e| {
-            tracing::error!(error = %e, "patch_preferences error");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
+    let any_scheduling = body.week_start_day.is_some()
+        || body.planning_trigger_offset.is_some()
+        || body.default_plan_length_days.is_some()
+        || body.wake_time.is_some();
+
+    let any_window = body.breakfast_window_start.is_some()
+        || body.breakfast_window_end.is_some()
+        || body.lunch_window_start.is_some()
+        || body.lunch_window_end.is_some()
+        || body.dinner_window_start.is_some()
+        || body.dinner_window_end.is_some();
+
+    let prefs = if any_window {
+        if any_scheduling {
+            state
+                .repos
+                .preferences
+                .patch_preferences(
+                    user_id,
+                    body.week_start_day,
+                    body.planning_trigger_offset,
+                    body.default_plan_length_days,
+                    body.wake_time,
+                )
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "patch_preferences error");
+                    StatusCode::INTERNAL_SERVER_ERROR
+                })?;
+        }
+        state
+            .repos
+            .preferences
+            .update_meal_windows(
+                user_id,
+                body.breakfast_window_start,
+                body.breakfast_window_end,
+                body.lunch_window_start,
+                body.lunch_window_end,
+                body.dinner_window_start,
+                body.dinner_window_end,
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "update_meal_windows error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+    } else if any_scheduling {
+        state
+            .repos
+            .preferences
+            .patch_preferences(
+                user_id,
+                body.week_start_day,
+                body.planning_trigger_offset,
+                body.default_plan_length_days,
+                body.wake_time,
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "patch_preferences error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+    } else {
+        state
+            .repos
+            .preferences
+            .get_or_create(user_id)
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "get_or_create preferences error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?
+    };
+
+    Ok(Json(UserPreferencesResponse::from(prefs)))
 }
 
 #[utoipa::path(

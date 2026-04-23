@@ -9,8 +9,24 @@ pub struct UserPreferences {
     pub planning_trigger_offset: i16,
     pub default_plan_length_days: i16,
     pub wake_time: NaiveTime,
+    pub breakfast_window_start: Option<NaiveTime>,
+    pub breakfast_window_end: Option<NaiveTime>,
+    pub lunch_window_start: Option<NaiveTime>,
+    pub lunch_window_end: Option<NaiveTime>,
+    pub dinner_window_start: Option<NaiveTime>,
+    pub dinner_window_end: Option<NaiveTime>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct MealHabit {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub meal_name: String,
+    pub slot: String,
+    pub recurrence_rule: String,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

@@ -5,6 +5,7 @@ pub(crate) mod briefing;
 pub(crate) mod catalog_details;
 pub(crate) mod catalog_ingest;
 pub(crate) mod dietary_restrictions;
+pub(crate) mod meal_habits;
 pub(crate) mod meal_suggestions;
 pub(crate) mod memories;
 pub(crate) mod preferences;

@@ -3,18 +3,18 @@ use utoipa::{Modify, OpenApi};
 
 use crate::api_response::{
     CatalogDishIngredientResponse, CatalogIngredientResponse, CatalogMealDishResponse,
-    DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse,
+    DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse, MealHabitResponse,
     MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
     ScheduleEntryResponse, SchedulePeriodApiResponse, ScheduleTemplateResponse,
     ScheduleTypeResponse, TaskResponse, UserDishPrefDetailResponse, UserIngredientPrefResponse,
     UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
-    CarryoverDecision, ConversationTurn, MealAdhocResolveRequest, MealAdhocResolveResponse,
-    MealEntry, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef, MealSuggestRequest,
-    Nutrition, NutritionSummary, Occasion, PatchEntryStatusRequest, PlaceTasksEntry,
-    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef,
-    TaskEntryRequest, TaskEntryResponse,
+    CarryoverDecision, ConversationTurn, CreateMealHabitRequest, MealAdhocResolveRequest,
+    MealAdhocResolveResponse, MealEntry, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
+    MealSuggestRequest, Nutrition, NutritionSummary, Occasion, PatchEntryStatusRequest,
+    PlaceTasksEntry, PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus,
+    SlotRef, TaskEntryRequest, TaskEntryResponse,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
@@ -77,6 +77,10 @@ impl Modify for BearerSecurityAddon {
         crate::routes::dietary_restrictions::create_restriction,
         crate::routes::dietary_restrictions::update_restriction,
         crate::routes::dietary_restrictions::delete_restriction,
+        // Meal Habits
+        crate::routes::meal_habits::list_meal_habits,
+        crate::routes::meal_habits::create_meal_habit,
+        crate::routes::meal_habits::delete_meal_habit,
         // Catalog
         crate::routes::catalog_ingest::ingest_ingredient,
         crate::routes::catalog_details::get_ingredient,
@@ -137,10 +141,12 @@ impl Modify for BearerSecurityAddon {
         UserResponse,
         UserPreferencesResponse,
         DietaryRestrictionResponse,
+        MealHabitResponse,
         ReadyStatus,
         UpdateProfileRequest,
         CreateRestrictionRequest,
         UpdateRestrictionRequest,
+        CreateMealHabitRequest,
         WeatherResponse,
         NewsHeadlineResponse,
         NewsResponse,
@@ -215,6 +221,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Users", description = "User profile management"),
         (name = "Preferences", description = "User preference settings"),
         (name = "Dietary Restrictions", description = "Dietary restriction management"),
+        (name = "Meal Habits", description = "Recurring meal preferences used during onboarding"),
         (name = "Briefing", description = "Morning briefing — weather, news, and yesterday recap"),
         (name = "Catalog", description = "Catalog ingredient, dish, and meal lookups and ingest"),
         (name = "My Ingredient Prefs", description = "User ingredient preference management (blocked/notes)"),

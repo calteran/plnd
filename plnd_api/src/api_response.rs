@@ -1,8 +1,8 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction, MealSuggestion, ScheduleEntry, ScheduleTemplate, ScheduleType, Task, User,
-    UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
+    DietaryRestriction, MealHabit, MealSuggestion, ScheduleEntry, ScheduleTemplate, ScheduleType,
+    Task, User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
 };
 use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
@@ -50,6 +50,12 @@ pub struct UserPreferencesResponse {
     pub planning_trigger_offset: i16,
     pub default_plan_length_days: i16,
     pub wake_time: NaiveTime,
+    pub breakfast_window_start: Option<NaiveTime>,
+    pub breakfast_window_end: Option<NaiveTime>,
+    pub lunch_window_start: Option<NaiveTime>,
+    pub lunch_window_end: Option<NaiveTime>,
+    pub dinner_window_start: Option<NaiveTime>,
+    pub dinner_window_end: Option<NaiveTime>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -62,8 +68,38 @@ impl From<UserPreferences> for UserPreferencesResponse {
             planning_trigger_offset: p.planning_trigger_offset,
             default_plan_length_days: p.default_plan_length_days,
             wake_time: p.wake_time,
+            breakfast_window_start: p.breakfast_window_start,
+            breakfast_window_end: p.breakfast_window_end,
+            lunch_window_start: p.lunch_window_start,
+            lunch_window_end: p.lunch_window_end,
+            dinner_window_start: p.dinner_window_start,
+            dinner_window_end: p.dinner_window_end,
             created_at: p.created_at,
             updated_at: p.updated_at,
+        }
+    }
+}
+
+/// API response wrapper for `plnd_data::models::MealHabit`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct MealHabitResponse {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub meal_name: String,
+    pub slot: String,
+    pub recurrence_rule: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<MealHabit> for MealHabitResponse {
+    fn from(h: MealHabit) -> Self {
+        Self {
+            id: h.id,
+            user_id: h.user_id,
+            meal_name: h.meal_name,
+            slot: h.slot,
+            recurrence_rule: h.recurrence_rule,
+            created_at: h.created_at,
         }
     }
 }
