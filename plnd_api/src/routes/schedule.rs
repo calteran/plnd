@@ -133,18 +133,23 @@ pub async fn post_plan(
     let entries = body
         .entries
         .into_iter()
-        .map(|e| PlanEntryInput {
-            date: e.date,
-            task_type: e.task_type,
-            task_ref_id: e.task_ref_id,
-            task_ref_type: e.task_ref_type,
-            title: e.title,
-            scheduled_start: e.scheduled_start,
-            after_milepost: e.after_milepost,
-            duration_minutes: e.duration_minutes.map(|d| d as i32),
-            energy_required: e.energy_required,
+        .map(|e| -> Result<PlanEntryInput, StatusCode> {
+            Ok(PlanEntryInput {
+                date: e.date,
+                task_type: e.task_type,
+                task_ref_id: e.task_ref_id,
+                task_ref_type: e.task_ref_type,
+                title: e.title,
+                scheduled_start: e.scheduled_start,
+                after_milepost: e.after_milepost,
+                duration_minutes: e
+                    .duration_minutes
+                    .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
+                    .transpose()?,
+                energy_required: e.energy_required,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     let carryover_decisions: HashMap<Uuid, CarryoverDecision> = body
         .carryover_decisions

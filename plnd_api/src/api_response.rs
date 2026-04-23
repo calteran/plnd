@@ -419,6 +419,8 @@ pub struct ScheduleEntryResponse {
     pub after_milepost: Option<String>,
     pub after_entry_id: Option<Uuid>,
     pub deviation_note: Option<String>,
+    pub duration_minutes: Option<i32>,
+    pub energy_required: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -443,6 +445,8 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
             after_milepost: e.after_milepost,
             after_entry_id: e.after_entry_id,
             deviation_note: e.deviation_note,
+            duration_minutes: e.duration_minutes,
+            energy_required: e.energy_required,
             created_at: e.created_at,
             updated_at: e.updated_at,
         }
