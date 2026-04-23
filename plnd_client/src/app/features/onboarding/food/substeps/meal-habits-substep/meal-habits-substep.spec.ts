@@ -22,7 +22,7 @@ describe('MealHabitsSubstepComponent', () => {
   beforeEach(async () => {
     habitsData = signal<MealHabitResponse[]>([]);
     habitsSvc = jasmine.createSpyObj('MealHabitsService', ['load', 'create', 'delete']);
-    (habitsSvc as any).habits = habitsData.asReadonly();
+    Object.defineProperty(habitsSvc, 'habits', { value: habitsData.asReadonly(), writable: false });
     stateSvc = jasmine.createSpyObj('OnboardingStateService', ['setMealHabits']);
 
     await TestBed.configureTestingModule({
