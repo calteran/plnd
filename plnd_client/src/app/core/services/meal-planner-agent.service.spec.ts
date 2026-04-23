@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { MealPlannerAgentService } from './meal-planner-agent.service';
 import { MealPlanState } from '../models/week-plan';
 
@@ -18,7 +19,7 @@ describe('MealPlannerAgentService', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
     svc      = TestBed.inject(MealPlannerAgentService);
     httpMock = TestBed.inject(HttpTestingController);

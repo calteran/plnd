@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { UserIngredientPrefsService } from './user-ingredient-prefs.service';
 import { UserIngredientPref } from '../models/user-ingredient-pref';
 
@@ -19,7 +20,7 @@ describe('UserIngredientPrefsService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     });
     service = TestBed.inject(UserIngredientPrefsService);
     httpMock = TestBed.inject(HttpTestingController);
