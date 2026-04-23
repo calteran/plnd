@@ -107,6 +107,8 @@ mod tests {
                     title: Some("Morning work".to_string()),
                     scheduled_start: Some(nine),
                     after_milepost: None,
+                    duration_minutes: None,
+                    energy_required: None,
                 },
                 PlanEntryInput {
                     date: yesterday,
@@ -116,6 +118,8 @@ mod tests {
                     title: Some("Afternoon work".to_string()),
                     scheduled_start: Some(ten),
                     after_milepost: None,
+                    duration_minutes: None,
+                    energy_required: None,
                 },
                 PlanEntryInput {
                     date: yesterday,
@@ -125,6 +129,8 @@ mod tests {
                     title: Some("Lunch".to_string()),
                     scheduled_start: Some(noon),
                     after_milepost: None,
+                    duration_minutes: None,
+                    energy_required: None,
                 },
             ],
             replace: false,
