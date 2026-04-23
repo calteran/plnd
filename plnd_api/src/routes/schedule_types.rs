@@ -8,6 +8,7 @@ use axum::{
 };
 use chrono::{NaiveDate, NaiveTime};
 use plnd_data::Error;
+use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -23,8 +24,6 @@ where
         .map_err(serde::de::Error::custom)
 }
 
-use serde::Deserialize;
-
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateScheduleTypeRequest {
     pub name: String,
@@ -38,6 +37,8 @@ pub struct CreateScheduleTypeRequest {
     pub anchor_date: Option<NaiveDate>,
 }
 
+/// Kept separate from `CreateScheduleTypeRequest` so PUT and POST can diverge independently
+/// (e.g. partial updates, additional fields) without a breaking schema change.
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct UpdateScheduleTypeRequest {
     pub name: String,
@@ -64,10 +65,14 @@ fn validate_schedule_type_request(
     if !(0..=127).contains(&days_bitmask) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if is_cycle && (cycle_length.is_none() || anchor_date.is_none()) {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
-    if !is_cycle && (cycle_length.is_some() || anchor_date.is_some()) {
+    if is_cycle {
+        if cycle_length.is_none() || anchor_date.is_none() {
+            return Err(StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        if cycle_length.unwrap() <= 0 {
+            return Err(StatusCode::UNPROCESSABLE_ENTITY);
+        }
+    } else if cycle_length.is_some() || anchor_date.is_some() {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     Ok(())
@@ -233,6 +238,9 @@ pub async fn delete_schedule_type(
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
+    // TODO(#534): this count+delete is a TOCTOU race — two concurrent deletes can both
+    // pass the guard and leave the user with zero schedule types. Atomise with a
+    // single-statement DELETE that embeds the count check.
     let count = state
         .repos
         .schedule_type

@@ -199,6 +199,18 @@ mod tests {
         assert!(result.iter().all(|t| t.user_id == uid));
     }
 
+    #[sqlx::test(migrations = "./migrations")]
+    async fn list_for_user_excludes_other_users(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        make_type(&pool, uid_a).await;
+        make_type(&pool, uid_b).await;
+
+        let result_a = list_for_user(&pool, uid_a).await.unwrap();
+        assert_eq!(result_a.len(), 1);
+        assert_eq!(result_a[0].user_id, uid_a);
+    }
+
     // -----------------------------------------------------------------------
     // create
     // -----------------------------------------------------------------------
@@ -321,6 +333,34 @@ mod tests {
         .await
         .unwrap();
         assert!(result.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_enforces_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let st = make_type(&pool, uid_a).await;
+
+        // uid_b cannot update uid_a's record — returns None
+        let result = update(
+            &pool,
+            st.id,
+            uid_b,
+            "Hijacked",
+            0,
+            wake(),
+            bed(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(result.is_none());
+
+        // uid_a's record is unchanged
+        let unchanged = get_by_id(&pool, st.id, uid_a).await.unwrap().unwrap();
+        assert_eq!(unchanged.name, "Weekdays");
     }
 
     // -----------------------------------------------------------------------
