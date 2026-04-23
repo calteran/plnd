@@ -475,7 +475,7 @@ export class PlanMealsStepComponent implements OnInit {
       .suggestSlot(date, slot, avoid)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next:  entry => this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title, entry.estimated_nutrition, entry.estimated),
+        next:  entry => this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title ?? '', entry.estimated_nutrition, entry.estimated),
         error: ()    => { /* leave cell unchanged; no user-visible feedback for now */ },
       });
   }
