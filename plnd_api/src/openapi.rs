@@ -11,8 +11,8 @@ use crate::api_response::{
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealHabitRequest, MealAdhocResolveRequest,
-    MealAdhocResolveResponse, MealEntry, MealPlanRequest, MealPlanResponse, MealPlanState,
-    MealRef, MealSuggestRequest, Nutrition, NutritionSummary, Occasion, PatchEntryStatusRequest,
+    MealAdhocResolveResponse, MealEntry, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
+    MealSuggestRequest, Nutrition, NutritionSummary, Occasion, PatchEntryStatusRequest,
     PlaceTasksEntry, PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus,
     SlotRef, TaskEntryRequest, TaskEntryResponse,
 };
