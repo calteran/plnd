@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use chrono::{NaiveDate, NaiveTime};
-use plnd_data::Error;
+use plnd_data::{repository::schedule_type::DeleteScheduleTypeOutcome, Error};
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -241,40 +241,19 @@ pub async fn delete_schedule_type(
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    // TODO(#534): this count+delete is a TOCTOU race — two concurrent deletes can both
-    // pass the guard and leave the user with zero schedule types. Atomise with a
-    // single-statement DELETE that embeds the count check.
-    let count = state
-        .repos
-        .schedule_type
-        .count_for_user(user_id)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "delete_schedule_type count DB error");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    if count <= 1 {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
-
-    state
+    match state
         .repos
         .schedule_type
         .delete(schedule_type_id, user_id)
         .await
-        .map_err(|e| match e {
-            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
-            e => {
-                tracing::error!(error = %e, "delete_schedule_type DB error");
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        })
-        .and_then(|deleted| {
-            if deleted {
-                Ok(StatusCode::NO_CONTENT)
-            } else {
-                Err(StatusCode::NOT_FOUND)
-            }
-        })
+    {
+        Ok(DeleteScheduleTypeOutcome::Deleted) => Ok(StatusCode::NO_CONTENT),
+        Ok(DeleteScheduleTypeOutcome::NotFound) => Err(StatusCode::NOT_FOUND),
+        Ok(DeleteScheduleTypeOutcome::LastType) => Err(StatusCode::UNPROCESSABLE_ENTITY),
+        Err(Error::ConnectionLost) => Err(StatusCode::SERVICE_UNAVAILABLE),
+        Err(e) => {
+            tracing::error!(error = %e, "delete_schedule_type DB error");
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
+    }
 }

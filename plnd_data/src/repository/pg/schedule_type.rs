@@ -4,8 +4,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    db::schedule_type as db, models::ScheduleType,
-    repository::schedule_type::ScheduleTypeRepository,
+    db::schedule_type as db,
+    models::ScheduleType,
+    repository::schedule_type::{DeleteScheduleTypeOutcome, ScheduleTypeRepository},
 };
 
 pub struct PgScheduleTypeRepository {
@@ -96,7 +97,11 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
             .map_err(Into::into)
     }
 
-    async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<bool, crate::Error> {
+    async fn delete(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<DeleteScheduleTypeOutcome, crate::Error> {
         db::delete(&self.pool, id, user_id)
             .await
             .map_err(Into::into)
