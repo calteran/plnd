@@ -1,7 +1,10 @@
 // plnd_client/src/app/features/onboarding/onboarding-state.service.ts
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { PreferencesService } from '../../core/services/preferences.service';
-import { MealPlanResponse } from '../../core/models/week-plan';
+import { MealPlanResponse, PlanEntryRequest } from '../../core/models/week-plan';
+import { ScheduleTemplate } from '../../core/models/schedule-template';
+import { ScheduleTypeResponse } from '../../core/models/schedule-type';
+import { MealHabitResponse } from '../../core/models/meal-habit';
 
 export type SectionId = 'account' | 'tasks' | 'food';
 export type SectionStatus = 'not-started' | 'complete';
@@ -10,6 +13,7 @@ export type SectionStatus = 'not-started' | 'complete';
 export class OnboardingStateService {
   private readonly prefs = inject(PreferencesService);
 
+  // ── Existing signals ────────────────────────────────────────────────────
   private readonly statusSignal = signal<Record<SectionId, SectionStatus>>({
     account: 'not-started',
     tasks: 'not-started',
@@ -19,15 +23,49 @@ export class OnboardingStateService {
   private readonly planPeriodSignal = signal<{ start: string; end: string } | null>(null);
   private readonly enjoyedIngredientsSignal = signal<string[]>([]);
 
+  // ── New signals (hub-and-spoke design) ─────────────────────────────────
+  private readonly planningPrefsCompleteSignal = signal<boolean>(false);
+  private readonly upcomingTaskNamesSignal = signal<string[]>([]);
+  private readonly placedTasksSignal = signal<PlanEntryRequest[]>([]);
+  private readonly scheduleTypesSignal = signal<ScheduleTypeResponse[]>([]);
+  private readonly mealHabitsSignal = signal<MealHabitResponse[]>([]);
+  // Held in state so the hub stats banner can read totalRoutines without extra injection.
+  // The Tasks component feeds this in after creating/fetching templates.
+  private readonly scheduleTemplatesSignal = signal<ScheduleTemplate[]>([]);
+
+  // ── Public read-only signals ────────────────────────────────────────────
   readonly sectionStatus = this.statusSignal.asReadonly();
   readonly mealPlan = this.mealPlanSignal.asReadonly();
   readonly planPeriod = this.planPeriodSignal.asReadonly();
   readonly enjoyedIngredients = this.enjoyedIngredientsSignal.asReadonly();
+  readonly planningPrefsComplete = this.planningPrefsCompleteSignal.asReadonly();
+  readonly upcomingTaskNames = this.upcomingTaskNamesSignal.asReadonly();
+  readonly placedTasks = this.placedTasksSignal.asReadonly();
+  readonly scheduleTypes = this.scheduleTypesSignal.asReadonly();
+  readonly mealHabits = this.mealHabitsSignal.asReadonly();
+  readonly scheduleTemplates = this.scheduleTemplatesSignal.asReadonly();
 
+  // ── Computed signals ────────────────────────────────────────────────────
   readonly allSectionsComplete = computed(() =>
     Object.values(this.statusSignal()).every(status => status === 'complete')
   );
 
+  // Hub stats banner
+  readonly totalRoutines = computed(() => this.scheduleTemplatesSignal().length);
+  readonly totalTasks = computed(() => this.placedTasksSignal().length);
+  // Assumes mealPlan.meals contains only non-skipped entries (MealEntry has no skipped field).
+  // If skipped entries can appear here, a filter is needed. See #531.
+  readonly totalMeals = computed(() => this.mealPlanSignal()?.meals.length ?? 0);
+  readonly planDays = computed(() => {
+    const p = this.planPeriodSignal();
+    if (!p) return 0;
+    // Use local-noon parsing to avoid UTC-offset day rollback (same pattern as computeFirstPlanPeriod).
+    const start = new Date(`${p.start}T12:00:00`);
+    const end = new Date(`${p.end}T12:00:00`);
+    return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+  });
+
+  // ── Mutation methods ────────────────────────────────────────────────────
   markComplete(section: SectionId): void {
     this.statusSignal.update(s => ({ ...s, [section]: 'complete' }));
   }
@@ -44,6 +82,32 @@ export class OnboardingStateService {
     const userPrefs = this.prefs.preferences();
     if (!userPrefs) return;
     this.planPeriodSignal.set(computeFirstPlanPeriod(today, userPrefs));
+  }
+
+  // One-way flag: intentionally has no reset path. Mirrors markComplete(section) semantics.
+  // Call only after successfully saving planning prefs to the backend.
+  setPlanningPrefsComplete(): void {
+    this.planningPrefsCompleteSignal.set(true);
+  }
+
+  setUpcomingTaskNames(names: string[]): void {
+    this.upcomingTaskNamesSignal.set(names);
+  }
+
+  setPlacedTasks(tasks: PlanEntryRequest[]): void {
+    this.placedTasksSignal.set(tasks);
+  }
+
+  setScheduleTypes(types: ScheduleTypeResponse[]): void {
+    this.scheduleTypesSignal.set(types);
+  }
+
+  setMealHabits(habits: MealHabitResponse[]): void {
+    this.mealHabitsSignal.set(habits);
+  }
+
+  setScheduleTemplates(templates: ScheduleTemplate[]): void {
+    this.scheduleTemplatesSignal.set(templates);
   }
 }
 

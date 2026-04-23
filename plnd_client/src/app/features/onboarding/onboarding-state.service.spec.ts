@@ -4,6 +4,10 @@ import { signal, WritableSignal } from '@angular/core';
 import { OnboardingStateService, computeFirstPlanPeriod, SectionId } from './onboarding-state.service';
 import { PreferencesService } from '../../core/services/preferences.service';
 import { UserPreferences } from '../../core/models/preferences';
+import { MealEntry, PlanEntryRequest } from '../../core/models/week-plan';
+import { ScheduleTemplate } from '../../core/models/schedule-template';
+import { ScheduleTypeResponse } from '../../core/models/schedule-type';
+import { MealHabitResponse } from '../../core/models/meal-habit';
 
 describe('OnboardingStateService', () => {
   let service: OnboardingStateService;
@@ -78,6 +82,172 @@ describe('OnboardingStateService', () => {
     expect(period!.start).toBe('2026-04-22');
     expect(period!.end).toBe('2026-04-29'); // offset=-3 → ratio 4/7 = 0.57 ≥ 0.15 → normal case
   });
+
+  // ── New signal initial state ────────────────────────────────────────────
+
+  it('initial state: planningPrefsComplete false, arrays empty', () => {
+    expect(service.planningPrefsComplete()).toBeFalse();
+    expect(service.upcomingTaskNames()).toEqual([]);
+    expect(service.placedTasks()).toEqual([]);
+    expect(service.scheduleTypes()).toEqual([]);
+    expect(service.mealHabits()).toEqual([]);
+    expect(service.scheduleTemplates()).toEqual([]);
+  });
+
+  // ── Setter methods ──────────────────────────────────────────────────────
+
+  it('setPlanningPrefsComplete sets the flag to true', () => {
+    service.setPlanningPrefsComplete();
+    expect(service.planningPrefsComplete()).toBeTrue();
+  });
+
+  it('setPlanningPrefsComplete is idempotent — calling twice stays true', () => {
+    service.setPlanningPrefsComplete();
+    service.setPlanningPrefsComplete();
+    expect(service.planningPrefsComplete()).toBeTrue();
+  });
+
+  it('setUpcomingTaskNames stores the names', () => {
+    service.setUpcomingTaskNames(['Morning run', 'Read 20 min']);
+    expect(service.upcomingTaskNames()).toEqual(['Morning run', 'Read 20 min']);
+  });
+
+  it('setPlacedTasks stores the placed task entries', () => {
+    const tasks: PlanEntryRequest[] = [
+      { date: '2026-04-22', task_type: 'custom', title: 'Morning run', scheduled_start: '07:00' },
+    ];
+    service.setPlacedTasks(tasks);
+    expect(service.placedTasks()).toEqual(tasks);
+  });
+
+  it('setScheduleTypes stores schedule type records', () => {
+    const types: ScheduleTypeResponse[] = [
+      {
+        type_id: 'st-1', user_id: 'u1', name: 'Weekdays',
+        days: [1, 2, 3, 4, 5], wake_time: '07:00', bed_time: '22:00',
+        created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
+      },
+    ];
+    service.setScheduleTypes(types);
+    expect(service.scheduleTypes()).toEqual(types);
+  });
+
+  it('setMealHabits stores meal habit records', () => {
+    const habits: MealHabitResponse[] = [
+      {
+        habit_id: 'mh-1', user_id: 'u1', meal_slot: 'breakfast',
+        recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+        meal_ref: null, title: 'Oatmeal',
+        created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
+      },
+    ];
+    service.setMealHabits(habits);
+    expect(service.mealHabits()).toEqual(habits);
+  });
+
+  it('setScheduleTemplates stores template records', () => {
+    const templates: ScheduleTemplate[] = [
+      {
+        template_id: 'tmpl-1', user_id: 'u1', task_type: 'custom',
+        title: 'Morning run', recurrence: 'weekdays',
+        recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+        time_window_start: '07:00', time_window_end: '08:00',
+        duration_minutes: 30, energy_required: 'medium',
+        is_milepost: false, task_ref_id: null, task_ref_type: null,
+        created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
+      },
+    ];
+    service.setScheduleTemplates(templates);
+    expect(service.scheduleTemplates()).toEqual(templates);
+  });
+
+  // ── Computed signals ────────────────────────────────────────────────────
+
+  it('totalRoutines reflects scheduleTemplates length', () => {
+    expect(service.totalRoutines()).toBe(0);
+    service.setScheduleTemplates([
+      {
+        template_id: 'a', user_id: 'u1', task_type: 'custom', title: 'A',
+        recurrence: 'daily', recurrence_rule: 'FREQ=DAILY',
+        time_window_start: null, time_window_end: null, duration_minutes: null,
+        energy_required: 'low', is_milepost: false, task_ref_id: null, task_ref_type: null,
+        created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
+      },
+      {
+        template_id: 'b', user_id: 'u1', task_type: 'custom', title: 'B',
+        recurrence: 'daily', recurrence_rule: 'FREQ=DAILY',
+        time_window_start: null, time_window_end: null, duration_minutes: null,
+        energy_required: 'low', is_milepost: false, task_ref_id: null, task_ref_type: null,
+        created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
+      },
+    ]);
+    expect(service.totalRoutines()).toBe(2);
+  });
+
+  it('totalTasks reflects placedTasks length', () => {
+    expect(service.totalTasks()).toBe(0);
+    service.setPlacedTasks([
+      { date: '2026-04-22', task_type: 'custom', title: 'Task A', scheduled_start: '09:00' },
+      { date: '2026-04-23', task_type: 'custom', title: 'Task B', scheduled_start: '10:00' },
+    ]);
+    expect(service.totalTasks()).toBe(2);
+  });
+
+  it('totalMeals is 0 when no meal plan is set', () => {
+    expect(service.totalMeals()).toBe(0);
+  });
+
+  it('totalMeals counts meals in the meal plan', () => {
+    const fakeMeals: MealEntry[] = [
+      { date: '2026-04-22', occasion: 'breakfast', meal_ref: null, title: 'Oatmeal', estimated: true },
+      { date: '2026-04-22', occasion: 'lunch',     meal_ref: null, title: 'Salad',   estimated: true },
+      { date: '2026-04-22', occasion: 'dinner',    meal_ref: null, title: 'Pasta',   estimated: true },
+      { date: '2026-04-23', occasion: 'breakfast', meal_ref: null, title: 'Eggs',    estimated: true },
+    ];
+    service.setMealPlan({ plan_start: '2026-04-22', meals: fakeMeals });
+    expect(service.totalMeals()).toBe(4);
+  });
+
+  it('planDays is 0 when no plan period is set', () => {
+    expect(service.planDays()).toBe(0);
+  });
+
+  it('planDays computes days between start and end', () => {
+    prefsSignal.set({
+      user_id: 'u1', week_start_day: 1,
+      planning_trigger_offset: -3, default_plan_length_days: 7,
+      wake_time: '07:00:00',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    });
+    service.computeAndSetPlanPeriod('2026-04-22');
+    // start='2026-04-22', end='2026-04-29' → 7 days
+    expect(service.planDays()).toBe(7);
+  });
+
+  it('planDays works for 14-day plan periods', () => {
+    prefsSignal.set({
+      user_id: 'u1', week_start_day: 1,
+      planning_trigger_offset: -2, default_plan_length_days: 14,
+      wake_time: '07:00:00',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    });
+    service.computeAndSetPlanPeriod('2026-04-22');
+    // start='2026-04-22', end='2026-05-06' → 14 days
+    expect(service.planDays()).toBe(14);
+  });
+
+  it('planDays works for 28-day plan periods', () => {
+    prefsSignal.set({
+      user_id: 'u1', week_start_day: 1,
+      planning_trigger_offset: -2, default_plan_length_days: 28,
+      wake_time: '07:00:00',
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+    });
+    service.computeAndSetPlanPeriod('2026-04-22');
+    // offset=-2, planLength=28 → trigger on day 26 → ratio 26/28 = 0.929 ≥ 0.15 → normal
+    // end = 2026-04-22 + 28 = 2026-05-20
+    expect(service.planDays()).toBe(28);
+  });
 });
 
 describe('computeFirstPlanPeriod', () => {
@@ -125,5 +295,12 @@ describe('computeFirstPlanPeriod', () => {
     const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -10 });
     expect(result.start).toBe('2026-04-22');
     expect(result.end).toBe('2026-04-29');
+  });
+
+  it('works with 28-day plan lengths (4-week segmented option)', () => {
+    // offset=-2, planLength=28 → trigger on day 26 → ratio 26/28 = 0.929 ≥ 0.15 → normal
+    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 28, planning_trigger_offset: -2 });
+    expect(result.start).toBe('2026-04-22');
+    expect(result.end).toBe('2026-05-20');
   });
 });
