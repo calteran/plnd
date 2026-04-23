@@ -281,10 +281,7 @@ async fn main() {
         )
         .route("/meal-habits", get(meal_habits::list_meal_habits))
         .route("/meal-habits", post(meal_habits::create_meal_habit))
-        .route(
-            "/meal-habits/{id}",
-            delete(meal_habits::delete_meal_habit),
-        )
+        .route("/meal-habits/{id}", delete(meal_habits::delete_meal_habit))
         .route(
             "/search/ingredients",
             get(search::search_ingredients_handler),

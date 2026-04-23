@@ -236,18 +236,9 @@ mod tests {
         let start = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
         let end = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
 
-        let prefs = update_meal_windows(
-            &pool,
-            uid,
-            Some(start),
-            Some(end),
-            None,
-            None,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+        let prefs = update_meal_windows(&pool, uid, Some(start), Some(end), None, None, None, None)
+            .await
+            .unwrap();
 
         assert_eq!(prefs.breakfast_window_start, Some(start));
         assert_eq!(prefs.breakfast_window_end, Some(end));
@@ -281,18 +272,10 @@ mod tests {
 
         // Now only update breakfast — lunch must be preserved
         let new_b_start = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
-        let prefs = update_meal_windows(
-            &pool,
-            uid,
-            Some(new_b_start),
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+        let prefs =
+            update_meal_windows(&pool, uid, Some(new_b_start), None, None, None, None, None)
+                .await
+                .unwrap();
 
         assert_eq!(prefs.breakfast_window_start, Some(new_b_start));
         assert_eq!(prefs.breakfast_window_end, Some(b_end));

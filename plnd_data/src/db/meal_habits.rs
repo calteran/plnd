@@ -95,9 +95,15 @@ mod tests {
     async fn create_returns_habit(pool: PgPool) {
         let uid = new_user(&pool).await;
 
-        let habit = create(&pool, uid, "Oatmeal", "breakfast", "FREQ=WEEKLY;BYDAY=MO,WE,FR")
-            .await
-            .expect("create failed");
+        let habit = create(
+            &pool,
+            uid,
+            "Oatmeal",
+            "breakfast",
+            "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+        )
+        .await
+        .expect("create failed");
 
         assert_eq!(habit.user_id, uid);
         assert_eq!(habit.meal_name, "Oatmeal");
