@@ -5,6 +5,7 @@ use crate::auth::jwt::Claims;
 use crate::models::{
     CarryoverDecision as HttpCarryoverDecision, PatchEntryStatusRequest, PostSchedulePlanRequest,
 };
+use crate::routes::domain_constants::VALID_ENERGY_LEVELS;
 use crate::state::AppState;
 use axum::{
     extract::{Extension, Path, Query, State},
@@ -146,7 +147,14 @@ pub async fn post_plan(
                     .duration_minutes
                     .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
                     .transpose()?,
-                energy_required: e.energy_required,
+                energy_required: {
+                    if let Some(ref level) = e.energy_required {
+                        if !VALID_ENERGY_LEVELS.contains(&level.as_str()) {
+                            return Err(StatusCode::BAD_REQUEST);
+                        }
+                    }
+                    e.energy_required
+                },
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
