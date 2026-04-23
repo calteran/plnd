@@ -51,7 +51,7 @@ import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/pla
           <app-meal-habits-substep (complete)="advance()" />
         }
         @case (5) {
-          @if (weekPlanService.planStart()) {
+          @if (planStart()) {
             <app-plan-meals-step
               [firstRun]="true"
               [planStart]="planStart()"
@@ -71,7 +71,7 @@ import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/pla
 export class OnboardingFoodComponent implements OnInit {
   readonly internalStep = signal(0);
 
-  protected readonly weekPlanService = inject(WeekPlanService);
+  private readonly weekPlanService = inject(WeekPlanService);
   private readonly state = inject(OnboardingStateService);
   private readonly preferencesService = inject(PreferencesService);
   private readonly router = inject(Router);
