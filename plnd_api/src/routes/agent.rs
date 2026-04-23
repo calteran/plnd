@@ -817,7 +817,7 @@ mod tests {
         let end_same = NaiveDate::from_ymd_opt(2026, 5, 1).unwrap();
         let end_after = NaiveDate::from_ymd_opt(2026, 5, 10).unwrap();
         assert!(end_before < start, "preceding end should trigger 400");
-        assert!(!(end_same < start), "same-day end is valid");
-        assert!(!(end_after < start), "later end is valid");
+        assert!(end_same >= start, "same-day end is valid");
+        assert!(end_after >= start, "later end is valid");
     }
 }
