@@ -59,7 +59,7 @@ fn validate_schedule_type_request(
     cycle_length: Option<i32>,
     anchor_date: Option<NaiveDate>,
 ) -> Result<(), StatusCode> {
-    if name.trim().is_empty() || name.len() > MAX_NAME_LEN {
+    if name.trim().is_empty() || name.trim().len() > MAX_NAME_LEN {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     if !(0..=127).contains(&days_bitmask) {
@@ -175,7 +175,7 @@ pub async fn create_schedule_type(
         (status = 422, description = "Validation error"),
     )
 )]
-/// PUT /schedule-types/:id — replace all fields of an existing schedule type
+/// PUT /schedule-types/{id} — replace all fields of an existing schedule type
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn update_schedule_type(
     State(state): State<Arc<AppState>>,
@@ -208,9 +208,12 @@ pub async fn update_schedule_type(
             body.anchor_date,
         )
         .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "update_schedule_type DB error");
-            StatusCode::INTERNAL_SERVER_ERROR
+        .map_err(|e| match e {
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            e => {
+                tracing::error!(error = %e, "update_schedule_type DB error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         })?
         .map(|st| Json(ScheduleTypeResponse::from(st)))
         .ok_or(StatusCode::NOT_FOUND)
@@ -229,7 +232,7 @@ pub async fn update_schedule_type(
         (status = 422, description = "Cannot delete the last schedule type"),
     )
 )]
-/// DELETE /schedule-types/:id — remove a schedule type (rejected if it is the user's only one)
+/// DELETE /schedule-types/{id} — remove a schedule type (rejected if it is the user's only one)
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn delete_schedule_type(
     State(state): State<Arc<AppState>>,
@@ -260,9 +263,12 @@ pub async fn delete_schedule_type(
         .schedule_type
         .delete(schedule_type_id, user_id)
         .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "delete_schedule_type DB error");
-            StatusCode::INTERNAL_SERVER_ERROR
+        .map_err(|e| match e {
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            e => {
+                tracing::error!(error = %e, "delete_schedule_type DB error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         })
         .and_then(|deleted| {
             if deleted {
