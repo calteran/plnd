@@ -257,6 +257,29 @@ describe('ScheduleTypesSubstepComponent', () => {
     expect(errorEl.textContent).toContain('at least one day');
   });
 
+  it('save shows error when cycle card is missing anchor date', async () => {
+    const { fixture, component, svcMock } = await setup();
+    fixture.detectChanges();
+    // Add a blank card and enable cycle mode with cycle_length but no anchor_date
+    component.addCard();
+    const cycleCardIdx = component.cards().length - 1;
+    component.updateCard(cycleCardIdx, {
+      is_cycle: true,
+      cycle_length: 7,
+      anchor_date: null,
+      days_bitmask: 0,
+    });
+    const completeSpy = jasmine.createSpy('complete');
+    component.complete.subscribe(completeSpy);
+    component.save();
+    fixture.detectChanges();
+    expect(svcMock.create).not.toHaveBeenCalled();
+    expect(completeSpy).not.toHaveBeenCalled();
+    const errorEl = fixture.nativeElement.querySelector('.save-error');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl.textContent).toContain('Cycle schedule types must have a cycle length and start date.');
+  });
+
   // ── 12. Save error shown on API failure ──────────────────────────────────────
 
   it('save() shows save-error message when API call fails', async () => {

@@ -1,12 +1,13 @@
 import {
   Component,
   EventEmitter,
+  OnDestroy,
   OnInit,
   Output,
   inject,
   signal,
 } from '@angular/core';
-import { forkJoin, of } from 'rxjs';
+import { forkJoin } from 'rxjs';
 import { ScheduleTypesService } from '../../../../../core/services/schedule-types.service';
 import { ScheduleTypeResponse } from '../../../../../core/models/schedule-type';
 import { OnboardingStateService } from '../../../onboarding-state.service';
@@ -30,6 +31,7 @@ const DAY_PILLS: DayPill[] = [
 ];
 
 interface ScheduleCard {
+  localId: string;
   id: string | null;
   name: string;
   days_bitmask: number;
@@ -44,6 +46,7 @@ interface ScheduleCard {
 function defaultCards(): ScheduleCard[] {
   return [
     {
+      localId: crypto.randomUUID(),
       id: null,
       name: 'Weekdays',
       days_bitmask: 62, // Mon–Fri: bits 1–5
@@ -55,6 +58,7 @@ function defaultCards(): ScheduleCard[] {
       showRemoveHint: false,
     },
     {
+      localId: crypto.randomUUID(),
       id: null,
       name: 'Weekends',
       days_bitmask: 65, // Sat+Sun: bits 0+6
@@ -70,6 +74,7 @@ function defaultCards(): ScheduleCard[] {
 
 function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
   return {
+    localId: crypto.randomUUID(),
     id: r.id,
     name: r.name,
     // Trim seconds from "HH:MM:SS" → "HH:MM" for <input type="time">
@@ -90,7 +95,7 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
   template: `
     <div class="schedule-types-substep">
 
-      @for (card of cards(); track $index; let cardIdx = $index) {
+      @for (card of cards(); track card.localId; let cardIdx = $index) {
         <div class="schedule-card">
 
           <!-- Card header: editable name + remove button -->
@@ -224,7 +229,7 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
 
       <!-- Validation error -->
       @if (validationError()) {
-        <p class="save-error">All schedule types must have at least one day assigned.</p>
+        <p class="save-error">{{ validationError() }}</p>
       }
 
       <!-- Save error -->
@@ -236,8 +241,9 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
       <button
         type="button"
         class="save-btn"
+        [disabled]="isSaving()"
         (click)="save()"
-      >Save &amp; Continue →</button>
+      >{{ isSaving() ? 'Saving…' : 'Save & Continue →' }}</button>
 
     </div>
   `,
@@ -427,7 +433,7 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
     }
   `],
 })
-export class ScheduleTypesSubstepComponent implements OnInit {
+export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
   @Output() complete = new EventEmitter<void>();
 
   private readonly scheduleTypesService = inject(ScheduleTypesService);
@@ -435,7 +441,10 @@ export class ScheduleTypesSubstepComponent implements OnInit {
 
   readonly cards = signal<ScheduleCard[]>([]);
   readonly saveError = signal(false);
-  readonly validationError = signal(false);
+  readonly validationError = signal('');
+  readonly isSaving = signal(false);
+
+  private removeHintTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly dayPills = DAY_PILLS;
 
@@ -495,16 +504,23 @@ export class ScheduleTypesSubstepComponent implements OnInit {
     if (card.days_bitmask !== 0) {
       // Show inline hint, auto-dismiss after 3 seconds
       this.updateCard(index, { showRemoveHint: true });
-      setTimeout(() => {
+      if (this.removeHintTimer) clearTimeout(this.removeHintTimer);
+      this.removeHintTimer = setTimeout(() => {
         this.updateCard(index, { showRemoveHint: false });
+        this.removeHintTimer = null;
       }, 3000);
     } else {
       this.cards.update(list => list.filter((_, i) => i !== index));
     }
   }
 
+  ngOnDestroy(): void {
+    if (this.removeHintTimer) clearTimeout(this.removeHintTimer);
+  }
+
   addCard(): void {
     const blank: ScheduleCard = {
+      localId: crypto.randomUUID(),
       id: null,
       name: '',
       days_bitmask: 0,
@@ -537,19 +553,22 @@ export class ScheduleTypesSubstepComponent implements OnInit {
   }
 
   save(): void {
+    if (this.isSaving()) return;
+
     this.saveError.set(false);
-    this.validationError.set(false);
+    this.validationError.set('');
 
-    // Validate all cards
-    const valid = this.cards().every(card => {
-      if (card.is_cycle) {
-        return (card.cycle_length ?? 0) >= 1 && !!card.anchor_date;
-      }
-      return card.days_bitmask > 0;
-    });
+    // Validate 7-day cards
+    const missing7Day = this.cards().filter(c => !c.is_cycle && c.days_bitmask === 0);
+    // Validate cycle cards
+    const missingCycle = this.cards().filter(c => c.is_cycle && (!c.cycle_length || c.cycle_length < 1 || !c.anchor_date));
 
-    if (!valid) {
-      this.validationError.set(true);
+    if (missing7Day.length > 0) {
+      this.validationError.set('All schedule types must have at least one day assigned.');
+      return;
+    }
+    if (missingCycle.length > 0) {
+      this.validationError.set('Cycle schedule types must have a cycle length and start date.');
       return;
     }
 
@@ -569,14 +588,22 @@ export class ScheduleTypesSubstepComponent implements OnInit {
       return this.scheduleTypesService.create(req);
     });
 
-    forkJoin(requests.length > 0 ? requests : [of([] as unknown as ScheduleTypeResponse)]).subscribe({
+    if (requests.length === 0) {
+      this.stateService.setScheduleTypes([]);
+      this.complete.emit();
+      return;
+    }
+
+    this.isSaving.set(true);
+    forkJoin(requests).subscribe({
       next: (responses) => {
-        const typed = responses as ScheduleTypeResponse[];
-        this.stateService.setScheduleTypes(typed);
+        this.stateService.setScheduleTypes(responses);
+        this.isSaving.set(false);
         this.complete.emit();
       },
       error: () => {
         this.saveError.set(true);
+        this.isSaving.set(false);
       },
     });
   }
