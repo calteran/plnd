@@ -276,7 +276,7 @@ export class WeekPlanService {
           next[entry.date] = { ...(next[entry.date] ?? {}), [slot]: {
             approvalState: 'proposed',
             mealRef: entry.meal_ref,
-            title: entry.title,
+            title: entry.title ?? '',
             nutrition: entry.estimated_nutrition,
             estimated: entry.estimated,
           } };
