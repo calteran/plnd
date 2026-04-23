@@ -53,6 +53,8 @@ export class OnboardingStateService {
   // Hub stats banner
   readonly totalRoutines = computed(() => this.scheduleTemplatesSignal().length);
   readonly totalTasks = computed(() => this.placedTasksSignal().length);
+  // Assumes mealPlan.meals contains only non-skipped entries (MealEntry has no skipped field).
+  // If skipped entries can appear here, a filter is needed. See #531.
   readonly totalMeals = computed(() => this.mealPlanSignal()?.meals.length ?? 0);
   readonly planDays = computed(() => {
     const p = this.planPeriodSignal();
@@ -82,6 +84,8 @@ export class OnboardingStateService {
     this.planPeriodSignal.set(computeFirstPlanPeriod(today, userPrefs));
   }
 
+  // One-way flag: intentionally has no reset path. Mirrors markComplete(section) semantics.
+  // Call only after successfully saving planning prefs to the backend.
   setPlanningPrefsComplete(): void {
     this.planningPrefsCompleteSignal.set(true);
   }

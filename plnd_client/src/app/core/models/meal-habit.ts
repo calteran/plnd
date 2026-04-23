@@ -1,3 +1,5 @@
+// Frontend-first model anticipating backend issue #517.
+// Fields reflect the UI spec; align with backend response shape when #517 ships.
 import { MealRef, MealSlot } from './week-plan';
 
 export interface MealHabitResponse {
