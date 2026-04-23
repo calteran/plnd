@@ -15,7 +15,7 @@ use uuid::Uuid;
 // Breakfast, Lunch, and Dinner as meal habit slots. The Occasion::Snack variant
 // exists for schedule/plan entries but is not part of the onboarding habit flow.
 // To add snack in the future: extend the slot check constraint in
-// 0023_create_user_meal_habits.sql and add "snack" here.
+// plnd_data/migrations/0023_create_user_meal_habits.sql and add "snack" here.
 pub const VALID_SLOTS: &[&str] = &["breakfast", "lunch", "dinner"];
 pub const MAX_MEAL_NAME_LEN: usize = 100;
 pub const MAX_RRULE_LEN: usize = 500;
