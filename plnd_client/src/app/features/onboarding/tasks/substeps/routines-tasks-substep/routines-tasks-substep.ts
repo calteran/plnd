@@ -1,0 +1,581 @@
+import {
+  Component,
+  EventEmitter,
+  OnInit,
+  Output,
+  inject,
+  signal,
+  computed,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { ScheduleTemplatesService } from '../../../../../core/services/schedule-templates.service';
+import { ScheduleTemplate, CreateScheduleTemplateRequest } from '../../../../../core/models/schedule-template';
+import { OnboardingStateService } from '../../../onboarding-state.service';
+
+// ── Recurrence dropdown option ───────────────────────────────────────────────
+
+interface RecurrenceOption {
+  value: string;  // rrule string or 'CUSTOM'
+  label: string;
+}
+
+const RECURRENCE_OPTIONS: RecurrenceOption[] = [
+  { value: 'FREQ=DAILY',                             label: 'Every day' },
+  { value: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',      label: 'Weekdays' },
+  { value: 'FREQ=WEEKLY;BYDAY=SA,SU',                label: 'Weekends' },
+  { value: 'FREQ=WEEKLY;BYDAY=',                     label: 'Weekly…' },
+  { value: 'CUSTOM',                                 label: 'Custom…' },
+];
+
+// ── Day-of-week pills for "Weekly…" selector ─────────────────────────────────
+
+interface DayOption {
+  byday: string;   // RRULE BYDAY abbreviation
+  label: string;   // single-letter display
+}
+
+const DAY_OPTIONS: DayOption[] = [
+  { byday: 'MO', label: 'M' },
+  { byday: 'TU', label: 'T' },
+  { byday: 'WE', label: 'W' },
+  { byday: 'TH', label: 'T' },
+  { byday: 'FR', label: 'F' },
+  { byday: 'SA', label: 'S' },
+  { byday: 'SU', label: 'S' },
+];
+
+// ── Inspiration chips ────────────────────────────────────────────────────────
+
+interface InspirationChip {
+  id: string;
+  name: string;
+  rrule: string;
+  emoji: string;
+}
+
+const INSPIRATION_CHIPS: InspirationChip[] = [
+  { id: 'morning-walk',  name: 'Morning walk', rrule: 'FREQ=DAILY', emoji: '🌅' },
+  { id: 'medication',    name: 'Medication',   rrule: 'FREQ=DAILY', emoji: '💊' },
+  { id: 'journal',       name: 'Journal',      rrule: 'FREQ=DAILY', emoji: '📓' },
+  { id: 'brush-teeth',   name: 'Brush teeth',  rrule: 'FREQ=DAILY', emoji: '🦷' },
+  { id: 'meditate',      name: 'Meditate',     rrule: 'FREQ=DAILY', emoji: '🧘' },
+  { id: 'wind-down',     name: 'Wind down',    rrule: 'FREQ=DAILY', emoji: '🛏' },
+  { id: 'walk-the-dog',  name: 'Walk the dog', rrule: 'FREQ=DAILY', emoji: '🐕' },
+];
+
+// ── Local routine entry (in-progress form state) ─────────────────────────────
+
+/** Map an rrule string to a short human-readable chip label. */
+export function rruleToHumanLabel(rrule: string): string {
+  if (rrule === 'FREQ=DAILY')                         return 'daily';
+  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR')  return 'weekdays';
+  if (rrule === 'FREQ=WEEKLY;BYDAY=SA,SU')            return 'weekends';
+  if (rrule.startsWith('FREQ=WEEKLY;BYDAY=')) {
+    const byday = rrule.replace('FREQ=WEEKLY;BYDAY=', '');
+    const day = DAY_OPTIONS.find(d => d.byday === byday);
+    if (day) {
+      const name = { MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat', SU: 'Sun' }[byday] ?? byday;
+      return `weekly · ${name}`;
+    }
+    return 'weekly';
+  }
+  if (rrule === 'CUSTOM') return 'custom';
+  return rrule;
+}
+
+/** Map an rrule string to the RecurrenceType expected by the API. */
+function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' | 'custom' {
+  if (rrule === 'FREQ=DAILY')                        return 'daily';
+  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR') return 'weekdays';
+  if (rrule.startsWith('FREQ=WEEKLY;BYDAY='))        return 'weekly';
+  return 'custom';
+}
+
+@Component({
+  selector: 'app-routines-tasks-substep',
+  standalone: true,
+  imports: [FormsModule],
+  template: `
+    <div class="routines-tasks-substep">
+
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <!-- Section 1: Recurring Routines                                   -->
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <section class="section">
+        <p class="section-subtitle">Things you do on a regular schedule.</p>
+
+        <!-- Entry form -->
+        <div class="entry-form">
+          <input
+            type="text"
+            class="name-input"
+            placeholder="Routine name…"
+            [(ngModel)]="routineName"
+            aria-label="Routine name"
+          />
+          <div class="recurrence-row">
+            <select
+              class="recurrence-select"
+              [(ngModel)]="selectedRrule"
+              aria-label="Recurrence"
+            >
+              @for (opt of recurrenceOptions; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </div>
+
+          @if (isWeeklySelected()) {
+            <div class="day-row" role="group" aria-label="Day of week">
+              @for (day of dayOptions; track day.byday) {
+                <button
+                  type="button"
+                  class="day-pill"
+                  [class.day-pill--active]="selectedWeekDay === day.byday"
+                  (click)="selectWeekDay(day.byday)"
+                  [attr.aria-label]="day.byday"
+                  [attr.aria-pressed]="selectedWeekDay === day.byday"
+                >{{ day.label }}</button>
+              }
+            </div>
+          }
+
+          <button
+            type="button"
+            class="add-btn"
+            [disabled]="!routineName.trim()"
+            (click)="addRoutine()"
+          >+ Add</button>
+        </div>
+
+        <!-- Inspiration chips -->
+        @if (availableInspirationChips().length > 0) {
+          <div class="inspiration-block">
+            <span class="inspiration-label">Inspiration</span>
+            <div class="chip-row">
+              @for (chip of availableInspirationChips(); track chip.id) {
+                <button
+                  type="button"
+                  class="inspiration-chip"
+                  (click)="addInspirationChip(chip)"
+                  [attr.aria-label]="'Add ' + chip.name"
+                >{{ chip.emoji }} {{ chip.name }}</button>
+              }
+            </div>
+          </div>
+        }
+
+        <!-- Added routines -->
+        @if (routines().length > 0) {
+          <div class="added-chips" aria-label="Added routines">
+            @for (routine of routines(); track routine.localId) {
+              <span class="routine-chip">
+                <span class="chip-body" role="note">
+                  {{ routine.name }} · {{ rruleToHumanLabel(routine.rrule) }}
+                </span>
+                <button
+                  type="button"
+                  class="chip-remove"
+                  (click)="removeRoutine(routine.localId)"
+                  [attr.aria-label]="'Remove ' + routine.name"
+                >✕</button>
+              </span>
+            }
+          </div>
+        }
+      </section>
+
+      <hr class="divider" />
+
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <!-- Section 2: Upcoming Tasks                                       -->
+      <!-- ═══════════════════════════════════════════════════════════════ -->
+      <section class="section">
+        <p class="section-subtitle">One-off things to get done in your planning period. Duration and timing set in the next step.</p>
+
+        <!-- Entry form -->
+        <div class="entry-form">
+          <input
+            type="text"
+            class="name-input"
+            placeholder="Task name…"
+            [(ngModel)]="taskName"
+            aria-label="Task name"
+          />
+          <button
+            type="button"
+            class="add-btn"
+            [disabled]="!taskName.trim()"
+            (click)="addTask()"
+          >+ Add</button>
+        </div>
+
+        <!-- Added tasks -->
+        @if (taskNames().length > 0) {
+          <div class="added-chips" aria-label="Added tasks">
+            @for (name of taskNames(); track name) {
+              <span class="routine-chip">
+                <span class="chip-body" role="note">{{ name }}</span>
+                <button
+                  type="button"
+                  class="chip-remove"
+                  (click)="removeTask(name)"
+                  [attr.aria-label]="'Remove ' + name"
+                >✕</button>
+              </span>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- Save & Continue -->
+      <button
+        type="button"
+        class="save-btn"
+        (click)="save()"
+      >Save &amp; Continue →</button>
+
+    </div>
+  `,
+  styles: [`
+    .routines-tasks-substep {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .section {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-subtitle {
+      margin: 0;
+      font-size: 13px;
+      color: #78350f;
+    }
+
+    .entry-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .name-input {
+      border: 1.5px solid #fde68a;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+      color: #78350f;
+      outline: none;
+    }
+
+    .name-input:focus {
+      border-color: #d97706;
+    }
+
+    .recurrence-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .recurrence-select {
+      flex: 1;
+      border: 1.5px solid #fde68a;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 13px;
+      color: #78350f;
+      background: #ffffff;
+      outline: none;
+    }
+
+    .recurrence-select:focus {
+      border-color: #d97706;
+    }
+
+    .day-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .day-pill {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 1.5px solid #d1d5db;
+      background: #f3f4f6;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .day-pill--active {
+      background: #d97706;
+      border-color: #d97706;
+      color: #ffffff;
+    }
+
+    .add-btn {
+      align-self: flex-start;
+      background: #d97706;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .add-btn:hover:not([disabled]) {
+      background: #b45309;
+    }
+
+    .add-btn[disabled] {
+      background: #fde68a;
+      color: #78350f;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .inspiration-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .inspiration-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .inspiration-chip {
+      background: #fff7ed;
+      border: 1.5px solid #fde68a;
+      border-radius: 20px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #78350f;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .inspiration-chip:hover {
+      background: #fef3c7;
+    }
+
+    .added-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .routine-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #fef3c7;
+      border: 1.5px solid #fde68a;
+      border-radius: 20px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #78350f;
+    }
+
+    .chip-body {
+      font-size: 12px;
+    }
+
+    .chip-remove {
+      background: none;
+      border: none;
+      padding: 0 2px;
+      cursor: pointer;
+      font-size: 11px;
+      color: #92400e;
+      line-height: 1;
+    }
+
+    .chip-remove:hover {
+      color: #dc2626;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1.5px solid #fde68a;
+      margin: 0;
+    }
+
+    .save-btn {
+      align-self: flex-end;
+      background: #d97706;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .save-btn:hover {
+      background: #b45309;
+    }
+  `],
+})
+export class RoutinesTasksSubstepComponent implements OnInit {
+  @Output() complete = new EventEmitter<void>();
+
+  private readonly templatesService = inject(ScheduleTemplatesService);
+  private readonly stateService = inject(OnboardingStateService);
+
+  // ── Public constants used in the template ────────────────────────────────
+  readonly recurrenceOptions = RECURRENCE_OPTIONS;
+  readonly dayOptions = DAY_OPTIONS;
+  readonly rruleToHumanLabel = rruleToHumanLabel;
+
+  // ── Routine form state ────────────────────────────────────────────────────
+  routineName = '';
+  selectedRrule = 'FREQ=DAILY';
+  selectedWeekDay = 'MO';
+
+  readonly isWeeklySelected = computed(() => this.selectedRrule === 'FREQ=WEEKLY;BYDAY=');
+
+  // ── Task form state ───────────────────────────────────────────────────────
+  taskName = '';
+  readonly taskNames = signal<string[]>([]);
+
+  // ── Local routine chip state ──────────────────────────────────────────────
+  /** Local representation of a routine (backed by a ScheduleTemplate server record). */
+  readonly routines = signal<{ localId: string; name: string; rrule: string; templateId: string | null }[]>([]);
+
+  // ── Inspiration chips: hidden once tapped ────────────────────────────────
+  private readonly usedInspirationIds = signal<Set<string>>(new Set());
+  readonly availableInspirationChips = computed(() => {
+    const used = this.usedInspirationIds();
+    return INSPIRATION_CHIPS.filter(c => !used.has(c.id));
+  });
+
+  ngOnInit(): void {
+    // Load existing templates from the service signal (already fetched by parent)
+    const existing = this.templatesService.templates();
+    if (existing && existing.length > 0) {
+      this.routines.set(
+        existing.map(t => ({
+          localId: crypto.randomUUID(),
+          name: t.title,
+          rrule: t.recurrence_rule ?? 'FREQ=DAILY',
+          templateId: t.template_id,
+        }))
+      );
+    }
+  }
+
+  selectWeekDay(byday: string): void {
+    this.selectedWeekDay = byday;
+  }
+
+  /** Resolve the effective rrule for the current form state. */
+  private effectiveRrule(): string {
+    if (this.selectedRrule === 'FREQ=WEEKLY;BYDAY=') {
+      return `FREQ=WEEKLY;BYDAY=${this.selectedWeekDay}`;
+    }
+    return this.selectedRrule;
+  }
+
+  addRoutine(): void {
+    const name = this.routineName.trim();
+    if (!name) return;
+
+    const rrule = this.effectiveRrule();
+    const recurrence = rruleToRecurrenceType(rrule);
+    const req: CreateScheduleTemplateRequest = {
+      task_type: 'custom',
+      title: name,
+      recurrence,
+      recurrence_rule: rrule,
+    };
+
+    this.templatesService.create(req).subscribe({
+      next: (template: ScheduleTemplate) => {
+        this.routines.update(list => [
+          ...list,
+          { localId: crypto.randomUUID(), name: template.title, rrule: template.recurrence_rule ?? rrule, templateId: template.template_id },
+        ]);
+      },
+    });
+
+    this.routineName = '';
+  }
+
+  addInspirationChip(chip: InspirationChip): void {
+    // Mark chip as used immediately so it disappears from the inspiration list
+    this.usedInspirationIds.update(set => new Set([...set, chip.id]));
+
+    const req: CreateScheduleTemplateRequest = {
+      task_type: 'custom',
+      title: chip.name,
+      recurrence: 'daily',
+      recurrence_rule: chip.rrule,
+    };
+
+    this.templatesService.create(req).subscribe({
+      next: (template: ScheduleTemplate) => {
+        this.routines.update(list => [
+          ...list,
+          { localId: crypto.randomUUID(), name: template.title, rrule: template.recurrence_rule ?? chip.rrule, templateId: template.template_id },
+        ]);
+      },
+    });
+  }
+
+  removeRoutine(localId: string): void {
+    const routine = this.routines().find(r => r.localId === localId);
+    if (!routine) return;
+
+    // Remove from local list immediately
+    this.routines.update(list => list.filter(r => r.localId !== localId));
+
+    // Only call delete if the template has a server-assigned ID
+    if (routine.templateId) {
+      this.templatesService.delete(routine.templateId).subscribe();
+    }
+  }
+
+  addTask(): void {
+    const name = this.taskName.trim();
+    if (!name) return;
+    this.taskNames.update(list => [...list, name]);
+    this.taskName = '';
+  }
+
+  removeTask(name: string): void {
+    this.taskNames.update(list => list.filter(n => n !== name));
+  }
+
+  save(): void {
+    const templates = this.templatesService.templates() ?? [];
+    this.stateService.setScheduleTemplates(templates);
+    this.stateService.setUpcomingTaskNames(this.taskNames());
+    this.complete.emit();
+  }
+}
