@@ -39,6 +39,25 @@ pub struct PatchPreferencesRequest {
     pub default_plan_length_days: Option<i16>,
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub wake_time: Option<NaiveTime>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub breakfast_window_start: Option<NaiveTime>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub breakfast_window_end: Option<NaiveTime>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub lunch_window_start: Option<NaiveTime>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub lunch_window_end: Option<NaiveTime>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub dinner_window_start: Option<NaiveTime>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub dinner_window_end: Option<NaiveTime>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct CreateMealHabitRequest {
+    pub meal_name: String,
+    pub slot: String,
+    pub recurrence_rule: String,
 }
 
 // ---------------------------------------------------------------------------

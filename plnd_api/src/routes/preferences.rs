@@ -47,20 +47,64 @@ pub async fn patch_preferences(
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
+    let any_scheduling = body.week_start_day.is_some()
+        || body.planning_trigger_offset.is_some()
+        || body.default_plan_length_days.is_some()
+        || body.wake_time.is_some();
+
+    if any_scheduling {
+        state
+            .repos
+            .preferences
+            .patch_preferences(
+                user_id,
+                body.week_start_day,
+                body.planning_trigger_offset,
+                body.default_plan_length_days,
+                body.wake_time,
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "patch_preferences error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
+
+    let any_window = body.breakfast_window_start.is_some()
+        || body.breakfast_window_end.is_some()
+        || body.lunch_window_start.is_some()
+        || body.lunch_window_end.is_some()
+        || body.dinner_window_start.is_some()
+        || body.dinner_window_end.is_some();
+
+    if any_window {
+        state
+            .repos
+            .preferences
+            .update_meal_windows(
+                user_id,
+                body.breakfast_window_start,
+                body.breakfast_window_end,
+                body.lunch_window_start,
+                body.lunch_window_end,
+                body.dinner_window_start,
+                body.dinner_window_end,
+            )
+            .await
+            .map_err(|e| {
+                tracing::error!(error = %e, "update_meal_windows error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    }
+
     state
         .repos
         .preferences
-        .patch_preferences(
-            user_id,
-            body.week_start_day,
-            body.planning_trigger_offset,
-            body.default_plan_length_days,
-            body.wake_time,
-        )
+        .get_or_create(user_id)
         .await
         .map(|p| Json(UserPreferencesResponse::from(p)))
         .map_err(|e| {
-            tracing::error!(error = %e, "patch_preferences error");
+            tracing::error!(error = %e, "get_or_create preferences error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }
