@@ -4,6 +4,7 @@ export interface UserPreferences {
   planning_trigger_offset: number; // signed days relative to plan_start
   default_plan_length_days: number; // 1–90
   wake_time: string;                // "HH:MM:SS" — used by Phase 5 push scheduler
+  planning_time?: string;           // "HH:MM:SS" — weekly planning reminder time
   created_at: string;
   updated_at: string;
 }
@@ -13,4 +14,5 @@ export interface UpdatePreferencesRequest {
   planning_trigger_offset?: number;
   default_plan_length_days?: number;
   wake_time?: string;
+  planning_time?: string;
 }

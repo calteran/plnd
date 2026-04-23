@@ -51,6 +51,8 @@ pub struct PatchPreferencesRequest {
     pub dinner_window_start: Option<NaiveTime>,
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub dinner_window_end: Option<NaiveTime>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub planning_time: Option<NaiveTime>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]

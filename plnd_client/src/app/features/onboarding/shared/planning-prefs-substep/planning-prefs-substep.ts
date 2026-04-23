@@ -201,7 +201,6 @@ export class PlanningPrefsSubstepComponent implements OnInit {
   readonly planLength = signal<7 | 14 | 28>(14);
   readonly weekStart = signal<number>(1); // Monday default
   readonly planningDay = signal<number>(1); // Monday default
-  // UI-only until backend adds planning_time field to UserPreferences — see #553
   readonly planningTime = signal<string>('08:00');
   readonly saveError = signal(false);
 
@@ -240,6 +239,7 @@ export class PlanningPrefsSubstepComponent implements OnInit {
         default_plan_length_days: this.planLength(),
         week_start_day: this.weekStart(),
         planning_trigger_offset: offset,
+        planning_time: this.planningTime() + ':00',
       })
       .subscribe({
         next: () => {

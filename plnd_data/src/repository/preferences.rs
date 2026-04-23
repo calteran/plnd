@@ -8,6 +8,7 @@ use crate::models::UserPreferences;
 pub trait PreferencesRepository: Send + Sync {
     async fn get_or_create(&self, user_id: Uuid) -> Result<UserPreferences, crate::Error>;
 
+    #[allow(clippy::too_many_arguments)]
     async fn patch_preferences(
         &self,
         user_id: Uuid,
@@ -15,6 +16,7 @@ pub trait PreferencesRepository: Send + Sync {
         planning_trigger_offset: Option<i16>,
         default_plan_length_days: Option<i16>,
         wake_time: Option<NaiveTime>,
+        planning_time: Option<NaiveTime>,
     ) -> Result<UserPreferences, crate::Error>;
 
     #[allow(clippy::too_many_arguments)]

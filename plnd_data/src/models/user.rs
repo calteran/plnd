@@ -15,6 +15,7 @@ pub struct UserPreferences {
     pub lunch_window_end: Option<NaiveTime>,
     pub dinner_window_start: Option<NaiveTime>,
     pub dinner_window_end: Option<NaiveTime>,
+    pub planning_time: Option<NaiveTime>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

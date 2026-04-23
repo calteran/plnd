@@ -64,7 +64,8 @@ pub async fn patch_preferences(
     let any_scheduling = body.week_start_day.is_some()
         || body.planning_trigger_offset.is_some()
         || body.default_plan_length_days.is_some()
-        || body.wake_time.is_some();
+        || body.wake_time.is_some()
+        || body.planning_time.is_some();
 
     let any_window = body.breakfast_window_start.is_some()
         || body.breakfast_window_end.is_some()
@@ -75,6 +76,10 @@ pub async fn patch_preferences(
 
     let prefs = if any_window {
         if any_scheduling {
+            // Result intentionally discarded: update_meal_windows below returns the
+            // full row (including planning_time) via its own RETURNING clause, so
+            // the final response is correct. The patch_preferences call only needs
+            // to persist the scheduling fields before the window update runs.
             state
                 .repos
                 .preferences
@@ -84,6 +89,7 @@ pub async fn patch_preferences(
                     body.planning_trigger_offset,
                     body.default_plan_length_days,
                     body.wake_time,
+                    body.planning_time,
                 )
                 .await
                 .map_err(|e| {
@@ -118,6 +124,7 @@ pub async fn patch_preferences(
                 body.planning_trigger_offset,
                 body.default_plan_length_days,
                 body.wake_time,
+                body.planning_time,
             )
             .await
             .map_err(|e| {

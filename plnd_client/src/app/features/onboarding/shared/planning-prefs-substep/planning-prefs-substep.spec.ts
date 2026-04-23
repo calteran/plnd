@@ -148,7 +148,18 @@ describe('PlanningPrefsSubstepComponent', () => {
       default_plan_length_days: 28,
       week_start_day: 1,
       planning_trigger_offset: -1,
+      planning_time: '08:00:00',
     });
+  });
+
+  it('save() sends updated planning_time when signal is changed', async () => {
+    const { fixture, component, prefsMock } = await setup(false);
+    fixture.detectChanges();
+    component.planningTime.set('09:30');
+    component.save();
+    expect(prefsMock.patchPreferences).toHaveBeenCalledWith(
+      jasmine.objectContaining({ planning_time: '09:30:00' })
+    );
   });
 
   it('save() computes offset=0 when planningDay equals weekStart', async () => {
