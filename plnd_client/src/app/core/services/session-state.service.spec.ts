@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { SessionStateService } from './session-state.service';
 import { UserService } from './user.service';
 import { PreferencesService } from './preferences.service';
@@ -14,7 +15,7 @@ describe('SessionStateService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule]
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     });
     service = TestBed.inject(SessionStateService);
   });

@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
 import { PostSchedulePlanRequest } from '../models/week-plan';
 
@@ -9,7 +10,7 @@ describe('WeekPlanService', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule],
+      providers: [provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
     httpMock = TestBed.inject(HttpTestingController);

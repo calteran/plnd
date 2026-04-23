@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
-import { RouterTestingModule } from '@angular/router/testing';
-import { Router } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { Router, provideRouter } from '@angular/router';
 import { DietaryRestrictionsComponent } from './dietary-restrictions';
 import { DietaryRestriction } from '../../../core/models/dietary-restriction';
 
@@ -32,7 +32,8 @@ describe('DietaryRestrictionsComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [DietaryRestrictionsComponent, HttpClientTestingModule, RouterTestingModule]
+      imports: [DietaryRestrictionsComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])]
     }).compileComponents();
     httpMock = TestBed.inject(HttpTestingController);
   });

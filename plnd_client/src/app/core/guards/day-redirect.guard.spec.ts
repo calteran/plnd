@@ -1,6 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
-import { ActivatedRouteSnapshot, UrlTree } from '@angular/router';
+import { ActivatedRouteSnapshot, UrlTree, provideRouter } from '@angular/router';
 import { validateDayDateGuard } from './day-redirect.guard';
 
 describe('validateDayDateGuard', () => {
@@ -15,7 +14,7 @@ describe('validateDayDateGuard', () => {
   }
 
   beforeEach(() => {
-    TestBed.configureTestingModule({ imports: [RouterTestingModule] });
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
   });
 
   describe('valid ISO dates', () => {

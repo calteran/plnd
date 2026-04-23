@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { DietaryRestrictionsService } from './dietary-restrictions.service';
 import { DietaryRestriction } from '../models/dietary-restriction';
 
@@ -31,7 +32,7 @@ describe('DietaryRestrictionsService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule]
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     });
     service = TestBed.inject(DietaryRestrictionsService);
     httpMock = TestBed.inject(HttpTestingController);

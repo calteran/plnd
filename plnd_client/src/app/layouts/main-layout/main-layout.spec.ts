@@ -1,14 +1,16 @@
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { RouterTestingModule } from '@angular/router/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { OAuthModule } from 'angular-oauth2-oidc';
 import { MainLayoutComponent } from './main-layout';
 
 describe('MainLayoutComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [MainLayoutComponent, RouterTestingModule, HttpClientTestingModule, OAuthModule.forRoot()]
+      imports: [MainLayoutComponent, OAuthModule.forRoot()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])]
     }).compileComponents();
   });
 

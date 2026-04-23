@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ScheduleTemplatesService } from './schedule-templates.service';
 import { ScheduleTemplate } from '../models/schedule-template';
 
@@ -28,7 +29,7 @@ describe('ScheduleTemplatesService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule]
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     });
     service = TestBed.inject(ScheduleTemplatesService);
     httpMock = TestBed.inject(HttpTestingController);

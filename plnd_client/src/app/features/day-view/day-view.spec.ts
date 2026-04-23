@@ -1,7 +1,6 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
-import { RouterTestingModule } from '@angular/router/testing';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { DayViewComponent } from './day-view';
 import { ScheduleService } from '../../core/services/schedule.service';
@@ -49,10 +48,11 @@ describe('DayViewComponent (schedule view)', () => {
   it('shows skeleton rows while loading', async () => {
     const svc = makeScheduleServiceMock({ isLoading: true });
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -64,10 +64,11 @@ describe('DayViewComponent (schedule view)', () => {
   it('shows error state when loadError is set', async () => {
     const svc = makeScheduleServiceMock({ loadError: 'Network error' });
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -79,10 +80,11 @@ describe('DayViewComponent (schedule view)', () => {
   it('shows empty state when no items', async () => {
     const svc = makeScheduleServiceMock({ scheduleItems: [] });
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -98,10 +100,11 @@ describe('DayViewComponent (schedule view)', () => {
     ];
     const svc = makeScheduleServiceMock({ scheduleItems: items });
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -114,10 +117,11 @@ describe('DayViewComponent (schedule view)', () => {
   it('calls loadDay with the route date param on init', async () => {
     const svc = makeScheduleServiceMock();
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
     }).compileComponents();
@@ -135,10 +139,11 @@ describe('DayViewComponent (isToday wiring)', () => {
     const svc = makeScheduleServiceMock({ date });
     const briefing = makeBriefingServiceMock();
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService,  useValue: svc },
         { provide: BriefingService,  useValue: briefing },
+        provideRouter([]),
         { provide: ActivatedRoute,   useValue: { params: of({ date }) } },
       ],
     }).compileComponents();
@@ -173,10 +178,11 @@ describe('DayViewComponent (onItemAdded)', () => {
   it('calls scheduleService.loadDay to reload after a task is added', async () => {
     const svc = makeScheduleServiceMock({ date: '2026-03-20' });
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService,  useValue: svc },
         { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        provideRouter([]),
         { provide: ActivatedRoute,   useValue: mockActivatedRoute },
       ],
     }).compileComponents();
@@ -196,10 +202,11 @@ describe('DayViewComponent (toast)', () => {
   async function setupToast() {
     const svc = makeScheduleServiceMock();
     await TestBed.configureTestingModule({
-      imports: [DayViewComponent, RouterTestingModule],
+      imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService,  useValue: svc },
         { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        provideRouter([]),
         { provide: ActivatedRoute,   useValue: mockActivatedRoute },
       ],
     }).compileComponents();

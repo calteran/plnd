@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { PreferencesService } from './preferences.service';
 import { UserPreferences } from '../models/preferences';
 
@@ -19,7 +20,7 @@ describe('PreferencesService', () => {
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      imports: [HttpClientTestingModule]
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     });
     service = TestBed.inject(PreferencesService);
     httpMock = TestBed.inject(HttpTestingController);

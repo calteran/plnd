@@ -1,10 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { authGuard } from './auth.guard';
 import { AuthService } from '../services/auth.service';
-import { ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree } from '@angular/router';
+import { ActivatedRouteSnapshot, RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
 
 describe('authGuard', () => {
   let authService: AuthService;
@@ -19,8 +19,7 @@ describe('authGuard', () => {
   beforeEach(() => {
     const oauthMock = jasmine.createSpyObj('OAuthService', ['configure', 'logOut', 'loadDiscoveryDocumentAndLogin', 'getIdToken']);
     TestBed.configureTestingModule({
-      imports: [RouterTestingModule, HttpClientTestingModule],
-      providers: [{ provide: OAuthService, useValue: oauthMock }]
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: OAuthService, useValue: oauthMock }, provideRouter([])]
     });
     authService = TestBed.inject(AuthService);
     localStorage.clear();

@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { PlanDayCardComponent } from './plan-day-card';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 
@@ -16,7 +17,8 @@ describe('PlanDayCardComponent', () => {
   beforeEach(async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
-      imports: [PlanDayCardComponent, HttpClientTestingModule]
+      imports: [PlanDayCardComponent],
+      providers: [provideHttpClient(), provideHttpClientTesting()]
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
     service.initSession('2026-03-31', '2026-04-06');

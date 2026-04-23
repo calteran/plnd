@@ -1,6 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Router } from '@angular/router';
-import { RouterTestingModule } from '@angular/router/testing';
+import { Router, provideRouter } from '@angular/router';
 import { ProfileComponent } from './profile';
 import { UserService } from '../../../core/services/user.service';
 import { signal } from '@angular/core';
@@ -35,8 +34,8 @@ describe('ProfileComponent', () => {
     userService.updateUser.and.returnValue(of(mockUser));
 
     await TestBed.configureTestingModule({
-      imports: [ProfileComponent, RouterTestingModule],
-      providers: [{ provide: UserService, useValue: userService }]
+      imports: [ProfileComponent],
+      providers: [{ provide: UserService, useValue: userService }, provideRouter([])]
     }).compileComponents();
 
     fixture = TestBed.createComponent(ProfileComponent);
