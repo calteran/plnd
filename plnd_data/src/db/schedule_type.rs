@@ -10,7 +10,10 @@ const COLUMNS: &str =
 
 /// List all schedule types for a user, ordered by created_at ascending.
 #[tracing::instrument(skip(pool), fields(table = "user_schedule_types", op = "list"))]
-pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<ScheduleType>, DatabaseError> {
+pub async fn list_for_user(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<ScheduleType>, DatabaseError> {
     sqlx::query_as::<_, ScheduleType>(&format!(
         "SELECT {COLUMNS} FROM user_schedule_types WHERE user_id = $1 ORDER BY created_at ASC"
     ))
@@ -157,9 +160,19 @@ mod tests {
     }
 
     async fn make_type(pool: &PgPool, user_id: Uuid) -> ScheduleType {
-        create(pool, user_id, "Weekdays", 62, wake(), bed(), false, None, None)
-            .await
-            .expect("create failed")
+        create(
+            pool,
+            user_id,
+            "Weekdays",
+            62,
+            wake(),
+            bed(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("create failed")
     }
 
     // -----------------------------------------------------------------------
@@ -209,9 +222,19 @@ mod tests {
     async fn create_cycle_type_stores_cycle_fields(pool: PgPool) {
         let uid = new_user(&pool).await;
         let anchor = NaiveDate::from_ymd_opt(2026, 1, 6).unwrap();
-        let st = create(&pool, uid, "Cycle", 0, wake(), bed(), true, Some(10), Some(anchor))
-            .await
-            .expect("create cycle failed");
+        let st = create(
+            &pool,
+            uid,
+            "Cycle",
+            0,
+            wake(),
+            bed(),
+            true,
+            Some(10),
+            Some(anchor),
+        )
+        .await
+        .expect("create cycle failed");
 
         assert!(st.is_cycle);
         assert_eq!(st.cycle_length, Some(10));
@@ -259,10 +282,21 @@ mod tests {
         let st = make_type(&pool, uid).await;
         let new_wake = NaiveTime::from_hms_opt(6, 30, 0).unwrap();
 
-        let updated = update(&pool, st.id, uid, "Mornings", 31, new_wake, bed(), false, None, None)
-            .await
-            .unwrap()
-            .expect("update returned None");
+        let updated = update(
+            &pool,
+            st.id,
+            uid,
+            "Mornings",
+            31,
+            new_wake,
+            bed(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap()
+        .expect("update returned None");
 
         assert_eq!(updated.name, "Mornings");
         assert_eq!(updated.days_bitmask, 31);
@@ -272,8 +306,20 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn update_returns_none_for_unknown(pool: PgPool) {
         let uid = new_user(&pool).await;
-        let result =
-            update(&pool, Uuid::new_v4(), uid, "X", 0, wake(), bed(), false, None, None).await.unwrap();
+        let result = update(
+            &pool,
+            Uuid::new_v4(),
+            uid,
+            "X",
+            0,
+            wake(),
+            bed(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert!(result.is_none());
     }
 

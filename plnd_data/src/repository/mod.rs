@@ -88,7 +88,9 @@ impl Repositories {
             schedule_template: Arc::new(pg::schedule_template::PgScheduleTemplateRepository::new(
                 pool.clone(),
             )),
-            schedule_type: Arc::new(pg::schedule_type::PgScheduleTypeRepository::new(pool.clone())),
+            schedule_type: Arc::new(pg::schedule_type::PgScheduleTypeRepository::new(
+                pool.clone(),
+            )),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),
             task: Arc::new(pg::task::PgTaskRepository::new(pool.clone())),
             user: Arc::new(pg::user::PgUserRepository::new(pool.clone())),

@@ -9,6 +9,7 @@ pub mod meal_suggestions;
 pub mod preferences;
 pub mod schedule;
 pub mod schedule_template;
+pub mod schedule_types;
 pub mod search;
 pub mod system;
 pub mod tasks;

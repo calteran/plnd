@@ -4,8 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    db::schedule_type as db,
-    models::ScheduleType,
+    db::schedule_type as db, models::ScheduleType,
     repository::schedule_type::ScheduleTypeRepository,
 };
 
@@ -22,7 +21,9 @@ impl PgScheduleTypeRepository {
 #[async_trait]
 impl ScheduleTypeRepository for PgScheduleTypeRepository {
     async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<ScheduleType>, crate::Error> {
-        db::list_for_user(&self.pool, user_id).await.map_err(Into::into)
+        db::list_for_user(&self.pool, user_id)
+            .await
+            .map_err(Into::into)
     }
 
     async fn get_by_id(
@@ -30,7 +31,9 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
         id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<ScheduleType>, crate::Error> {
-        db::get_by_id(&self.pool, id, user_id).await.map_err(Into::into)
+        db::get_by_id(&self.pool, id, user_id)
+            .await
+            .map_err(Into::into)
     }
 
     async fn create(
@@ -44,9 +47,19 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
     ) -> Result<ScheduleType, crate::Error> {
-        db::create(&self.pool, user_id, name, days_bitmask, wake_time, bed_time, is_cycle, cycle_length, anchor_date)
-            .await
-            .map_err(Into::into)
+        db::create(
+            &self.pool,
+            user_id,
+            name,
+            days_bitmask,
+            wake_time,
+            bed_time,
+            is_cycle,
+            cycle_length,
+            anchor_date,
+        )
+        .await
+        .map_err(Into::into)
     }
 
     async fn update(
@@ -61,16 +74,31 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
     ) -> Result<Option<ScheduleType>, crate::Error> {
-        db::update(&self.pool, id, user_id, name, days_bitmask, wake_time, bed_time, is_cycle, cycle_length, anchor_date)
+        db::update(
+            &self.pool,
+            id,
+            user_id,
+            name,
+            days_bitmask,
+            wake_time,
+            bed_time,
+            is_cycle,
+            cycle_length,
+            anchor_date,
+        )
+        .await
+        .map_err(Into::into)
+    }
+
+    async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error> {
+        db::count_for_user(&self.pool, user_id)
             .await
             .map_err(Into::into)
     }
 
-    async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error> {
-        db::count_for_user(&self.pool, user_id).await.map_err(Into::into)
-    }
-
     async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<bool, crate::Error> {
-        db::delete(&self.pool, id, user_id).await.map_err(Into::into)
+        db::delete(&self.pool, id, user_id)
+            .await
+            .map_err(Into::into)
     }
 }
