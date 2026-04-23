@@ -64,6 +64,7 @@ pub async fn get_or_create(pool: &PgPool, user_id: Uuid) -> Result<UserPreferenc
 }
 
 /// Upsert meal window time ranges on the user's preferences row.
+#[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip(pool), fields(table = "preferences", op = "update_meal_windows"))]
 pub async fn update_meal_windows(
     pool: &PgPool,

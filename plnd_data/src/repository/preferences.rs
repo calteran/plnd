@@ -17,6 +17,7 @@ pub trait PreferencesRepository: Send + Sync {
         wake_time: Option<NaiveTime>,
     ) -> Result<UserPreferences, crate::Error>;
 
+    #[allow(clippy::too_many_arguments)]
     async fn update_meal_windows(
         &self,
         user_id: Uuid,
