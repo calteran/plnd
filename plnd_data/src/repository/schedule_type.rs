@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::models::ScheduleType;
 
 /// Outcome of an atomic schedule-type delete operation.
+#[derive(Debug, PartialEq)]
 pub enum DeleteScheduleTypeOutcome {
     Deleted,
     NotFound,

@@ -148,7 +148,11 @@ pub async fn delete(
         return Ok(DeleteScheduleTypeOutcome::Deleted);
     }
 
-    // rows_affected == 0: distinguish NotFound from LastType
+    // rows_affected == 0: distinguish NotFound from LastType.
+    // The DELETE and this EXISTS run in separate round-trips (no enclosing
+    // transaction), so a third concurrent actor could remove the row between
+    // the two queries.  In that extreme case we return NotFound rather than
+    // LastType — a harmless inaccuracy since the guard held at DELETE time.
     let exists: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM user_schedule_types WHERE id = $1 AND user_id = $2)",
     )
