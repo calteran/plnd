@@ -42,6 +42,11 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             return Err(StatusCode::BAD_REQUEST);
         }
     }
+    if let Some(ref level) = e.energy_required {
+        if !VALID_ENERGY_LEVELS.contains(&level.as_str()) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
     Ok(PlanEntryInput {
         date: e.date,
         task_type: e.task_type,
@@ -54,14 +59,7 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             .duration_minutes
             .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
             .transpose()?,
-        energy_required: {
-            if let Some(ref level) = e.energy_required {
-                if !VALID_ENERGY_LEVELS.contains(&level.as_str()) {
-                    return Err(StatusCode::BAD_REQUEST);
-                }
-            }
-            e.energy_required
-        },
+        energy_required: e.energy_required,
     })
 }
 
@@ -150,7 +148,11 @@ fn expand_habit_to_entries(
             });
         }
         // Safe: post_plan validates plan_end - plan_start <= 366, so we never reach NaiveDate::MAX.
-        date = date.succ_opt().unwrap_or(plan_end);
+        if let Some(next) = date.succ_opt() {
+            date = next;
+        } else {
+            break;
+        }
     }
     entries
 }
