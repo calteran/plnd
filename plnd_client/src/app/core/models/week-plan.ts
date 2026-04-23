@@ -128,6 +128,25 @@ export interface PlanEntryRequest {
   title?: string;
   scheduled_start: string; // "HH:MM"
   after_milepost?: string;
+  duration_minutes?: number;
+  energy_required?: EnergyLevel;
+}
+
+// -- Task Placement ----------------------------------------------------------
+
+export interface PlaceTasksRequest {
+  task_names: string[];
+  plan_start: string; // ISO date
+  plan_end: string;   // ISO date
+}
+
+export interface PlaceTasksEntry {
+  title: string;
+  scheduled_date: string; // ISO date
+  time_window_start: string; // "HH:MM"
+  duration_minutes: number;
+  energy_required: EnergyLevel;
+  task_type: string;
 }
 
 export interface PostSchedulePlanRequest {
