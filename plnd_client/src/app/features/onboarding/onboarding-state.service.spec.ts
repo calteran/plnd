@@ -127,9 +127,10 @@ describe('OnboardingStateService', () => {
   it('setScheduleTypes stores schedule type records', () => {
     const types: ScheduleTypeResponse[] = [
       {
-        type_id: 'st-1', user_id: 'u1', name: 'Weekdays',
-        days: [1, 2, 3, 4, 5], wake_time: '07:00', bed_time: '22:00',
-        created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
+        id: 'st-1', user_id: 'u1', name: 'Weekdays',
+        days_bitmask: 0b0111110, wake_time: '07:00:00', bed_time: '22:00:00',
+        is_cycle: false, cycle_length: null, anchor_date: null,
+        created_at: '2026-04-22T00:00:00Z',
       },
     ];
     service.setScheduleTypes(types);
