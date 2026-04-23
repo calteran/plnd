@@ -74,14 +74,15 @@ pub async fn create_meal_habit(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    if body.recurrence_rule.is_empty() || body.recurrence_rule.len() > MAX_RRULE_LEN {
+    let recurrence_rule = body.recurrence_rule.trim().to_string();
+    if recurrence_rule.is_empty() || recurrence_rule.len() > MAX_RRULE_LEN {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     state
         .repos
         .meal_habit
-        .create(user_id, &meal_name, &body.slot, &body.recurrence_rule)
+        .create(user_id, &meal_name, &body.slot, &recurrence_rule)
         .await
         .map(|h| (StatusCode::CREATED, Json(MealHabitResponse::from(h))))
         .map_err(|e| match e {

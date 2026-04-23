@@ -221,6 +221,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Users", description = "User profile management"),
         (name = "Preferences", description = "User preference settings"),
         (name = "Dietary Restrictions", description = "Dietary restriction management"),
+        (name = "Meal Habits", description = "Recurring meal preferences used during onboarding"),
         (name = "Briefing", description = "Morning briefing — weather, news, and yesterday recap"),
         (name = "Catalog", description = "Catalog ingredient, dish, and meal lookups and ingest"),
         (name = "My Ingredient Prefs", description = "User ingredient preference management (blocked/notes)"),
