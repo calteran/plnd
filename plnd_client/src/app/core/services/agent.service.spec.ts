@@ -7,6 +7,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { AgentService } from './agent.service';
 import { ConfigService } from './config.service';
 import { TaskEntryRequest, TaskEntryResponse } from '../models/agent';
+import { PlaceTasksRequest, PlaceTasksEntry } from '../models/week-plan';
 
 const mockConfig = { api: { baseUrl: 'http://localhost:3000' } };
 
@@ -83,5 +84,33 @@ describe('AgentService', () => {
   it('returns a cold Observable (no request until subscribed)', () => {
     service.createTask({ input: 'test' });
     httpMock.expectNone('http://localhost:3000/agent/task');
+  });
+
+  // ── placeTasks() ─────────────────────────────────────────────────────────────
+
+  it('POSTs to /agent/place-tasks with the request body', () => {
+    const req: PlaceTasksRequest = {
+      task_names: ['Morning Walk'],
+      plan_start: '2026-04-28',
+      plan_end: '2026-04-30',
+    };
+    const mockEntries: PlaceTasksEntry[] = [{
+      title: 'Morning Walk',
+      scheduled_date: '2026-04-28',
+      time_window_start: '08:00',
+      duration_minutes: 30,
+      energy_required: 'medium',
+      task_type: 'exercise',
+    }];
+    let result: PlaceTasksEntry[] | undefined;
+
+    service.placeTasks(req).subscribe((r: PlaceTasksEntry[]) => (result = r));
+
+    const http = httpMock.expectOne('http://localhost:3000/agent/place-tasks');
+    expect(http.request.method).toBe('POST');
+    expect(http.request.body).toEqual(req);
+    http.flush(mockEntries);
+
+    expect(result).toEqual(mockEntries);
   });
 });
