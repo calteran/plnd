@@ -12,6 +12,7 @@ pub(crate) mod pg;
 pub mod preferences;
 pub mod schedule;
 pub mod schedule_template;
+pub mod schedule_type;
 pub mod session;
 pub mod task;
 pub mod user;
@@ -29,6 +30,7 @@ pub use memory::MemoryRepository;
 pub use preferences::PreferencesRepository;
 pub use schedule::ScheduleRepository;
 pub use schedule_template::ScheduleTemplateRepository;
+pub use schedule_type::ScheduleTypeRepository;
 pub use session::SessionRepository;
 pub use task::TaskRepository;
 pub use user::UserRepository;
@@ -50,6 +52,7 @@ pub struct Repositories {
     pub preferences: Arc<dyn PreferencesRepository>,
     pub schedule: Arc<dyn ScheduleRepository>,
     pub schedule_template: Arc<dyn ScheduleTemplateRepository>,
+    pub schedule_type: Arc<dyn ScheduleTypeRepository>,
     pub session: Arc<dyn SessionRepository>,
     pub task: Arc<dyn TaskRepository>,
     pub user: Arc<dyn UserRepository>,
@@ -83,6 +86,9 @@ impl Repositories {
             preferences: Arc::new(pg::preferences::PgPreferencesRepository::new(pool.clone())),
             schedule: Arc::new(pg::schedule::PgScheduleRepository::new(pool.clone())),
             schedule_template: Arc::new(pg::schedule_template::PgScheduleTemplateRepository::new(
+                pool.clone(),
+            )),
+            schedule_type: Arc::new(pg::schedule_type::PgScheduleTypeRepository::new(
                 pool.clone(),
             )),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),

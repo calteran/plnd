@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction, MealSuggestion, ScheduleEntry, ScheduleTemplate, Task, User,
+    DietaryRestriction, MealSuggestion, ScheduleEntry, ScheduleTemplate, ScheduleType, Task, User,
     UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
 };
 use plnd_data::query_types::{
@@ -465,6 +465,39 @@ impl From<PostSchedulePlanResponse> for PostSchedulePlanApiResponse {
         Self {
             committed: r.committed,
             planning_task_status: r.planning_task_status,
+        }
+    }
+}
+
+/// API response wrapper for `plnd_data::models::ScheduleType`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct ScheduleTypeResponse {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub name: String,
+    /// Bitmask: bit 0 = Sunday, bit 1 = Monday, …, bit 6 = Saturday.
+    pub days_bitmask: i32,
+    pub wake_time: NaiveTime,
+    pub bed_time: NaiveTime,
+    pub is_cycle: bool,
+    pub cycle_length: Option<i32>,
+    pub anchor_date: Option<NaiveDate>,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<ScheduleType> for ScheduleTypeResponse {
+    fn from(s: ScheduleType) -> Self {
+        Self {
+            id: s.id,
+            user_id: s.user_id,
+            name: s.name,
+            days_bitmask: s.days_bitmask,
+            wake_time: s.wake_time,
+            bed_time: s.bed_time,
+            is_cycle: s.is_cycle,
+            cycle_length: s.cycle_length,
+            anchor_date: s.anchor_date,
+            created_at: s.created_at,
         }
     }
 }
