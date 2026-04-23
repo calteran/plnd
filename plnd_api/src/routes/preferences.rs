@@ -45,6 +45,20 @@ pub async fn patch_preferences(
         }
     }
 
+    // Cross-field: when both window bounds are provided, start must precede end
+    let window_pairs = [
+        (body.breakfast_window_start, body.breakfast_window_end),
+        (body.lunch_window_start, body.lunch_window_end),
+        (body.dinner_window_start, body.dinner_window_end),
+    ];
+    for (start, end) in window_pairs {
+        if let (Some(s), Some(e)) = (start, end) {
+            if s >= e {
+                return Err(StatusCode::UNPROCESSABLE_ENTITY);
+            }
+        }
+    }
+
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let any_scheduling = body.week_start_day.is_some()

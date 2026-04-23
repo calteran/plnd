@@ -25,7 +25,6 @@ pub const MAX_RRULE_LEN: usize = 500;
         (status = 401, description = "Unauthorized"),
     )
 )]
-/// GET /meal-habits — list all meal habits for the current user
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn list_meal_habits(
     State(state): State<Arc<AppState>>,
@@ -58,7 +57,6 @@ pub async fn list_meal_habits(
         (status = 422, description = "Validation error"),
     )
 )]
-/// POST /meal-habits — create a new meal habit
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn create_meal_habit(
     State(state): State<Arc<AppState>>,
@@ -108,7 +106,6 @@ pub async fn create_meal_habit(
         (status = 404, description = "Meal habit not found"),
     )
 )]
-/// DELETE /meal-habits/{id} — remove a meal habit
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn delete_meal_habit(
     State(state): State<Arc<AppState>>,
