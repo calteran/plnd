@@ -723,6 +723,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   cancelEdit(): void {
+    this.saveError.set('');
     this.editingId.set(null);
   }
 
