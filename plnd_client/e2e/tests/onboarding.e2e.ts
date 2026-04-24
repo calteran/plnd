@@ -165,4 +165,47 @@ test.describe('Onboarding', () => {
       await expect(accountCard.locator('.card-badge.badge--done')).toContainText('✓ done');
     });
   });
+
+  test.describe('Hub skip modal', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
+        route.fulfill({ status: 200, body: '' })
+      );
+      await page.goto('/onboarding');
+      await expect(page.locator('h1')).toHaveText('Welcome to PLND!');
+    });
+
+    test('Skip button is visible when sections are incomplete', async ({ page }) => {
+      await expect(page.locator('.btn-skip')).toBeVisible();
+      await expect(page.locator('.btn-skip')).toHaveText('Skip');
+    });
+
+    test('clicking Skip opens the skip modal', async ({ page }) => {
+      await page.locator('.btn-skip').click();
+      await expect(page.locator('.modal-card')).toBeVisible();
+      await expect(page.locator('.modal-card')).toContainText('Skip setup for now?');
+    });
+
+    test('"Keep going" dismisses the modal', async ({ page }) => {
+      await page.locator('.btn-skip').click();
+      await expect(page.locator('.modal-card')).toBeVisible();
+      await page.locator('.btn-ghost-amber').click();
+      await expect(page.locator('.modal-card')).not.toBeVisible();
+      await expect(page).toHaveURL(/\/onboarding$/);
+    });
+
+    test('Escape key dismisses the modal', async ({ page }) => {
+      await page.locator('.btn-skip').click();
+      await expect(page.locator('.modal-card')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.modal-card')).not.toBeVisible();
+    });
+
+    test('"Skip for now" calls complete-onboarding and navigates to /day/2026-03-28', async ({ page }) => {
+      await page.locator('.btn-skip').click();
+      await page.locator('.btn-gray-primary').click();
+      await expect(page).toHaveURL(/\/day\/2026-03-28/);
+    });
+  });
 });
