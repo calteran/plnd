@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -422,4 +422,32 @@ describe('OnboardingHubComponent', () => {
     expect(err).toBeTruthy();
     expect(err?.textContent).toContain('Something went wrong');
   });
+
+  it('commitPlan() shows error banner and re-enables CTA when /schedule/plan fails', fakeAsync(() => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+
+    fixture.componentInstance.commitPlan();
+    fixture.detectChanges();
+
+    const planReq = httpTesting.expectOne(req =>
+      req.method === 'POST' && req.url.includes('/schedule/plan')
+    );
+    planReq.flush('Server Error', { status: 500, statusText: 'Internal Server Error' });
+    tick();
+    fixture.detectChanges();
+
+    // CTA re-enables
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeFalse();
+
+    // error banner visible
+    const err: HTMLElement = fixture.nativeElement.querySelector('.commit-error');
+    expect(err).toBeTruthy();
+    expect(err?.textContent).toContain('Something went wrong');
+
+    httpTesting.verify();
+  }));
 });
