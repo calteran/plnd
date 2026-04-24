@@ -902,4 +902,64 @@ test.describe('Onboarding', () => {
       await expect(foodCard.locator('.card-badge.badge--done')).toContainText('✓ done');
     });
   });
+
+  test.describe('Full happy path', () => {
+    test('complete all 3 sections → stats banner → Approve Plan → /day/plan-start', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/schedule/plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLAN_COMMITTED })
+      );
+      await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
+        route.fulfill({ status: 200, body: '' })
+      );
+
+      await page.goto('/onboarding');
+
+      await completeAccountSpoke(page);
+      await completeTasksSpoke(page);
+      await completeFoodSpoke(page);
+
+      await expect(page.locator('.stats-banner')).toBeVisible();
+      await expect(page.locator('.btn-cta.btn--accent')).toBeVisible();
+
+      await page.locator('.btn-cta.btn--accent').click();
+      await expect(page).toHaveURL(/\/day\/2026-03-28/);
+    });
+  });
+
+  test.describe('Guard: already-onboarded user', () => {
+    test('onboarded user visiting /onboarding/tasks redirects to /today', async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      await page.addInitScript(() => {
+        localStorage.setItem('auth_token', 'synthetic.test.token');
+      });
+      await page.route(`${API_BASE}/users/me`, route =>
+        route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
+      );
+      await page.route(`${API_BASE}/preferences/me`, route =>
+        route.fulfill({ status: 200, json: MOCK_PREFS })
+      );
+      await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+        route.fulfill({ status: 200, json: { planned: false } })
+      );
+      await page.route(`${API_BASE}/briefing/weather`, route =>
+        route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
+      );
+      await page.route(`${API_BASE}/briefing/news`, route =>
+        route.fulfill({ status: 200, json: MOCK_BRIEFING_NEWS })
+      );
+      await page.route(`${API_BASE}/briefing/yesterday`, route =>
+        route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
+      );
+      await page.route(`${API_BASE}/schedule/period**`, route =>
+        route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
+      );
+      await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
+        route.fulfill({ status: 200, json: [] })
+      );
+
+      await page.goto('/onboarding/tasks');
+      await expect(page).toHaveURL(/\/day\//);
+    });
+  });
 });
