@@ -1,7 +1,10 @@
-import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
-import { from, mergeMap } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { Subject, forkJoin, from, mergeMap, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, filter, map, switchMap, take } from 'rxjs/operators';
+import { CatalogService, IngredientSearchResponse, LocalIngredientResult } from '../../../../../core/services/catalog.service';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
+import { UserIngredientPrefsService } from '../../../../../core/services/user-ingredient-prefs.service';
 import { UserMealsService } from '../../../../../core/services/user-meals.service';
 
 const EMOJIS = ['😖', '😕', '😐', '🙂', '😍'] as const;
@@ -41,6 +44,14 @@ const LIFESTYLE_GROUPS: { group: string; items: { key: string; emoji: string; la
     ],
   },
 ];
+
+interface IngredientRating {
+  name: string;
+  score: number;
+  catalogIngredientId: string;
+}
+
+const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], providers_queried: [], providers_from_cache: [] };
 
 @Component({
   selector: 'app-dietary-preferences-substep',
@@ -103,9 +114,25 @@ const LIFESTYLE_GROUPS: { group: string; items: { key: string; emoji: string; la
         <div class="section-header-static">Ingredient Ratings</div>
         <div class="legend">hate — meh — love</div>
         <div class="rating-entry-row">
-          <input type="text" class="text-input flex-1" placeholder="Ingredient…"
-            [value]="ingredientInput()"
-            (input)="ingredientInput.set(asText($event))" />
+          <div class="search-wrap">
+            <input type="text" class="text-input flex-1" placeholder="Search ingredient…"
+              [value]="ingredientInput()"
+              (input)="onIngredientInput(asText($event))"
+              (keydown.escape)="ingredientSearchResults.set([])"
+              (blur)="ingredientSearchResults.set([])" />
+            @if (ingredientSearchResults().length) {
+              <div class="search-dropdown">
+                @for (r of ingredientSearchResults(); track r.ingredient_id) {
+                  <button type="button" class="search-result" (mousedown)="$event.preventDefault()" (click)="selectIngredientResult(r)">
+                    <span class="result-name">{{ r.name }}</span>
+                    @if (r.allergens.length) {
+                      <span class="result-allergens">{{ r.allergens.join(', ') }}</span>
+                    }
+                  </button>
+                }
+              </div>
+            }
+          </div>
           <div class="emoji-row">
             @for (e of emojis; track $index) {
               <button type="button" class="emoji-btn"
@@ -114,19 +141,21 @@ const LIFESTYLE_GROUPS: { group: string; items: { key: string; emoji: string; la
               >{{ e }}</button>
             }
           </div>
-          <button type="button" class="btn-add" (click)="addIngredientRating()">Add</button>
+          <button type="button" class="btn-add"
+            [disabled]="!pendingIngredientId() || pendingIngredientScore() === null || savingIngredient()"
+            (click)="addIngredientRating()">Add</button>
         </div>
-        @for (r of ingredientRatings(); track r.name) {
+        @for (r of ingredientRatings(); track r.catalogIngredientId) {
           <div class="rated-row">
             <span class="rated-name flex-1">
-              <button type="button" class="btn-remove-inline" (click)="removeIngredientRating(r.name)">✕</button>
+              <button type="button" class="btn-remove-inline" (click)="removeIngredientRating(r.catalogIngredientId)">✕</button>
               {{ r.name }}
             </span>
             <div class="emoji-row">
               @for (e of emojis; track $index) {
                 <button type="button" class="emoji-btn"
                   [class.emoji-btn--selected]="r.score === $index"
-                  (click)="updateIngredientScore(r.name, $index)"
+                  (click)="updateIngredientScore(r.catalogIngredientId, $index)"
                 >{{ e }}</button>
               }
             </div>
@@ -195,6 +224,14 @@ const LIFESTYLE_GROUPS: { group: string; items: { key: string; emoji: string; la
     .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }
     .legend { padding: 8px 14px 0; font-size: 11px; color: #9ca3af; text-align: right; }
     .rating-entry-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; flex-wrap: wrap; }
+    .search-wrap { position: relative; flex: 1; display: flex; }
+    .search-wrap .text-input { width: 100%; }
+    .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #fff; border: 1.5px solid #d1d5db; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 10; max-height: 200px; overflow-y: auto; margin-top: 2px; }
+    .search-result { display: flex; flex-direction: column; width: 100%; background: none; border: none; border-bottom: 1px solid #f3f4f6; padding: 8px 10px; text-align: left; cursor: pointer; gap: 2px; }
+    .search-result:last-child { border-bottom: none; }
+    .search-result:hover { background: #f9fafb; }
+    .result-name { font-size: 13px; color: #111827; }
+    .result-allergens { font-size: 11px; color: #9ca3af; }
     .emoji-row { display: flex; gap: 2px; }
     .emoji-btn { background: none; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; font-size: 18px; cursor: pointer; line-height: 1; }
     .emoji-btn--selected { border-color: #d97706; background: #fef3c7; }
@@ -209,16 +246,23 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
 
   private readonly dietaryService = inject(DietaryRestrictionsService);
   private readonly mealsService = inject(UserMealsService);
+  private readonly catalogService = inject(CatalogService);
+  private readonly ingredientPrefsService = inject(UserIngredientPrefsService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+
+  private readonly ingredientSearch$ = new Subject<string>();
 
   readonly lifestyleExpanded = signal(false);
   readonly selectedLifestyles = signal<string[]>([]);
   readonly customLifestyleInput = signal('');
 
-  // Ingredient ratings are local-only; persistence requires catalog ID resolution.
-  // Tracked in https://github.com/calteran/plnd/issues/560
   readonly ingredientInput = signal('');
   readonly pendingIngredientScore = signal<number | null>(null);
-  readonly ingredientRatings = signal<{ name: string; score: number }[]>([]);
+  readonly pendingIngredientId = signal<string | null>(null);
+  readonly ingredientSearchResults = signal<LocalIngredientResult[]>([]);
+  readonly savingIngredient = signal(false);
+  readonly ingredientRatings = signal<IngredientRating[]>([]);
 
   readonly mealInput = signal('');
   readonly pendingMealScore = signal<number | null>(null);
@@ -238,6 +282,31 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
         .map(r => r.name);
       if (keys.length) this.selectedLifestyles.set(keys);
     }
+
+    this.ingredientPrefsService.load();
+    toObservable(this.ingredientPrefsService.prefs, { injector: this.injector }).pipe(
+      filter(prefs => prefs.length > 0 && this.ingredientRatings().length === 0),
+      take(1),
+      switchMap(prefs =>
+        forkJoin(prefs.map(p =>
+          this.catalogService.getIngredient(p.catalog_ingredient_id).pipe(
+            map(ing => ({
+              name: (ing as { name?: string }).name ?? p.catalog_ingredient_id,
+              score: p.preference_score + 2, // API -2..2 → emoji 0..4
+              catalogIngredientId: p.catalog_ingredient_id,
+            }))
+          )
+        ))
+      ),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(ratings => this.ingredientRatings.set(ratings));
+
+    this.ingredientSearch$.pipe(
+      debounceTime(300),
+      distinctUntilChanged(),
+      switchMap(q => q.length >= 2 ? this.catalogService.searchIngredients(q) : of(EMPTY_SEARCH)),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(resp => this.ingredientSearchResults.set(resp.local));
   }
 
   protected asText(e: Event): string {
@@ -265,21 +334,60 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
     this.customLifestyleInput.set('');
   }
 
+  onIngredientInput(value: string): void {
+    this.ingredientInput.set(value);
+    this.pendingIngredientId.set(null);
+    this.ingredientSearch$.next(value.trim());
+  }
+
+  selectIngredientResult(result: LocalIngredientResult): void {
+    this.ingredientInput.set(result.name);
+    this.pendingIngredientId.set(result.ingredient_id);
+    this.ingredientSearchResults.set([]);
+  }
+
   addIngredientRating(): void {
-    const name = this.ingredientInput().trim();
+    const name  = this.ingredientInput().trim();
     const score = this.pendingIngredientScore();
-    if (!name || score === null) return;
-    this.ingredientRatings.update(r => [...r.filter(x => x.name !== name), { name, score }]);
-    this.ingredientInput.set('');
-    this.pendingIngredientScore.set(null);
+    const id    = this.pendingIngredientId();
+    if (!name || score === null || !id || this.savingIngredient()) return;
+
+    const preferenceScore = score - 2; // emoji index 0-4 → API -2..+2
+    this.savingIngredient.set(true);
+    this.ingredientPrefsService.upsert(id, { preference_score: preferenceScore }).subscribe({
+      next: () => {
+        this.ingredientRatings.update(r =>
+          [...r.filter(x => x.catalogIngredientId !== id), { name, score, catalogIngredientId: id }]
+        );
+        this.ingredientInput.set('');
+        this.pendingIngredientScore.set(null);
+        this.pendingIngredientId.set(null);
+        this.savingIngredient.set(false);
+      },
+      error: () => {
+        this.saveError.set(true);
+        this.savingIngredient.set(false);
+      },
+    });
   }
 
-  removeIngredientRating(name: string): void {
-    this.ingredientRatings.update(r => r.filter(x => x.name !== name));
+  removeIngredientRating(catalogIngredientId: string): void {
+    this.ingredientPrefsService.remove(catalogIngredientId).subscribe({
+      next: () => this.ingredientRatings.update(r => r.filter(x => x.catalogIngredientId !== catalogIngredientId)),
+      error: () => this.saveError.set(true),
+    });
   }
 
-  updateIngredientScore(name: string, score: number): void {
-    this.ingredientRatings.update(r => r.map(x => x.name === name ? { ...x, score } : x));
+  updateIngredientScore(catalogIngredientId: string, score: number): void {
+    const existing = this.ingredientRatings().find(x => x.catalogIngredientId === catalogIngredientId);
+    if (!existing || existing.score === score) return;
+    const preferenceScore = score - 2;
+    this.ingredientPrefsService.upsert(catalogIngredientId, { preference_score: preferenceScore }).subscribe({
+      next: () => this.ingredientRatings.update(r =>
+        r.map(x => x.catalogIngredientId === catalogIngredientId ? { ...x, score } : x)
+      ),
+      error: () => this.saveError.set(true),
+    });
   }
 
   addMealRating(): void {
