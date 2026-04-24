@@ -1,13 +1,16 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 import { OnboardingHubComponent } from './onboarding-hub';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfigService } from '../../../core/services/config.service';
+
+/** Minimal UserService stub used in most tests. */
+const userServiceStub = { completeOnboarding: () => of(undefined) };
 
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
@@ -16,6 +19,7 @@ function makeStateMock() {
     food: 'not-started',
   });
   const allCompleteSignal = signal(false);
+  const planPeriodSignal = signal<{ start: string; end: string } | null>(null);
 
   return {
     sectionStatus: statusSignal.asReadonly(),
@@ -30,7 +34,8 @@ function makeStateMock() {
     totalTasks: signal(0).asReadonly(),
     totalMeals: signal(0).asReadonly(),
     planDays: signal(0).asReadonly(),
-    planPeriod: signal(null).asReadonly(),
+    planPeriod: planPeriodSignal.asReadonly(),
+    planPeriodSignal,
     mealPlan: signal(null).asReadonly(),
     placedTasks: signal([]).asReadonly(),
     mealHabits: signal([]).asReadonly(),
@@ -48,7 +53,7 @@ describe('OnboardingHubComponent', () => {
       imports: [OnboardingHubComponent],
       providers: [
         { provide: OnboardingStateService, useValue: stateMock },
-        { provide: UserService, useValue: { completeOnboarding: () => of(undefined) } },
+        { provide: UserService, useValue: userServiceStub },
         { provide: ConfigService, useValue: { getConfig: () => ({ api: { baseUrl: 'http://localhost:3000' } }) } },
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -94,7 +99,7 @@ describe('OnboardingHubComponent', () => {
 
   it('renders all 4 section titles', () => {
     const text: string = fixture.nativeElement.textContent;
-    expect(text).toContain('Account');
+    expect(text).toContain('Account Settings');
     expect(text).toContain('Tasks & Routines');
     expect(text).toContain('Food & Meals');
     expect(text).toContain('Exercise');
@@ -202,7 +207,8 @@ describe('OnboardingHubComponent', () => {
   it('stats banner shows stat labels: Routines, Tasks, Meals, Days', () => {
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
     fixture.detectChanges();
-    const labels: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.stat-label');
+    const banner: HTMLElement = fixture.nativeElement.querySelector('.stats-banner');
+    const labels: NodeListOf<HTMLElement> = banner.querySelectorAll('.stat-label');
     const texts = Array.from(labels).map((el: HTMLElement) => el.textContent?.trim());
     expect(texts).toEqual(['Routines', 'Tasks', 'Meals', 'Days']);
   });
@@ -262,8 +268,8 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('"Keep going" button dismisses the skip modal', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (fixture.componentInstance as any).showSkipModal.set(true);
+    // open via UI
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
     fixture.detectChanges();
     const keepGoing: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-ghost-amber');
     keepGoing.click();
@@ -274,8 +280,8 @@ describe('OnboardingHubComponent', () => {
 
   it('"Skip for now" navigates to /day/<today>', () => {
     spyOn(router, 'navigate');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (fixture.componentInstance as any).showSkipModal.set(true);
+    // open via UI
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
     fixture.detectChanges();
     const skipBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-gray-primary');
     skipBtn.click();
@@ -284,8 +290,8 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('Escape key closes the skip modal', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (fixture.componentInstance as any).showSkipModal.set(true);
+    // open via UI, then test the keyboard handler directly
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
     fixture.detectChanges();
     fixture.componentInstance.onEscapeKey();
     fixture.detectChanges();
@@ -294,8 +300,8 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('skip modal has role="dialog" and aria-modal="true"', () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (fixture.componentInstance as any).showSkipModal.set(true);
+    // open via UI
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
     fixture.detectChanges();
     const card: HTMLElement = fixture.nativeElement.querySelector('.modal-card');
     expect(card?.getAttribute('role')).toBe('dialog');
@@ -358,7 +364,7 @@ describe('OnboardingHubComponent', () => {
     expect(btn?.classList).toContain('btn--accent');
   });
 
-  it('clicking "Approve Plan →" calls commitPlan() when all sections complete', () => {
+  it('"Approve Plan →" click binding wires to commitPlan()', () => {
     spyOn(fixture.componentInstance, 'commitPlan');
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
     fixture.detectChanges();
@@ -367,8 +373,30 @@ describe('OnboardingHubComponent', () => {
     expect(fixture.componentInstance.commitPlan).toHaveBeenCalled();
   });
 
+  it('commitPlan() posts to /schedule/plan then calls completeOnboarding', () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    spyOn(userServiceStub, 'completeOnboarding').and.callThrough();
+    // Give the mock a valid plan period so commitPlan() doesn't bail early
+    stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+
+    fixture.componentInstance.commitPlan();
+
+    const planReq = httpTesting.expectOne(req =>
+      req.method === 'POST' && req.url.includes('/schedule/plan'),
+    );
+    planReq.flush({ committed: 3, planning_task_status: 'completed' });
+
+    expect(userServiceStub.completeOnboarding).toHaveBeenCalled();
+
+    httpTesting.verify();
+  });
+
   it('button shows "Saving…" text and is disabled during submission', () => {
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    // isSubmitting is a protected signal; (as any) cast required since it
+    // cannot be triggered via DOM without async HTTP mocking.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (fixture.componentInstance as any).isSubmitting.set(true);
     fixture.detectChanges();
@@ -385,6 +413,8 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('error banner appears when commitError is true', () => {
+    // commitError is a protected signal; (as any) cast required since it
+    // cannot be triggered via DOM without async HTTP mocking.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (fixture.componentInstance as any).commitError.set(true);
     fixture.detectChanges();
