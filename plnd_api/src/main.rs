@@ -355,7 +355,7 @@ async fn main() {
         )
         .route(
             "/schedule/templates/{id}",
-            delete(schedule_template::delete_template),
+            delete(schedule_template::delete_template).put(schedule_template::update_template),
         )
         .route(
             "/schedule-types",

@@ -3,7 +3,7 @@ import { signal, WritableSignal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { RoutinesTasksSubstepComponent } from './routines-tasks-substep';
 import { ScheduleTemplatesService } from '../../../../../core/services/schedule-templates.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
@@ -36,7 +36,7 @@ function makeTemplatesSvcMock(initialTemplates: ScheduleTemplate[] = []) {
   const templatesSignal: WritableSignal<ScheduleTemplate[] | null> = signal(initialTemplates);
   const mock = jasmine.createSpyObj<ScheduleTemplatesService>(
     'ScheduleTemplatesService',
-    ['load', 'create', 'delete', 'clear'],
+    ['load', 'create', 'delete', 'update', 'clear'],
     { templates: templatesSignal.asReadonly() }
   );
   return { mock, templatesSignal };
@@ -55,6 +55,7 @@ async function setup(initialTemplates: ScheduleTemplate[] = []) {
 
   templatesSvcMock.create.and.returnValue(of(makeTemplate()));
   templatesSvcMock.delete.and.returnValue(of(undefined));
+  templatesSvcMock.update.and.returnValue(of(makeTemplate()));
 
   await TestBed.configureTestingModule({
     imports: [RoutinesTasksSubstepComponent],
@@ -273,5 +274,95 @@ describe('RoutinesTasksSubstepComponent', () => {
 
     dayRow = fixture.nativeElement.querySelector('.day-row');
     expect(dayRow).not.toBeNull();
+  });
+
+  // ── 11. Tapping a routine chip body opens the inline edit card ───────────────
+
+  it('clicking a routine chip body opens the inline edit card', async () => {
+    const existing = makeTemplate({ template_id: 'tmpl-1', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' });
+    const { fixture } = await setup([existing]);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.routine-edit-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.routine-chip')).not.toBeNull();
+
+    const chipBody: HTMLButtonElement = fixture.nativeElement.querySelector('.chip-body--clickable');
+    chipBody.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.routine-edit-card')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('.routine-chip')).toBeNull();
+  });
+
+  // ── 12. Cancel edit restores chip and clears saveError ───────────────────────
+
+  it('cancelling edit restores the chip and clears any pending error', async () => {
+    const existing = makeTemplate();
+    const { fixture, component } = await setup([existing]);
+    fixture.detectChanges();
+
+    const routine = component.routines()[0];
+    component.openEdit(routine);
+    component.saveError.set('Some previous error');
+    fixture.detectChanges();
+
+    const cancelBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.cancel-btn');
+    cancelBtn.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.routine-edit-card')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.routine-chip')).not.toBeNull();
+    expect(component.saveError()).toBe('');
+  });
+
+  // ── 13. Successful save calls update(), updates chip, closes edit card ────────
+
+  it('a successful save calls update() with correct args, updates chip text, closes edit card', async () => {
+    const existing = makeTemplate({ template_id: 'tmpl-1', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' });
+    const updated = makeTemplate({ template_id: 'tmpl-1', title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' });
+    const { fixture, component, templatesSvcMock } = await setup([existing]);
+    templatesSvcMock.update.and.returnValue(of(updated));
+    fixture.detectChanges();
+
+    // Open edit, change title
+    const chipBody: HTMLButtonElement = fixture.nativeElement.querySelector('.chip-body--clickable');
+    chipBody.click();
+    fixture.detectChanges();
+
+    component.editTitle = 'Evening walk';
+    fixture.detectChanges();
+
+    const saveBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.routine-edit-card .add-btn');
+    saveBtn.click();
+    fixture.detectChanges();
+
+    expect(templatesSvcMock.update).toHaveBeenCalledOnceWith(
+      'tmpl-1',
+      jasmine.objectContaining({ title: 'Evening walk', recurrence: 'daily' })
+    );
+    expect(fixture.nativeElement.querySelector('.routine-edit-card')).toBeNull();
+    const chipBodyEl: HTMLButtonElement = fixture.nativeElement.querySelector('.chip-body--clickable');
+    expect(chipBodyEl.textContent).toContain('Evening walk');
+  });
+
+  // ── 14. Failed save shows error and keeps edit card open ─────────────────────
+
+  it('a failed save shows an error message and keeps the edit card open', async () => {
+    const existing = makeTemplate();
+    const { fixture, component, templatesSvcMock } = await setup([existing]);
+    templatesSvcMock.update.and.returnValue(throwError(() => new Error('network error')));
+    fixture.detectChanges();
+
+    component.openEdit(component.routines()[0]);
+    fixture.detectChanges();
+
+    const saveBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.routine-edit-card .add-btn');
+    saveBtn.click();
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.routine-edit-card')).not.toBeNull();
+    const errorEl: HTMLElement | null = fixture.nativeElement.querySelector('.add-error');
+    expect(errorEl).not.toBeNull();
+    expect(component.saveError()).toContain('Failed to save');
   });
 });

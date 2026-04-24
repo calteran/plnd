@@ -84,6 +84,52 @@ pub async fn delete(
         .map_err(DatabaseError::from)
 }
 
+/// Update a schedule template. Returns the updated record, or None if not found / not owned.
+#[allow(clippy::too_many_arguments)]
+#[tracing::instrument(skip(pool), fields(table = "schedule_templates", op = "update"))]
+pub async fn update(
+    pool: &PgPool,
+    template_id: Uuid,
+    user_id: Uuid,
+    title: &str,
+    recurrence: &str,
+    recurrence_rule: Option<&str>,
+    time_window_start: Option<NaiveTime>,
+    time_window_end: Option<NaiveTime>,
+    duration_minutes: Option<i32>,
+    energy_required: &str,
+    is_milepost: bool,
+    task_ref_id: Option<Uuid>,
+    task_ref_type: Option<&str>,
+) -> Result<Option<ScheduleTemplate>, DatabaseError> {
+    sqlx::query_as::<_, ScheduleTemplate>(
+        "UPDATE schedule_templates
+         SET title = $3, recurrence = $4, recurrence_rule = $5,
+             time_window_start = $6, time_window_end = $7, duration_minutes = $8,
+             energy_required = $9, is_milepost = $10, task_ref_id = $11,
+             task_ref_type = $12, updated_at = NOW()
+         WHERE template_id = $1 AND user_id = $2
+         RETURNING template_id, user_id, task_type, title, recurrence, recurrence_rule,
+             time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
+             task_ref_id, task_ref_type, created_at, updated_at",
+    )
+    .bind(template_id)
+    .bind(user_id)
+    .bind(title)
+    .bind(recurrence)
+    .bind(recurrence_rule)
+    .bind(time_window_start)
+    .bind(time_window_end)
+    .bind(duration_minutes)
+    .bind(energy_required)
+    .bind(is_milepost)
+    .bind(task_ref_id)
+    .bind(task_ref_type)
+    .fetch_optional(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -217,6 +263,127 @@ mod tests {
         let uid = new_user(&pool).await;
         let deleted = delete(&pool, Uuid::new_v4(), uid).await.unwrap();
         assert!(!deleted);
+    }
+
+    // -----------------------------------------------------------------------
+    // update
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_returns_updated_template(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let t = create(
+            &pool,
+            uid,
+            "meal",
+            "Breakfast",
+            "daily",
+            None,
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        let updated = update(
+            &pool,
+            t.template_id,
+            uid,
+            "Lunch",
+            "weekdays",
+            None,
+            None,
+            None,
+            None,
+            "high",
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        assert!(updated.is_some());
+        let updated = updated.unwrap();
+        assert_eq!(updated.template_id, t.template_id);
+        assert_eq!(updated.title, "Lunch");
+        assert_eq!(updated.recurrence, "weekdays");
+        assert_eq!(updated.energy_required, "high");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_returns_none_for_unknown(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let result = update(
+            &pool,
+            Uuid::new_v4(),
+            uid,
+            "Lunch",
+            "daily",
+            None,
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(result.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_enforces_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let t = create(
+            &pool,
+            uid_a,
+            "meal",
+            "Breakfast",
+            "daily",
+            None,
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+        // uid_b cannot update uid_a's template
+        let result = update(
+            &pool,
+            t.template_id,
+            uid_b,
+            "Hacked",
+            "daily",
+            None,
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(result.is_none());
+
+        // Original record must be unchanged
+        let remaining = list_for_user(&pool, uid_a).await.unwrap();
+        assert_eq!(remaining[0].title, "Breakfast");
     }
 
     #[sqlx::test(migrations = "./migrations")]

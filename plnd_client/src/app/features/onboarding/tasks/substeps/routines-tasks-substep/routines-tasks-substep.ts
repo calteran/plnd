@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ScheduleTemplatesService } from '../../../../../core/services/schedule-templates.service';
-import { ScheduleTemplate, CreateScheduleTemplateRequest } from '../../../../../core/models/schedule-template';
+import { ScheduleTemplate, CreateScheduleTemplateRequest, UpdateScheduleTemplateRequest } from '../../../../../core/models/schedule-template';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 
 // ── Recurrence dropdown option ───────────────────────────────────────────────
@@ -79,6 +79,18 @@ export function rruleToHumanLabel(rrule: string): string {
     return 'weekly';
   }
   return rrule;
+}
+
+/** Parse a stored rrule string back into the form's (selectedRrule, selectedWeekDay) pair. */
+function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekDay: string } {
+  if (rrule === 'FREQ=DAILY') return { selectedRrule: 'FREQ=DAILY', selectedWeekDay: 'MO' };
+  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR') return { selectedRrule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', selectedWeekDay: 'MO' };
+  if (rrule === 'FREQ=WEEKLY;BYDAY=SA,SU') return { selectedRrule: 'FREQ=WEEKLY;BYDAY=SA,SU', selectedWeekDay: 'MO' };
+  if (rrule.startsWith('FREQ=WEEKLY;BYDAY=')) {
+    const byday = rrule.replace('FREQ=WEEKLY;BYDAY=', '');
+    return { selectedRrule: 'FREQ=WEEKLY;BYDAY=', selectedWeekDay: byday || 'MO' };
+  }
+  return { selectedRrule: 'FREQ=DAILY', selectedWeekDay: 'MO' };
 }
 
 /** Map an rrule string to the RecurrenceType expected by the API. */
@@ -171,17 +183,72 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
         @if (routines().length > 0) {
           <div class="added-chips" aria-label="Added routines">
             @for (routine of routines(); track routine.localId) {
-              <span class="routine-chip">
-                <span class="chip-body" role="note">
-                  {{ routine.name }} · {{ rruleToHumanLabel(routine.rrule) }}
+              @if (editingId() === routine.localId) {
+                <div class="routine-edit-card">
+                  <input
+                    type="text"
+                    class="name-input"
+                    [(ngModel)]="editTitle"
+                    aria-label="Routine name"
+                  />
+                  <div class="recurrence-row">
+                    <select
+                      class="recurrence-select"
+                      [(ngModel)]="editSelectedRrule"
+                      aria-label="Recurrence"
+                    >
+                      @for (opt of recurrenceOptions; track opt.value) {
+                        <option [value]="opt.value">{{ opt.label }}</option>
+                      }
+                    </select>
+                  </div>
+                  @if (isEditWeeklySelected) {
+                    <div class="day-row" role="group" aria-label="Day of week">
+                      @for (day of dayOptions; track day.byday) {
+                        <button
+                          type="button"
+                          class="day-pill"
+                          [class.day-pill--active]="editSelectedWeekDay === day.byday"
+                          (click)="editSelectedWeekDay = day.byday"
+                          [attr.aria-label]="day.byday"
+                          [attr.aria-pressed]="editSelectedWeekDay === day.byday"
+                        >{{ day.label }}</button>
+                      }
+                    </div>
+                  }
+                  <div class="edit-actions">
+                    <button
+                      type="button"
+                      class="add-btn"
+                      [disabled]="!editTitle.trim() || isSaving()"
+                      (click)="saveEdit(routine)"
+                    >Save</button>
+                    <button
+                      type="button"
+                      class="cancel-btn"
+                      (click)="cancelEdit()"
+                    >Cancel</button>
+                  </div>
+                  @if (saveError()) {
+                    <p class="add-error" role="alert">{{ saveError() }}</p>
+                  }
+                </div>
+              } @else {
+                <span class="routine-chip">
+                  <button
+                    type="button"
+                    class="chip-body chip-body--clickable"
+                    (click)="openEdit(routine)"
+                    [attr.aria-label]="'Edit ' + routine.name"
+                  >{{ routine.name }} · {{ rruleToHumanLabel(routine.rrule) }}</button>
+                  <button
+                    type="button"
+                    class="chip-remove"
+                    (click)="removeRoutine(routine.localId)"
+                    [attr.aria-label]="'Remove ' + routine.name"
+                  >✕</button>
                 </span>
-                <button
-                  type="button"
-                  class="chip-remove"
-                  (click)="removeRoutine(routine.localId)"
-                  [attr.aria-label]="'Remove ' + routine.name"
-                >✕</button>
-              </span>
+              }
             }
           </div>
         }
@@ -412,6 +479,20 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       font-size: 12px;
     }
 
+    .chip-body--clickable {
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      color: #78350f;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    .chip-body--clickable:hover {
+      text-decoration: underline;
+    }
+
     .chip-remove {
       background: none;
       border: none;
@@ -424,6 +505,37 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
 
     .chip-remove:hover {
       color: #dc2626;
+    }
+
+    .routine-edit-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      background: #fff7ed;
+      border: 1.5px solid #fde68a;
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .edit-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .cancel-btn {
+      background: none;
+      border: 1.5px solid #d1d5db;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 13px;
+      color: #6b7280;
+      cursor: pointer;
+    }
+
+    .cancel-btn:hover {
+      background: #f3f4f6;
     }
 
     .divider {
@@ -473,6 +585,18 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   // ── Loading / error state ─────────────────────────────────────────────────
   readonly isAdding = signal(false);
   readonly addError = signal('');
+
+  // ── Inline edit state ─────────────────────────────────────────────────────
+  readonly editingId = signal<string | null>(null);
+  editTitle = '';
+  editSelectedRrule = 'FREQ=DAILY';
+  editSelectedWeekDay = 'MO';
+  readonly isSaving = signal(false);
+  readonly saveError = signal('');
+
+  get isEditWeeklySelected(): boolean {
+    return this.editSelectedRrule === 'FREQ=WEEKLY;BYDAY=';
+  }
 
   // ── Task form state ───────────────────────────────────────────────────────
   taskName = '';
@@ -587,6 +711,55 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     if (routine.templateId) {
       this.templatesService.delete(routine.templateId).subscribe();
     }
+  }
+
+  openEdit(routine: { localId: string; name: string; rrule: string; templateId: string | null }): void {
+    const { selectedRrule, selectedWeekDay } = rruleToFormState(routine.rrule);
+    this.editTitle = routine.name;
+    this.editSelectedRrule = selectedRrule;
+    this.editSelectedWeekDay = selectedWeekDay;
+    this.saveError.set('');
+    this.editingId.set(routine.localId);
+  }
+
+  cancelEdit(): void {
+    this.saveError.set('');
+    this.editingId.set(null);
+  }
+
+  saveEdit(routine: { localId: string; name: string; rrule: string; templateId: string | null }): void {
+    if (!routine.templateId || this.isSaving()) return;
+    const title = this.editTitle.trim();
+    if (!title) return;
+
+    const rrule = this.editEffectiveRrule();
+    const recurrence = rruleToRecurrenceType(rrule);
+    const req: UpdateScheduleTemplateRequest = { title, recurrence, recurrence_rule: rrule };
+
+    this.isSaving.set(true);
+    this.saveError.set('');
+    this.templatesService.update(routine.templateId, req).subscribe({
+      next: (updated: ScheduleTemplate) => {
+        this.routines.update(list =>
+          list.map(r => r.localId === routine.localId
+            ? { ...r, name: updated.title, rrule: updated.recurrence_rule ?? rrule }
+            : r)
+        );
+        this.editingId.set(null);
+        this.isSaving.set(false);
+      },
+      error: () => {
+        this.saveError.set('Failed to save. Please try again.');
+        this.isSaving.set(false);
+      },
+    });
+  }
+
+  private editEffectiveRrule(): string {
+    if (this.editSelectedRrule === 'FREQ=WEEKLY;BYDAY=') {
+      return `FREQ=WEEKLY;BYDAY=${this.editSelectedWeekDay}`;
+    }
+    return this.editSelectedRrule;
   }
 
   addTask(): void {

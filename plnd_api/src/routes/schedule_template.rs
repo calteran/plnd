@@ -15,6 +15,22 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
+pub struct UpdateScheduleTemplateRequest {
+    pub title: String,
+    pub recurrence: String,
+    pub recurrence_rule: Option<String>,
+    pub time_window_start: Option<NaiveTime>,
+    pub time_window_end: Option<NaiveTime>,
+    pub duration_minutes: Option<i32>,
+    /// Defaults to "medium" if omitted.
+    pub energy_required: Option<String>,
+    /// Defaults to false if omitted.
+    pub is_milepost: Option<bool>,
+    pub task_ref_id: Option<Uuid>,
+    pub task_ref_type: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct CreateScheduleTemplateRequest {
     pub task_type: String,
     pub title: String,
@@ -156,6 +172,68 @@ pub async fn delete_template(
                 Err(StatusCode::NOT_FOUND)
             }
         })
+}
+
+#[utoipa::path(
+    put,
+    path = "/schedule/templates/{id}",
+    tag = "Schedule Templates",
+    security(("bearer_auth" = [])),
+    params(("id" = Uuid, Path, description = "Template ID")),
+    request_body = UpdateScheduleTemplateRequest,
+    responses(
+        (status = 200, description = "Template updated", body = ScheduleTemplateResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Template not found or not owned by current user"),
+        (status = 422, description = "Invalid recurrence, energy_required, or empty title"),
+    )
+)]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+pub async fn update_template(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(template_id): Path<Uuid>,
+    Json(body): Json<UpdateScheduleTemplateRequest>,
+) -> Result<Json<ScheduleTemplateResponse>, StatusCode> {
+    if body.title.trim().is_empty() {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    if !VALID_RECURRENCE_TYPES.contains(&body.recurrence.as_str()) {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let energy = body.energy_required.as_deref().unwrap_or("medium");
+    if !VALID_ENERGY_LEVELS.contains(&energy) {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    state
+        .repos
+        .schedule_template
+        .update_template(
+            template_id,
+            user_id,
+            &body.title,
+            &body.recurrence,
+            body.recurrence_rule.as_deref(),
+            body.time_window_start,
+            body.time_window_end,
+            body.duration_minutes,
+            energy,
+            body.is_milepost.unwrap_or(false),
+            body.task_ref_id,
+            body.task_ref_type.as_deref(),
+        )
+        .await
+        .map_err(|e| match e {
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            e => {
+                tracing::error!(error = %e, "update_template DB error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })?
+        .map(|t| Json(ScheduleTemplateResponse::from(t)))
+        .ok_or(StatusCode::NOT_FOUND)
 }
 
 #[cfg(test)]

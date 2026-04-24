@@ -34,6 +34,19 @@ export interface CreateScheduleTemplateRequest {
   task_ref_type?: string;
 }
 
+export interface UpdateScheduleTemplateRequest {
+  title: string;
+  recurrence: RecurrenceType;
+  recurrence_rule?: string;
+  time_window_start?: string;
+  time_window_end?: string;
+  duration_minutes?: number;
+  energy_required?: EnergyLevel;
+  is_milepost?: boolean;
+  task_ref_id?: string;
+  task_ref_type?: string;
+}
+
 const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 /**
