@@ -2,6 +2,13 @@ export type RestrictionType = 'allergy' | 'intolerance' | 'preference' | 'cultur
 
 export const RESTRICTION_TYPES: RestrictionType[] = ['allergy', 'intolerance', 'preference', 'cultural_religious'];
 
+export const RESTRICTION_LABELS: Record<RestrictionType, string> = {
+  allergy: 'Allergy',
+  intolerance: 'Intolerance',
+  preference: 'Preference',
+  cultural_religious: 'Cultural / Religious',
+};
+
 export interface DietaryRestriction {
   restriction_id: string;
   user_id: string;
