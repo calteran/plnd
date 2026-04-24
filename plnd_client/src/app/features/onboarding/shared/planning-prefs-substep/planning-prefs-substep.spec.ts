@@ -157,6 +157,23 @@ describe('PlanningPrefsSubstepComponent', () => {
     expect(prefsMock.patchPreferences).toHaveBeenCalledTimes(1);
   });
 
+  it('save button is disabled while isSaving is true', async () => {
+    const { fixture, component } = await setup(false);
+    fixture.detectChanges();
+    component.isSaving.set(true);
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
+    expect(btn.disabled).toBeTrue();
+  });
+
+  it('save() is a no-op when isSaving is already true', async () => {
+    const { fixture, component, prefsMock } = await setup(false);
+    fixture.detectChanges();
+    component.isSaving.set(true);
+    component.save();
+    expect(prefsMock.patchPreferences).not.toHaveBeenCalled();
+  });
+
   // ── save() ──────────────────────────────────────────────────────────────────
 
   it('save() calls patchPreferences with correct fields', async () => {
