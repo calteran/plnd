@@ -30,4 +30,21 @@ pub trait ScheduleTemplateRepository: Send + Sync {
 
     async fn delete_template(&self, user_id: Uuid, template_id: Uuid)
         -> Result<bool, crate::Error>;
+
+    #[allow(clippy::too_many_arguments)]
+    async fn update_template(
+        &self,
+        template_id: Uuid,
+        user_id: Uuid,
+        title: &str,
+        recurrence: &str,
+        recurrence_rule: Option<&str>,
+        time_window_start: Option<NaiveTime>,
+        time_window_end: Option<NaiveTime>,
+        duration_minutes: Option<i32>,
+        energy_required: &str,
+        is_milepost: bool,
+        task_ref_id: Option<Uuid>,
+        task_ref_type: Option<&str>,
+    ) -> Result<Option<ScheduleTemplate>, crate::Error>;
 }

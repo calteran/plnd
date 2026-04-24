@@ -72,4 +72,38 @@ impl ScheduleTemplateRepository for PgScheduleTemplateRepository {
             .await
             .map_err(Into::into)
     }
+
+    async fn update_template(
+        &self,
+        template_id: Uuid,
+        user_id: Uuid,
+        title: &str,
+        recurrence: &str,
+        recurrence_rule: Option<&str>,
+        time_window_start: Option<NaiveTime>,
+        time_window_end: Option<NaiveTime>,
+        duration_minutes: Option<i32>,
+        energy_required: &str,
+        is_milepost: bool,
+        task_ref_id: Option<Uuid>,
+        task_ref_type: Option<&str>,
+    ) -> Result<Option<ScheduleTemplate>, crate::Error> {
+        db::update(
+            &self.pool,
+            template_id,
+            user_id,
+            title,
+            recurrence,
+            recurrence_rule,
+            time_window_start,
+            time_window_end,
+            duration_minutes,
+            energy_required,
+            is_milepost,
+            task_ref_id,
+            task_ref_type,
+        )
+        .await
+        .map_err(Into::into)
+    }
 }

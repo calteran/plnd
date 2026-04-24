@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { ConfigService } from './config.service';
-import { ScheduleTemplate, CreateScheduleTemplateRequest } from '../models/schedule-template';
+import { ScheduleTemplate, CreateScheduleTemplateRequest, UpdateScheduleTemplateRequest } from '../models/schedule-template';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleTemplatesService {
@@ -48,6 +48,19 @@ export class ScheduleTemplatesService {
       tap(() => {
         const current = this.templatesSignal() ?? [];
         this.templatesSignal.set(current.filter(t => t.template_id !== id));
+      })
+    );
+  }
+
+  /** PUT /schedule/templates/{id} and update the item in the signal */
+  update(id: string, req: UpdateScheduleTemplateRequest): Observable<ScheduleTemplate> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.put<ScheduleTemplate>(`${apiBase}/schedule/templates/${id}`, req).pipe(
+      tap(updated => {
+        const current = this.templatesSignal();
+        if (current) {
+          this.templatesSignal.set(current.map(t => (t.template_id === id ? updated : t)));
+        }
       })
     );
   }
