@@ -139,6 +139,24 @@ describe('PlanningPrefsSubstepComponent', () => {
     expect(text).toContain('Planning');
   });
 
+  // ── embedded save button ─────────────────────────────────────────────────────
+
+  it('renders a Save & Continue button when prefs not complete', async () => {
+    const { fixture } = await setup(false);
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
+    expect(btn).not.toBeNull();
+    expect(btn.textContent?.trim()).toContain('Save');
+  });
+
+  it('clicking the save button invokes patchPreferences', async () => {
+    const { fixture, prefsMock } = await setup(false);
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
+    btn.click();
+    expect(prefsMock.patchPreferences).toHaveBeenCalledTimes(1);
+  });
+
   // ── save() ──────────────────────────────────────────────────────────────────
 
   it('save() calls patchPreferences with correct fields', async () => {

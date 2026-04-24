@@ -80,6 +80,10 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
           You can update these after onboarding in
           <strong>Settings → Planning</strong>.
         </p>
+
+        <button type="button" class="save-btn" (click)="save()">
+          Save &amp; Continue →
+        </button>
       </div>
     }
   `,
@@ -189,6 +193,20 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       color: #6b7280;
       margin: 0;
     }
+
+    .save-btn {
+      background: var(--color-accent, #d97706);
+      color: #ffffff;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      align-self: flex-end;
+    }
+
+    .save-btn:hover { background: var(--color-accent-dark, #78350f); }
   `],
 })
 export class PlanningPrefsSubstepComponent implements OnInit {
@@ -197,7 +215,7 @@ export class PlanningPrefsSubstepComponent implements OnInit {
   readonly state = inject(OnboardingStateService);
   private readonly preferencesService = inject(PreferencesService);
 
-  // Form state — public so tests and parent spokes can access via @ViewChild
+  // Form state — public for test access
   readonly planLength = signal<7 | 14 | 28>(14);
   readonly weekStart = signal<number>(1); // Monday default
   readonly planningDay = signal<number>(1); // Monday default
@@ -226,7 +244,6 @@ export class PlanningPrefsSubstepComponent implements OnInit {
     this.planningTime.set((event.target as HTMLInputElement).value);
   }
 
-  /** Called by the parent spoke via @ViewChild when SpokeChromeComponent emits continueClick. */
   save(): void {
     // planning_trigger_offset: signed days from plan start to the planning day.
     // Formula: -((weekStart - planningDay + 7) % 7)
