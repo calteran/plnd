@@ -60,6 +60,9 @@ type DotState = 'completed' | 'current' | 'ahead';
   `,
   styles: [`
     .spoke-chrome {
+      max-width: 560px;
+      margin-inline: auto;
+      width: 100%;
       display: flex;
       flex-direction: column;
       min-height: 100%;
