@@ -1,6 +1,16 @@
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { switchMap } from 'rxjs/operators';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
+import { ConfigService } from '../../../core/services/config.service';
+import { UserService } from '../../../core/services/user.service';
+import {
+  PostSchedulePlanRequest,
+  PostSchedulePlanResponse,
+  PlanEntryRequest,
+} from '../../../core/models/week-plan';
 
 interface HubSection {
   id: SectionId | 'exercise';
@@ -11,12 +21,21 @@ interface HubSection {
   disabled: boolean;
 }
 
+// No planning task exists in the onboarding flow — the DB UPDATE silently no-ops on a nil UUID.
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
+const SLOT_DEFAULT_TIME: Record<string, string> = {
+  breakfast: '08:00',
+  lunch: '12:00',
+  dinner: '18:00',
+  snack: '15:00',
+};
+
 const HUB_SECTIONS: HubSection[] = [
   {
     id: 'account',
     icon: '👤',
-    title: 'Account',
-    description: 'Set up your display name and wake time.',
+    title: 'Account Settings',
+    description: 'Display name and notifications',
     route: '/onboarding/account',
     disabled: false,
   },
@@ -24,15 +43,15 @@ const HUB_SECTIONS: HubSection[] = [
     id: 'tasks',
     icon: '📋',
     title: 'Tasks & Routines',
-    description: 'Set your planning cadence and add recurring tasks.',
+    description: 'Recurring routines and upcoming tasks',
     route: '/onboarding/tasks',
     disabled: false,
   },
   {
     id: 'food',
-    icon: '🍽️',
+    icon: '🥗',
     title: 'Food & Meals',
-    description: 'Add dietary preferences and generate your first meal plan.',
+    description: 'Dietary needs and first meal plan',
     route: '/onboarding/food',
     disabled: false,
   },
@@ -40,7 +59,7 @@ const HUB_SECTIONS: HubSection[] = [
     id: 'exercise',
     icon: '🏃',
     title: 'Exercise',
-    description: 'Exercise tracking — coming in a future update.',
+    description: 'Coming in a future update',
     route: '',
     disabled: true,
   },
@@ -51,10 +70,10 @@ const HUB_SECTIONS: HubSection[] = [
   standalone: true,
   imports: [],
   template: `
-    <div class="hub">
+    <div class="hub" [class.hub--submitting]="isSubmitting()">
       <header class="hub-header">
         <h1 class="hub-title">Welcome to PLND!</h1>
-        <p class="hub-subtitle">Complete each section to build your first week.</p>
+        <p class="hub-subtitle">Complete sections in any order</p>
       </header>
 
       <div class="section-grid">
@@ -91,18 +110,84 @@ const HUB_SECTIONS: HubSection[] = [
         }
       </div>
 
+      @if (allDone()) {
+        <div class="stats-banner">
+          <p class="stats-heading">Everything looks good</p>
+          <div class="stats-row">
+            <div class="stat">
+              <span class="stat-label">Routines</span>
+              <span class="stat-value">{{ onboardingState.totalRoutines() }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Tasks</span>
+              <span class="stat-value">{{ onboardingState.totalTasks() }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Meals</span>
+              <span class="stat-value">{{ onboardingState.totalMeals() }}</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Days</span>
+              <span class="stat-value">{{ onboardingState.planDays() }}</span>
+            </div>
+          </div>
+        </div>
+      }
+
+      @if (commitError()) {
+        <div class="commit-error" role="alert">
+          Something went wrong — your plan wasn't saved. Please try again.
+        </div>
+      }
+
       <div class="hub-cta">
-        <button
-          class="btn-cta"
-          [class.btn--accent]="allDone()"
-          [class.btn--ghost]="!allDone()"
-          type="button"
-          (click)="goToReview()">
-          Review &amp; Build My First Week →
-        </button>
-        <p class="hub-note">Future planning happens in the weekly planning wizard.</p>
+        @if (!allDone()) {
+          <button
+            class="btn-skip"
+            type="button"
+            (click)="showSkipModal.set(true)">
+            Skip
+          </button>
+          <button
+            class="btn-cta btn--ghost btn--disabled"
+            type="button"
+            disabled
+            aria-disabled="true">
+            Approve Plan →
+          </button>
+        } @else {
+          <button
+            class="btn-cta btn--accent"
+            type="button"
+            [disabled]="isSubmitting()"
+            (click)="commitPlan()">
+            @if (isSubmitting()) {
+              <span class="spinner" aria-hidden="true"></span>
+              Saving…
+            } @else {
+              Approve Plan →
+            }
+          </button>
+        }
       </div>
     </div>
+
+    @if (showSkipModal()) {
+      <div class="modal-backdrop" (click)="showSkipModal.set(false)">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="skip-modal-title" (click)="$event.stopPropagation()">
+          <h2 id="skip-modal-title" class="modal-title">Skip setup for now?</h2>
+          <p class="modal-body">Your progress is saved. You can add more detail anytime from <strong>Settings</strong>.</p>
+          <div class="modal-actions">
+            <button class="btn-ghost-amber" type="button" (click)="showSkipModal.set(false)">
+              Keep going
+            </button>
+            <button class="btn-gray-primary" type="button" (click)="skipOnboarding()">
+              Skip for now
+            </button>
+          </div>
+        </div>
+      </div>
+    }
   `,
   styles: [`
     /* ── Page shell ─────────────────────────────── */
@@ -222,18 +307,102 @@ const HUB_SECTIONS: HubSection[] = [
       color: var(--color-text-muted);
     }
 
-    /* ── CTA area ───────────────────────────────── */
-    .hub-cta {
+    /* Hub submitting state — dim cards and stats banner */
+    .hub--submitting .section-grid,
+    .hub--submitting .stats-banner {
+      opacity: 0.6;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+
+    /* Stats banner */
+    .stats-banner {
+      background: var(--color-accent-light);
+      border: 1.5px solid var(--color-accent-border);
+      border-radius: 10px;
+      padding: 16px;
+      animation: slide-fade-in 0.3s ease-out;
+    }
+    .stats-heading {
+      margin: 0 0 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      text-align: center;
+    }
+    .stats-row {
+      display: flex;
+      align-items: stretch;
+    }
+    .stat {
+      flex: 1;
       display: flex;
       flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      padding: 0 12px;
+    }
+    .stat + .stat {
+      border-left: 1px solid var(--color-accent-border);
+    }
+    .stat-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--color-accent-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .stat-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--color-text-primary);
+    }
+
+    @keyframes slide-fade-in {
+      from { opacity: 0; transform: translateY(-8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Error banner */
+    .commit-error {
+      background: var(--color-accent-light);
+      border: 1.5px solid var(--color-accent-border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: var(--color-accent-dark);
+    }
+
+    /* CTA button row */
+    .hub-cta {
+      display: flex;
+      gap: 10px;
       align-items: stretch;
-      gap: 8px;
       padding-top: 4px;
     }
+
+    /* Skip button */
+    .btn-skip {
+      all: unset;
+      box-sizing: border-box;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--color-btn-neutral-text);
+      border: 1.5px solid var(--color-btn-neutral-border);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-skip:hover {
+      background: var(--color-surface-base);
+    }
+
+    /* CTA full-width when alone */
     .btn-cta {
       all: unset;
       box-sizing: border-box;
-      width: 100%;
+      flex: 1;
       padding: 12px 24px;
       border-radius: 8px;
       font-size: 14px;
@@ -241,6 +410,10 @@ const HUB_SECTIONS: HubSection[] = [
       text-align: center;
       cursor: pointer;
       transition: opacity 0.12s, background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
     }
     .btn-cta:focus-visible {
       outline: 2px solid var(--color-accent);
@@ -250,32 +423,130 @@ const HUB_SECTIONS: HubSection[] = [
       background: transparent;
       border: 1.5px solid var(--color-accent-border);
       color: var(--color-text-secondary);
+      opacity: 0.5;
     }
-    .btn--ghost:hover {
-      background: var(--color-accent-light);
+    .btn--disabled {
+      cursor: not-allowed;
     }
     .btn--accent {
       background: var(--color-accent);
       border: 1.5px solid transparent;
       color: var(--color-btn-accent-text);
     }
-    .btn--accent:hover {
+    .btn--accent:hover:not([disabled]) {
       opacity: 0.88;
     }
-    .hub-note {
+    .btn--accent[disabled] {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    /* Spinner */
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: var(--color-btn-accent-text);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Modal backdrop */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: var(--color-modal-backdrop);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    /* Modal card */
+    .modal-card {
+      background: var(--color-surface-white);
+      border: 1.5px solid var(--color-accent-border);
+      border-radius: 10px;
+      padding: 24px;
+      max-width: 360px;
+      width: 90%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal-title {
       margin: 0;
-      font-size: 11px;
-      color: var(--color-text-muted);
-      text-align: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+    }
+    .modal-body {
+      margin: 0;
+      font-size: 13px;
+      color: var(--color-text-body);
+      line-height: 1.5;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      padding-top: 4px;
+    }
+    .btn-ghost-amber {
+      all: unset;
+      box-sizing: border-box;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1.5px solid var(--color-accent-border);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+    }
+    .btn-ghost-amber:hover {
+      background: var(--color-accent-light);
+    }
+    .btn-gray-primary {
+      all: unset;
+      box-sizing: border-box;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      background: var(--color-btn-neutral-bg);
+      color: var(--color-btn-accent-text);
+      cursor: pointer;
+    }
+    .btn-gray-primary:hover {
+      background: var(--color-btn-neutral-bg-hover);
     }
   `],
 })
 export class OnboardingHubComponent {
-  private readonly onboardingState = inject(OnboardingStateService);
+  protected readonly onboardingState = inject(OnboardingStateService);
   private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
+  private readonly config = inject(ConfigService);
+  private readonly userService = inject(UserService);
+  private readonly destroyRef = inject(DestroyRef);
 
-  readonly sections = HUB_SECTIONS;
-  readonly allDone = this.onboardingState.allSectionsComplete;
+  protected readonly isSubmitting = signal(false);
+  protected readonly commitError  = signal(false);
+  protected readonly showSkipModal = signal(false);
+
+  protected readonly sections = HUB_SECTIONS;
+  protected readonly allDone = this.onboardingState.allSectionsComplete;
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.showSkipModal()) {
+      this.showSkipModal.set(false);
+    }
+  }
 
   statusFor(section: HubSection): 'not-started' | 'complete' | null {
     if (section.disabled) return null;
@@ -287,7 +558,59 @@ export class OnboardingHubComponent {
     this.router.navigate([section.route]);
   }
 
-  goToReview(): void {
-    this.router.navigate(['/onboarding/review']);
+  commitPlan(): void {
+    const period = this.onboardingState.planPeriod();
+    if (!period || this.isSubmitting()) return;
+
+    this.isSubmitting.set(true);
+    this.commitError.set(false);
+
+    const mealPlan = this.onboardingState.mealPlan();
+    const entries: PlanEntryRequest[] = (mealPlan?.meals ?? []).map(m => ({
+      date: m.date,
+      task_type: 'meal',
+      task_ref_id: m.meal_ref?.id,
+      task_ref_type: m.meal_ref?.type,
+      title: m.meal_ref ? undefined : m.title,
+      scheduled_start: SLOT_DEFAULT_TIME[m.occasion] ?? '12:00',
+      after_milepost: m.occasion,
+    }));
+
+    const body: PostSchedulePlanRequest = {
+      plan_start: period.start,
+      plan_end: period.end,
+      planning_task_id: NIL_UUID,
+      entries,
+      placed_tasks: this.onboardingState.placedTasks(),
+      meal_habit_ids: this.onboardingState.mealHabits().map(h => h.id),
+    };
+
+    const apiBase = this.config.getConfig().api.baseUrl;
+    this.http.post<PostSchedulePlanResponse>(`${apiBase}/schedule/plan`, body)
+      .pipe(
+        switchMap(() => this.userService.completeOnboarding()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => {
+          this.isSubmitting.set(false);
+          this.router.navigate(['/day', period.start]);
+        },
+        error: () => {
+          this.isSubmitting.set(false);
+          this.commitError.set(true);
+        },
+      });
+  }
+
+  skipOnboarding(): void {
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.userService.completeOnboarding()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.router.navigate(['/day', today]),
+        error: () => this.commitError.set(true),
+      });
   }
 }

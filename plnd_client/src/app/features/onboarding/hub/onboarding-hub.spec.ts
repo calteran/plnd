@@ -1,8 +1,13 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { of } from 'rxjs';
 import { OnboardingHubComponent } from './onboarding-hub';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
+import { UserService } from '../../../core/services/user.service';
+import { ConfigService } from '../../../core/services/config.service';
 
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
@@ -11,6 +16,7 @@ function makeStateMock() {
     food: 'not-started',
   });
   const allCompleteSignal = signal(false);
+  const planPeriodSignal = signal<{ start: string; end: string } | null>(null);
 
   return {
     sectionStatus: statusSignal.asReadonly(),
@@ -21,6 +27,15 @@ function makeStateMock() {
         allCompleteSignal.set(true);
       }
     }),
+    totalRoutines: signal(0).asReadonly(),
+    totalTasks: signal(0).asReadonly(),
+    totalMeals: signal(0).asReadonly(),
+    planDays: signal(0).asReadonly(),
+    planPeriod: planPeriodSignal.asReadonly(),
+    planPeriodSignal,
+    mealPlan: signal(null).asReadonly(),
+    placedTasks: signal([]).asReadonly(),
+    mealHabits: signal([]).asReadonly(),
   };
 }
 
@@ -28,13 +43,19 @@ describe('OnboardingHubComponent', () => {
   let fixture: ComponentFixture<OnboardingHubComponent>;
   let stateMock: ReturnType<typeof makeStateMock>;
   let router: Router;
+  let userServiceStub: { completeOnboarding: jasmine.Spy };
 
   beforeEach(async () => {
     stateMock = makeStateMock();
+    userServiceStub = { completeOnboarding: jasmine.createSpy('completeOnboarding').and.returnValue(of(undefined)) };
     await TestBed.configureTestingModule({
       imports: [OnboardingHubComponent],
       providers: [
         { provide: OnboardingStateService, useValue: stateMock },
+        { provide: UserService, useValue: userServiceStub },
+        { provide: ConfigService, useValue: { getConfig: () => ({ api: { baseUrl: 'http://localhost:3000' } }) } },
+        provideHttpClient(),
+        provideHttpClientTesting(),
         provideRouter([]),
       ],
     }).compileComponents();
@@ -77,10 +98,24 @@ describe('OnboardingHubComponent', () => {
 
   it('renders all 4 section titles', () => {
     const text: string = fixture.nativeElement.textContent;
-    expect(text).toContain('Account');
+    expect(text).toContain('Account Settings');
     expect(text).toContain('Tasks & Routines');
     expect(text).toContain('Food & Meals');
     expect(text).toContain('Exercise');
+  });
+
+  // ── Hub subtitle ────────────────────────────────────────────────────────────
+
+  it('hub subtitle reads "Complete sections in any order"', () => {
+    const subtitle: HTMLElement = fixture.nativeElement.querySelector('.hub-subtitle');
+    expect(subtitle?.textContent?.trim()).toBe('Complete sections in any order');
+  });
+
+  // ── Section descriptions ────────────────────────────────────────────────────
+
+  it('Account section description is "Display name and notifications"', () => {
+    const descs: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.card-desc');
+    expect(descs[0].textContent?.trim()).toBe('Display name and notifications');
   });
 
   // ── Badge initial state ─────────────────────────────────────────────────────
@@ -153,6 +188,30 @@ describe('OnboardingHubComponent', () => {
     expect(cards[1].classList).not.toContain('section-card--done');
   });
 
+  // ── Stats banner ────────────────────────────────────────────────────────────
+
+  it('stats banner is hidden when no sections are complete', () => {
+    const banner: HTMLElement = fixture.nativeElement.querySelector('.stats-banner');
+    expect(banner).toBeNull();
+  });
+
+  it('stats banner appears when all 3 sections are complete', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const banner: HTMLElement = fixture.nativeElement.querySelector('.stats-banner');
+    expect(banner).toBeTruthy();
+    expect(banner.querySelector('.stats-heading')?.textContent?.trim()).toBe('Everything looks good');
+  });
+
+  it('stats banner shows stat labels: Routines, Tasks, Meals, Days', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const banner: HTMLElement = fixture.nativeElement.querySelector('.stats-banner');
+    const labels: NodeListOf<HTMLElement> = banner.querySelectorAll('.stat-label');
+    const texts = Array.from(labels).map((el: HTMLElement) => el.textContent?.trim());
+    expect(texts).toEqual(['Routines', 'Tasks', 'Meals', 'Days']);
+  });
+
   // ── CTA button state ────────────────────────────────────────────────────────
 
   it('CTA has btn--ghost style when 0 sections are complete', () => {
@@ -176,6 +235,78 @@ describe('OnboardingHubComponent', () => {
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
     expect(btn.classList).toContain('btn--accent');
     expect(btn.classList).not.toContain('btn--ghost');
+  });
+
+  // ── Skip button ──────────────────────────────────────────────────────────────
+
+  it('skip button is visible when sections are incomplete', () => {
+    const skip: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-skip');
+    expect(skip).toBeTruthy();
+  });
+
+  it('skip button is absent when all sections are complete', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const skip: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-skip');
+    expect(skip).toBeNull();
+  });
+
+  // ── Skip modal ──────────────────────────────────────────────────────────────
+
+  it('skip modal is not shown initially', () => {
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeNull();
+  });
+
+  it('clicking Skip button opens the skip modal', () => {
+    const skip: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-skip');
+    skip.click();
+    fixture.detectChanges();
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeTruthy();
+  });
+
+  it('"Keep going" button dismisses the skip modal', () => {
+    // open via UI
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const keepGoing: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-ghost-amber');
+    keepGoing.click();
+    fixture.detectChanges();
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeNull();
+  });
+
+  it('"Skip for now" calls completeOnboarding() then navigates to /day/<today>', () => {
+    spyOn(router, 'navigate');
+    // open via UI
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const skipBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-gray-primary');
+    skipBtn.click();
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    expect(userServiceStub.completeOnboarding).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/day', today]);
+  });
+
+  it('Escape key closes the skip modal', () => {
+    // open via UI, then test the keyboard handler directly
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    fixture.componentInstance.onEscapeKey();
+    fixture.detectChanges();
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeNull();
+  });
+
+  it('skip modal has role="dialog" and aria-modal="true"', () => {
+    // open via UI
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    const card: HTMLElement = fixture.nativeElement.querySelector('.modal-card');
+    expect(card?.getAttribute('role')).toBe('dialog');
+    expect(card?.getAttribute('aria-modal')).toBe('true');
   });
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -213,17 +344,112 @@ describe('OnboardingHubComponent', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it('clicking CTA navigates to /onboarding/review', () => {
-    spyOn(router, 'navigate');
+  // ── CTA behavior ────────────────────────────────────────────────────────────
+
+  it('CTA shows "Approve Plan" text', () => {
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.textContent).toContain('Approve Plan');
+  });
+
+  it('"Approve Plan →" is disabled (ghost) when sections are incomplete', () => {
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeTrue();
+    expect(btn?.classList).toContain('btn--ghost');
+  });
+
+  it('"Approve Plan →" is enabled amber primary when all sections complete', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeFalse();
+    expect(btn?.classList).toContain('btn--accent');
+  });
+
+  it('"Approve Plan →" click binding wires to commitPlan()', () => {
+    spyOn(fixture.componentInstance, 'commitPlan');
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
     btn.click();
-    expect(router.navigate).toHaveBeenCalledWith(['/onboarding/review']);
+    expect(fixture.componentInstance.commitPlan).toHaveBeenCalled();
   });
 
-  // ── Footer note ─────────────────────────────────────────────────────────────
+  it('commitPlan() posts to /schedule/plan then calls completeOnboarding', () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    spyOn(router, 'navigate');
+    // Give the mock a valid plan period so commitPlan() doesn't bail early
+    stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
 
-  it('renders the "weekly planning wizard" footer note', () => {
-    const note: HTMLElement = fixture.nativeElement.querySelector('.hub-note');
-    expect(note?.textContent).toContain('weekly planning wizard');
+    fixture.componentInstance.commitPlan();
+
+    const planReq = httpTesting.expectOne(req =>
+      req.method === 'POST' && req.url.includes('/schedule/plan'),
+    );
+    planReq.flush({ committed: 3, planning_task_status: 'completed' });
+
+    expect(userServiceStub.completeOnboarding).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/day', '2026-05-01']);
+
+    httpTesting.verify();
   });
+
+  it('button shows "Saving…" text and is disabled during submission', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    // isSubmitting is a protected signal; (as any) cast required since it
+    // cannot be triggered via DOM without async HTTP mocking.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).isSubmitting.set(true);
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeTrue();
+    expect(btn?.textContent).toContain('Saving');
+  });
+
+  // ── Error state ─────────────────────────────────────────────────────────────
+
+  it('error banner is hidden initially', () => {
+    const err: HTMLElement = fixture.nativeElement.querySelector('.commit-error');
+    expect(err).toBeNull();
+  });
+
+  it('error banner appears when commitError is true', () => {
+    // commitError is a protected signal; (as any) cast required since it
+    // cannot be triggered via DOM without async HTTP mocking.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).commitError.set(true);
+    fixture.detectChanges();
+    const err: HTMLElement = fixture.nativeElement.querySelector('.commit-error');
+    expect(err).toBeTruthy();
+    expect(err?.textContent).toContain('Something went wrong');
+  });
+
+  it('commitPlan() shows error banner and re-enables CTA when /schedule/plan fails', fakeAsync(() => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+
+    fixture.componentInstance.commitPlan();
+    fixture.detectChanges();
+
+    const planReq = httpTesting.expectOne(req =>
+      req.method === 'POST' && req.url.includes('/schedule/plan')
+    );
+    planReq.flush('Server Error', { status: 500, statusText: 'Internal Server Error' });
+    tick();
+    fixture.detectChanges();
+
+    // CTA re-enables
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeFalse();
+
+    // error banner visible
+    const err: HTMLElement = fixture.nativeElement.querySelector('.commit-error');
+    expect(err).toBeTruthy();
+    expect(err?.textContent).toContain('Something went wrong');
+
+    httpTesting.verify();
+  }));
 });
