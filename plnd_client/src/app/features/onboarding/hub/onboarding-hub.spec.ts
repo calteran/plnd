@@ -100,6 +100,20 @@ describe('OnboardingHubComponent', () => {
     expect(text).toContain('Exercise');
   });
 
+  // ── Hub subtitle ────────────────────────────────────────────────────────────
+
+  it('hub subtitle reads "Complete sections in any order"', () => {
+    const subtitle: HTMLElement = fixture.nativeElement.querySelector('.hub-subtitle');
+    expect(subtitle?.textContent?.trim()).toBe('Complete sections in any order');
+  });
+
+  // ── Section descriptions ────────────────────────────────────────────────────
+
+  it('Account section description is "Display name and notifications"', () => {
+    const descs: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.card-desc');
+    expect(descs[0].textContent?.trim()).toBe('Display name and notifications');
+  });
+
   // ── Badge initial state ─────────────────────────────────────────────────────
 
   it('active section badges initially have badge--muted class', () => {
@@ -170,6 +184,29 @@ describe('OnboardingHubComponent', () => {
     expect(cards[1].classList).not.toContain('section-card--done');
   });
 
+  // ── Stats banner ────────────────────────────────────────────────────────────
+
+  it('stats banner is hidden when no sections are complete', () => {
+    const banner: HTMLElement = fixture.nativeElement.querySelector('.stats-banner');
+    expect(banner).toBeNull();
+  });
+
+  it('stats banner appears when all 3 sections are complete', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const banner: HTMLElement = fixture.nativeElement.querySelector('.stats-banner');
+    expect(banner).toBeTruthy();
+    expect(banner.querySelector('.stats-heading')?.textContent?.trim()).toBe('Everything looks good');
+  });
+
+  it('stats banner shows stat labels: Routines, Tasks, Meals, Days', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const labels: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.stat-label');
+    const texts = Array.from(labels).map((el: HTMLElement) => el.textContent?.trim());
+    expect(texts).toEqual(['Routines', 'Tasks', 'Meals', 'Days']);
+  });
+
   // ── CTA button state ────────────────────────────────────────────────────────
 
   it('CTA has btn--ghost style when 0 sections are complete', () => {
@@ -193,6 +230,76 @@ describe('OnboardingHubComponent', () => {
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
     expect(btn.classList).toContain('btn--accent');
     expect(btn.classList).not.toContain('btn--ghost');
+  });
+
+  // ── Skip button ──────────────────────────────────────────────────────────────
+
+  it('skip button is visible when sections are incomplete', () => {
+    const skip: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-skip');
+    expect(skip).toBeTruthy();
+  });
+
+  it('skip button is absent when all sections are complete', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const skip: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-skip');
+    expect(skip).toBeNull();
+  });
+
+  // ── Skip modal ──────────────────────────────────────────────────────────────
+
+  it('skip modal is not shown initially', () => {
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeNull();
+  });
+
+  it('clicking Skip button opens the skip modal', () => {
+    const skip: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-skip');
+    skip.click();
+    fixture.detectChanges();
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeTruthy();
+  });
+
+  it('"Keep going" button dismisses the skip modal', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).showSkipModal.set(true);
+    fixture.detectChanges();
+    const keepGoing: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-ghost-amber');
+    keepGoing.click();
+    fixture.detectChanges();
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeNull();
+  });
+
+  it('"Skip for now" navigates to /day/<today>', () => {
+    spyOn(router, 'navigate');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).showSkipModal.set(true);
+    fixture.detectChanges();
+    const skipBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-gray-primary');
+    skipBtn.click();
+    const today = new Date().toISOString().split('T')[0];
+    expect(router.navigate).toHaveBeenCalledWith(['/day', today]);
+  });
+
+  it('Escape key closes the skip modal', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).showSkipModal.set(true);
+    fixture.detectChanges();
+    fixture.componentInstance.onEscapeKey();
+    fixture.detectChanges();
+    const modal: HTMLElement = fixture.nativeElement.querySelector('.modal-backdrop');
+    expect(modal).toBeNull();
+  });
+
+  it('skip modal has role="dialog" and aria-modal="true"', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).showSkipModal.set(true);
+    fixture.detectChanges();
+    const card: HTMLElement = fixture.nativeElement.querySelector('.modal-card');
+    expect(card?.getAttribute('role')).toBe('dialog');
+    expect(card?.getAttribute('aria-modal')).toBe('true');
   });
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -230,17 +337,59 @@ describe('OnboardingHubComponent', () => {
     expect(router.navigate).not.toHaveBeenCalled();
   });
 
-  it('clicking CTA navigates to /onboarding/review', () => {
-    spyOn(router, 'navigate');
+  // ── CTA behavior ────────────────────────────────────────────────────────────
+
+  it('CTA shows "Approve Plan" text', () => {
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
-    btn.click();
-    expect(router.navigate).toHaveBeenCalledWith(['/onboarding/review']);
+    expect(btn?.textContent).toContain('Approve Plan');
   });
 
-  // ── Footer note ─────────────────────────────────────────────────────────────
+  it('"Approve Plan →" is disabled (ghost) when sections are incomplete', () => {
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeTrue();
+    expect(btn?.classList).toContain('btn--ghost');
+  });
 
-  it('renders the "weekly planning wizard" footer note', () => {
-    const note: HTMLElement = fixture.nativeElement.querySelector('.hub-note');
-    expect(note?.textContent).toContain('weekly planning wizard');
+  it('"Approve Plan →" is enabled amber primary when all sections complete', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeFalse();
+    expect(btn?.classList).toContain('btn--accent');
+  });
+
+  it('clicking "Approve Plan →" calls commitPlan() when all sections complete', () => {
+    spyOn(fixture.componentInstance, 'commitPlan');
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    btn.click();
+    expect(fixture.componentInstance.commitPlan).toHaveBeenCalled();
+  });
+
+  it('button shows "Saving…" text and is disabled during submission', () => {
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).isSubmitting.set(true);
+    fixture.detectChanges();
+    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
+    expect(btn?.disabled).toBeTrue();
+    expect(btn?.textContent).toContain('Saving');
+  });
+
+  // ── Error state ─────────────────────────────────────────────────────────────
+
+  it('error banner is hidden initially', () => {
+    const err: HTMLElement = fixture.nativeElement.querySelector('.commit-error');
+    expect(err).toBeNull();
+  });
+
+  it('error banner appears when commitError is true', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (fixture.componentInstance as any).commitError.set(true);
+    fixture.detectChanges();
+    const err: HTMLElement = fixture.nativeElement.querySelector('.commit-error');
+    expect(err).toBeTruthy();
+    expect(err?.textContent).toContain('Something went wrong');
   });
 });
