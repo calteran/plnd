@@ -73,6 +73,21 @@ async function landAtScheduleTypes(page: Page): Promise<void> {
   await expect(page.locator('.schedule-types-substep')).toBeVisible();
 }
 
+// Drives from hub to the Routines & Tasks substep.
+// Caller must have already set up the /schedule/templates route.
+// This helper registers /schedule-types itself.
+async function landAtRoutinesTasks(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/schedule-types`, route =>
+    route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+  );
+  await page.locator('.section-card').nth(1).click();
+  await expect(page.locator('.planning-prefs')).toBeVisible();
+  await page.locator('.planning-prefs .save-btn').click();
+  await expect(page.locator('.schedule-types-substep')).toBeVisible();
+  await page.locator('.schedule-types-substep .save-btn').click();
+  await expect(page.locator('.routines-tasks-substep')).toBeVisible();
+}
+
 async function completeFoodSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/meal-habits`, route =>
     route.fulfill({ status: 200, json: [] })
@@ -515,6 +530,67 @@ test.describe('Onboarding', () => {
       await firstCard.locator('.cycle-toggle-link').click();
       await expect(firstCard.locator('.day-pill')).toHaveCount(7);
       await expect(firstCard.locator('.cycle-toggle-link')).toHaveText('Non-7-day schedule?');
+    });
+  });
+
+  test.describe('Tasks spoke — Routines & Tasks', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/schedule/templates`, route => {
+        if (route.request().method() === 'POST') {
+          route.fulfill({ status: 201, json: MOCK_TEMPLATE_MORNING_WALK });
+        } else {
+          route.fulfill({ status: 200, json: [] });
+        }
+      });
+      await page.goto('/onboarding');
+      await landAtRoutinesTasks(page);
+    });
+
+    test('add routine via form: name + recurrence chip appears', async ({ page }) => {
+      // Override the POST mock to return a template matching what the form submitted.
+      await page.route(`${API_BASE}/schedule/templates`, route => {
+        if (route.request().method() === 'POST') {
+          route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning yoga' } });
+        } else {
+          route.fulfill({ status: 200, json: [] });
+        }
+      });
+
+      await page.locator('[aria-label="Routine name"]').fill('Morning yoga');
+      await page.locator('.add-btn').first().click();
+
+      const routineChips = page.locator('[aria-label="Added routines"] .routine-chip');
+      await expect(routineChips).toHaveCount(1);
+      await expect(routineChips.nth(0)).toContainText('Morning yoga');
+      await expect(routineChips.nth(0)).toContainText('daily');
+    });
+
+    test('add routine via inspiration chip (Morning walk)', async ({ page }) => {
+      await page.locator('.inspiration-chip').filter({ hasText: 'Morning walk' }).click();
+
+      const routineChips = page.locator('[aria-label="Added routines"] .routine-chip');
+      await expect(routineChips).toHaveCount(1);
+      await expect(routineChips.nth(0)).toContainText('Morning walk');
+      await expect(page.locator('.inspiration-chip').filter({ hasText: 'Morning walk' })).not.toBeVisible();
+    });
+
+    test('tap chip opens inline recurrence editor', async ({ page }) => {
+      await page.locator('[aria-label="Routine name"]').fill('Morning yoga');
+      await page.locator('.add-btn').first().click();
+
+      await page.locator('.chip-body--clickable').click();
+      await expect(page.locator('.routine-edit-card')).toBeVisible();
+    });
+
+    test('add upcoming task appears as chip without recurrence label', async ({ page }) => {
+      await page.locator('[aria-label="Task name"]').fill('Buy groceries');
+      await page.locator('.add-btn').last().click();
+
+      const taskChips = page.locator('[aria-label="Added tasks"] .routine-chip');
+      await expect(taskChips).toHaveCount(1);
+      await expect(taskChips.nth(0)).toContainText('Buy groceries');
+      await expect(taskChips.nth(0)).not.toContainText('·');
     });
   });
 });
