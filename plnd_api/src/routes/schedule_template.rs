@@ -14,6 +14,17 @@ use plnd_data::Error;
 use std::sync::Arc;
 use uuid::Uuid;
 
+/// Returns 422 if `rule` is `Some` but does not begin with `FREQ=`.
+/// Uppercase-only: RFC 5545 canonical form; the frontend always generates uppercase.
+fn validate_recurrence_rule(rule: Option<&str>) -> Result<(), StatusCode> {
+    if let Some(r) = rule {
+        if !r.starts_with("FREQ=") {
+            return Err(StatusCode::UNPROCESSABLE_ENTITY);
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct UpdateScheduleTemplateRequest {
     pub title: String,
@@ -84,7 +95,7 @@ pub async fn list_templates(
     responses(
         (status = 201, description = "Template created", body = ScheduleTemplateResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 422, description = "Invalid task_type, recurrence, energy_required, or empty title"),
+        (status = 422, description = "Invalid task_type, recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -106,6 +117,7 @@ pub async fn create_template(
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
+    validate_recurrence_rule(body.recurrence_rule.as_deref())?;
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
@@ -185,7 +197,7 @@ pub async fn delete_template(
         (status = 200, description = "Template updated", body = ScheduleTemplateResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Template not found or not owned by current user"),
-        (status = 422, description = "Invalid recurrence, energy_required, or empty title"),
+        (status = 422, description = "Invalid recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -205,6 +217,7 @@ pub async fn update_template(
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
+    validate_recurrence_rule(body.recurrence_rule.as_deref())?;
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
@@ -273,5 +286,34 @@ mod tests {
             assert!(VALID_ENERGY_LEVELS.contains(e), "missing energy: {e}");
         }
         assert!(!VALID_ENERGY_LEVELS.contains(&"extreme"));
+    }
+
+    #[test]
+    fn recurrence_rule_valid_rrule_accepted() {
+        for rule in &[
+            "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+            "FREQ=DAILY",
+            "FREQ=MONTHLY;BYMONTHDAY=1",
+        ] {
+            assert!(
+                validate_recurrence_rule(Some(rule)).is_ok(),
+                "should accept: {rule}"
+            );
+        }
+    }
+
+    #[test]
+    fn recurrence_rule_invalid_format_rejected() {
+        for rule in &["garbage", "", "BYDAY=MO", "freq=weekly"] {
+            assert!(
+                validate_recurrence_rule(Some(rule)).is_err(),
+                "should reject: {rule}"
+            );
+        }
+    }
+
+    #[test]
+    fn recurrence_rule_none_is_always_valid() {
+        assert!(validate_recurrence_rule(None).is_ok());
     }
 }
