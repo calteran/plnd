@@ -133,6 +133,20 @@ async function landAtMealTimes(page: Page): Promise<void> {
   await expect(page.locator('.meal-times')).toBeVisible();
 }
 
+async function landAtDietaryPreferences(page: Page): Promise<void> {
+  await landAtMealTimes(page);
+  await page.locator('.btn-continue').click();
+  await expect(page.locator('.restrictions-substep')).toBeVisible();
+  await page.locator('.btn-continue').click();
+  await expect(page.locator('.prefs-substep')).toBeVisible();
+}
+
+async function landAtMealHabits(page: Page): Promise<void> {
+  await landAtDietaryPreferences(page);
+  await page.locator('.btn-continue').click();
+  await expect(page.locator('.meal-habits')).toBeVisible();
+}
+
 async function completeFoodSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/meal-habits`, route =>
     route.fulfill({ status: 200, json: [] })
@@ -770,6 +784,77 @@ test.describe('Onboarding', () => {
       await page.locator('.btn-cancel').click();
       await expect(page.locator('.card-edit')).not.toBeVisible();
       await expect(page.locator('.card-default')).toBeVisible();
+    });
+  });
+
+  test.describe('Food spoke — Dietary Preferences', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.goto('/onboarding');
+      await landAtDietaryPreferences(page);
+    });
+
+    test('Lifestyle panel is collapsed by default; expands on click', async ({ page }) => {
+      await expect(page.locator('.lifestyle-expanded')).not.toBeVisible();
+      await page.locator('.section-header').first().click();
+      await expect(page.locator('.lifestyle-expanded')).toBeVisible();
+    });
+
+    test('selecting Vegan chip marks it amber', async ({ page }) => {
+      await page.locator('.section-header').first().click();
+      await expect(page.locator('.lifestyle-expanded')).toBeVisible();
+      const veganChip = page.locator('.chip').filter({ hasText: 'Vegan' });
+      await veganChip.click();
+      await expect(veganChip).toHaveClass(/chip--amber/);
+    });
+  });
+
+  test.describe('Food spoke — Meal Habits', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/meal-habits`, route => {
+        if (route.request().method() === 'POST') {
+          route.fulfill({ status: 201, json: MOCK_MEAL_HABIT });
+        } else {
+          route.fulfill({ status: 200, json: [] });
+        }
+      });
+      await page.goto('/onboarding');
+      await landAtMealHabits(page);
+    });
+
+    test('add Oatmeal for Breakfast → appears as habit chip', async ({ page }) => {
+      await page.locator('.meal-habits .name-input').fill('Oatmeal');
+      await expect(page.locator('.pills-row .pill').filter({ hasText: 'Breakfast' })).toHaveClass(/pill--active/);
+      await page.locator('.btn-add').click();
+
+      await expect(page.locator('.habit-chip')).toHaveCount(1);
+      await expect(page.locator('.habit-chip').first()).toContainText('Oatmeal');
+    });
+
+    test('conflict warning when adding second Breakfast/Every day entry', async ({ page }) => {
+      // Override the GET mock (LIFO — this wins over the beforeEach handler) and reload
+      // so habitsService picks up the existing Oatmeal habit before we navigate.
+      await page.route(`${API_BASE}/meal-habits`, route => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({ status: 200, json: [MOCK_MEAL_HABIT] });
+        } else {
+          route.fulfill({ status: 201, json: { ...MOCK_MEAL_HABIT, id: 'habit-2', meal_name: 'Granola' } });
+        }
+      });
+
+      // Navigate fresh so habitsService.load() fires against the new GET mock.
+      await page.goto('/onboarding');
+      await landAtMealHabits(page);
+
+      // Default slot = Breakfast, default recurrence = Every day → conflict fires on load.
+      await expect(page.locator('.conflict-warning')).toBeVisible();
+      await expect(page.locator('.conflict-warning')).toContainText('Oatmeal');
+      await expect(page.locator('.btn-add')).toContainText('Add anyway');
+
+      await page.locator('.meal-habits .name-input').fill('Granola');
+      await page.locator('.btn-add').click();
+      await expect(page.locator('.habit-chip')).toHaveCount(2);
     });
   });
 });
