@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use axum::{
+    Json,
     extract::{Extension, Query, State},
     http::StatusCode,
-    Json,
 };
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};

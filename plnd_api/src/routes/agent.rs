@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use axum::{extract::State, http::StatusCode, Extension, Json};
+use axum::{Extension, Json, extract::State, http::StatusCode};
 use chrono::Utc;
-use plnd_agent::{xml_escape, AgentContext, AgentError, UseCase};
+use plnd_agent::{AgentContext, AgentError, UseCase, xml_escape};
 use uuid::Uuid;
 
 use crate::auth::jwt::Claims;

@@ -2,9 +2,9 @@ use crate::api_response::UserResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, State},
     http::StatusCode,
-    Json,
 };
 use std::sync::Arc;
 use uuid::Uuid;

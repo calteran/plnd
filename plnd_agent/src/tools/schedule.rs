@@ -681,10 +681,12 @@ mod tests {
         assert!(schema_requires_field(&schema, "date"));
         assert!(!schema_requires_user_id(&schema));
         // date property should exist
-        assert!(schema
-            .get("properties")
-            .and_then(|p| p.get("date"))
-            .is_some());
+        assert!(
+            schema
+                .get("properties")
+                .and_then(|p| p.get("date"))
+                .is_some()
+        );
     }
 
     #[test]

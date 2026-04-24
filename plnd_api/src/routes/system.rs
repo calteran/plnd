@@ -1,9 +1,9 @@
 use crate::models::ReadyStatus;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{ConnectInfo, State},
     http::{HeaderMap, StatusCode},
-    Json,
 };
 use chrono::Utc;
 use serde::Deserialize;

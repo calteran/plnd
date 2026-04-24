@@ -2,12 +2,12 @@ use crate::api_response::ScheduleTypeResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Path, State},
     http::StatusCode,
-    Json,
 };
 use chrono::{NaiveDate, NaiveTime};
-use plnd_data::{repository::schedule_type::DeleteScheduleTypeOutcome, Error};
+use plnd_data::{Error, repository::schedule_type::DeleteScheduleTypeOutcome};
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;

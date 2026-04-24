@@ -3,9 +3,9 @@ use crate::auth::jwt::Claims;
 use crate::models::PatchPreferencesRequest;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, State},
     http::StatusCode,
-    Json,
 };
 use std::sync::Arc;
 use uuid::Uuid;

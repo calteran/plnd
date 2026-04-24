@@ -1233,9 +1233,11 @@ mod tests {
         let schema = estimate_nutrition_from_description_schema();
         let required = schema["required"].as_array().unwrap();
         assert!(required.iter().any(|v| v.as_str() == Some("name")));
-        assert!(required
-            .iter()
-            .any(|v| v.as_str() == Some("inferred_ingredients")));
+        assert!(
+            required
+                .iter()
+                .any(|v| v.as_str() == Some("inferred_ingredients"))
+        );
     }
 
     #[test]

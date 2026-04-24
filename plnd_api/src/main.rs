@@ -2,9 +2,8 @@ mod telemetry;
 
 use axum::http::{HeaderName, HeaderValue, Method};
 use axum::{
-    middleware,
+    Router, middleware,
     routing::{delete, get, patch, post, put},
-    Router,
 };
 use governor::{Quota, RateLimiter};
 use opentelemetry::trace::TracerProvider;

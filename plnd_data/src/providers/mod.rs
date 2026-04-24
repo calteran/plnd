@@ -24,7 +24,7 @@ pub use weather::{OpenMeteoProvider, WeatherData, WeatherProvider};
 pub(crate) const USER_AGENT: &str = concat!("com.tingeese.plnd-dev/", env!("CARGO_PKG_VERSION"));
 
 pub(crate) fn build_http_client() -> reqwest::Client {
-    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT_LANGUAGE};
+    use reqwest::header::{ACCEPT_LANGUAGE, HeaderMap, HeaderValue};
 
     let mut headers = HeaderMap::new();
     headers.insert(ACCEPT_LANGUAGE, HeaderValue::from_static("en"));

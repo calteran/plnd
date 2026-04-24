@@ -1,5 +1,5 @@
 use plnd_api::routes::schedule_types::{
-    CreateScheduleTypeRequest, UpdateScheduleTypeRequest, MAX_NAME_LEN,
+    CreateScheduleTypeRequest, MAX_NAME_LEN, UpdateScheduleTypeRequest,
 };
 
 // ---------------------------------------------------------------------------

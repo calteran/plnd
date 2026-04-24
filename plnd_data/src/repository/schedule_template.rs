@@ -29,7 +29,7 @@ pub trait ScheduleTemplateRepository: Send + Sync {
     ) -> Result<ScheduleTemplate, crate::Error>;
 
     async fn delete_template(&self, user_id: Uuid, template_id: Uuid)
-        -> Result<bool, crate::Error>;
+    -> Result<bool, crate::Error>;
 
     #[allow(clippy::too_many_arguments)]
     async fn update_template(

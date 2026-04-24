@@ -1,9 +1,9 @@
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, State},
     http::{HeaderMap, StatusCode},
-    Json,
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

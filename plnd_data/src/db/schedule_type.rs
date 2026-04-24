@@ -6,8 +6,7 @@ use crate::db::error::DatabaseError;
 use crate::models::ScheduleType;
 use crate::repository::schedule_type::DeleteScheduleTypeOutcome;
 
-const COLUMNS: &str =
-    "id, user_id, name, days_bitmask, wake_time, bed_time, is_cycle, cycle_length, anchor_date, created_at";
+const COLUMNS: &str = "id, user_id, name, days_bitmask, wake_time, bed_time, is_cycle, cycle_length, anchor_date, created_at";
 
 /// List all schedule types for a user, ordered by created_at ascending.
 #[tracing::instrument(skip(pool), fields(table = "user_schedule_types", op = "list"))]

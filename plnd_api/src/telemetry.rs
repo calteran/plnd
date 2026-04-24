@@ -1,10 +1,10 @@
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
+    Resource,
     logs::SdkLoggerProvider,
     metrics::{PeriodicReader, SdkMeterProvider},
     trace::SdkTracerProvider,
-    Resource,
 };
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 

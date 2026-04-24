@@ -28,7 +28,7 @@ pub struct NewsQuery {
 #[async_trait]
 pub trait NewsProvider: Send + Sync {
     async fn headlines(&self, query: NewsQuery)
-        -> Result<Vec<NewsHeadline>, ExternalProviderError>;
+    -> Result<Vec<NewsHeadline>, ExternalProviderError>;
 }
 
 // ── Pure helpers ──────────────────────────────────────────────────────────────

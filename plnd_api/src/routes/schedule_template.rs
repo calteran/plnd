@@ -5,9 +5,9 @@ use crate::routes::domain_constants::{
 };
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Path, State},
     http::StatusCode,
-    Json,
 };
 use chrono::NaiveTime;
 use plnd_data::Error;

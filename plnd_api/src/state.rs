@@ -2,8 +2,8 @@ use crate::auth::{JwksCache, JwtService, SessionService};
 use crate::briefing::BriefingState;
 use governor::DefaultKeyedRateLimiter;
 use plnd_agent::AgentService;
-use plnd_data::search::ProviderSearchService;
 use plnd_data::Repositories;
+use plnd_data::search::ProviderSearchService;
 use std::sync::Arc;
 
 /// Shared application state available to all route handlers

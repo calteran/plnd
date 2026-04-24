@@ -1,5 +1,5 @@
-use plnd_data::providers::dtos::{ExternalDish, SearchQuery};
 use plnd_data::providers::RecipeProvider;
+use plnd_data::providers::dtos::{ExternalDish, SearchQuery};
 use sqlx::PgConnection;
 use std::collections::HashSet;
 use std::sync::Arc;

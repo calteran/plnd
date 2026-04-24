@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use futures::StreamExt;
-use plnd_data::cache::{make_cache_key, SearchCache};
+use plnd_data::cache::{SearchCache, make_cache_key};
 use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery, SearchResult};
 use plnd_data::providers::error::ExternalProviderError;
 use plnd_data::providers::nutrition::NutritionProvider;

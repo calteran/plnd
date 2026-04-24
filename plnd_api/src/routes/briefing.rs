@@ -1,9 +1,9 @@
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Query, State},
     http::StatusCode,
-    Json,
 };
 use chrono::{NaiveDate, Utc};
 use plnd_data::providers::{Location, NewsQuery};

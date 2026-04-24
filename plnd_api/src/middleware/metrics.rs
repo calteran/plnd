@@ -8,9 +8,8 @@
 //! is populated in request extensions. Falls back to the raw URI path if unavailable.
 
 use opentelemetry::{
-    global,
+    KeyValue, global,
     metrics::{Histogram, UpDownCounter},
-    KeyValue,
 };
 use opentelemetry_semantic_conventions::{
     attribute::{HTTP_REQUEST_METHOD, HTTP_RESPONSE_STATUS_CODE, HTTP_ROUTE},
@@ -152,10 +151,10 @@ where
 mod tests {
     use super::*;
     use axum::{
+        Router,
         body::Body,
         http::{Request, StatusCode},
         routing::get,
-        Router,
     };
     use tower::ServiceExt;
 

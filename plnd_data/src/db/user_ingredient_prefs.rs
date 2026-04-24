@@ -71,7 +71,7 @@ pub async fn delete(
 mod tests {
     use super::*;
     use crate::db::{
-        catalog_ingest::{ingest_ingredient, IngestIngredientParams},
+        catalog_ingest::{IngestIngredientParams, ingest_ingredient},
         users,
     };
 

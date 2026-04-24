@@ -2,9 +2,9 @@ use crate::api_response::DietaryRestrictionResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Path, State},
     http::StatusCode,
-    Json,
 };
 use plnd_data::Error;
 use std::sync::Arc;
