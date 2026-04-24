@@ -157,6 +157,8 @@ export interface PostSchedulePlanRequest {
   replace?: boolean;
   /** Carryover decisions: entry_id → "defer" | "dismiss" | "accept" */
   carryover_decisions?: Record<string, CarryoverDecision>;
+  placed_tasks?: PlanEntryRequest[];
+  meal_habit_ids?: string[];
 }
 
 export interface PostSchedulePlanResponse {

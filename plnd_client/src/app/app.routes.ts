@@ -52,11 +52,6 @@ export const routes: Routes = [
         path: 'food',
         loadComponent: () =>
           import('./features/onboarding/food/onboarding-food').then(m => m.OnboardingFoodComponent)
-      },
-      {
-        path: 'review',
-        loadComponent: () =>
-          import('./features/onboarding/review/onboarding-review').then(m => m.OnboardingReviewComponent)
       }
     ]
   },
