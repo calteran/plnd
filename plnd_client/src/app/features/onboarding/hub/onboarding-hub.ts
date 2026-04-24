@@ -1,4 +1,5 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { switchMap } from 'rxjs/operators';
@@ -20,6 +21,7 @@ interface HubSection {
   disabled: boolean;
 }
 
+// No planning task exists in the onboarding flow — the DB UPDATE silently no-ops on a nil UUID.
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 const SLOT_DEFAULT_TIME: Record<string, string> = {
   breakfast: '08:00',
@@ -172,8 +174,8 @@ const HUB_SECTIONS: HubSection[] = [
 
     @if (showSkipModal()) {
       <div class="modal-backdrop" (click)="showSkipModal.set(false)">
-        <div class="modal-card" (click)="$event.stopPropagation()">
-          <h2 class="modal-title">Skip setup for now?</h2>
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="skip-modal-title" (click)="$event.stopPropagation()">
+          <h2 id="skip-modal-title" class="modal-title">Skip setup for now?</h2>
           <p class="modal-body">Your progress is saved. You can add more detail anytime from <strong>Settings</strong>.</p>
           <div class="modal-actions">
             <button class="btn-ghost-amber" type="button" (click)="showSkipModal.set(false)">
@@ -530,13 +532,21 @@ export class OnboardingHubComponent {
   private readonly http = inject(HttpClient);
   private readonly config = inject(ConfigService);
   private readonly userService = inject(UserService);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly isSubmitting = signal(false);
   protected readonly commitError  = signal(false);
   protected readonly showSkipModal = signal(false);
 
-  readonly sections = HUB_SECTIONS;
-  readonly allDone = this.onboardingState.allSectionsComplete;
+  protected readonly sections = HUB_SECTIONS;
+  protected readonly allDone = this.onboardingState.allSectionsComplete;
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.showSkipModal()) {
+      this.showSkipModal.set(false);
+    }
+  }
 
   statusFor(section: HubSection): 'not-started' | 'complete' | null {
     if (section.disabled) return null;
@@ -577,9 +587,15 @@ export class OnboardingHubComponent {
 
     const apiBase = this.config.getConfig().api.baseUrl;
     this.http.post<PostSchedulePlanResponse>(`${apiBase}/schedule/plan`, body)
-      .pipe(switchMap(() => this.userService.completeOnboarding()))
+      .pipe(
+        switchMap(() => this.userService.completeOnboarding()),
+        takeUntilDestroyed(this.destroyRef),
+      )
       .subscribe({
-        next: () => this.router.navigate(['/day', period.start]),
+        next: () => {
+          this.isSubmitting.set(false);
+          this.router.navigate(['/day', period.start]);
+        },
         error: () => {
           this.isSubmitting.set(false);
           this.commitError.set(true);

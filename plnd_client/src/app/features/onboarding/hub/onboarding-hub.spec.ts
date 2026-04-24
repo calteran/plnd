@@ -1,8 +1,13 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { of } from 'rxjs';
 import { OnboardingHubComponent } from './onboarding-hub';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
+import { UserService } from '../../../core/services/user.service';
+import { ConfigService } from '../../../core/services/config.service';
 
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
@@ -21,6 +26,14 @@ function makeStateMock() {
         allCompleteSignal.set(true);
       }
     }),
+    totalRoutines: signal(0).asReadonly(),
+    totalTasks: signal(0).asReadonly(),
+    totalMeals: signal(0).asReadonly(),
+    planDays: signal(0).asReadonly(),
+    planPeriod: signal(null).asReadonly(),
+    mealPlan: signal(null).asReadonly(),
+    placedTasks: signal([]).asReadonly(),
+    mealHabits: signal([]).asReadonly(),
   };
 }
 
@@ -35,6 +48,10 @@ describe('OnboardingHubComponent', () => {
       imports: [OnboardingHubComponent],
       providers: [
         { provide: OnboardingStateService, useValue: stateMock },
+        { provide: UserService, useValue: { completeOnboarding: () => of(undefined) } },
+        { provide: ConfigService, useValue: { getConfig: () => ({ api: { baseUrl: 'http://localhost:3000' } }) } },
+        provideHttpClient(),
+        provideHttpClientTesting(),
         provideRouter([]),
       ],
     }).compileComponents();
