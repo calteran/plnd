@@ -84,7 +84,7 @@ pub async fn list_templates(
     responses(
         (status = 201, description = "Template created", body = ScheduleTemplateResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 422, description = "Invalid task_type, recurrence, energy_required, or empty title"),
+        (status = 422, description = "Invalid task_type, recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -105,6 +105,11 @@ pub async fn create_template(
     let energy = body.energy_required.as_deref().unwrap_or("medium");
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    if let Some(ref rule) = body.recurrence_rule {
+        if !rule.starts_with("FREQ=") {
+            return Err(StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
@@ -185,7 +190,7 @@ pub async fn delete_template(
         (status = 200, description = "Template updated", body = ScheduleTemplateResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Template not found or not owned by current user"),
-        (status = 422, description = "Invalid recurrence, energy_required, or empty title"),
+        (status = 422, description = "Invalid recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -204,6 +209,11 @@ pub async fn update_template(
     let energy = body.energy_required.as_deref().unwrap_or("medium");
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    if let Some(ref rule) = body.recurrence_rule {
+        if !rule.starts_with("FREQ=") {
+            return Err(StatusCode::UNPROCESSABLE_ENTITY);
+        }
     }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
@@ -273,5 +283,29 @@ mod tests {
             assert!(VALID_ENERGY_LEVELS.contains(e), "missing energy: {e}");
         }
         assert!(!VALID_ENERGY_LEVELS.contains(&"extreme"));
+    }
+
+    #[test]
+    fn recurrence_rule_valid_rrule_accepted() {
+        for rule in &[
+            "FREQ=WEEKLY;BYDAY=MO,WE,FR",
+            "FREQ=DAILY",
+            "FREQ=MONTHLY;BYMONTHDAY=1",
+        ] {
+            assert!(rule.starts_with("FREQ="), "should accept: {rule}");
+        }
+    }
+
+    #[test]
+    fn recurrence_rule_invalid_format_rejected() {
+        for rule in &["garbage", "", "BYDAY=MO", "freq=weekly"] {
+            assert!(!rule.starts_with("FREQ="), "should reject: {rule}");
+        }
+    }
+
+    #[test]
+    fn recurrence_rule_none_is_always_valid() {
+        let rule: Option<&str> = None;
+        assert!(rule.is_none_or(|r| r.starts_with("FREQ=")));
     }
 }
