@@ -365,4 +365,42 @@ test.describe('Onboarding', () => {
       await expect(page.locator('.btn-cta.btn--accent')).toBeEnabled();
     });
   });
+
+  test.describe('Account spoke', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/users/me`, route => {
+        if (route.request().method() === 'PATCH') {
+          route.fulfill({ status: 200, json: { ...MOCK_USER_NEW, display_name: 'Test User' } });
+        } else {
+          route.fulfill({ status: 200, json: MOCK_USER_NEW });
+        }
+      });
+      await page.goto('/onboarding/account');
+      await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
+    });
+
+    test('display name input is empty (user has no display_name)', async ({ page }) => {
+      await expect(page.locator('#displayName')).toHaveValue('');
+    });
+
+    test('email is shown as static text from user data', async ({ page }) => {
+      await expect(page.locator('.email-display')).toHaveText('testuser@mock.plnd');
+    });
+
+    test('SMS input is hidden until SMS toggle is switched on', async ({ page }) => {
+      await expect(page.locator('[aria-label="Phone number"]')).not.toBeVisible();
+      await page.locator('[aria-label="SMS notifications"]').check();
+      await expect(page.locator('[aria-label="Phone number"]')).toBeVisible();
+    });
+
+    test('Save & Continue → navigates to hub and marks account complete', async ({ page }) => {
+      await page.locator('#displayName').fill('Test User');
+      await page.locator('.btn-continue').click();
+      await expect(page).toHaveURL(/\/onboarding$/);
+
+      const accountCard = page.locator('.section-card').first();
+      await expect(accountCard.locator('.card-badge.badge--done')).toContainText('✓ done');
+    });
+  });
 });
