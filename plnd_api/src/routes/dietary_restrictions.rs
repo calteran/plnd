@@ -22,7 +22,7 @@ pub struct UpdateRestrictionRequest {
     pub notes: Option<String>,
 }
 
-pub const VALID_TYPES: &[&str] = &["allergy", "intolerance", "preference"];
+pub const VALID_TYPES: &[&str] = &["allergy", "intolerance", "preference", "cultural_religious"];
 pub const MAX_NAME_LEN: usize = 100;
 pub const MAX_NOTES_LEN: usize = 500;
 

@@ -109,6 +109,7 @@ import {
                 <option value="allergy">Allergy</option>
                 <option value="intolerance">Intolerance</option>
                 <option value="preference">Preference</option>
+                <option value="cultural_religious">Cultural / Religious</option>
               </select>
             </div>
 
@@ -344,7 +345,8 @@ export class DietaryRestrictionsComponent implements OnInit {
     return {
       allergy: items.filter(i => i.restriction_type === 'allergy'),
       intolerance: items.filter(i => i.restriction_type === 'intolerance'),
-      preference: items.filter(i => i.restriction_type === 'preference')
+      preference: items.filter(i => i.restriction_type === 'preference'),
+      cultural_religious: items.filter(i => i.restriction_type === 'cultural_religious'),
     };
   });
 

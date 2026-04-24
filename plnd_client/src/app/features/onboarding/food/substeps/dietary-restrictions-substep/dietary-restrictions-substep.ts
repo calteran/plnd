@@ -2,16 +2,7 @@ import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angula
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { RestrictionType } from '../../../../../core/models/dietary-restriction';
 
-// Display-only union — 'cultural_religious' maps to 'preference' for the API.
-// Backend migration to add 'cultural_religious' to DB constraint is tracked in
-// https://github.com/calteran/plnd/issues/559
 type DisplayRestrictionType = 'allergy' | 'intolerance' | 'cultural_religious';
-
-const API_TYPE_MAP: Record<DisplayRestrictionType, RestrictionType> = {
-  allergy: 'allergy',
-  intolerance: 'intolerance',
-  cultural_religious: 'preference',
-};
 
 const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: string; badgeColor: string; badgeBg: string }> = {
   allergy:            { label: 'Allergy',             borderColor: '#fca5a5', badgeColor: '#dc2626', badgeBg: '#fee2e2' },
@@ -140,11 +131,9 @@ export class DietaryRestrictionsSubstepComponent implements OnInit {
   }
 
   displayTypeFor(apiType: RestrictionType): DisplayRestrictionType {
-    // No way to distinguish 'preference' saved as cultural_religious vs plain preference;
-    // display all 'preference' items under cultural_religious as the closest match.
-    return apiType === 'allergy' ? 'allergy'
-         : apiType === 'intolerance' ? 'intolerance'
-         : 'cultural_religious';
+    if (apiType === 'allergy') return 'allergy';
+    if (apiType === 'intolerance') return 'intolerance';
+    return 'cultural_religious'; // covers 'cultural_religious' and legacy 'preference' data
   }
 
   add(): void {
@@ -153,7 +142,7 @@ export class DietaryRestrictionsSubstepComponent implements OnInit {
     this.addError.set(false);
     this.restrictionsService
       .create({
-        restriction_type: API_TYPE_MAP[this.selectedDisplayType()],
+        restriction_type: this.selectedDisplayType(),
         name,
         ...(this.newNote().trim() ? { notes: this.newNote().trim() } : {}),
       })

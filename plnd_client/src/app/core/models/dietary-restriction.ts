@@ -1,6 +1,6 @@
-export type RestrictionType = 'allergy' | 'intolerance' | 'preference';
+export type RestrictionType = 'allergy' | 'intolerance' | 'preference' | 'cultural_religious';
 
-export const RESTRICTION_TYPES: RestrictionType[] = ['allergy', 'intolerance', 'preference'];
+export const RESTRICTION_TYPES: RestrictionType[] = ['allergy', 'intolerance', 'preference', 'cultural_religious'];
 
 export interface DietaryRestriction {
   restriction_id: string;
