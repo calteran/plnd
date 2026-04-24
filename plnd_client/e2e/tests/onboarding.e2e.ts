@@ -403,4 +403,53 @@ test.describe('Onboarding', () => {
       await expect(accountCard.locator('.card-badge.badge--done')).toContainText('✓ done');
     });
   });
+
+  test.describe('Planning Prefs (shared)', () => {
+    test('shown on first entry into Tasks spoke', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.goto('/onboarding/tasks');
+      await expect(page.locator('.planning-prefs')).toBeVisible();
+      await expect(page.locator('.dot')).toHaveCount(4);
+      await expect(page.locator('.dot.dot--current')).toHaveCount(1);
+    });
+
+    test('skipped on Food after Tasks spoke completed planning prefs', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/meal-habits`, route =>
+        route.fulfill({ status: 200, json: [] })
+      );
+
+      await page.goto('/onboarding');
+      await completeTasksSpoke(page);
+
+      await page.locator('.section-card').nth(2).click();
+      await expect(page.locator('.spoke-title')).toHaveText('Food & Meals');
+      await expect(page.locator('.planning-prefs')).not.toBeVisible();
+      await expect(page.locator('.meal-times')).toBeVisible();
+    });
+
+    test('shown on first entry into Food spoke; skipped on Tasks entered after', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/schedule-types`, route =>
+        route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+      );
+      await page.route(`${API_BASE}/schedule/templates`, route =>
+        route.fulfill({ status: 200, json: [] })
+      );
+
+      await page.goto('/onboarding/food');
+      await expect(page.locator('.planning-prefs')).toBeVisible();
+
+      await page.locator('.planning-prefs .save-btn').click();
+      await expect(page.locator('.meal-times')).toBeVisible();
+
+      await page.locator('.hub-link').click();
+      await expect(page).toHaveURL(/\/onboarding$/);
+      await page.locator('.section-card').nth(1).click();
+      await expect(page.locator('.spoke-title')).toHaveText('Tasks & Routines');
+
+      await expect(page.locator('.planning-prefs')).not.toBeVisible();
+      await expect(page.locator('.schedule-types-substep')).toBeVisible();
+    });
+  });
 });
