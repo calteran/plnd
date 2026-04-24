@@ -11,6 +11,94 @@ import {
   seedOnboarding,
 } from '../helpers/onboarding-mocks';
 
+// ── Spoke completion helpers ──────────────────────────────────────────────────
+
+async function completeAccountSpoke(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/users/me`, route => {
+    if (route.request().method() === 'PATCH') {
+      route.fulfill({ status: 200, json: { ...MOCK_USER_NEW, display_name: 'Test' } });
+    } else {
+      route.fulfill({ status: 200, json: MOCK_USER_NEW });
+    }
+  });
+  await page.locator('.section-card').first().click();
+  await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
+  await page.locator('.btn-continue').click();
+  await expect(page).toHaveURL(/\/onboarding$/);
+}
+
+async function completeTasksSpoke(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/schedule-types`, route =>
+    route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+  );
+  await page.route(`${API_BASE}/schedule/templates`, route => {
+    if (route.request().method() === 'POST') {
+      route.fulfill({ status: 201, json: MOCK_TEMPLATE_MORNING_WALK });
+    } else {
+      route.fulfill({ status: 200, json: [] });
+    }
+  });
+  await page.route(`${API_BASE}/agent/place-tasks`, route =>
+    route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+  );
+
+  await page.locator('.section-card').nth(1).click();
+  await expect(page.locator('.spoke-title')).toHaveText('Tasks & Routines');
+
+  // Step 1: Planning Prefs
+  await expect(page.locator('.planning-prefs')).toBeVisible();
+  await page.locator('.planning-prefs .save-btn').click();
+
+  // Step 2: Schedule Types
+  await expect(page.locator('.schedule-types-substep')).toBeVisible();
+  await page.locator('.schedule-types-substep .save-btn').click();
+
+  // Step 3: Routines & Tasks
+  await expect(page.locator('.routines-tasks-substep')).toBeVisible();
+  await page.locator('.routines-tasks-substep .save-btn').click();
+
+  // Step 4: Task Placement Review (host div class is "placement-review")
+  await expect(page.locator('.placement-review')).toBeVisible();
+  await page.locator('.placement-review .save-btn').click();
+
+  await expect(page).toHaveURL(/\/onboarding$/);
+}
+
+async function completeFoodSpoke(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/meal-habits`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
+  await page.route(`${API_BASE}/agent/meal-plan`, route =>
+    route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
+  );
+
+  await page.locator('.section-card').nth(2).click();
+  await expect(page.locator('.spoke-title')).toHaveText('Food & Meals');
+
+  // planningPrefsComplete=true after Tasks, so Food starts at Meal Times (internalStep=1)
+  // Step 1: Meal Times
+  await expect(page.locator('.meal-times')).toBeVisible();
+  await page.locator('.btn-continue').click();
+
+  // Step 2: Dietary Restrictions
+  await expect(page.locator('.restrictions-substep')).toBeVisible();
+  await page.locator('.btn-continue').click();
+
+  // Step 3: Dietary Preferences
+  await expect(page.locator('.prefs-substep')).toBeVisible();
+  await page.locator('.btn-continue').click();
+
+  // Step 4: Meal Habits
+  await expect(page.locator('.meal-habits')).toBeVisible();
+  await page.locator('.btn-continue').click();
+
+  // Step 5: Meal Plan Review — wait for generation then save
+  await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
+  await page.locator('.btn-continue').click();
+
+  await expect(page).toHaveURL(/\/onboarding$/);
+}
+
 test.describe('Onboarding', () => {
   test('unauthenticated /onboarding visit redirects to /login', async ({ page }) => {
     await page.goto('/onboarding');
@@ -206,6 +294,75 @@ test.describe('Onboarding', () => {
       await page.locator('.btn-skip').click();
       await page.locator('.btn-gray-primary').click();
       await expect(page).toHaveURL(/\/day\/2026-03-28/);
+    });
+  });
+
+  test.describe('Hub stats banner and commit plan', () => {
+    test('stats banner appears with stat labels when all 3 sections complete', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.goto('/onboarding');
+
+      await completeAccountSpoke(page);
+      await completeTasksSpoke(page);
+      await completeFoodSpoke(page);
+
+      await expect(page.locator('.stats-banner')).toBeVisible();
+
+      const labels = page.locator('.stat-label');
+      await expect(labels.nth(0)).toHaveText('Routines');
+      await expect(labels.nth(1)).toHaveText('Tasks');
+      await expect(labels.nth(2)).toHaveText('Meals');
+      await expect(labels.nth(3)).toHaveText('Days');
+    });
+
+    test('Approve Plan → is amber/enabled when all 3 sections complete', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.goto('/onboarding');
+
+      await completeAccountSpoke(page);
+      await completeTasksSpoke(page);
+      await completeFoodSpoke(page);
+
+      await expect(page.locator('.btn-cta.btn--accent')).toBeVisible();
+      await expect(page.locator('.btn-cta.btn--ghost')).not.toBeVisible();
+      await expect(page.locator('.btn-skip')).not.toBeVisible();
+    });
+
+    test('commit plan: POST /schedule/plan + complete-onboarding → navigates to /day/plan-start', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/schedule/plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLAN_COMMITTED })
+      );
+      await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
+        route.fulfill({ status: 200, body: '' })
+      );
+      await page.goto('/onboarding');
+
+      await completeAccountSpoke(page);
+      await completeTasksSpoke(page);
+      await completeFoodSpoke(page);
+
+      await page.locator('.btn-cta.btn--accent').click();
+      await expect(page).toHaveURL(/\/day\/2026-03-28/);
+    });
+
+    test('POST /schedule/plan 500 → error banner shown; CTA re-enables', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/schedule/plan`, route =>
+        route.fulfill({ status: 500, body: 'Internal Server Error' })
+      );
+      await page.goto('/onboarding');
+
+      await completeAccountSpoke(page);
+      await completeTasksSpoke(page);
+      await completeFoodSpoke(page);
+
+      await page.locator('.btn-cta.btn--accent').click();
+
+      await expect(page.locator('.commit-error')).toBeVisible();
+      await expect(page.locator('.commit-error')).toContainText('Something went wrong');
+      await expect(page.locator('.hub--submitting')).not.toBeVisible();
+      await expect(page.locator('.btn-cta.btn--accent')).toBeEnabled();
     });
   });
 });
