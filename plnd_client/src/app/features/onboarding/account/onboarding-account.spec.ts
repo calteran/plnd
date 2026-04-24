@@ -93,8 +93,8 @@ describe('OnboardingAccountComponent', () => {
   });
 
   it('renders pre-filled email', () => {
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('#email');
-    expect(input.value).toBe('alice@example.com');
+    const el: HTMLElement = fixture.nativeElement.querySelector('.email-display');
+    expect(el?.textContent?.trim()).toBe('alice@example.com');
   });
 
   it('SMS phone input is hidden by default', () => {
