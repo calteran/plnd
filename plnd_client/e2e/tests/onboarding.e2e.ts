@@ -88,6 +88,42 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
 }
 
+// Drives to Task Placement Review with one task added ("Morning run").
+// Does NOT mock /agent/place-tasks — each test does this individually.
+async function landAtTaskPlacement(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/schedule-types`, route =>
+    route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+  );
+  await page.route(`${API_BASE}/schedule/templates`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
+
+  await page.locator('.section-card').nth(1).click();
+  await expect(page.locator('.planning-prefs')).toBeVisible();
+  await page.locator('.planning-prefs .save-btn').click();
+  await expect(page.locator('.schedule-types-substep')).toBeVisible();
+  await page.locator('.schedule-types-substep .save-btn').click();
+
+  // Add one task before proceeding to placement
+  await expect(page.locator('.routines-tasks-substep')).toBeVisible();
+  await page.locator('[aria-label="Task name"]').fill('Morning run');
+  await page.locator('.add-btn').last().click();
+
+  // Override POST route to return matching task
+  await page.route(`${API_BASE}/schedule/templates`, route => {
+    if (route.request().method() === 'POST') {
+      route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning run', task_type: 'custom' } });
+    } else {
+      route.fulfill({ status: 200, json: [] });
+    }
+  });
+
+  await expect(page.locator('[aria-label="Added tasks"] .routine-chip')).toHaveCount(1);
+  await page.locator('.routines-tasks-substep .save-btn').click();
+
+  await expect(page.locator('.placement-review')).toBeVisible();
+}
+
 async function completeFoodSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/meal-habits`, route =>
     route.fulfill({ status: 200, json: [] })
@@ -591,6 +627,71 @@ test.describe('Onboarding', () => {
       await expect(taskChips).toHaveCount(1);
       await expect(taskChips.nth(0)).toContainText('Buy groceries');
       await expect(taskChips.nth(0)).not.toContainText('·');
+    });
+  });
+
+  test.describe('Tasks spoke — Task Placement Review', () => {
+    test('loading state shown while POST /agent/place-tasks completes', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/agent/place-tasks`, async route => {
+        await new Promise(r => setTimeout(r, 200));
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS });
+      });
+      await page.goto('/onboarding');
+      await landAtTaskPlacement(page);
+
+      const loadingOrGrid = page.locator('.loading-state, .day-card');
+      await expect(loadingOrGrid.first()).toBeVisible();
+    });
+
+    test('AI-placed tasks visible in day cards with meal dividers', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.goto('/onboarding');
+      await landAtTaskPlacement(page);
+
+      await expect(page.locator('.day-card').first()).toBeVisible();
+      await expect(page.locator('.meal-divider').first()).toBeVisible();
+      await expect(page.locator('.meal-label').first()).toBeVisible();
+      await expect(page.locator('.task-row').first()).toBeVisible();
+      await expect(page.locator('.task-title').first()).toHaveText('Morning run');
+      await expect(page.locator('.energy-badge').first()).toBeVisible();
+    });
+
+    test('tap Edit → change energy → Save updates the task row', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.goto('/onboarding');
+      await landAtTaskPlacement(page);
+
+      await expect(page.locator('.task-row').first()).toBeVisible();
+      await page.locator('.edit-btn').first().click();
+      await expect(page.locator('.task-row--editing')).toBeVisible();
+
+      await page.locator('[aria-label="Energy level"]').selectOption('low');
+      await page.locator('.save-edit-btn').click();
+
+      await expect(page.locator('.task-row--editing')).not.toBeVisible();
+      await expect(page.locator('.energy-badge').first()).toHaveClass(/energy-badge--low/);
+    });
+
+    test('Save & Return to Hub marks Tasks complete and navigates to hub', async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.goto('/onboarding');
+      await landAtTaskPlacement(page);
+
+      await page.locator('.placement-review .save-btn').click();
+      await expect(page).toHaveURL(/\/onboarding$/);
+
+      const tasksCard = page.locator('.section-card').nth(1);
+      await expect(tasksCard.locator('.card-badge.badge--done')).toContainText('✓ done');
     });
   });
 });
