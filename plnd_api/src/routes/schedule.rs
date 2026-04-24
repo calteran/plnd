@@ -37,15 +37,15 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
     if !VALID_TASK_TYPES.contains(&e.task_type.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(ref mp) = e.after_milepost {
-        if !VALID_AFTER_MILEPOSTS.contains(&mp.as_str()) {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref mp) = e.after_milepost
+        && !VALID_AFTER_MILEPOSTS.contains(&mp.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(ref level) = e.energy_required {
-        if !VALID_ENERGY_LEVELS.contains(&level.as_str()) {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref level) = e.energy_required
+        && !VALID_ENERGY_LEVELS.contains(&level.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
     Ok(PlanEntryInput {
         date: e.date,

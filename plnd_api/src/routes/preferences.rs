@@ -29,20 +29,20 @@ pub async fn patch_preferences(
     Extension(claims): Extension<Claims>,
     Json(body): Json<PatchPreferencesRequest>,
 ) -> Result<Json<UserPreferencesResponse>, StatusCode> {
-    if let Some(wsd) = body.week_start_day {
-        if !(0..=6).contains(&wsd) {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(wsd) = body.week_start_day
+        && !(0..=6).contains(&wsd)
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if let Some(pto) = body.planning_trigger_offset {
-        if !(-14..=14).contains(&pto) {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(pto) = body.planning_trigger_offset
+        && !(-14..=14).contains(&pto)
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if let Some(lpd) = body.default_plan_length_days {
-        if !(1..=90).contains(&lpd) {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(lpd) = body.default_plan_length_days
+        && !(1..=90).contains(&lpd)
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     // Cross-field: when both window bounds are provided, start must precede end
@@ -52,10 +52,10 @@ pub async fn patch_preferences(
         (body.dinner_window_start, body.dinner_window_end),
     ];
     for (start, end) in window_pairs {
-        if let (Some(s), Some(e)) = (start, end) {
-            if s >= e {
-                return Err(StatusCode::UNPROCESSABLE_ENTITY);
-            }
+        if let (Some(s), Some(e)) = (start, end)
+            && s >= e
+        {
+            return Err(StatusCode::UNPROCESSABLE_ENTITY);
         }
     }
 

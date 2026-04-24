@@ -93,10 +93,10 @@ pub async fn create_restriction(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    if let Some(ref n) = body.notes {
-        if n.len() > MAX_NOTES_LEN {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(ref n) = body.notes
+        && n.len() > MAX_NOTES_LEN
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     state
@@ -149,10 +149,10 @@ pub async fn update_restriction(
 ) -> Result<Json<DietaryRestrictionResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    if let Some(ref n) = body.notes {
-        if n.len() > MAX_NOTES_LEN {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(ref n) = body.notes
+        && n.len() > MAX_NOTES_LEN
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     state
