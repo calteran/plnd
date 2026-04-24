@@ -61,11 +61,12 @@ fn test_update_request_notes_only() {
 // --- Constant assertions ---
 
 #[test]
-fn test_valid_types_has_three_values() {
-    assert_eq!(VALID_TYPES.len(), 3);
+fn test_valid_types_has_four_values() {
+    assert_eq!(VALID_TYPES.len(), 4);
     assert!(VALID_TYPES.contains(&"allergy"));
     assert!(VALID_TYPES.contains(&"intolerance"));
     assert!(VALID_TYPES.contains(&"preference"));
+    assert!(VALID_TYPES.contains(&"cultural_religious"));
 }
 
 #[test]

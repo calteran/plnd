@@ -1,18 +1,18 @@
 import { Component, OnInit, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { TitleCasePipe } from '@angular/common';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { DietaryRestrictionsService } from '../../../core/services/dietary-restrictions.service';
 import {
   DietaryRestriction,
   RestrictionType,
-  RESTRICTION_TYPES
+  RESTRICTION_TYPES,
+  RESTRICTION_LABELS,
 } from '../../../core/models/dietary-restriction';
 
 @Component({
   selector: 'app-dietary-restrictions',
   standalone: true,
-  imports: [ReactiveFormsModule, TitleCasePipe],
+  imports: [ReactiveFormsModule],
   template: `
     <div class="dr-page">
       <div class="dr-header">
@@ -28,7 +28,7 @@ import {
           @for (type of restrictionTypes; track type) {
             @if (groupedRestrictions()[type]?.length) {
               <section class="type-section">
-                <h2 class="type-heading">{{ type | titlecase }}</h2>
+                <h2 class="type-heading">{{ restrictionLabels[type] }}</h2>
                 @for (item of groupedRestrictions()[type]; track item.restriction_id) {
                   <div class="restriction-item">
                     @if (editingId === item.restriction_id) {
@@ -109,6 +109,7 @@ import {
                 <option value="allergy">Allergy</option>
                 <option value="intolerance">Intolerance</option>
                 <option value="preference">Preference</option>
+                <option value="cultural_religious">Cultural / Religious</option>
               </select>
             </div>
 
@@ -338,13 +339,15 @@ export class DietaryRestrictionsComponent implements OnInit {
   private readonly router = inject(Router);
 
   readonly restrictionTypes: RestrictionType[] = RESTRICTION_TYPES;
+  readonly restrictionLabels = RESTRICTION_LABELS;
 
   readonly groupedRestrictions = computed<Record<RestrictionType, DietaryRestriction[]>>(() => {
     const items = this.dietaryRestrictionsService.restrictions() ?? [];
     return {
       allergy: items.filter(i => i.restriction_type === 'allergy'),
       intolerance: items.filter(i => i.restriction_type === 'intolerance'),
-      preference: items.filter(i => i.restriction_type === 'preference')
+      preference: items.filter(i => i.restriction_type === 'preference'),
+      cultural_religious: items.filter(i => i.restriction_type === 'cultural_religious'),
     };
   });
 

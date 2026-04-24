@@ -49,9 +49,9 @@ describe('DietaryRestrictionsSubstepComponent', () => {
     });
   }));
 
-  it('maps cultural_religious display type to preference API type', fakeAsync(() => {
+  it('sends cultural_religious type directly to the API', fakeAsync(() => {
     restrictionsSvc.create.and.returnValue(of({
-      restriction_id: 'r2', user_id: 'u1', restriction_type: 'preference',
+      restriction_id: 'r2', user_id: 'u1', restriction_type: 'cultural_religious',
       name: 'Pork', notes: null, created_at: '', updated_at: '',
     }));
     component.newName.set('Pork');
@@ -59,7 +59,7 @@ describe('DietaryRestrictionsSubstepComponent', () => {
     component.add();
     tick();
     expect(restrictionsSvc.create).toHaveBeenCalledWith({
-      restriction_type: 'preference',
+      restriction_type: 'cultural_religious',
       name: 'Pork',
     });
   }));
@@ -80,6 +80,7 @@ describe('DietaryRestrictionsSubstepComponent', () => {
   it('displayTypeFor() maps API types to display types correctly', () => {
     expect(component.displayTypeFor('allergy')).toBe('allergy');
     expect(component.displayTypeFor('intolerance')).toBe('intolerance');
-    expect(component.displayTypeFor('preference')).toBe('cultural_religious');
+    expect(component.displayTypeFor('cultural_religious')).toBe('cultural_religious');
+    expect(component.displayTypeFor('preference')).toBe('cultural_religious'); // legacy data
   });
 });
