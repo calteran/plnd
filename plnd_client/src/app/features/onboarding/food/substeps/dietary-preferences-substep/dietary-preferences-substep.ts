@@ -1,7 +1,7 @@
-import { Component, DestroyRef, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subject, from, mergeMap, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, switchMap } from 'rxjs/operators';
+import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, inject, signal } from '@angular/core';
+import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
+import { Subject, forkJoin, from, mergeMap, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, filter, map, switchMap, take } from 'rxjs/operators';
 import { CatalogService, IngredientSearchResponse, LocalIngredientResult } from '../../../../../core/services/catalog.service';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { UserIngredientPrefsService } from '../../../../../core/services/user-ingredient-prefs.service';
@@ -119,11 +119,11 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
               [value]="ingredientInput()"
               (input)="onIngredientInput(asText($event))"
               (keydown.escape)="ingredientSearchResults.set([])"
-              (blur)="onIngredientBlur()" />
+              (blur)="ingredientSearchResults.set([])" />
             @if (ingredientSearchResults().length) {
               <div class="search-dropdown">
                 @for (r of ingredientSearchResults(); track r.ingredient_id) {
-                  <button type="button" class="search-result" (click)="selectIngredientResult(r)">
+                  <button type="button" class="search-result" (mousedown)="$event.preventDefault()" (click)="selectIngredientResult(r)">
                     <span class="result-name">{{ r.name }}</span>
                     @if (r.allergens.length) {
                       <span class="result-allergens">{{ r.allergens.join(', ') }}</span>
@@ -249,6 +249,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
   private readonly catalogService = inject(CatalogService);
   private readonly ingredientPrefsService = inject(UserIngredientPrefsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
 
   private readonly ingredientSearch$ = new Subject<string>();
 
@@ -281,6 +282,24 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
         .map(r => r.name);
       if (keys.length) this.selectedLifestyles.set(keys);
     }
+
+    this.ingredientPrefsService.load();
+    toObservable(this.ingredientPrefsService.prefs, { injector: this.injector }).pipe(
+      filter(prefs => prefs.length > 0 && this.ingredientRatings().length === 0),
+      take(1),
+      switchMap(prefs =>
+        forkJoin(prefs.map(p =>
+          this.catalogService.getIngredient(p.catalog_ingredient_id).pipe(
+            map(ing => ({
+              name: (ing as { name?: string }).name ?? p.catalog_ingredient_id,
+              score: p.preference_score + 2, // API -2..2 → emoji 0..4
+              catalogIngredientId: p.catalog_ingredient_id,
+            }))
+          )
+        ))
+      ),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(ratings => this.ingredientRatings.set(ratings));
 
     this.ingredientSearch$.pipe(
       debounceTime(300),
@@ -319,11 +338,6 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
     this.ingredientInput.set(value);
     this.pendingIngredientId.set(null);
     this.ingredientSearch$.next(value.trim());
-  }
-
-  onIngredientBlur(): void {
-    // Delay so dropdown click events fire before the list is cleared
-    setTimeout(() => this.ingredientSearchResults.set([]), 150);
   }
 
   selectIngredientResult(result: LocalIngredientResult): void {

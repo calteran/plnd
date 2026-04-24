@@ -29,7 +29,7 @@ export class CatalogService {
   }
 
   searchIngredients(query: string, limit = 8): Observable<IngredientSearchResponse> {
-    const params = { q: query, limit: String(limit) };
+    const params = { q: query, limit };
     return this.http.get<IngredientSearchResponse>(`${this.apiBase}/search/ingredients`, { params });
   }
 

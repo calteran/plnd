@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ComponentFixture } from '@angular/core/testing';
 import { DietaryPreferencesSubstepComponent } from './dietary-preferences-substep';
@@ -25,7 +26,8 @@ describe('DietaryPreferencesSubstepComponent', () => {
       of({ local: [], external: [], providers_queried: [], providers_from_cache: [] })
     );
 
-    ingredientPrefsSvc = jasmine.createSpyObj('UserIngredientPrefsService', ['upsert', 'remove']);
+    ingredientPrefsSvc = jasmine.createSpyObj('UserIngredientPrefsService', ['upsert', 'remove', 'load']);
+    Object.defineProperty(ingredientPrefsSvc, 'prefs', { value: signal([]), configurable: true });
     ingredientPrefsSvc.upsert.and.returnValue(of({
       user_ingredient_pref_id: 'pref-1', user_id: 'u1',
       catalog_ingredient_id: 'ing-1', preference_score: 2,
