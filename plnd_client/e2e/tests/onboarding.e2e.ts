@@ -134,6 +134,9 @@ async function landAtMealTimes(page: Page): Promise<void> {
 }
 
 async function landAtDietaryPreferences(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/my/ingredient-prefs`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
   await landAtMealTimes(page);
   await page.locator('.btn-continue').click();
   await expect(page.locator('.restrictions-substep')).toBeVisible();
@@ -147,7 +150,31 @@ async function landAtMealHabits(page: Page): Promise<void> {
   await expect(page.locator('.meal-habits')).toBeVisible();
 }
 
+async function mockDayView(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/schedule/plan/status**`, route =>
+    route.fulfill({ status: 200, json: { planned: false } })
+  );
+  await page.route(`${API_BASE}/briefing/weather`, route =>
+    route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
+  );
+  await page.route(`${API_BASE}/briefing/news`, route =>
+    route.fulfill({ status: 200, json: MOCK_BRIEFING_NEWS })
+  );
+  await page.route(`${API_BASE}/briefing/yesterday`, route =>
+    route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
+  );
+  await page.route(`${API_BASE}/schedule/period**`, route =>
+    route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
+  );
+  await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
+}
+
 async function completeFoodSpoke(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/my/ingredient-prefs`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
   await page.route(`${API_BASE}/meal-habits`, route =>
     route.fulfill({ status: 200, json: [] })
   );
@@ -377,6 +404,7 @@ test.describe('Onboarding', () => {
     });
 
     test('"Skip for now" calls complete-onboarding and navigates to /day/2026-03-28', async ({ page }) => {
+      await mockDayView(page);
       await page.locator('.btn-skip').click();
       await page.locator('.btn-gray-primary').click();
       await expect(page).toHaveURL(/\/day\/2026-03-28/);
@@ -422,6 +450,7 @@ test.describe('Onboarding', () => {
       await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
         route.fulfill({ status: 200, body: '' })
       );
+      await mockDayView(page);
       await page.goto('/onboarding');
 
       await completeAccountSpoke(page);
@@ -915,6 +944,7 @@ test.describe('Onboarding', () => {
       await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
         route.fulfill({ status: 200, body: '' })
       );
+      await mockDayView(page);
 
       await page.goto('/onboarding');
 
