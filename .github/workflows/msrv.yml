@@ -1,0 +1,60 @@
+name: MSRV
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify MSRV declarations
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-msrv
+        run: cargo install cargo-msrv --locked
+
+      - name: Verify MSRV for each workspace crate
+        id: verify
+        run: |
+          failed=0
+          output=""
+          for manifest in plnd_agent/Cargo.toml plnd_api/Cargo.toml plnd_data/Cargo.toml plnd_seed/Cargo.toml; do
+            if ! result=$(cargo msrv --manifest-path "$manifest" verify 2>&1); then
+              failed=1
+              output+="### $manifest\n\`\`\`\n$result\n\`\`\`\n\n"
+            fi
+          done
+          if [[ $failed -ne 0 ]]; then
+            {
+              echo "msrv_output<<EOF"
+              printf '%b' "$output"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Open issue on MSRV violation
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create \
+            --title "MSRV violation detected (weekly check)" \
+            --label "bug" \
+            --body "## MSRV verification failed
+
+          The weekly MSRV check found that one or more crates' declared \`rust-version\` is no longer accurate. A dependency update likely raised the effective minimum.
+
+          **Action required:** Update the affected crate's \`rust-version\` field and run \`just msrv\` locally to confirm.
+
+          ${{ steps.verify.outputs.msrv_output }}
+
+          _Triggered by workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}_"
