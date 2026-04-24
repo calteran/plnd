@@ -5,9 +5,9 @@ use crate::routes::domain_constants::{
 };
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Path, State},
     http::StatusCode,
-    Json,
 };
 use chrono::NaiveTime;
 use plnd_data::Error;
@@ -17,10 +17,10 @@ use uuid::Uuid;
 /// Returns 422 if `rule` is `Some` but does not begin with `FREQ=`.
 /// Uppercase-only: RFC 5545 canonical form; the frontend always generates uppercase.
 fn validate_recurrence_rule(rule: Option<&str>) -> Result<(), StatusCode> {
-    if let Some(r) = rule {
-        if !r.starts_with("FREQ=") {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(r) = rule
+        && !r.starts_with("FREQ=")
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     Ok(())
 }

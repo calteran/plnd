@@ -1,5 +1,5 @@
-use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery};
 use plnd_data::providers::NutritionProvider;
+use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery};
 use sqlx::PgConnection;
 use std::collections::HashSet;
 use std::sync::Arc;

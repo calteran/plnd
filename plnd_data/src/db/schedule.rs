@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::models::{CarryoverDecision, CommitPlanInput, ScheduleEntry, CARRYOVER_LOOKBACK_DAYS};
+use crate::models::{CARRYOVER_LOOKBACK_DAYS, CarryoverDecision, CommitPlanInput, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 const ENTRY_COLS: &str =

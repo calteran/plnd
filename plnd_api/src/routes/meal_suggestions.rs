@@ -2,9 +2,9 @@ use crate::api_response::MealSuggestionResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Query, State},
     http::StatusCode,
-    Json,
 };
 use chrono::NaiveDate;
 use serde::Deserialize;

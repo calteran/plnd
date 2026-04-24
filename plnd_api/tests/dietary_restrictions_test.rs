@@ -1,5 +1,5 @@
 use plnd_api::routes::dietary_restrictions::{
-    CreateRestrictionRequest, UpdateRestrictionRequest, MAX_NAME_LEN, MAX_NOTES_LEN, VALID_TYPES,
+    CreateRestrictionRequest, MAX_NAME_LEN, MAX_NOTES_LEN, UpdateRestrictionRequest, VALID_TYPES,
 };
 
 // --- CreateRestrictionRequest ---

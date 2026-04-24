@@ -165,17 +165,17 @@ fn parse_completion(response: OaiResponse) -> Result<CompletionResponse, LlmErro
 
     // Fall back to the legacy function_call field when tool_calls is empty.
     // The legacy API carries no call ID, so we synthesise a stable placeholder.
-    if tool_calls.is_empty() {
-        if let Some(fc) = choice.message.function_call {
-            let arguments = serde_json::from_str(&fc.arguments).map_err(|e| {
-                LlmError::ToolCallParsing(format!("function_call '{}': {}", fc.name, e))
-            })?;
-            tool_calls.push(ToolCall {
-                id: "function_call_0".to_string(),
-                name: fc.name,
-                arguments,
-            });
-        }
+    if tool_calls.is_empty()
+        && let Some(fc) = choice.message.function_call
+    {
+        let arguments = serde_json::from_str(&fc.arguments).map_err(|e| {
+            LlmError::ToolCallParsing(format!("function_call '{}': {}", fc.name, e))
+        })?;
+        tool_calls.push(ToolCall {
+            id: "function_call_0".to_string(),
+            name: fc.name,
+            arguments,
+        });
     }
 
     Ok(CompletionResponse {

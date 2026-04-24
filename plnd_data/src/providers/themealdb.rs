@@ -83,27 +83,27 @@ fn parse_measure(s: &str) -> (Decimal, String) {
         let unit_str = s[space_pos + 1..].trim();
 
         // Sub-case: fraction like "1/2"
-        if qty_str.contains('/') {
-            if let Some(dec) = parse_fraction(qty_str) {
-                let unit = if unit_str.is_empty() {
-                    "serving".to_string()
-                } else {
-                    unit_str.to_string()
-                };
-                return (dec, unit);
-            }
+        if qty_str.contains('/')
+            && let Some(dec) = parse_fraction(qty_str)
+        {
+            let unit = if unit_str.is_empty() {
+                "serving".to_string()
+            } else {
+                unit_str.to_string()
+            };
+            return (dec, unit);
         }
 
         // Sub-case: plain number like "1" or "250"
-        if let Ok(qty) = qty_str.parse::<f64>() {
-            if let Ok(d) = Decimal::try_from(qty) {
-                let unit = if unit_str.is_empty() {
-                    "serving".to_string()
-                } else {
-                    unit_str.to_string()
-                };
-                return (d, unit);
-            }
+        if let Ok(qty) = qty_str.parse::<f64>()
+            && let Ok(d) = Decimal::try_from(qty)
+        {
+            let unit = if unit_str.is_empty() {
+                "serving".to_string()
+            } else {
+                unit_str.to_string()
+            };
+            return (d, unit);
         }
     }
 
@@ -114,15 +114,15 @@ fn parse_measure(s: &str) -> (Decimal, String) {
     if unit_start > 0 {
         let qty_str = &s[..unit_start];
         let unit = s[unit_start..].trim();
-        if let Ok(qty) = qty_str.parse::<f64>() {
-            if let Ok(d) = Decimal::try_from(qty) {
-                let unit = if unit.is_empty() {
-                    "serving".to_string()
-                } else {
-                    unit.to_string()
-                };
-                return (d, unit);
-            }
+        if let Ok(qty) = qty_str.parse::<f64>()
+            && let Ok(d) = Decimal::try_from(qty)
+        {
+            let unit = if unit.is_empty() {
+                "serving".to_string()
+            } else {
+                unit.to_string()
+            };
+            return (d, unit);
         }
     }
 

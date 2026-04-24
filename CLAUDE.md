@@ -59,6 +59,7 @@ just fmt              # Rust formatting
 just clippy           # Rust linting
 just deny             # Dependency security/license check
 just machete          # Unused dependency detection
+just msrv             # MSRV declaration check — run after bumping deps or using new Rust features
 just ts-lint          # TypeScript/Angular ESLint
 just ts-deps          # TypeScript dependency health
 
@@ -77,6 +78,7 @@ just worktree-new     # Create a worktree with Angular deps installed (prevents 
 ## Development Standards
 
 - Always use latest stable versions of Rust and Node.js dependencies
+- **Use current Rust idioms freely** — do not avoid modern language features (e.g., `impl Trait` in return position, `let`-chains, async closures) to artificially preserve a low MSRV. When adopting a feature that requires a newer compiler, update the affected crate's `rust-version` field in its `Cargo.toml` and run `just msrv` to confirm the declaration is accurate. Advancing the MSRV is normal maintenance, not a breaking change.
 - Health data is sensitive — strict access controls required
 - Neurodivergent support principles: gradual exposure, sensory-friendly, customizable
 - **Never leave a known issue in code without a tracking GitHub issue** — if a bug, limitation, or tech debt is identified and not fixed immediately, open an issue before moving on

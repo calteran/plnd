@@ -41,16 +41,16 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.logging.level = log_level;
     }
 
-    if let Ok(max_connections) = std::env::var("APP_DATABASE__MAX_CONNECTIONS") {
-        if let Ok(max_conn) = max_connections.parse::<usize>() {
-            app_config.database.max_connections = max_conn;
-        }
+    if let Ok(max_connections) = std::env::var("APP_DATABASE__MAX_CONNECTIONS")
+        && let Ok(max_conn) = max_connections.parse::<usize>()
+    {
+        app_config.database.max_connections = max_conn;
     }
 
-    if let Ok(timeout) = std::env::var("APP_API__TIMEOUT") {
-        if let Ok(timeout_val) = timeout.parse::<u64>() {
-            app_config.api.timeout = timeout_val;
-        }
+    if let Ok(timeout) = std::env::var("APP_API__TIMEOUT")
+        && let Ok(timeout_val) = timeout.parse::<u64>()
+    {
+        app_config.api.timeout = timeout_val;
     }
 
     if let Ok(url) = std::env::var("APP_AUTH__OIDC_INTERNAL_ISSUER_URL") {
@@ -105,10 +105,10 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.llm.capable.api_key = key;
     }
 
-    if let Ok(v) = std::env::var("APP_AGENT__RATE_LIMIT_PER_MINUTE") {
-        if let Ok(limit) = v.parse::<u32>() {
-            app_config.agent.rate_limit_per_minute = limit;
-        }
+    if let Ok(v) = std::env::var("APP_AGENT__RATE_LIMIT_PER_MINUTE")
+        && let Ok(limit) = v.parse::<u32>()
+    {
+        app_config.agent.rate_limit_per_minute = limit;
     }
 
     if let Ok(v) = std::env::var("APP_OTEL__ENDPOINT") {

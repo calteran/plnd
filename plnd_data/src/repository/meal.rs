@@ -73,7 +73,7 @@ pub trait MealRepository: Send + Sync {
     ) -> Result<Option<(Option<serde_json::Value>, bool)>, crate::Error>;
 
     async fn catalog_ingredient(&self, id: Uuid)
-        -> Result<Option<CatalogIngredient>, crate::Error>;
+    -> Result<Option<CatalogIngredient>, crate::Error>;
 
     async fn catalog_dish(
         &self,

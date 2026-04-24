@@ -5,7 +5,7 @@ use serde::Serialize;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::cache::{make_cache_key, SearchCache};
+use crate::cache::{SearchCache, make_cache_key};
 use crate::providers::dtos::{SearchQuery, SearchResult};
 use crate::providers::exercise::ExerciseProvider;
 use crate::providers::nutrition::NutritionProvider;

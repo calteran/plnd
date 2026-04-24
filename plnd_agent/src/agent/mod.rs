@@ -190,10 +190,10 @@ impl AgentLoop<'_> {
             }
 
             // Capture any text the LLM produced alongside (or instead of) tool calls.
-            if let Some(ref text) = response.content {
-                if !text.is_empty() {
-                    last_content = Some(text.clone());
-                }
+            if let Some(ref text) = response.content
+                && !text.is_empty()
+            {
+                last_content = Some(text.clone());
             }
 
             // Record the assistant turn in history, including any tool calls so
@@ -222,12 +222,11 @@ impl AgentLoop<'_> {
             let tool_results = self.execute_tools_parallel(&ctx, response.tool_calls).await;
 
             // If a terminal tool was in the batch, capture its result.
-            if let Some(ref term_id) = terminal_call_id {
-                if let Some(tr) = tool_results.iter().find(|r| &r.tool_call_id == term_id) {
-                    if let Ok(ref val) = tr.result {
-                        last_content = Some(json_to_string(val.clone()));
-                    }
-                }
+            if let Some(ref term_id) = terminal_call_id
+                && let Some(tr) = tool_results.iter().find(|r| &r.tool_call_id == term_id)
+                && let Ok(ref val) = tr.result
+            {
+                last_content = Some(json_to_string(val.clone()));
             }
 
             // Append all results as a single Tool-role message (grouped so
@@ -600,8 +599,8 @@ impl AgentService {
 #[cfg(test)]
 mod tests {
     use std::sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     };
 
     use tokio::time::Duration;

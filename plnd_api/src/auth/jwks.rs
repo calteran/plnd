@@ -1,5 +1,5 @@
 use crate::auth::error::AuthError;
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode, decode_header};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -93,20 +93,20 @@ impl JwksCache {
         // Fast path: read lock, return cached keyset if still fresh.
         {
             let read = self.cache.read().await;
-            if let Some(cached) = read.as_ref() {
-                if cached.fetched_at.elapsed() < JWKS_TTL {
-                    return Ok(cached.keyset.clone());
-                }
+            if let Some(cached) = read.as_ref()
+                && cached.fetched_at.elapsed() < JWKS_TTL
+            {
+                return Ok(cached.keyset.clone());
             }
         }
 
         // Slow path: acquire write lock and refresh.
         let mut write = self.cache.write().await;
         // Double-check after acquiring write lock (another thread may have refreshed).
-        if let Some(cached) = write.as_ref() {
-            if cached.fetched_at.elapsed() < JWKS_TTL {
-                return Ok(cached.keyset.clone());
-            }
+        if let Some(cached) = write.as_ref()
+            && cached.fetched_at.elapsed() < JWKS_TTL
+        {
+            return Ok(cached.keyset.clone());
         }
 
         let keyset = self.fetch_fresh_jwks().await?;

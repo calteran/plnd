@@ -2,9 +2,9 @@ use crate::api_response::UserResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, State},
     http::StatusCode,
-    Json,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -63,15 +63,15 @@ pub async fn patch_me(
 ) -> Result<Json<UserResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    if let Some(ref name) = body.display_name {
-        if name.len() > 100 {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(ref name) = body.display_name
+        && name.len() > 100
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if let Some(ref url) = body.avatar_url {
-        if url.len() > 500 {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
+    if let Some(ref url) = body.avatar_url
+        && url.len() > 500
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
     match state

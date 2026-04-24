@@ -3,9 +3,9 @@ use crate::auth::jwt::Claims;
 use crate::models::CreateMealHabitRequest;
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Path, State},
     http::StatusCode,
-    Json,
 };
 use plnd_data::Error;
 use std::sync::Arc;

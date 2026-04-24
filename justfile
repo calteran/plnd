@@ -16,6 +16,7 @@ init:
     cargo install cargo-nextest --locked
     cargo install cargo-deny --locked
     cargo install cargo-machete
+    cargo install cargo-msrv --locked
 
     echo "→ Installing Angular/Node dependencies..."
     cd plnd_client && npm ci
@@ -118,6 +119,14 @@ deny:
 
 machete:
     cargo machete
+
+# Verify MSRV declarations in all workspace crates — call after bumping deps or adopting new Rust features
+msrv:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for manifest in plnd_agent/Cargo.toml plnd_api/Cargo.toml plnd_data/Cargo.toml plnd_seed/Cargo.toml; do
+        cargo msrv --manifest-path "$manifest" verify
+    done
 
 # TypeScript quality commands
 ts-lint:

@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use crate::auth::error::AuthError;
 use async_trait::async_trait;
-use plnd_data::repository::SessionRepository;
 use plnd_data::Error;
+use plnd_data::repository::SessionRepository;
 use uuid::Uuid;
 
 #[derive(Clone)]

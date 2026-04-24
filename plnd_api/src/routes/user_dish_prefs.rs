@@ -1,7 +1,7 @@
 use axum::{
+    Extension, Json,
     extract::{Path, State},
     http::StatusCode,
-    Extension, Json,
 };
 use rust_decimal::Decimal;
 use serde::Deserialize;
@@ -11,8 +11,8 @@ use uuid::Uuid;
 use crate::api_response::UserDishPrefDetailResponse;
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::repository::AddIngredientParams;
 use plnd_data::Error;
+use plnd_data::repository::AddIngredientParams;
 
 #[utoipa::path(
     get,
@@ -206,10 +206,10 @@ pub async fn patch(
 
     if has_recipe_fields {
         // Treat instructions value: null → clear, string → set, absent → keep
-        let instructions: Option<&str> =
-            body.instructions
-                .as_ref()
-                .and_then(|v| if v.is_null() { None } else { v.as_str() });
+        let instructions: Option<&str> = body
+            .instructions
+            .as_ref()
+            .and_then(|v| if v.is_null() { None } else { v.as_str() });
 
         state
             .repos

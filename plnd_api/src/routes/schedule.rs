@@ -11,13 +11,13 @@ use crate::routes::domain_constants::{
 };
 use crate::state::AppState;
 use axum::{
+    Json,
     extract::{Extension, Path, Query, State},
     http::StatusCode,
-    Json,
 };
 use chrono::{Datelike, NaiveDate, Weekday};
-use plnd_data::models::{CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput};
 use plnd_data::Error;
+use plnd_data::models::{CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -37,15 +37,15 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
     if !VALID_TASK_TYPES.contains(&e.task_type.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(ref mp) = e.after_milepost {
-        if !VALID_AFTER_MILEPOSTS.contains(&mp.as_str()) {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref mp) = e.after_milepost
+        && !VALID_AFTER_MILEPOSTS.contains(&mp.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(ref level) = e.energy_required {
-        if !VALID_ENERGY_LEVELS.contains(&level.as_str()) {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref level) = e.energy_required
+        && !VALID_ENERGY_LEVELS.contains(&level.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
     Ok(PlanEntryInput {
         date: e.date,
@@ -485,12 +485,16 @@ mod tests {
         let entries = expand_habit_to_entries(&habit, start, end);
         assert_eq!(entries.len(), 3);
         assert!(entries.iter().all(|e| e.task_type == "meal"));
-        assert!(entries
-            .iter()
-            .all(|e| e.title == Some("Oatmeal".to_string())));
-        assert!(entries
-            .iter()
-            .all(|e| e.after_milepost == Some("breakfast".to_string())));
+        assert!(
+            entries
+                .iter()
+                .all(|e| e.title == Some("Oatmeal".to_string()))
+        );
+        assert!(
+            entries
+                .iter()
+                .all(|e| e.after_milepost == Some("breakfast".to_string()))
+        );
         assert!(entries.iter().all(|e| e.scheduled_start.is_none()));
     }
 

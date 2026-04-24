@@ -32,7 +32,7 @@ impl From<sqlx::Error> for DatabaseError {
             sqlx::Error::PoolClosed | sqlx::Error::PoolTimedOut => DatabaseError::ConnectionLost,
             sqlx::Error::Io(_) => DatabaseError::ConnectionLost,
             sqlx::Error::Configuration(_) => DatabaseError::ConfigurationError(error.to_string()),
-            sqlx::Error::Database(ref db_err) if db_err.code().as_deref() == Some("23505") => {
+            sqlx::Error::Database(db_err) if db_err.code().as_deref() == Some("23505") => {
                 DatabaseError::UniqueViolation
             }
             _ => DatabaseError::QueryError(error.to_string()),
