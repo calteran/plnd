@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { CatalogService } from './catalog.service';
+import { CatalogService, IngredientSearchResponse, LocalIngredientResult } from './catalog.service';
 
 describe('CatalogService', () => {
   let service: CatalogService;
@@ -67,5 +67,38 @@ describe('CatalogService', () => {
     req.flush(mockResponse);
 
     expect(result?.catalog_ingredient_id).toBe('uuid-123');
+  });
+
+  it('searchIngredients() makes GET /search/ingredients with q and limit params', () => {
+    const mockLocal: LocalIngredientResult[] = [
+      { ingredient_id: 'abc-123', name: 'Oats', description: null, allergens: ['gluten'], occasion_tags: [], external_source: null },
+    ];
+    const mockResponse: IngredientSearchResponse = { local: mockLocal, external: [], providers_queried: [], providers_from_cache: [] };
+    let result: IngredientSearchResponse | undefined;
+    service.searchIngredients('oats').subscribe(r => (result = r));
+
+    const req = httpMock.expectOne(r =>
+      r.url.endsWith('/search/ingredients') &&
+      r.method === 'GET' &&
+      r.params.get('q') === 'oats' &&
+      r.params.get('limit') === '8'
+    );
+    req.flush(mockResponse);
+
+    expect(result?.local.length).toBe(1);
+    expect(result?.local[0].ingredient_id).toBe('abc-123');
+    expect(result?.local[0].name).toBe('Oats');
+  });
+
+  it('searchIngredients() respects custom limit parameter', () => {
+    service.searchIngredients('rice', 5).subscribe();
+
+    const req = httpMock.expectOne(r =>
+      r.url.endsWith('/search/ingredients') &&
+      r.params.get('q') === 'rice' &&
+      r.params.get('limit') === '5'
+    );
+    req.flush({ local: [], external: [], providers_queried: [], providers_from_cache: [] });
+    expect(req.request.method).toBe('GET');
   });
 });

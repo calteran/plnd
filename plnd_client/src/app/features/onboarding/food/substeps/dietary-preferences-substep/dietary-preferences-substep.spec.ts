@@ -1,7 +1,9 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { ComponentFixture } from '@angular/core/testing';
 import { DietaryPreferencesSubstepComponent } from './dietary-preferences-substep';
+import { CatalogService } from '../../../../../core/services/catalog.service';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
+import { UserIngredientPrefsService } from '../../../../../core/services/user-ingredient-prefs.service';
 import { UserMealsService } from '../../../../../core/services/user-meals.service';
 import { of } from 'rxjs';
 
@@ -10,17 +12,34 @@ describe('DietaryPreferencesSubstepComponent', () => {
   let fixture: ComponentFixture<DietaryPreferencesSubstepComponent>;
   let mealsSvc: jasmine.SpyObj<UserMealsService>;
   let restrictionsSvc: jasmine.SpyObj<DietaryRestrictionsService>;
+  let catalogSvc: jasmine.SpyObj<CatalogService>;
+  let ingredientPrefsSvc: jasmine.SpyObj<UserIngredientPrefsService>;
 
   beforeEach(async () => {
     mealsSvc = jasmine.createSpyObj('UserMealsService', ['createFromScratch', 'updateMetadata']);
     restrictionsSvc = jasmine.createSpyObj('DietaryRestrictionsService', ['create', 'load', 'restrictions']);
     restrictionsSvc.restrictions.and.returnValue(null);
 
+    catalogSvc = jasmine.createSpyObj('CatalogService', ['searchIngredients']);
+    catalogSvc.searchIngredients.and.returnValue(
+      of({ local: [], external: [], providers_queried: [], providers_from_cache: [] })
+    );
+
+    ingredientPrefsSvc = jasmine.createSpyObj('UserIngredientPrefsService', ['upsert', 'remove']);
+    ingredientPrefsSvc.upsert.and.returnValue(of({
+      user_ingredient_pref_id: 'pref-1', user_id: 'u1',
+      catalog_ingredient_id: 'ing-1', preference_score: 2,
+      notes: null, created_at: '', updated_at: '',
+    }));
+    ingredientPrefsSvc.remove.and.returnValue(of(undefined));
+
     await TestBed.configureTestingModule({
       imports: [DietaryPreferencesSubstepComponent],
       providers: [
         { provide: UserMealsService, useValue: mealsSvc },
         { provide: DietaryRestrictionsService, useValue: restrictionsSvc },
+        { provide: CatalogService, useValue: catalogSvc },
+        { provide: UserIngredientPrefsService, useValue: ingredientPrefsSvc },
       ],
     }).compileComponents();
 
@@ -39,6 +58,34 @@ describe('DietaryPreferencesSubstepComponent', () => {
     component.toggleLifestyle('vegan');
     expect(component.selectedLifestyles()).not.toContain('vegan');
   });
+
+  it('addIngredientRating() calls upsert with correct score mapping and adds to local list', fakeAsync(() => {
+    component.ingredientInput.set('Oats');
+    component.pendingIngredientId.set('ing-1');
+    component.pendingIngredientScore.set(4); // index 4 = 😍 → preference_score +2
+
+    component.addIngredientRating();
+    tick();
+
+    expect(ingredientPrefsSvc.upsert).toHaveBeenCalledWith('ing-1', { preference_score: 2 });
+    expect(component.ingredientRatings().length).toBe(1);
+    expect(component.ingredientRatings()[0]).toEqual({ name: 'Oats', score: 4, catalogIngredientId: 'ing-1' });
+    expect(component.ingredientInput()).toBe('');
+    expect(component.pendingIngredientScore()).toBeNull();
+    expect(component.pendingIngredientId()).toBeNull();
+  }));
+
+  it('addIngredientRating() does nothing when no catalog ID selected', fakeAsync(() => {
+    component.ingredientInput.set('Unknown thing');
+    component.pendingIngredientScore.set(3);
+    // pendingIngredientId is null by default
+
+    component.addIngredientRating();
+    tick();
+
+    expect(ingredientPrefsSvc.upsert).not.toHaveBeenCalled();
+    expect(component.ingredientRatings().length).toBe(0);
+  }));
 
   it('addMealRating() creates meal then updates metadata with correct rating', fakeAsync(() => {
     const mockMeal = {
