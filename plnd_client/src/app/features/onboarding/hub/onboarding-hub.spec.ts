@@ -277,14 +277,16 @@ describe('OnboardingHubComponent', () => {
     expect(modal).toBeNull();
   });
 
-  it('"Skip for now" navigates to /day/<today>', () => {
+  it('"Skip for now" calls completeOnboarding() then navigates to /day/<today>', () => {
     spyOn(router, 'navigate');
     // open via UI
     (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
     fixture.detectChanges();
     const skipBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-gray-primary');
     skipBtn.click();
-    const today = new Date().toISOString().split('T')[0];
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    expect(userServiceStub.completeOnboarding).toHaveBeenCalled();
     expect(router.navigate).toHaveBeenCalledWith(['/day', today]);
   });
 

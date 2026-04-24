@@ -317,8 +317,8 @@ const HUB_SECTIONS: HubSection[] = [
 
     /* Stats banner */
     .stats-banner {
-      background: #fef3c7;
-      border: 1.5px solid #fde68a;
+      background: var(--color-accent-light);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 10px;
       padding: 16px;
       animation: slide-fade-in 0.3s ease-out;
@@ -327,7 +327,7 @@ const HUB_SECTIONS: HubSection[] = [
       margin: 0 0 12px;
       font-size: 13px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
       text-align: center;
     }
     .stats-row {
@@ -343,19 +343,19 @@ const HUB_SECTIONS: HubSection[] = [
       padding: 0 12px;
     }
     .stat + .stat {
-      border-left: 1px solid #fde68a;
+      border-left: 1px solid var(--color-accent-border);
     }
     .stat-label {
       font-size: 10px;
       font-weight: 600;
-      color: #92400e;
+      color: var(--color-accent-dark);
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
     .stat-value {
       font-size: 20px;
       font-weight: 800;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
 
     @keyframes slide-fade-in {
@@ -365,12 +365,12 @@ const HUB_SECTIONS: HubSection[] = [
 
     /* Error banner */
     .commit-error {
-      background: #fef3c7;
-      border: 1.5px solid #fde68a;
+      background: var(--color-accent-light);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 8px;
       padding: 10px 14px;
       font-size: 13px;
-      color: #92400e;
+      color: var(--color-accent-dark);
     }
 
     /* CTA button row */
@@ -389,13 +389,13 @@ const HUB_SECTIONS: HubSection[] = [
       border-radius: 8px;
       font-size: 14px;
       font-weight: 600;
-      color: #6b7280;
-      border: 1.5px solid #e5e7eb;
+      color: var(--color-btn-neutral-text);
+      border: 1.5px solid var(--color-btn-neutral-border);
       cursor: pointer;
       white-space: nowrap;
     }
     .btn-skip:hover {
-      background: #f9fafb;
+      background: var(--color-surface-base);
     }
 
     /* CTA full-width when alone */
@@ -421,17 +421,17 @@ const HUB_SECTIONS: HubSection[] = [
     }
     .btn--ghost {
       background: transparent;
-      border: 1.5px solid #fde68a;
-      color: #b45309;
+      border: 1.5px solid var(--color-accent-border);
+      color: var(--color-text-secondary);
       opacity: 0.5;
     }
     .btn--disabled {
       cursor: not-allowed;
     }
     .btn--accent {
-      background: #d97706;
+      background: var(--color-accent);
       border: 1.5px solid transparent;
-      color: #ffffff;
+      color: var(--color-btn-accent-text);
     }
     .btn--accent:hover:not([disabled]) {
       opacity: 0.88;
@@ -446,8 +446,8 @@ const HUB_SECTIONS: HubSection[] = [
       display: inline-block;
       width: 14px;
       height: 14px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: #ffffff;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: var(--color-btn-accent-text);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
     }
@@ -459,7 +459,7 @@ const HUB_SECTIONS: HubSection[] = [
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(254, 249, 240, 0.88);
+      background: var(--color-modal-backdrop);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -468,8 +468,8 @@ const HUB_SECTIONS: HubSection[] = [
 
     /* Modal card */
     .modal-card {
-      background: #ffffff;
-      border: 1.5px solid #fde68a;
+      background: var(--color-surface-white);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 10px;
       padding: 24px;
       max-width: 360px;
@@ -482,12 +482,12 @@ const HUB_SECTIONS: HubSection[] = [
       margin: 0;
       font-size: 16px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
     .modal-body {
       margin: 0;
       font-size: 13px;
-      color: #374151;
+      color: var(--color-text-body);
       line-height: 1.5;
     }
     .modal-actions {
@@ -503,12 +503,12 @@ const HUB_SECTIONS: HubSection[] = [
       border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
-      border: 1.5px solid #fde68a;
-      color: #b45309;
+      border: 1.5px solid var(--color-accent-border);
+      color: var(--color-text-secondary);
       cursor: pointer;
     }
     .btn-ghost-amber:hover {
-      background: #fef3c7;
+      background: var(--color-accent-light);
     }
     .btn-gray-primary {
       all: unset;
@@ -517,12 +517,12 @@ const HUB_SECTIONS: HubSection[] = [
       border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
-      background: #6b7280;
-      color: #ffffff;
+      background: var(--color-btn-neutral-bg);
+      color: var(--color-btn-accent-text);
       cursor: pointer;
     }
     .btn-gray-primary:hover {
-      background: #4b5563;
+      background: var(--color-btn-neutral-bg-hover);
     }
   `],
 })
@@ -604,7 +604,13 @@ export class OnboardingHubComponent {
   }
 
   skipOnboarding(): void {
-    const today = new Date().toISOString().split('T')[0];
-    this.router.navigate(['/day', today]);
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.userService.completeOnboarding()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => this.router.navigate(['/day', today]),
+        error: () => this.commitError.set(true),
+      });
   }
 }
