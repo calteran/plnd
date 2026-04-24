@@ -80,6 +80,10 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
           You can update these after onboarding in
           <strong>Settings → Planning</strong>.
         </p>
+
+        <button type="button" class="save-btn" [disabled]="isSaving()" (click)="save()">
+          {{ isSaving() ? 'Saving…' : 'Save & Continue →' }}
+        </button>
       </div>
     }
   `,
@@ -189,6 +193,21 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       color: #6b7280;
       margin: 0;
     }
+
+    .save-btn {
+      align-self: flex-end;
+      background: #d97706;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .save-btn:hover { background: #b45309; }
   `],
 })
 export class PlanningPrefsSubstepComponent implements OnInit {
@@ -197,12 +216,13 @@ export class PlanningPrefsSubstepComponent implements OnInit {
   readonly state = inject(OnboardingStateService);
   private readonly preferencesService = inject(PreferencesService);
 
-  // Form state — public so tests and parent spokes can access via @ViewChild
+  // Form state — public for test access
   readonly planLength = signal<7 | 14 | 28>(14);
   readonly weekStart = signal<number>(1); // Monday default
   readonly planningDay = signal<number>(1); // Monday default
   readonly planningTime = signal<string>('08:00');
   readonly saveError = signal(false);
+  readonly isSaving = signal(false);
 
   readonly planLengthOptions: { value: 7 | 14 | 28; label: string }[] = [
     { value: 7, label: '1 week' },
@@ -226,14 +246,15 @@ export class PlanningPrefsSubstepComponent implements OnInit {
     this.planningTime.set((event.target as HTMLInputElement).value);
   }
 
-  /** Called by the parent spoke via @ViewChild when SpokeChromeComponent emits continueClick. */
   save(): void {
+    if (this.isSaving()) return;
     // planning_trigger_offset: signed days from plan start to the planning day.
     // Formula: -((weekStart - planningDay + 7) % 7)
     // e.g. weekStart=Mon(1), planningDay=Sun(0) → -1; planningDay=Mon(1) → 0; planningDay=Sat(6) → -2
     const raw = (this.weekStart() - this.planningDay() + 7) % 7;
     const offset = raw === 0 ? 0 : -raw;
     this.saveError.set(false);
+    this.isSaving.set(true);
     this.preferencesService
       .patchPreferences({
         default_plan_length_days: this.planLength(),
@@ -243,6 +264,7 @@ export class PlanningPrefsSubstepComponent implements OnInit {
       })
       .subscribe({
         next: () => {
+          this.isSaving.set(false);
           const d = new Date();
           const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           this.state.setPlanningPrefsComplete();
@@ -250,6 +272,7 @@ export class PlanningPrefsSubstepComponent implements OnInit {
           this.complete.emit();
         },
         error: () => {
+          this.isSaving.set(false);
           this.saveError.set(true);
         },
       });

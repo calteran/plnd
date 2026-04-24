@@ -103,9 +103,30 @@ describe('SpokeChromeComponent', () => {
     expect(spy).toHaveBeenCalledOnceWith(undefined);
   });
 
-  it('continue button is always present', () => {
+  it('continue button is present by default (showContinue not set)', () => {
     const fixture = setup(3, 1);
     expect(fixture.nativeElement.querySelector('.btn-continue')).not.toBeNull();
+  });
+
+  it('hides continue button when showContinue is false', () => {
+    const fixture = TestBed.createComponent(SpokeChromeComponent);
+    fixture.componentRef.setInput('title', 'Test Section');
+    fixture.componentRef.setInput('totalSteps', 3);
+    fixture.componentRef.setInput('currentStep', 1);
+    fixture.componentRef.setInput('showContinue', false);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.btn-continue')).toBeNull();
+  });
+
+  it('shows a right-side spacer when showContinue is false', () => {
+    const fixture = TestBed.createComponent(SpokeChromeComponent);
+    fixture.componentRef.setInput('title', 'Test Section');
+    fixture.componentRef.setInput('totalSteps', 3);
+    fixture.componentRef.setInput('currentStep', 1);
+    fixture.componentRef.setInput('showContinue', false);
+    fixture.detectChanges();
+    const spacers = fixture.nativeElement.querySelectorAll('.footer-spacer');
+    expect(spacers.length).toBe(2); // left spacer (step 1) + right spacer (no continue)
   });
 
   it('dots each have a title attribute', () => {

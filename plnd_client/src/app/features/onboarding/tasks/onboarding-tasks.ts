@@ -1,4 +1,4 @@
-import { Component, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
@@ -24,13 +24,12 @@ type TasksSubstep = 'planning-prefs' | 'schedule-types' | 'routines-tasks' | 'ta
       [title]="'Tasks & Routines'"
       [totalSteps]="totalDotSteps()"
       [currentStep]="currentDotStep()"
+      [showContinue]="false"
       (backClick)="onBack()"
-      (continueClick)="onContinue()"
     >
       @switch (activeSubstep()) {
         @case ('planning-prefs') {
           <app-planning-prefs-substep
-            #planningPrefsSubstep
             (complete)="onSubstepComplete()"
           />
         }
@@ -51,18 +50,6 @@ export class OnboardingTasksComponent {
   private readonly stateService = inject(OnboardingStateService);
   private readonly router = inject(Router);
 
-  /**
-   * ViewChild reference to PlanningPrefsSubstepComponent.
-   * The planning-prefs substep has no embedded save button; it relies on the
-   * parent calling save() via ViewChild. The SpokeChromeComponent's footer
-   * "Save & Continue →" button drives this for the planning-prefs step.
-   * For all other substeps the substep has its own save button, so onContinue()
-   * is a no-op there (the chrome footer button appears but is functionally
-   * redundant — tracked in #563).
-   */
-  @ViewChild('planningPrefsSubstep')
-  planningPrefsSubstep?: PlanningPrefsSubstepComponent;
-
   readonly activeSubstep = signal<TasksSubstep>(
     this.stateService.planningPrefsComplete() ? 'schedule-types' : 'planning-prefs'
   );
@@ -78,15 +65,6 @@ export class OnboardingTasksComponent {
     const idx = stepMap.indexOf(this.activeSubstep());
     return idx + 1;
   });
-
-  onContinue(): void {
-    // Only the planning-prefs substep relies on the chrome footer button for saving.
-    // All other substeps embed their own "Save & Continue →" button.
-    if (this.activeSubstep() === 'planning-prefs') {
-      this.planningPrefsSubstep?.save();
-    }
-    // No-op for other substeps: their own save buttons drive progression.
-  }
 
   onBack(): void {
     const current = this.activeSubstep();

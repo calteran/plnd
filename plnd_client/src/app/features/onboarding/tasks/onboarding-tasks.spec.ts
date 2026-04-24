@@ -16,7 +16,6 @@ import { TaskPlacementReviewSubstepComponent } from './substeps/task-placement-r
 @Component({ selector: 'app-planning-prefs-substep', standalone: true, template: '' })
 class PlanningPrefsStub {
   @Output() complete = new EventEmitter<void>();
-  save(): void { /* stub */ }
 }
 
 @Component({ selector: 'app-schedule-types-substep', standalone: true, template: '' })
@@ -231,27 +230,12 @@ describe('OnboardingTasksComponent', () => {
     expect(el).toBeTruthy();
   });
 
-  // ── onContinue() ────────────────────────────────────────────────────────────
+  // ── chrome footer continue button suppressed ─────────────────────────────────
 
-  it('onContinue() calls save() on planningPrefsSubstep when active step is planning-prefs', async () => {
-    const { component, fixture } = await setup(false);
-    expect(component.activeSubstep()).toBe('planning-prefs');
-    fixture.detectChanges();
-    const stub = component.planningPrefsSubstep as unknown as PlanningPrefsStub;
-    spyOn(stub, 'save');
-    component.onContinue();
-    expect(stub.save).toHaveBeenCalled();
-  });
-
-  it('onContinue() does not call save() when active step is not planning-prefs', async () => {
-    const { component, fixture } = await setup(false);
-    component.activeSubstep.set('schedule-types');
-    fixture.detectChanges();
-    // planningPrefsSubstep ViewChild is undefined when schedule-types is rendered
-    const saveSpy = jasmine.createSpy('save');
-    (component as unknown as { planningPrefsSubstep: { save: jasmine.Spy } }).planningPrefsSubstep = { save: saveSpy };
-    component.onContinue();
-    expect(saveSpy).not.toHaveBeenCalled();
+  it('does not render chrome footer continue button (showContinue=false)', async () => {
+    const { fixture } = await setup(false);
+    const btn = fixture.nativeElement.querySelector('.btn-continue');
+    expect(btn).toBeNull();
   });
 
   // ── Additional onBack() navigation tests ────────────────────────────────────
