@@ -9,9 +9,6 @@ import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfigService } from '../../../core/services/config.service';
 
-/** Minimal UserService stub used in most tests. */
-const userServiceStub = { completeOnboarding: () => of(undefined) };
-
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
     account: 'not-started',
@@ -46,9 +43,11 @@ describe('OnboardingHubComponent', () => {
   let fixture: ComponentFixture<OnboardingHubComponent>;
   let stateMock: ReturnType<typeof makeStateMock>;
   let router: Router;
+  let userServiceStub: { completeOnboarding: jasmine.Spy };
 
   beforeEach(async () => {
     stateMock = makeStateMock();
+    userServiceStub = { completeOnboarding: jasmine.createSpy('completeOnboarding').and.returnValue(of(undefined)) };
     await TestBed.configureTestingModule({
       imports: [OnboardingHubComponent],
       providers: [
@@ -375,7 +374,7 @@ describe('OnboardingHubComponent', () => {
 
   it('commitPlan() posts to /schedule/plan then calls completeOnboarding', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
-    spyOn(userServiceStub, 'completeOnboarding').and.callThrough();
+    spyOn(router, 'navigate');
     // Give the mock a valid plan period so commitPlan() doesn't bail early
     stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
@@ -389,6 +388,7 @@ describe('OnboardingHubComponent', () => {
     planReq.flush({ committed: 3, planning_task_status: 'completed' });
 
     expect(userServiceStub.completeOnboarding).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/day', '2026-05-01']);
 
     httpTesting.verify();
   });
