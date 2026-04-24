@@ -7,7 +7,7 @@ import {
   MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS,
   MOCK_TEMPLATE_MORNING_WALK, MOCK_PLACED_TASKS, MOCK_MEAL_PLAN,
   MOCK_MEAL_HABIT, MOCK_DIETARY_RESTRICTION_ALLERGY,
-  MOCK_DIETARY_RESTRICTION_INTOLERANCE, MOCK_PLAN_COMMITTED,
+  MOCK_PLAN_COMMITTED,
   seedOnboarding,
 } from '../helpers/onboarding-mocks';
 
@@ -877,7 +877,7 @@ test.describe('Onboarding', () => {
       await page.locator('.btn-continue').click();
 
       // Button should be disabled while generation is in flight
-      await expect(page.locator('.btn-continue')).toBeDisabled();
+      await expect(page.locator('.btn-continue')).toBeDisabled({ timeout: 500 });
       // Then enabled once the agent response arrives
       await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
     });
