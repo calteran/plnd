@@ -226,6 +226,9 @@ test.describe('Onboarding', () => {
     await page.route(`${API_BASE}/schedule/period**`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ entries: [], carryover: [] }) })
     );
+    await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+    );
 
     await page.addInitScript(() => {
       localStorage.setItem('auth_token', 'synthetic.test.token');

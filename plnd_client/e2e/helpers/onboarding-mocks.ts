@@ -99,14 +99,6 @@ export const MOCK_DIETARY_RESTRICTION_ALLERGY = {
   created_at: '2026-01-01T00:00:00Z',
 };
 
-export const MOCK_DIETARY_RESTRICTION_INTOLERANCE = {
-  restriction_id: 'restriction-lactose-uuid',
-  name: 'Lactose',
-  restriction_type: 'intolerance',
-  notes: null,
-  created_at: '2026-01-01T00:00:00Z',
-};
-
 // ── Plan commit ───────────────────────────────────────────────────────────────
 
 export const MOCK_PLAN_COMMITTED = {
