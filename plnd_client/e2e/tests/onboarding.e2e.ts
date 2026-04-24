@@ -66,6 +66,7 @@ async function completeTasksSpoke(page: Page): Promise<void> {
 
 // Navigates to tasks spoke and completes the Planning Prefs substep.
 // Page must be at /onboarding after seedOnboarding.
+// Caller is responsible for registering the /schedule-types route before calling this.
 async function landAtScheduleTypes(page: Page): Promise<void> {
   await page.locator('.section-card').nth(1).click();
   await expect(page.locator('.planning-prefs')).toBeVisible();
@@ -80,10 +81,7 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
   await page.route(`${API_BASE}/schedule-types`, route =>
     route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
   );
-  await page.locator('.section-card').nth(1).click();
-  await expect(page.locator('.planning-prefs')).toBeVisible();
-  await page.locator('.planning-prefs .save-btn').click();
-  await expect(page.locator('.schedule-types-substep')).toBeVisible();
+  await landAtScheduleTypes(page);
   await page.locator('.schedule-types-substep .save-btn').click();
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
 }
@@ -91,25 +89,7 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
 // Drives to Task Placement Review with one task added ("Morning run").
 // Does NOT mock /agent/place-tasks — each test does this individually.
 async function landAtTaskPlacement(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/schedule-types`, route =>
-    route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
-  );
-  await page.route(`${API_BASE}/schedule/templates`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-
-  await page.locator('.section-card').nth(1).click();
-  await expect(page.locator('.planning-prefs')).toBeVisible();
-  await page.locator('.planning-prefs .save-btn').click();
-  await expect(page.locator('.schedule-types-substep')).toBeVisible();
-  await page.locator('.schedule-types-substep .save-btn').click();
-
-  // Add one task before proceeding to placement
-  await expect(page.locator('.routines-tasks-substep')).toBeVisible();
-  await page.locator('[aria-label="Task name"]').fill('Morning run');
-  await page.locator('.add-btn').last().click();
-
-  // Override POST route to return matching task
+  // Register the POST-handling mock before any click so the request is intercepted correctly.
   await page.route(`${API_BASE}/schedule/templates`, route => {
     if (route.request().method() === 'POST') {
       route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning run', task_type: 'custom' } });
@@ -118,6 +98,10 @@ async function landAtTaskPlacement(page: Page): Promise<void> {
     }
   });
 
+  await landAtRoutinesTasks(page);
+
+  await page.locator('[aria-label="Task name"]').fill('Morning run');
+  await page.locator('.add-btn').last().click();
   await expect(page.locator('[aria-label="Added tasks"] .routine-chip')).toHaveCount(1);
   await page.locator('.routines-tasks-substep .save-btn').click();
 
