@@ -33,20 +33,10 @@ import { OnboardingStateService } from '../onboarding-state.service';
           <span class="field-hint">Used in greetings and plan summaries.</span>
         </div>
 
-        <!-- Email (display only — not saved) -->
+        <!-- Email (display only — managed by OAuth provider) -->
         <div class="field-group">
-          <label class="field-label" for="email">Email</label>
-          <div class="prefilled-row">
-            <input
-              id="email"
-              type="email"
-              class="text-input prefilled-input"
-              [value]="email()"
-              readonly
-              autocomplete="email"
-            />
-            <span class="prefilled-chip">Pre-filled</span>
-          </div>
+          <label class="field-label">Email</label>
+          <span class="email-display">{{ email() }}</span>
         </div>
 
         <!-- Notifications section -->
@@ -168,35 +158,12 @@ import { OnboardingStateService } from '../onboarding-state.service';
       color: #6b7280;
     }
 
-    /* ── Pre-filled row ───────────────────────────────────────── */
+    /* ── Email display (read-only) ────────────────────────────── */
 
-    .prefilled-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .prefilled-input {
-      border-color: var(--color-accent-border, #fde68a);
-      background: var(--color-accent-light, #fef3c7);
-      color: var(--color-accent-dark, #78350f);
-      flex: 1;
-    }
-
-    .prefilled-input:focus {
-      border-color: var(--color-accent, #d97706);
-    }
-
-    .prefilled-chip {
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--color-accent-dark, #78350f);
-      background: var(--color-accent-light, #fef3c7);
-      border: 1.5px solid var(--color-accent-border, #fde68a);
-      border-radius: 10px;
-      padding: 2px 8px;
-      white-space: nowrap;
-      flex-shrink: 0;
+    .email-display {
+      font-size: 14px;
+      color: #6b7280;
+      padding: 4px 0;
     }
 
     /* ── Section heading ──────────────────────────────────────── */
