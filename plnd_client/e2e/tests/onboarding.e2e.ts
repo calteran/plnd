@@ -64,6 +64,15 @@ async function completeTasksSpoke(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/onboarding$/);
 }
 
+// Navigates to tasks spoke and completes the Planning Prefs substep.
+// Page must be at /onboarding after seedOnboarding.
+async function landAtScheduleTypes(page: Page): Promise<void> {
+  await page.locator('.section-card').nth(1).click();
+  await expect(page.locator('.planning-prefs')).toBeVisible();
+  await page.locator('.planning-prefs .save-btn').click();
+  await expect(page.locator('.schedule-types-substep')).toBeVisible();
+}
+
 async function completeFoodSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/meal-habits`, route =>
     route.fulfill({ status: 200, json: [] })
@@ -450,6 +459,62 @@ test.describe('Onboarding', () => {
 
       await expect(page.locator('.planning-prefs')).not.toBeVisible();
       await expect(page.locator('.schedule-types-substep')).toBeVisible();
+    });
+  });
+
+  test.describe('Tasks spoke — Schedule Types', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/schedule-types`, route =>
+        route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+      );
+      await page.goto('/onboarding');
+      await landAtScheduleTypes(page);
+    });
+
+    test('two pre-configured cards (Weekdays + Weekends) are visible', async ({ page }) => {
+      const cards = page.locator('.schedule-card');
+      await expect(cards).toHaveCount(2);
+      await expect(cards.nth(0).locator('.card-name-input')).toHaveValue('Weekdays');
+      await expect(cards.nth(1).locator('.card-name-input')).toHaveValue('Weekends');
+    });
+
+    test('Weekdays card has M T W T F selected (5 active day pills)', async ({ page }) => {
+      const weekdays = page.locator('.schedule-card').nth(0);
+      const activePills = weekdays.locator('.day-pill.day-pill--active');
+      await expect(activePills).toHaveCount(5);
+    });
+
+    test('Add new schedule type via "+ Add schedule type"', async ({ page }) => {
+      await page.locator('.add-link').click();
+      const cards = page.locator('.schedule-card');
+      await expect(cards).toHaveCount(3);
+      await expect(cards.nth(2).locator('.card-name-input')).toHaveValue('');
+    });
+
+    test('✕ disabled while days assigned; shows inline hint on click', async ({ page }) => {
+      const firstCard = page.locator('.schedule-card').nth(0);
+      await expect(firstCard.locator('.remove-btn')).toBeDisabled();
+      // Disabled buttons don't fire click events; dispatch manually to reach Angular handler.
+      await firstCard.locator('.remove-btn').dispatchEvent('click');
+      await expect(firstCard.locator('.remove-hint')).toBeVisible();
+      await expect(firstCard.locator('.remove-hint')).toContainText('Uncheck all days before removing this type');
+    });
+
+    test('Non-7-day schedule? switches card to cycle mode', async ({ page }) => {
+      const firstCard = page.locator('.schedule-card').nth(0);
+      await firstCard.locator('.cycle-toggle-link').click();
+      const dayPills = firstCard.locator('.day-pill');
+      await expect(dayPills).toHaveCount(1);
+      await expect(firstCard.locator('.cycle-toggle-link')).toHaveText('Switch to 7-day week');
+    });
+
+    test('Switch to 7-day week reverts to letter day pills', async ({ page }) => {
+      const firstCard = page.locator('.schedule-card').nth(0);
+      await firstCard.locator('.cycle-toggle-link').click();
+      await firstCard.locator('.cycle-toggle-link').click();
+      await expect(firstCard.locator('.day-pill')).toHaveCount(7);
+      await expect(firstCard.locator('.cycle-toggle-link')).toHaveText('Non-7-day schedule?');
     });
   });
 });
