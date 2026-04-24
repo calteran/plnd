@@ -124,6 +124,15 @@ async function landAtTaskPlacement(page: Page): Promise<void> {
   await expect(page.locator('.placement-review')).toBeVisible();
 }
 
+// Lands on Meal Times substep (planningPrefsComplete=true after Tasks spoke).
+async function landAtMealTimes(page: Page): Promise<void> {
+  await completeTasksSpoke(page);
+
+  await page.locator('.section-card').nth(2).click();
+  await expect(page.locator('.spoke-title')).toHaveText('Food & Meals');
+  await expect(page.locator('.meal-times')).toBeVisible();
+}
+
 async function completeFoodSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/meal-habits`, route =>
     route.fulfill({ status: 200, json: [] })
@@ -692,6 +701,75 @@ test.describe('Onboarding', () => {
 
       const tasksCard = page.locator('.section-card').nth(1);
       await expect(tasksCard.locator('.card-badge.badge--done')).toContainText('✓ done');
+    });
+  });
+
+  test.describe('Food spoke — Meal Times', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.goto('/onboarding');
+      await landAtMealTimes(page);
+    });
+
+    test('three meal slot cards visible: Breakfast, Lunch, Dinner', async ({ page }) => {
+      const cards = page.locator('.meal-slot-card');
+      await expect(cards).toHaveCount(3);
+      await expect(cards.nth(0).locator('.card-header')).toContainText('Breakfast');
+      await expect(cards.nth(1).locator('.card-header')).toContainText('Lunch');
+      await expect(cards.nth(2).locator('.card-header')).toContainText('Dinner');
+    });
+
+    test('Save & Continue → advances to Dietary Restrictions', async ({ page }) => {
+      await page.locator('.btn-continue').click();
+      await expect(page.locator('.restrictions-substep')).toBeVisible();
+    });
+  });
+
+  test.describe('Food spoke — Dietary Restrictions', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/dietary-restrictions`, route => {
+        if (route.request().method() === 'POST') {
+          route.fulfill({ status: 201, json: MOCK_DIETARY_RESTRICTION_ALLERGY });
+        } else {
+          route.fulfill({ status: 200, json: [] });
+        }
+      });
+      await page.goto('/onboarding');
+      await landAtMealTimes(page);
+      await page.locator('.btn-continue').click();
+      await expect(page.locator('.restrictions-substep')).toBeVisible();
+    });
+
+    test('add Allergy entry shows Allergy badge', async ({ page }) => {
+      await page.locator('.type-btn').filter({ hasText: 'Allergy' }).click();
+      await expect(page.locator('.type-btn').filter({ hasText: 'Allergy' })).toHaveClass(/type-btn--active/);
+
+      await page.locator('.name-row .name-input').fill('Peanuts');
+      await page.locator('.btn-add').click();
+
+      await expect(page.locator('.restriction-card')).toHaveCount(1);
+      await expect(page.locator('.type-badge')).toContainText('Allergy');
+    });
+
+    test('tap restriction card opens inline edit mode', async ({ page }) => {
+      await page.locator('.name-row .name-input').fill('Peanuts');
+      await page.locator('.btn-add').click();
+      await expect(page.locator('.restriction-card')).toHaveCount(1);
+
+      await page.locator('.card-default').click();
+      await expect(page.locator('.card-edit')).toBeVisible();
+    });
+
+    test('cancel edit returns to default card view', async ({ page }) => {
+      await page.locator('.name-row .name-input').fill('Peanuts');
+      await page.locator('.btn-add').click();
+
+      await page.locator('.card-default').click();
+      await expect(page.locator('.card-edit')).toBeVisible();
+      await page.locator('.btn-cancel').click();
+      await expect(page.locator('.card-edit')).not.toBeVisible();
+      await expect(page.locator('.card-default')).toBeVisible();
     });
   });
 });
