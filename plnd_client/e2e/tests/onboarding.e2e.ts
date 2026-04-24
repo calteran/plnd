@@ -857,4 +857,49 @@ test.describe('Onboarding', () => {
       await expect(page.locator('.habit-chip')).toHaveCount(2);
     });
   });
+
+  test.describe('Food spoke — Meal Plan Review', () => {
+    test.beforeEach(async ({ page }) => {
+      await seedOnboarding(page);
+      await page.route(`${API_BASE}/meal-habits`, route =>
+        route.fulfill({ status: 200, json: [] })
+      );
+    });
+
+    test('Save & Continue disabled during generation; enabled after plan loads', async ({ page }) => {
+      await page.route(`${API_BASE}/agent/meal-plan`, async route => {
+        await new Promise(r => setTimeout(r, 300));
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN });
+      });
+
+      await page.goto('/onboarding');
+      await landAtMealHabits(page);
+      await page.locator('.btn-continue').click();
+
+      // Button should be disabled while generation is in flight
+      await expect(page.locator('.btn-continue')).toBeDisabled();
+      // Then enabled once the agent response arrives
+      await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
+    });
+
+    test('Save & Continue → navigates to hub with Food marked complete', async ({ page }) => {
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
+      );
+
+      await page.goto('/onboarding');
+      await landAtMealHabits(page);
+      await page.locator('.btn-continue').click();
+
+      // Wait for generation to finish, then click Save & Continue
+      await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
+      await page.locator('.btn-continue').click();
+
+      // Should return to the hub
+      await expect(page).toHaveURL(/\/onboarding$/);
+      // Food card (index 2) should be marked done
+      const foodCard = page.locator('.section-card').nth(2);
+      await expect(foodCard.locator('.card-badge.badge--done')).toContainText('✓ done');
+    });
+  });
 });
