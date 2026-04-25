@@ -136,12 +136,12 @@ import { OnboardingStateService } from '../onboarding-state.service';
     }
 
     .text-input {
-      border: 1.5px solid #d1d5db;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 8px 10px;
       font-size: 14px;
-      color: #1f2937;
-      background: #ffffff;
+      color: var(--color-text-body);
+      background: var(--color-surface-white);
       outline: none;
       transition: border-color 0.15s;
       width: 100%;
@@ -149,20 +149,20 @@ import { OnboardingStateService } from '../onboarding-state.service';
     }
 
     .text-input:focus {
-      border-color: var(--color-accent, #d97706);
-      box-shadow: 0 0 0 2px rgba(217, 119, 6, 0.15);
+      border-color: var(--color-accent);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 15%, transparent);
     }
 
     .field-hint {
       font-size: 11px;
-      color: #6b7280;
+      color: var(--color-text-muted);
     }
 
     /* ── Email display (read-only) ────────────────────────────── */
 
     .email-display {
       font-size: 14px;
-      color: #6b7280;
+      color: var(--color-text-muted);
       padding: 4px 0;
     }
 
@@ -198,7 +198,7 @@ import { OnboardingStateService } from '../onboarding-state.service';
     .toggle-label {
       font-size: 14px;
       font-weight: 600;
-      color: #1f2937;
+      color: var(--color-text-primary);
     }
 
     .toggle-subtitle {
@@ -235,9 +235,9 @@ import { OnboardingStateService } from '../onboarding-state.service';
 
     .save-error {
       font-size: 13px;
-      color: #b91c1c;
-      background: #fef2f2;
-      border: 1.5px solid #fca5a5;
+      color: var(--color-destructive);
+      background: var(--color-destructive-light);
+      border: 1.5px solid var(--color-destructive-border);
       border-radius: 6px;
       padding: 10px 12px;
       margin: 0;
