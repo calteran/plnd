@@ -7,6 +7,11 @@ body {
   color: var(--color-text-body);
 }
 button { cursor: pointer; font-family: inherit; }
+input, select, textarea {
+  background: var(--color-surface-white);
+  color: var(--color-text-body);
+  font-family: inherit;
+}
 a { color: inherit; text-decoration: none; }
 
 // Focus ring — always visible, never removed

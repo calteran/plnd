@@ -262,13 +262,13 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
     }
 
     .schedule-card {
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 10px;
       padding: 16px;
       display: flex;
       flex-direction: column;
       gap: 12px;
-      background: #ffffff;
+      background: var(--color-surface-white);
     }
 
     .card-header {
@@ -279,33 +279,33 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
 
     .card-name-input {
       flex: 1;
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 6px 10px;
       font-size: 14px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
       outline: none;
     }
 
     .card-name-input:focus {
-      border-color: #d97706;
+      border-color: var(--color-accent);
     }
 
     .remove-btn {
       background: none;
-      border: 1.5px solid #d1d5db;
+      border: 1.5px solid var(--color-btn-neutral-border);
       border-radius: 6px;
       padding: 4px 8px;
       font-size: 14px;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--color-btn-neutral-text);
       transition: color 0.15s, border-color 0.15s;
     }
 
     .remove-btn:hover:not(.remove-btn--disabled) {
-      color: #dc2626;
-      border-color: #dc2626;
+      color: var(--color-destructive);
+      border-color: var(--color-destructive);
     }
 
     .remove-btn--disabled {
@@ -315,10 +315,10 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
 
     .remove-hint {
       font-size: 11px;
-      color: #d97706;
+      color: var(--color-accent);
       margin: 0;
       padding: 4px 6px;
-      background: #fef3c7;
+      background: var(--color-accent-light);
       border-radius: 4px;
     }
 
@@ -332,21 +332,21 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      border: 1.5px solid #d1d5db;
-      background: #f3f4f6;
+      border: 1.5px solid var(--color-btn-neutral-border);
+      background: var(--color-surface-base);
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--color-text-body);
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .day-pill--active {
-      background: #d97706;
-      border-color: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-btn-accent-text);
     }
 
     .time-row {
@@ -361,11 +361,11 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
       gap: 4px;
       font-size: 11px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
 
     .time-input {
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 6px 10px;
       font-size: 13px;
@@ -376,7 +376,7 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
       border: none;
       padding: 0;
       font-size: 12px;
-      color: #d97706;
+      color: var(--color-accent);
       cursor: pointer;
       text-decoration: underline;
       text-align: left;
@@ -394,11 +394,11 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
       gap: 4px;
       font-size: 11px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
 
     .cycle-input {
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 6px 10px;
       font-size: 13px;
@@ -409,7 +409,7 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
       border: none;
       padding: 4px 0;
       font-size: 13px;
-      color: #d97706;
+      color: var(--color-accent);
       cursor: pointer;
       text-decoration: underline;
       text-align: left;
@@ -417,26 +417,26 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
     }
 
     .save-error {
-      color: #dc2626;
+      color: var(--color-destructive);
       font-size: 12px;
       margin: 0;
     }
 
     .save-btn {
       align-self: flex-end;
-      background: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      color: var(--color-btn-accent-text);
       border: none;
       border-radius: 8px;
       padding: 10px 20px;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: filter 0.15s;
     }
 
     .save-btn:hover {
-      background: #b45309;
+      filter: brightness(0.88);
     }
   `],
 })
