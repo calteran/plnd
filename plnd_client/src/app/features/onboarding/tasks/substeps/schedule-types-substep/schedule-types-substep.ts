@@ -482,13 +482,15 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
     const bitValue = 1 << bit;
     const card = this.cards()[cardIndex];
 
-    // No-op: day already belongs to this card — days cannot be deselected.
-    if ((card.days_bitmask & bitValue) !== 0) return;
+    // No-op: day already belongs to this card, or card is in cycle mode.
+    if (!card || card.is_cycle || (card.days_bitmask & bitValue) !== 0) return;
 
     this.cards.update(list =>
       list.map((c, i) => {
         if (i === cardIndex) return { ...c, days_bitmask: c.days_bitmask | bitValue };
-        if (!c.is_cycle) return { ...c, days_bitmask: c.days_bitmask & ~bitValue };
+        if (!c.is_cycle && (c.days_bitmask & bitValue) !== 0) {
+          return { ...c, days_bitmask: c.days_bitmask & ~bitValue };
+        }
         return c;
       })
     );
