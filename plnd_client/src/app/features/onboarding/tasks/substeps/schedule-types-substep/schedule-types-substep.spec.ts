@@ -99,20 +99,43 @@ describe('ScheduleTypesSubstepComponent', () => {
     expect(inputs[1].value).toBe('Rest Days');
   });
 
-  // ── 3. Toggling a day pill updates days_bitmask ──────────────────────────────
+  // ── 3. Claiming a day moves it to the clicked card ───────────────────────────
 
-  it('toggling a day pill updates the days_bitmask for that card', async () => {
+  it('clicking a day pill claims it for that card and removes it from the previous owner', async () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
-    // Card 0 is "Weekdays" with bitmask 62 (Mon–Fri). Click Sunday pill (bit 0, last pill).
+    // Card 0 is "Weekdays" (bitmask 62, Mon–Fri). Card 1 is "Weekends" (bitmask 65, Sat+Sun, bit 0=Sun).
+    // Click Sunday pill (bit 0, last pill in DAY_PILLS order M T W T F S S) on card 0.
     const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
     const dayPills: NodeListOf<HTMLButtonElement> = firstCard.querySelectorAll('.day-pill');
-    // DAY_PILLS order: M T W T F S S — last pill is Sunday (bit 0)
     const sundayPill = dayPills[6];
     sundayPill.click();
     fixture.detectChanges();
-    // 62 | (1 << 0) = 63
+    // Card 0 gains bit 0: 62 | 1 = 63
     expect(component.cards()[0].days_bitmask).toBe(63);
+    // Card 1 loses bit 0: 65 & ~1 = 64
+    expect(component.cards()[1].days_bitmask).toBe(64);
+  });
+
+  it('clicking an already-active day pill is a no-op', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    // Monday is bit 1, already set on Weekdays (bitmask 62).
+    component.toggleDay(0, 1);
+    expect(component.cards()[0].days_bitmask).toBe(62);
+    expect(component.cards()[1].days_bitmask).toBe(65);
+  });
+
+  it('claiming a day does not affect cycle-mode cards', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    // Enable cycle mode on card 1; give it a bitmask to verify it stays untouched.
+    component.enableCycleMode(1);
+    component.updateCard(1, { days_bitmask: 0b0101 });
+    // Claim Sunday (bit 0) on card 0 — card 0 doesn't own it yet after enableCycleMode cleared card 1.
+    component.toggleDay(0, 0);
+    // Card 1 (cycle) should be unchanged.
+    expect(component.cards()[1].days_bitmask).toBe(0b0101);
   });
 
   // ── 4. ✕ button is disabled when days_bitmask > 0 ───────────────────────────
