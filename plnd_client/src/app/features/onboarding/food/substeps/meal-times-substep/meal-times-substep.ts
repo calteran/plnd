@@ -56,13 +56,13 @@ function toHHMM(t: string | undefined): string | null {
       color: var(--color-accent-dark, #78350f);
     }
     .card-body { padding: 12px 14px; display: flex; gap: 24px; flex-wrap: wrap; }
-    .time-label { font-size: 12px; font-weight: 600; color: #374151; display: flex; flex-direction: column; gap: 4px; }
+    .time-label { font-size: 12px; font-weight: 600; color: var(--color-text-body); display: flex; flex-direction: column; gap: 4px; }
     .time-label input {
       border: 1.5px solid var(--color-accent-border, #fde68a);
       border-radius: 6px; padding: 5px 8px; font-size: 13px;
     }
-    .note { font-size: 12px; color: #6b7280; margin: 4px 0 0; }
-    .error { color: #dc2626; font-size: 12px; margin: 4px 0 0; }
+    .note { font-size: 12px; color: var(--color-text-muted); margin: 4px 0 0; }
+    .error { color: var(--color-destructive); font-size: 12px; margin: 4px 0 0; }
   `],
 })
 export class MealTimesSubstepComponent implements OnInit {

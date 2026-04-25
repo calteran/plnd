@@ -109,7 +109,7 @@ import { UserService } from '../../../core/services/user.service';
       border: none;
       cursor: pointer;
       font-size: 0.875rem;
-      color: #6366f1;
+      color: var(--color-accent);
       padding: 0.25rem 0.5rem;
     }
 
@@ -117,11 +117,11 @@ import { UserService } from '../../../core/services/user.service';
 
     h1 { margin: 0; font-size: 1.5rem; }
 
-    .loading-text { color: #6b7280; }
+    .loading-text { color: var(--color-text-muted); }
 
     .info-section {
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
+      background: var(--color-surface-warm);
+      border: 1px solid var(--color-border-row);
       border-radius: 8px;
       padding: 1rem;
       margin-bottom: 1.5rem;
@@ -134,32 +134,32 @@ import { UserService } from '../../../core/services/user.service';
       font-size: 0.875rem;
     }
 
-    .info-row + .info-row { border-top: 1px solid #e5e7eb; }
+    .info-row + .info-row { border-top: 1px solid var(--color-border-row); }
 
-    .info-label { color: #6b7280; }
-    .info-value { color: #111827; font-weight: 500; }
+    .info-label { color: var(--color-text-muted); }
+    .info-value { color: var(--color-text-primary); font-weight: 500; }
 
     .edit-form { display: flex; flex-direction: column; gap: 1.25rem; }
 
     .form-field { display: flex; flex-direction: column; gap: 0.375rem; }
 
-    label { font-size: 0.875rem; font-weight: 500; color: #374151; }
+    label { font-size: 0.875rem; font-weight: 500; color: var(--color-text-body); }
 
     input {
       padding: 0.5rem 0.75rem;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--color-accent-border);
       border-radius: 6px;
       font-size: 0.875rem;
       outline: none;
       transition: border-color 0.15s ease;
     }
 
-    input:focus { border-color: #6366f1; }
+    input:focus { border-color: var(--color-accent); }
 
-    .field-error { font-size: 0.75rem; color: #dc2626; }
+    .field-error { font-size: 0.75rem; color: var(--color-destructive); }
 
-    .status-success { color: #16a34a; font-size: 0.875rem; margin: 0; }
-    .status-error   { color: #dc2626; font-size: 0.875rem; margin: 0; }
+    .status-success { color: var(--color-success); font-size: 0.875rem; margin: 0; }
+    .status-error   { color: var(--color-destructive); font-size: 0.875rem; margin: 0; }
 
     .form-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
 
@@ -170,16 +170,16 @@ import { UserService } from '../../../core/services/user.service';
       font-weight: 500;
       cursor: pointer;
       border: none;
-      transition: opacity 0.15s ease;
+      transition: filter 0.15s ease, opacity 0.15s ease;
     }
 
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .btn--primary { background: #6366f1; color: #fff; }
-    .btn--primary:hover:not(:disabled) { background: #4f46e5; }
+    .btn--primary { background: var(--color-accent); color: var(--color-btn-accent-text); }
+    .btn--primary:hover:not(:disabled) { filter: brightness(0.88); }
 
-    .btn--secondary { background: #e5e7eb; color: #374151; }
-    .btn--secondary:hover { background: #d1d5db; }
+    .btn--secondary { background: var(--color-btn-neutral-border); color: var(--color-text-body); }
+    .btn--secondary:hover:not(:disabled) { filter: brightness(0.92); }
   `]
 })
 export class ProfileComponent implements OnInit {
