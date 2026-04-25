@@ -477,11 +477,23 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Toggle a day bit in the bitmask for 7-day mode. */
+  /** Claim a calendar day for this card, moving it away from whichever card currently owns it. */
   toggleDay(cardIndex: number, bit: number): void {
+    const bitValue = 1 << bit;
     const card = this.cards()[cardIndex];
-    const newMask = card.days_bitmask ^ (1 << bit);
-    this.updateCard(cardIndex, { days_bitmask: newMask });
+
+    // No-op: day already belongs to this card, or card is in cycle mode.
+    if (!card || card.is_cycle || (card.days_bitmask & bitValue) !== 0) return;
+
+    this.cards.update(list =>
+      list.map((c, i) => {
+        if (i === cardIndex) return { ...c, days_bitmask: c.days_bitmask | bitValue };
+        if (!c.is_cycle && (c.days_bitmask & bitValue) !== 0) {
+          return { ...c, days_bitmask: c.days_bitmask & ~bitValue };
+        }
+        return c;
+      })
+    );
   }
 
   /** Toggle a numbered cycle day. Cycle days use bits 0…(N-1), day n uses bit (n-1). */
