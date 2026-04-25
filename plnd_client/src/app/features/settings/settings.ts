@@ -95,7 +95,7 @@ import { PreferencesService } from '../../core/services/preferences.service';
       display: block;
       width: 100%;
       padding: 0.5rem;
-      border: 1px solid var(--color-border-row);
+      border: 1px solid var(--color-accent-border);
       border-radius: 4px;
     }
 

@@ -435,7 +435,7 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
       transition: filter 0.15s;
     }
 
-    .save-btn:hover {
+    .save-btn:hover:not(:disabled) {
       filter: brightness(0.88);
     }
   `],

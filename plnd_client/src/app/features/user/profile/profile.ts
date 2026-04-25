@@ -147,7 +147,7 @@ import { UserService } from '../../../core/services/user.service';
 
     input {
       padding: 0.5rem 0.75rem;
-      border: 1px solid var(--color-border-row);
+      border: 1px solid var(--color-accent-border);
       border-radius: 6px;
       font-size: 0.875rem;
       outline: none;
@@ -170,7 +170,7 @@ import { UserService } from '../../../core/services/user.service';
       font-weight: 500;
       cursor: pointer;
       border: none;
-      transition: filter 0.15s ease;
+      transition: filter 0.15s ease, opacity 0.15s ease;
     }
 
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -178,8 +178,8 @@ import { UserService } from '../../../core/services/user.service';
     .btn--primary { background: var(--color-accent); color: var(--color-btn-accent-text); }
     .btn--primary:hover:not(:disabled) { filter: brightness(0.88); }
 
-    .btn--secondary { background: var(--color-surface-white); color: var(--color-text-body); border: 1px solid var(--color-border-row); }
-    .btn--secondary:hover { filter: brightness(0.92); }
+    .btn--secondary { background: var(--color-btn-neutral-border); color: var(--color-text-body); }
+    .btn--secondary:hover:not(:disabled) { filter: brightness(0.92); }
   `]
 })
 export class ProfileComponent implements OnInit {
