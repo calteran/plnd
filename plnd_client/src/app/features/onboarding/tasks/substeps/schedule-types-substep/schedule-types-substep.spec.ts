@@ -212,6 +212,24 @@ describe('ScheduleTypesSubstepComponent', () => {
     expect(inputs[2].value).toBe('');
   });
 
+  // ── 8b. "Non-7-day schedule?" appends a cycle card ───────────────────────────
+
+  it('clicking "Non-7-day schedule?" appends a card with is_cycle=true and cycle_length=1', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    const addLinks: NodeListOf<HTMLButtonElement> =
+      fixture.nativeElement.querySelectorAll('.add-link');
+    addLinks[1].click(); // second add-link is "Non-7-day schedule?"
+    fixture.detectChanges();
+    const cards = component.cards();
+    expect(cards.length).toBe(3);
+    expect(cards[2].is_cycle).toBeTrue();
+    expect(cards[2].cycle_length).toBe(1);
+    const cycleInputs: NodeListOf<HTMLInputElement> =
+      fixture.nativeElement.querySelectorAll('.schedule-card')[2].querySelectorAll('.cycle-input');
+    expect(cycleInputs.length).toBe(2);
+  });
+
   // ── 9. Cycle mode toggle shows cycle-length and anchor-date inputs ───────────
 
   it('clicking "Non-7-day schedule?" shows cycle-length and anchor-date inputs', async () => {

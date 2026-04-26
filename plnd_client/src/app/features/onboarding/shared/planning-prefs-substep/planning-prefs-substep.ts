@@ -124,20 +124,20 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
     .seg-btn {
       flex: 1;
-      background: #ffffff;
+      background: var(--color-surface-white);
       border: none;
       border-right: 1.5px solid var(--color-accent-border, #fde68a);
       padding: 8px;
       font-size: 13px;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--color-btn-neutral-text);
     }
 
     .seg-btn:last-child { border-right: none; }
 
     .seg-btn--active {
       background: var(--color-accent, #d97706);
-      color: #ffffff;
+      color: var(--color-btn-accent-text);
       font-weight: 700;
     }
 
@@ -151,12 +151,12 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      border: 1.5px solid #d1d5db;
-      background: #ffffff;
+      border: 1.5px solid var(--color-btn-neutral-border);
+      background: var(--color-surface-white);
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--color-text-body);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -165,7 +165,7 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     .day-pill--active {
       background: var(--color-accent, #d97706);
       border-color: var(--color-accent, #d97706);
-      color: #ffffff;
+      color: var(--color-btn-accent-text);
     }
 
     .planning-day-row {
@@ -183,31 +183,31 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     }
 
     .save-error {
-      color: #dc2626;
+      color: var(--color-destructive);
       font-size: 12px;
       margin: 0;
     }
 
     .footer-note {
       font-size: 12px;
-      color: #6b7280;
+      color: var(--color-text-muted);
       margin: 0;
     }
 
     .save-btn {
       align-self: flex-end;
-      background: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      color: var(--color-btn-accent-text);
       border: none;
       border-radius: 8px;
       padding: 10px 20px;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: filter 0.15s;
     }
 
-    .save-btn:hover { background: #b45309; }
+    .save-btn:hover { filter: brightness(0.88); }
   `],
 })
 export class PlanningPrefsSubstepComponent implements OnInit {
