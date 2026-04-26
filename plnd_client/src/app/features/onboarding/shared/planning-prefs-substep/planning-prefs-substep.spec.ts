@@ -139,33 +139,6 @@ describe('PlanningPrefsSubstepComponent', () => {
     expect(text).toContain('Planning');
   });
 
-  // ── embedded save button ─────────────────────────────────────────────────────
-
-  it('renders a Save & Continue button when prefs not complete', async () => {
-    const { fixture } = await setup(false);
-    fixture.detectChanges();
-    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
-    expect(btn).not.toBeNull();
-    expect(btn.textContent?.trim()).toContain('Save');
-  });
-
-  it('clicking the save button invokes patchPreferences', async () => {
-    const { fixture, prefsMock } = await setup(false);
-    fixture.detectChanges();
-    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
-    btn.click();
-    expect(prefsMock.patchPreferences).toHaveBeenCalledTimes(1);
-  });
-
-  it('save button is disabled while isSaving is true', async () => {
-    const { fixture, component } = await setup(false);
-    fixture.detectChanges();
-    component.isSaving.set(true);
-    fixture.detectChanges();
-    const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
-    expect(btn.disabled).toBeTrue();
-  });
-
   it('save() is a no-op when isSaving is already true', async () => {
     const { fixture, component, prefsMock } = await setup(false);
     fixture.detectChanges();

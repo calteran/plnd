@@ -230,10 +230,20 @@ describe('OnboardingTasksComponent', () => {
     expect(el).toBeTruthy();
   });
 
-  // ── chrome footer continue button suppressed ─────────────────────────────────
+  // ── chrome footer continue button ────────────────────────────────────────────────────
 
-  it('does not render chrome footer continue button (showContinue=false)', async () => {
-    const { fixture } = await setup(false);
+  it('renders footer continue button when on planning-prefs substep', async () => {
+    const { fixture, component } = await setup(false);
+    component.activeSubstep.set('planning-prefs');
+    fixture.detectChanges();
+    const btn = fixture.nativeElement.querySelector('.btn-continue');
+    expect(btn).not.toBeNull();
+  });
+
+  it('hides footer continue button on non-planning-prefs substeps', async () => {
+    const { fixture, component } = await setup(false);
+    component.activeSubstep.set('schedule-types');
+    fixture.detectChanges();
     const btn = fixture.nativeElement.querySelector('.btn-continue');
     expect(btn).toBeNull();
   });

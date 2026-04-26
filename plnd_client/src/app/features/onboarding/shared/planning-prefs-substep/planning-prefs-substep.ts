@@ -81,9 +81,6 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
           <strong>Settings → Planning</strong>.
         </p>
 
-        <button type="button" class="save-btn" [disabled]="isSaving()" (click)="save()">
-          {{ isSaving() ? 'Saving…' : 'Save & Continue →' }}
-        </button>
       </div>
     }
   `,
@@ -194,20 +191,6 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       margin: 0;
     }
 
-    .save-btn {
-      align-self: flex-end;
-      background: var(--color-accent);
-      color: var(--color-btn-accent-text);
-      border: none;
-      border-radius: 8px;
-      padding: 10px 20px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      transition: filter 0.15s;
-    }
-
-    .save-btn:hover:not([disabled]) { filter: brightness(0.88); }
   `],
 })
 export class PlanningPrefsSubstepComponent implements OnInit {
