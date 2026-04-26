@@ -558,7 +558,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       transition: filter 0.15s;
     }
 
-    .save-btn:hover {
+    .save-btn:hover:not([disabled]) {
       filter: brightness(0.88);
     }
   `],

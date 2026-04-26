@@ -174,7 +174,7 @@ import { OnboardingStateService } from '../onboarding-state.service';
     .section-desc {
       margin: -4px 0 4px;
       font-size: 13px;
-      color: var(--color-text-secondary);
+      color: var(--color-text-muted);
     }
 
     .section-heading {

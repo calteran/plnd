@@ -207,7 +207,7 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       transition: filter 0.15s;
     }
 
-    .save-btn:hover { filter: brightness(0.88); }
+    .save-btn:hover:not([disabled]) { filter: brightness(0.88); }
   `],
 })
 export class PlanningPrefsSubstepComponent implements OnInit {
