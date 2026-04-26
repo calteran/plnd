@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
@@ -24,8 +24,10 @@ type TasksSubstep = 'planning-prefs' | 'schedule-types' | 'routines-tasks' | 'ta
       [title]="'Tasks & Routines'"
       [totalSteps]="totalDotSteps()"
       [currentStep]="currentDotStep()"
-      [showContinue]="false"
+      [showContinue]="activeSubstep() === 'planning-prefs'"
+      [continueDisabled]="planningPrefsRef()?.isSaving() ?? false"
       (backClick)="onBack()"
+      (continueClick)="planningPrefsRef()?.save()"
     >
       @switch (activeSubstep()) {
         @case ('planning-prefs') {
@@ -49,6 +51,8 @@ type TasksSubstep = 'planning-prefs' | 'schedule-types' | 'routines-tasks' | 'ta
 export class OnboardingTasksComponent {
   private readonly stateService = inject(OnboardingStateService);
   private readonly router = inject(Router);
+
+  readonly planningPrefsRef = viewChild(PlanningPrefsSubstepComponent);
 
   readonly activeSubstep = signal<TasksSubstep>(
     this.stateService.planningPrefsComplete() ? 'schedule-types' : 'planning-prefs'
