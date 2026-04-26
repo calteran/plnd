@@ -72,8 +72,11 @@ export function rruleToHumanLabel(rrule: string): string {
   if (rrule === 'FREQ=YEARLY')  return 'yearly';
   if (rrule.startsWith('FREQ=WEEKLY;BYDAY=')) {
     const byday = rrule.replace('FREQ=WEEKLY;BYDAY=', '');
+    if (!byday) return 'weekly';
     const names: Record<string, string> = { MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat', SU: 'Sun' };
-    return `weekly · ${byday.split(',').map(d => names[d] ?? d).join(', ')}`;
+    const order = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    const sortedDays = byday.split(',').sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return `weekly · ${sortedDays.map(d => names[d] ?? d).join(', ')}`;
   }
   return rrule;
 }
@@ -635,15 +638,19 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   selectWeekDay(byday: string): void {
-    this.selectedWeekDays = this.selectedWeekDays.includes(byday)
+    const next = this.selectedWeekDays.includes(byday)
       ? this.selectedWeekDays.filter(d => d !== byday)
       : [...this.selectedWeekDays, byday];
+    const order = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    this.selectedWeekDays = next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }
 
   toggleEditWeekDay(byday: string): void {
-    this.editSelectedWeekDays = this.editSelectedWeekDays.includes(byday)
+    const next = this.editSelectedWeekDays.includes(byday)
       ? this.editSelectedWeekDays.filter(d => d !== byday)
       : [...this.editSelectedWeekDays, byday];
+    const order = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    this.editSelectedWeekDays = next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }
 
   /** Resolve the effective rrule for the current form state. */
