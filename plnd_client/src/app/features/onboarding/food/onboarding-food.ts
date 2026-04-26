@@ -89,9 +89,10 @@ export class OnboardingFoodComponent implements OnInit {
   });
   readonly planStart = computed(() => this.state.planPeriod()?.start ?? '');
   readonly planEnd = computed(() => this.state.planPeriod()?.end ?? '');
-  readonly continueDisabledForStep = computed(() =>
-    this.internalStep() === 5 && this.weekPlanService.isGenerating()
-  );
+  readonly continueDisabledForStep = computed(() => {
+    if (this.internalStep() === 0) return this.planningPrefsRef()?.isSaving() ?? false;
+    return this.internalStep() === 5 && this.weekPlanService.isGenerating();
+  });
 
   private sessionInitialized = false;
 
