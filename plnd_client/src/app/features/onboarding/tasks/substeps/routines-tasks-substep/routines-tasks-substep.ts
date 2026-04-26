@@ -20,10 +20,10 @@ interface RecurrenceOption {
 }
 
 const RECURRENCE_OPTIONS: RecurrenceOption[] = [
-  { value: 'FREQ=DAILY',                             label: 'Every day' },
-  { value: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',      label: 'Weekdays' },
-  { value: 'FREQ=WEEKLY;BYDAY=SA,SU',                label: 'Weekends' },
-  { value: 'FREQ=WEEKLY;BYDAY=',                     label: 'Weekly…' },
+  { value: 'FREQ=DAILY',   label: 'Daily' },
+  { value: 'FREQ=WEEKLY',  label: 'Weekly' },
+  { value: 'FREQ=MONTHLY', label: 'Monthly' },
+  { value: 'FREQ=YEARLY',  label: 'Yearly' },
 ];
 
 // ── Day-of-week pills for "Weekly…" selector ─────────────────────────────────
@@ -66,39 +66,39 @@ const INSPIRATION_CHIPS: InspirationChip[] = [
 
 /** Map an rrule string to a short human-readable chip label. */
 export function rruleToHumanLabel(rrule: string): string {
-  if (rrule === 'FREQ=DAILY')                         return 'daily';
-  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR')  return 'weekdays';
-  if (rrule === 'FREQ=WEEKLY;BYDAY=SA,SU')            return 'weekends';
+  if (rrule === 'FREQ=DAILY')   return 'daily';
+  if (rrule === 'FREQ=WEEKLY')  return 'weekly';
+  if (rrule === 'FREQ=MONTHLY') return 'monthly';
+  if (rrule === 'FREQ=YEARLY')  return 'yearly';
   if (rrule.startsWith('FREQ=WEEKLY;BYDAY=')) {
     const byday = rrule.replace('FREQ=WEEKLY;BYDAY=', '');
-    const day = DAY_OPTIONS.find(d => d.byday === byday);
-    if (day) {
-      const name = { MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat', SU: 'Sun' }[byday] ?? byday;
-      return `weekly · ${name}`;
-    }
-    return 'weekly';
+    if (!byday) return 'weekly';
+    const names: Record<string, string> = { MO: 'Mon', TU: 'Tue', WE: 'Wed', TH: 'Thu', FR: 'Fri', SA: 'Sat', SU: 'Sun' };
+    const order = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    const sortedDays = byday.split(',').sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    return `weekly · ${sortedDays.map(d => names[d] ?? d).join(', ')}`;
   }
   return rrule;
 }
 
-/** Parse a stored rrule string back into the form's (selectedRrule, selectedWeekDay) pair. */
-function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekDay: string } {
-  if (rrule === 'FREQ=DAILY') return { selectedRrule: 'FREQ=DAILY', selectedWeekDay: 'MO' };
-  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR') return { selectedRrule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', selectedWeekDay: 'MO' };
-  if (rrule === 'FREQ=WEEKLY;BYDAY=SA,SU') return { selectedRrule: 'FREQ=WEEKLY;BYDAY=SA,SU', selectedWeekDay: 'MO' };
+/** Parse a stored rrule string back into the form's (selectedRrule, selectedWeekDays) pair. */
+function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekDays: string[] } {
+  if (rrule === 'FREQ=DAILY')   return { selectedRrule: 'FREQ=DAILY',   selectedWeekDays: [] };
+  if (rrule === 'FREQ=MONTHLY') return { selectedRrule: 'FREQ=MONTHLY', selectedWeekDays: [] };
+  if (rrule === 'FREQ=YEARLY')  return { selectedRrule: 'FREQ=YEARLY',  selectedWeekDays: [] };
+  if (rrule === 'FREQ=WEEKLY')  return { selectedRrule: 'FREQ=WEEKLY',  selectedWeekDays: [] };
   if (rrule.startsWith('FREQ=WEEKLY;BYDAY=')) {
     const byday = rrule.replace('FREQ=WEEKLY;BYDAY=', '');
-    return { selectedRrule: 'FREQ=WEEKLY;BYDAY=', selectedWeekDay: byday || 'MO' };
+    return { selectedRrule: 'FREQ=WEEKLY', selectedWeekDays: byday ? byday.split(',') : [] };
   }
-  return { selectedRrule: 'FREQ=DAILY', selectedWeekDay: 'MO' };
+  return { selectedRrule: 'FREQ=DAILY', selectedWeekDays: [] };
 }
 
 /** Map an rrule string to the RecurrenceType expected by the API. */
 function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' | 'custom' {
-  if (rrule === 'FREQ=DAILY')                        return 'daily';
-  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR') return 'weekdays';
-  if (rrule.startsWith('FREQ=WEEKLY;BYDAY='))        return 'weekly';
-  return 'custom';
+  if (rrule === 'FREQ=DAILY')          return 'daily';
+  if (rrule.startsWith('FREQ=WEEKLY')) return 'weekly';
+  return 'custom'; // FREQ=MONTHLY, FREQ=YEARLY
 }
 
 @Component({
@@ -141,13 +141,14 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
                 <button
                   type="button"
                   class="day-pill"
-                  [class.day-pill--active]="selectedWeekDay === day.byday"
+                  [class.day-pill--active]="selectedWeekDays.includes(day.byday)"
                   (click)="selectWeekDay(day.byday)"
                   [attr.aria-label]="day.byday"
-                  [attr.aria-pressed]="selectedWeekDay === day.byday"
+                  [attr.aria-pressed]="selectedWeekDays.includes(day.byday)"
                 >{{ day.label }}</button>
               }
             </div>
+            <p class="day-row-hint">Select days, or leave blank for every 7 days.</p>
           }
 
           <button
@@ -208,13 +209,14 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
                         <button
                           type="button"
                           class="day-pill"
-                          [class.day-pill--active]="editSelectedWeekDay === day.byday"
-                          (click)="editSelectedWeekDay = day.byday"
+                          [class.day-pill--active]="editSelectedWeekDays.includes(day.byday)"
+                          (click)="toggleEditWeekDay(day.byday)"
                           [attr.aria-label]="day.byday"
-                          [attr.aria-pressed]="editSelectedWeekDay === day.byday"
+                          [attr.aria-pressed]="editSelectedWeekDays.includes(day.byday)"
                         >{{ day.label }}</button>
                       }
                     </div>
+                    <p class="day-row-hint">Select days, or leave blank for every 7 days.</p>
                   }
                   <div class="edit-actions">
                     <button
@@ -391,6 +393,12 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       background: var(--color-accent);
       border-color: var(--color-accent);
       color: var(--color-btn-accent-text);
+    }
+
+    .day-row-hint {
+      font-size: 0.72rem;
+      color: var(--color-text-muted);
+      margin: 0;
     }
 
     .add-btn {
@@ -577,10 +585,10 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   // ── Routine form state ────────────────────────────────────────────────────
   routineName = '';
   selectedRrule = 'FREQ=DAILY';
-  selectedWeekDay = 'MO';
+  selectedWeekDays: string[] = [];
 
   get isWeeklySelected(): boolean {
-    return this.selectedRrule === 'FREQ=WEEKLY;BYDAY=';
+    return this.selectedRrule === 'FREQ=WEEKLY';
   }
 
   // ── Loading / error state ─────────────────────────────────────────────────
@@ -591,12 +599,12 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   readonly editingId = signal<string | null>(null);
   editTitle = '';
   editSelectedRrule = 'FREQ=DAILY';
-  editSelectedWeekDay = 'MO';
+  editSelectedWeekDays: string[] = [];
   readonly isSaving = signal(false);
   readonly saveError = signal('');
 
   get isEditWeeklySelected(): boolean {
-    return this.editSelectedRrule === 'FREQ=WEEKLY;BYDAY=';
+    return this.editSelectedRrule === 'FREQ=WEEKLY';
   }
 
   // ── Task form state ───────────────────────────────────────────────────────
@@ -630,13 +638,25 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   selectWeekDay(byday: string): void {
-    this.selectedWeekDay = byday;
+    const next = this.selectedWeekDays.includes(byday)
+      ? this.selectedWeekDays.filter(d => d !== byday)
+      : [...this.selectedWeekDays, byday];
+    const order = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    this.selectedWeekDays = next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  }
+
+  toggleEditWeekDay(byday: string): void {
+    const next = this.editSelectedWeekDays.includes(byday)
+      ? this.editSelectedWeekDays.filter(d => d !== byday)
+      : [...this.editSelectedWeekDays, byday];
+    const order = ['MO', 'TU', 'WE', 'TH', 'FR', 'SA', 'SU'];
+    this.editSelectedWeekDays = next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
   }
 
   /** Resolve the effective rrule for the current form state. */
   private effectiveRrule(): string {
-    if (this.selectedRrule === 'FREQ=WEEKLY;BYDAY=') {
-      return `FREQ=WEEKLY;BYDAY=${this.selectedWeekDay}`;
+    if (this.selectedRrule === 'FREQ=WEEKLY' && this.selectedWeekDays.length > 0) {
+      return `FREQ=WEEKLY;BYDAY=${this.selectedWeekDays.join(',')}`;
     }
     return this.selectedRrule;
   }
@@ -715,10 +735,10 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   openEdit(routine: { localId: string; name: string; rrule: string; templateId: string | null }): void {
-    const { selectedRrule, selectedWeekDay } = rruleToFormState(routine.rrule);
+    const { selectedRrule, selectedWeekDays } = rruleToFormState(routine.rrule);
     this.editTitle = routine.name;
     this.editSelectedRrule = selectedRrule;
-    this.editSelectedWeekDay = selectedWeekDay;
+    this.editSelectedWeekDays = selectedWeekDays;
     this.saveError.set('');
     this.editingId.set(routine.localId);
   }
@@ -757,8 +777,8 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   private editEffectiveRrule(): string {
-    if (this.editSelectedRrule === 'FREQ=WEEKLY;BYDAY=') {
-      return `FREQ=WEEKLY;BYDAY=${this.editSelectedWeekDay}`;
+    if (this.editSelectedRrule === 'FREQ=WEEKLY' && this.editSelectedWeekDays.length > 0) {
+      return `FREQ=WEEKLY;BYDAY=${this.editSelectedWeekDays.join(',')}`;
     }
     return this.editSelectedRrule;
   }

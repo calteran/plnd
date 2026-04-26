@@ -258,9 +258,9 @@ describe('RoutinesTasksSubstepComponent', () => {
     expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
   });
 
-  // ── 10. Day picker shows when "Weekly…" recurrence is selected ───────────────
+  // ── 10. Day picker shows when "Weekly" recurrence is selected ───────────────
 
-  it('shows day picker when "Weekly…" recurrence is selected', async () => {
+  it('shows day picker when "Weekly" recurrence is selected', async () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
 
@@ -268,8 +268,8 @@ describe('RoutinesTasksSubstepComponent', () => {
     let dayRow: HTMLElement | null = fixture.nativeElement.querySelector('.day-row');
     expect(dayRow).toBeNull();
 
-    // Select "Weekly…"
-    component.selectedRrule = 'FREQ=WEEKLY;BYDAY=';
+    // Select "Weekly"
+    component.selectedRrule = 'FREQ=WEEKLY';
     fixture.detectChanges();
 
     dayRow = fixture.nativeElement.querySelector('.day-row');
