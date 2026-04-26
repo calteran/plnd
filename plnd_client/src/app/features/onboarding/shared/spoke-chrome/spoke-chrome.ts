@@ -10,7 +10,7 @@ type DotState = 'completed' | 'current' | 'ahead';
   template: `
     <div class="spoke-chrome">
       <header class="spoke-header">
-        <a routerLink="/onboarding" class="hub-link">← Hub</a>
+        <a routerLink="/onboarding" class="hub-link">← Back</a>
         <h2 class="spoke-title">{{ title() }}</h2>
         <div
           class="dot-row"

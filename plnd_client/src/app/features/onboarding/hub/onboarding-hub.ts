@@ -73,7 +73,10 @@ const HUB_SECTIONS: HubSection[] = [
     <div class="hub" [class.hub--submitting]="isSubmitting()">
       <header class="hub-header">
         <h1 class="hub-title">Welcome to PLND!</h1>
-        <p class="hub-subtitle">Complete sections in any order</p>
+        <p class="hub-subtitle">
+          Let's build your first plan. Fill in each section in any order —
+          when they're all done you'll approve your plan and jump in.
+        </p>
       </header>
 
       <div class="section-grid">

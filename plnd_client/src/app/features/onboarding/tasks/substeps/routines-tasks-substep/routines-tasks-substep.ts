@@ -322,7 +322,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
     .section-subtitle {
       margin: 0;
       font-size: 13px;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
 
     .entry-form {
@@ -332,16 +332,17 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
     }
 
     .name-input {
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 8px 10px;
       font-size: 14px;
-      color: #78350f;
+      color: var(--color-text-primary);
+      background: var(--color-surface-white);
       outline: none;
     }
 
     .name-input:focus {
-      border-color: #d97706;
+      border-color: var(--color-accent);
     }
 
     .recurrence-row {
@@ -352,17 +353,17 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
 
     .recurrence-select {
       flex: 1;
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 7px 10px;
       font-size: 13px;
-      color: #78350f;
-      background: #ffffff;
+      color: var(--color-text-primary);
+      background: var(--color-surface-white);
       outline: none;
     }
 
     .recurrence-select:focus {
-      border-color: #d97706;
+      border-color: var(--color-accent);
     }
 
     .day-row {
@@ -375,43 +376,43 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      border: 1.5px solid #d1d5db;
-      background: #f3f4f6;
+      border: 1.5px solid var(--color-btn-neutral-border);
+      background: var(--color-surface-base);
       font-size: 12px;
       font-weight: 700;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--color-text-body);
       display: flex;
       align-items: center;
       justify-content: center;
     }
 
     .day-pill--active {
-      background: #d97706;
-      border-color: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-btn-accent-text);
     }
 
     .add-btn {
       align-self: flex-start;
-      background: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      color: var(--color-btn-accent-text);
       border: none;
       border-radius: 6px;
       padding: 7px 14px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: filter 0.15s;
     }
 
     .add-btn:hover:not([disabled]) {
-      background: #b45309;
+      filter: brightness(0.88);
     }
 
     .add-btn[disabled] {
-      background: #fde68a;
-      color: #78350f;
+      background: var(--color-accent-border);
+      color: var(--color-text-primary);
       cursor: not-allowed;
       opacity: 0.6;
     }
@@ -419,7 +420,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
     .add-error {
       margin: 0;
       font-size: 12px;
-      color: #dc2626;
+      color: var(--color-destructive);
     }
 
     .inspiration-block {
@@ -431,7 +432,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
     .inspiration-label {
       font-size: 11px;
       font-weight: 700;
-      color: #9ca3af;
+      color: var(--color-text-muted);
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
@@ -443,18 +444,18 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
     }
 
     .inspiration-chip {
-      background: #fff7ed;
-      border: 1.5px solid #fde68a;
+      background: var(--color-surface-warm);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 20px;
       padding: 5px 10px;
       font-size: 12px;
-      color: #78350f;
+      color: var(--color-text-primary);
       cursor: pointer;
       transition: background 0.15s;
     }
 
     .inspiration-chip:hover {
-      background: #fef3c7;
+      background: var(--color-accent-light);
     }
 
     .added-chips {
@@ -467,12 +468,12 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      background: #fef3c7;
-      border: 1.5px solid #fde68a;
+      background: var(--color-accent-light);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 20px;
       padding: 5px 10px;
       font-size: 12px;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
 
     .chip-body {
@@ -484,7 +485,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       border: none;
       padding: 0;
       cursor: pointer;
-      color: #78350f;
+      color: var(--color-text-primary);
       font-size: 12px;
       text-align: left;
     }
@@ -499,12 +500,12 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       padding: 0 2px;
       cursor: pointer;
       font-size: 11px;
-      color: #92400e;
+      color: var(--color-accent-dark);
       line-height: 1;
     }
 
     .chip-remove:hover {
-      color: #dc2626;
+      color: var(--color-destructive);
     }
 
     .routine-edit-card {
@@ -512,8 +513,8 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       flex-direction: column;
       gap: 8px;
       width: 100%;
-      background: #fff7ed;
-      border: 1.5px solid #fde68a;
+      background: var(--color-surface-warm);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 8px;
       padding: 10px 12px;
     }
@@ -526,39 +527,39 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
 
     .cancel-btn {
       background: none;
-      border: 1.5px solid #d1d5db;
+      border: 1.5px solid var(--color-btn-neutral-border);
       border-radius: 6px;
       padding: 6px 12px;
       font-size: 13px;
-      color: #6b7280;
+      color: var(--color-btn-neutral-text);
       cursor: pointer;
     }
 
     .cancel-btn:hover {
-      background: #f3f4f6;
+      background: var(--color-surface-base);
     }
 
     .divider {
       border: none;
-      border-top: 1.5px solid #fde68a;
+      border-top: 1.5px solid var(--color-accent-border);
       margin: 0;
     }
 
     .save-btn {
       align-self: flex-end;
-      background: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      color: var(--color-btn-accent-text);
       border: none;
       border-radius: 8px;
       padding: 10px 20px;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: filter 0.15s;
     }
 
-    .save-btn:hover {
-      background: #b45309;
+    .save-btn:hover:not([disabled]) {
+      filter: brightness(0.88);
     }
   `],
 })

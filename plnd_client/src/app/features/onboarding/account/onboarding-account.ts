@@ -41,6 +41,9 @@ import { OnboardingStateService } from '../onboarding-state.service';
 
         <!-- Notifications section -->
         <h3 class="section-heading">Notifications</h3>
+        <p class="section-desc">
+          PLND can remind you when it's time to plan your week, log a meal, or check off tasks.
+        </p>
 
         <!-- Email notifications -->
         <div class="toggle-row">
@@ -167,6 +170,12 @@ import { OnboardingStateService } from '../onboarding-state.service';
     }
 
     /* ── Section heading ──────────────────────────────────────── */
+
+    .section-desc {
+      margin: -4px 0 4px;
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
 
     .section-heading {
       font-size: 12px;

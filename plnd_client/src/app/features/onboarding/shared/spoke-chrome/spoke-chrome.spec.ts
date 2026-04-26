@@ -24,10 +24,10 @@ describe('SpokeChromeComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('shows "← Hub" link in header', () => {
+  it('shows "← Back" link in header', () => {
     const fixture = setup(3, 1);
     const link: HTMLAnchorElement = fixture.nativeElement.querySelector('.hub-link');
-    expect(link?.textContent?.trim()).toBe('← Hub');
+    expect(link?.textContent?.trim()).toBe('← Back');
   });
 
   it('displays the section title', () => {
