@@ -106,9 +106,9 @@ describe('OnboardingHubComponent', () => {
 
   // ── Hub subtitle ────────────────────────────────────────────────────────────
 
-  it('hub subtitle reads "Complete sections in any order"', () => {
+  it('hub subtitle prompts the user to build their first plan', () => {
     const subtitle: HTMLElement = fixture.nativeElement.querySelector('.hub-subtitle');
-    expect(subtitle?.textContent?.trim()).toBe('Complete sections in any order');
+    expect(subtitle?.textContent).toContain("Let's build your first plan");
   });
 
   // ── Section descriptions ────────────────────────────────────────────────────
