@@ -47,7 +47,7 @@ async function completeTasksSpoke(page: Page): Promise<void> {
 
   // Step 1: Planning Prefs
   await expect(page.locator('.planning-prefs')).toBeVisible();
-  await page.locator('.planning-prefs .save-btn').click();
+  await page.locator('.btn-continue').click();
 
   // Step 2: Schedule Types
   await expect(page.locator('.schedule-types-substep')).toBeVisible();
@@ -70,7 +70,7 @@ async function completeTasksSpoke(page: Page): Promise<void> {
 async function landAtScheduleTypes(page: Page): Promise<void> {
   await page.locator('.section-card').nth(1).click();
   await expect(page.locator('.planning-prefs')).toBeVisible();
-  await page.locator('.planning-prefs .save-btn').click();
+  await page.locator('.btn-continue').click();
   await expect(page.locator('.schedule-types-substep')).toBeVisible();
 }
 
@@ -539,7 +539,7 @@ test.describe('Onboarding', () => {
       await page.goto('/onboarding/food');
       await expect(page.locator('.planning-prefs')).toBeVisible();
 
-      await page.locator('.planning-prefs .save-btn').click();
+      await page.locator('.btn-continue').click();
       await expect(page.locator('.meal-times')).toBeVisible();
 
       await page.locator('.hub-link').click();
