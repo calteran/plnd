@@ -68,6 +68,30 @@ type DotState = 'completed' | 'current' | 'ahead';
       min-height: 100%;
     }
 
+    @media (min-width: 768px) {
+      .spoke-chrome {
+        min-height: unset;
+        margin-block: 32px;
+      }
+
+      .spoke-header {
+        background: transparent;
+        border-bottom: none;
+      }
+
+      .spoke-title {
+        font-size: 18px;
+        font-weight: 800;
+        color: var(--color-text-primary, #111827);
+        letter-spacing: -0.02em;
+      }
+
+      .spoke-footer {
+        background: transparent;
+        border-top: none;
+      }
+    }
+
     .spoke-header {
       display: flex;
       align-items: center;
