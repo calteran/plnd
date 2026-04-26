@@ -217,10 +217,10 @@ export class PlanningPrefsSubstepComponent implements OnInit {
   private readonly preferencesService = inject(PreferencesService);
 
   // Form state — public for test access
-  readonly planLength = signal<7 | 14 | 28>(14);
+  readonly planLength = signal<7 | 14 | 28>(7);
   readonly weekStart = signal<number>(1); // Monday default
-  readonly planningDay = signal<number>(1); // Monday default
-  readonly planningTime = signal<string>('08:00');
+  readonly planningDay = signal<number>(0); // Sunday default
+  readonly planningTime = signal<string>('15:00');
   readonly saveError = signal(false);
   readonly isSaving = signal(false);
 

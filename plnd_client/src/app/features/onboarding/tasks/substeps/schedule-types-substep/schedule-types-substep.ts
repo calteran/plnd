@@ -181,14 +181,8 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
             </label>
           </div>
 
-          <!-- Cycle mode toggle -->
-          @if (!card.is_cycle) {
-            <button
-              type="button"
-              class="cycle-toggle-link"
-              (click)="enableCycleMode(cardIdx)"
-            >Non-7-day schedule?</button>
-          } @else {
+          <!-- Cycle mode fields (only shown for cycle cards) -->
+          @if (card.is_cycle) {
             <div class="cycle-fields">
               <label class="cycle-field-label">
                 <span>Cycle length (days)</span>
@@ -228,6 +222,11 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
         class="add-link"
         (click)="addCard()"
       >+ Add schedule type</button>
+      <button
+        type="button"
+        class="add-link"
+        (click)="addCycleCard()"
+      >Non-7-day schedule?</button>
 
       <!-- Validation error -->
       @if (validationError()) {
@@ -563,6 +562,22 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
       bed_time: '22:00',
       is_cycle: false,
       cycle_length: null,
+      anchor_date: null,
+      showRemoveHint: false,
+    };
+    this.cards.update(list => [...list, blank]);
+  }
+
+  addCycleCard(): void {
+    const blank: ScheduleCard = {
+      localId: crypto.randomUUID(),
+      id: null,
+      name: '',
+      days_bitmask: 0,
+      wake_time: '07:00',
+      bed_time: '22:00',
+      is_cycle: true,
+      cycle_length: 1,
       anchor_date: null,
       showRemoveHint: false,
     };

@@ -95,10 +95,10 @@ describe('PlanningPrefsSubstepComponent', () => {
     });
   });
 
-  it('defaults plan length to 14 days', async () => {
+  it('defaults plan length to 1 week (7 days)', async () => {
     const { fixture, component } = await setup(false);
     fixture.detectChanges();
-    expect(component.planLength()).toBe(14);
+    expect(component.planLength()).toBe(7);
   });
 
   it('defaults week start to Monday (1)', async () => {
@@ -107,10 +107,10 @@ describe('PlanningPrefsSubstepComponent', () => {
     expect(component.weekStart()).toBe(1);
   });
 
-  it('defaults planning day to Monday (1)', async () => {
+  it('defaults planning day to Sunday (0)', async () => {
     const { fixture, component } = await setup(false);
     fixture.detectChanges();
-    expect(component.planningDay()).toBe(1);
+    expect(component.planningDay()).toBe(0);
   });
 
   it('selecting 4-week plan length updates signal', async () => {
@@ -187,7 +187,7 @@ describe('PlanningPrefsSubstepComponent', () => {
       default_plan_length_days: 28,
       week_start_day: 1,
       planning_trigger_offset: -1,
-      planning_time: '08:00:00',
+      planning_time: '15:00:00',
     });
   });
 
