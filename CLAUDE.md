@@ -19,6 +19,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - **ALWAYS use `just verify`** for pre-commit validation (parallel pipeline: quality + build + tests + e2e)
   - Exception: documentation-only changes (`.md` files, `docs/`) do not require `just verify`
 - Unit tests only: `just test-ng-headless` (Angular)
+- **All tests must pass before committing** — a failing test is never acceptable, regardless of whether you introduced it. There is no such thing as a "pre-existing" failure that can be ignored or dismissed. Fix every failing test before opening a PR.
 
 ### Shell Commands
 - **Never chain `cd` with `&&`** — run `cd <dir>` as a standalone command first, then follow with subsequent commands separately; this avoids triggering a permission prompt on every compound command
