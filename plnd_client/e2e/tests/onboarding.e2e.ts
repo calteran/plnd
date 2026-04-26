@@ -576,7 +576,7 @@ test.describe('Onboarding', () => {
     });
 
     test('Add new schedule type via "+ Add schedule type"', async ({ page }) => {
-      await page.locator('.add-link').click();
+      await page.getByRole('button', { name: '+ Add schedule type' }).click();
       const cards = page.locator('.schedule-card');
       await expect(cards).toHaveCount(3);
       await expect(cards.nth(2).locator('.card-name-input')).toHaveValue('');
@@ -591,20 +591,20 @@ test.describe('Onboarding', () => {
       await expect(firstCard.locator('.remove-hint')).toContainText('Uncheck all days before removing this type');
     });
 
-    test('Non-7-day schedule? switches card to cycle mode', async ({ page }) => {
-      const firstCard = page.locator('.schedule-card').nth(0);
-      await firstCard.locator('.cycle-toggle-link').click();
-      const dayPills = firstCard.locator('.day-pill');
-      await expect(dayPills).toHaveCount(1);
-      await expect(firstCard.locator('.cycle-toggle-link')).toHaveText('Switch to 7-day week');
+    test('Non-7-day schedule? adds a new cycle card', async ({ page }) => {
+      await page.getByRole('button', { name: 'Non-7-day schedule?' }).click();
+      const cards = page.locator('.schedule-card');
+      await expect(cards).toHaveCount(3);
+      await expect(cards.nth(2).locator('.cycle-toggle-link')).toHaveText('Switch to 7-day week');
     });
 
-    test('Switch to 7-day week reverts to letter day pills', async ({ page }) => {
-      const firstCard = page.locator('.schedule-card').nth(0);
-      await firstCard.locator('.cycle-toggle-link').click();
-      await firstCard.locator('.cycle-toggle-link').click();
-      await expect(firstCard.locator('.day-pill')).toHaveCount(7);
-      await expect(firstCard.locator('.cycle-toggle-link')).toHaveText('Non-7-day schedule?');
+    test('Switch to 7-day week reverts cycle card to letter day pills', async ({ page }) => {
+      await page.getByRole('button', { name: 'Non-7-day schedule?' }).click();
+      const cards = page.locator('.schedule-card');
+      const cycleCard = cards.nth(2);
+      await cycleCard.locator('.cycle-toggle-link').click();
+      await expect(cycleCard.locator('.day-pill')).toHaveCount(7);
+      await expect(cycleCard.locator('.cycle-toggle-link')).not.toBeVisible();
     });
   });
 
