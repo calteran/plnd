@@ -75,11 +75,13 @@ function makeStateMock(
   const taskNamesSignal: WritableSignal<string[]> = signal(taskNames);
   const periodSignal: WritableSignal<{ start: string; end: string } | null> = signal(period);
   const templatesSignal: WritableSignal<ScheduleTemplate[]> = signal(scheduleTemplates);
+  const routineCountSignal: WritableSignal<number> = signal(0);
 
   return {
     upcomingTaskNames: taskNamesSignal.asReadonly(),
     planPeriod: periodSignal.asReadonly(),
     scheduleTemplates: templatesSignal.asReadonly(),
+    totalRoutines: routineCountSignal.asReadonly(),
     setPlacedTasks: jasmine.createSpy('setPlacedTasks'),
     markComplete: jasmine.createSpy('markComplete'),
   };
@@ -146,18 +148,21 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
   // ── 2. Loading state while API call is in flight ─────────────────────────────
 
-  it('shows loading state while API call is in flight', async () => {
+  it('shows loading screen while API call is in flight', fakeAsync(async () => {
     const { fixture, httpController } = await setup();
     fixture.detectChanges();
 
-    const loadingMsg: HTMLElement | null = fixture.nativeElement.querySelector('.loading-msg');
-    expect(loadingMsg).not.toBeNull();
-    expect(loadingMsg!.textContent).toContain('Placing tasks in your plan');
+    const loadingScreen: HTMLElement | null =
+      fixture.nativeElement.querySelector('app-onboarding-loading-screen');
+    expect(loadingScreen).not.toBeNull();
 
-    // Flush the pending request to clean up
+    const h2: HTMLElement | null = loadingScreen!.querySelector('h2');
+    expect(h2?.textContent?.trim()).toBe('Building your plan');
+
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
     fixture.detectChanges();
-  });
+    tick(10000); // flush loading screen timers before test teardown
+  }));
 
   // ── 3. Calls POST /agent/place-tasks with correct body ───────────────────────
 

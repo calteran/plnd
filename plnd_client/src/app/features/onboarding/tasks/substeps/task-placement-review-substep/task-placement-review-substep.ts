@@ -18,6 +18,7 @@ import {
   EnergyLevel,
 } from '../../../../../core/models/week-plan';
 import { ScheduleTemplate } from '../../../../../core/models/schedule-template';
+import { OnboardingLoadingScreenComponent } from '../../../shared/onboarding-loading-screen/onboarding-loading-screen';
 
 // ── Meal slot divider definitions ────────────────────────────────────────────
 
@@ -205,7 +206,7 @@ export function expandTemplatesToEntries(
 @Component({
   selector: 'app-task-placement-review-substep',
   standalone: true,
-  imports: [],
+  imports: [OnboardingLoadingScreenComponent],
   template: `
     <div class="placement-review">
 
@@ -222,9 +223,11 @@ export function expandTemplatesToEntries(
 
       } @else if (isLoading()) {
         <!-- Loading state -->
-        <div class="loading-state">
-          <p class="loading-msg">Placing tasks in your plan&hellip;</p>
-        </div>
+        <app-onboarding-loading-screen
+          [taskCount]="loadingTaskNames().length"
+          [routineCount]="loadingRoutineCount()"
+          [taskNames]="loadingTaskNames()"
+        />
 
       } @else if (hasError()) {
         <!-- Error state -->
@@ -375,10 +378,9 @@ export function expandTemplatesToEntries(
       gap: 20px;
     }
 
-    /* ── Empty / Loading / Error ── */
+    /* ── Empty / Error ── */
 
     .empty-state,
-    .loading-state,
     .error-state {
       display: flex;
       flex-direction: column;
@@ -388,7 +390,6 @@ export function expandTemplatesToEntries(
     }
 
     .empty-msg,
-    .loading-msg,
     .error-msg {
       margin: 0;
       font-size: 14px;
@@ -685,6 +686,8 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   readonly isLoading = signal(false);
   readonly hasError = signal(false);
   readonly isEmpty = signal(false);
+  readonly loadingTaskNames    = signal<string[]>([]);
+  readonly loadingRoutineCount = signal<number>(0);
   /** Agent-placed one-off task entries — the only items saved as placed_tasks. */
   readonly entries = signal<PlaceTasksEntry[]>([]);
   /** Routine instances expanded from templates for preview only — NOT saved as placed_tasks.
@@ -720,6 +723,8 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     const period = this.stateService.planPeriod();
     if (!period) return;
 
+    this.loadingTaskNames.set(taskNames);
+    this.loadingRoutineCount.set(this.stateService.totalRoutines());
     this.isLoading.set(true);
     this.hasError.set(false);
     this.editState.set(null);
