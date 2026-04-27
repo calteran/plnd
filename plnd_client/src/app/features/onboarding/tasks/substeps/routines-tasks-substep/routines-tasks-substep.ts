@@ -182,6 +182,8 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
 
         <!-- Added routines -->
         @if (routines().length > 0) {
+          <div class="routines-block">
+          <span class="routines-label">Your routines</span>
           <div class="added-chips" aria-label="Added routines">
             @for (routine of routines(); track routine.localId) {
               @if (editingId() === routine.localId) {
@@ -252,6 +254,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
                 </span>
               }
             }
+          </div>
           </div>
         }
       </section>
@@ -452,18 +455,34 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
     }
 
     .inspiration-chip {
-      background: var(--color-surface-warm);
-      border: 1.5px solid var(--color-accent-border);
+      background: transparent;
+      border: 1.5px dashed var(--color-accent-border);
       border-radius: 20px;
       padding: 5px 10px;
       font-size: 12px;
-      color: var(--color-text-primary);
+      color: var(--color-text-muted);
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background 0.15s, color 0.15s;
     }
 
     .inspiration-chip:hover {
       background: var(--color-accent-light);
+      color: var(--color-text-primary);
+    }
+
+    .routines-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .routines-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--color-accent-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .added-chips {
@@ -476,8 +495,8 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
       display: inline-flex;
       align-items: center;
       gap: 4px;
-      background: var(--color-accent-light);
-      border: 1.5px solid var(--color-accent-border);
+      background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+      border: 1.5px solid var(--color-accent-dark);
       border-radius: 20px;
       padding: 5px 10px;
       font-size: 12px;
