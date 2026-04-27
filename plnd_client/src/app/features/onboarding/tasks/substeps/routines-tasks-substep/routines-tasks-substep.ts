@@ -122,6 +122,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
             placeholder="Routine name…"
             [(ngModel)]="routineName"
             aria-label="Routine name"
+            (keydown.enter)="addRoutine()"
           />
           <div class="recurrence-row">
             <select
@@ -275,6 +276,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
             placeholder="Task name…"
             [(ngModel)]="taskName"
             aria-label="Task name"
+            (keydown.enter)="addTask()"
           />
           <button
             type="button"
