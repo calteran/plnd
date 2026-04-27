@@ -233,7 +233,7 @@ export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
       { text: `${routines} routine${routines !== 1 ? 's' : ''}`, isTag: true },
     ]);
 
-    const templates: Array<(n: string) => MessagePart[]> = [
+    const templates: ((n: string) => MessagePart[])[] = [
       n => [{ text: 'Protecting time for ' }, { text: n, isTag: true }, { text: '…' }],
       n => [{ text: 'Fitting ' }, { text: n, isTag: true }, { text: ' into your morning…' }],
       n => [{ text: 'Scheduling ' }, { text: n, isTag: true }, { text: ' around your focus blocks…' }],
