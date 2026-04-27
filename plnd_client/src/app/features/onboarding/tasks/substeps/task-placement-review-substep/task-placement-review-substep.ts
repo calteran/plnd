@@ -17,6 +17,7 @@ import {
   PlanEntryRequest,
   EnergyLevel,
 } from '../../../../../core/models/week-plan';
+import { ScheduleTemplate } from '../../../../../core/models/schedule-template';
 
 // ── Meal slot divider definitions ────────────────────────────────────────────
 
@@ -129,6 +130,51 @@ function buildDayCards(entries: PlaceTasksEntry[], start: string, end: string): 
   });
 }
 
+// ── Routine expansion ─────────────────────────────────────────────────────────
+
+const RRULE_DAY_MAP: Record<string, number> = {
+  SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6,
+};
+
+export function expandTemplatesToEntries(
+  templates: ScheduleTemplate[],
+  planStart: string,
+  planEnd: string,
+): PlaceTasksEntry[] {
+  const dates = datesBetween(planStart, planEnd);
+  const entries: PlaceTasksEntry[] = [];
+
+  for (const t of templates) {
+    const rule = t.recurrence_rule ?? '';
+    let matchingDates: string[];
+
+    if (rule === 'FREQ=DAILY') {
+      matchingDates = dates;
+    } else if (rule.startsWith('FREQ=WEEKLY;BYDAY=')) {
+      const byday = rule.replace('FREQ=WEEKLY;BYDAY=', '');
+      const targetDays = new Set(byday.split(',').map(d => RRULE_DAY_MAP[d] ?? -1));
+      matchingDates = dates.filter(d => targetDays.has(new Date(`${d}T12:00:00`).getDay()));
+    } else {
+      // FREQ=MONTHLY, FREQ=YEARLY, bare FREQ=WEEKLY, unknown — skip client expansion.
+      // Backend handles these via schedule_template_ids.
+      continue;
+    }
+
+    for (const date of matchingDates) {
+      entries.push({
+        title: t.title,
+        scheduled_date: date,
+        task_type: t.task_type,
+        duration_minutes: t.duration_minutes ?? 30,
+        energy_required: t.energy_required,
+        time_window_start: t.time_window_start ?? '09:00',
+      });
+    }
+  }
+
+  return entries;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 @Component({
@@ -141,7 +187,7 @@ function buildDayCards(entries: PlaceTasksEntry[], start: string, end: string): 
       @if (isEmpty()) {
         <!-- Empty state -->
         <div class="empty-state">
-          <p class="empty-msg">No tasks to place. Add tasks in the previous step to see them here.</p>
+          <p class="empty-msg">No tasks or routines to place. Add items in the previous step to see them here.</p>
           <button
             type="button"
             class="save-btn"
@@ -602,8 +648,9 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   ngOnInit(): void {
     const taskNames = this.stateService.upcomingTaskNames();
     const period = this.stateService.planPeriod();
+    const scheduleTemplates = this.stateService.scheduleTemplates();
 
-    if (taskNames.length === 0 || period === null) {
+    if ((taskNames.length === 0 && scheduleTemplates.length === 0) || period === null) {
       this.isEmpty.set(true);
       return;
     }
@@ -620,11 +667,24 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
 
     const taskNames = this.stateService.upcomingTaskNames();
     const period = this.stateService.planPeriod();
-    if (!period || taskNames.length === 0) return;
+    if (!period) return;
 
     this.isLoading.set(true);
     this.hasError.set(false);
     this.editState.set(null);
+
+    const routineEntries = expandTemplatesToEntries(
+      this.stateService.scheduleTemplates(),
+      period.start,
+      period.end,
+    );
+
+    if (taskNames.length === 0) {
+      this.entries.set(routineEntries);
+      this.dayCards.set(buildDayCards(routineEntries, period.start, period.end));
+      this.isLoading.set(false);
+      return;
+    }
 
     const body: PlaceTasksRequest = {
       task_names: taskNames,
@@ -635,16 +695,17 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     this.agentService.placeTasks(body)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-      next: (result) => {
-        this.entries.set(result);
-        this.dayCards.set(buildDayCards(result, period.start, period.end));
-        this.isLoading.set(false);
-      },
-      error: () => {
-        this.hasError.set(true);
-        this.isLoading.set(false);
-      },
-    });
+        next: (result) => {
+          const allEntries = [...result, ...routineEntries];
+          this.entries.set(allEntries);
+          this.dayCards.set(buildDayCards(allEntries, period.start, period.end));
+          this.isLoading.set(false);
+        },
+        error: () => {
+          this.hasError.set(true);
+          this.isLoading.set(false);
+        },
+      });
   }
 
   // ── Row tracking ──────────────────────────────────────────────────────────
