@@ -454,9 +454,9 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     ).map(el => el.textContent?.trim() ?? '');
     expect(taskTitles).toContain('Daily Routine');
 
-    // Routine rows carry a "routine" badge, not an Edit button
-    const routineBadges = fixture.nativeElement.querySelectorAll('.routine-badge');
-    expect(routineBadges.length).toBeGreaterThan(0);
+    // Routine rows show no badge and no Edit button
+    expect(fixture.nativeElement.querySelectorAll('.routine-badge').length).toBe(0);
+    expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(0);
 
     // Save & Return must NOT include routine entries in placed_tasks
     const completeSpy = jasmine.createSpy('complete');
@@ -492,9 +492,9 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(taskTitles).toContain('Morning Walk');
     expect(taskTitles).toContain('Medication');
 
-    // Routine rows show the routine badge, not an Edit button
-    const routineBadges = fixture.nativeElement.querySelectorAll('.routine-badge');
-    expect(routineBadges.length).toBeGreaterThan(0);
+    // Routine rows show no badge; only the non-routine task has an Edit button
+    expect(fixture.nativeElement.querySelectorAll('.routine-badge').length).toBe(0);
+    expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(1);
 
     // Save & Return must include only the task in placed_tasks, NOT routine entries
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));

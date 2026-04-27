@@ -329,10 +329,6 @@ export function expandTemplatesToEntries(
                     <div class="task-row" [class.task-row--routine]="row.isRoutine">
                       @if (row.entry.time_window_start) {
                         <span class="task-time">{{ row.entry.time_window_start }}</span>
-                      } @else if (row.isRoutine) {
-                        <span class="task-time task-time--slot">
-                          {{ row.entry.after_milepost === 'breakfast' ? 'Morning' : row.entry.after_milepost === 'dinner' ? 'Evening' : 'Afternoon' }}
-                        </span>
                       }
                       <span class="task-title">{{ row.entry.title }}</span>
                       <div class="task-meta">
@@ -346,8 +342,6 @@ export function expandTemplatesToEntries(
                             (click)="openEdit(row.entryIndex)"
                             [attr.aria-label]="'Edit ' + row.entry.title"
                           >Edit</button>
-                        } @else {
-                          <span class="routine-badge">routine</span>
                         }
                       </div>
                     </div>
