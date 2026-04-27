@@ -143,10 +143,13 @@ export interface PlaceTasksRequest {
 export interface PlaceTasksEntry {
   title: string;
   scheduled_date: string; // ISO date
-  time_window_start: string; // "HH:MM"
+  task_type: string;
   duration_minutes: number;
   energy_required: EnergyLevel;
-  task_type: string;
+  /** Meal anchor for floating tasks — mutually exclusive with time_window_start. */
+  after_milepost?: string;
+  /** Exact start time "HH:MM" for fixed tasks — mutually exclusive with after_milepost. */
+  time_window_start?: string;
 }
 
 export interface PostSchedulePlanRequest {
@@ -159,6 +162,7 @@ export interface PostSchedulePlanRequest {
   carryover_decisions?: Record<string, CarryoverDecision>;
   placed_tasks?: PlanEntryRequest[];
   meal_habit_ids?: string[];
+  schedule_template_ids?: string[];
 }
 
 export interface PostSchedulePlanResponse {

@@ -48,7 +48,7 @@ interface DayCard {
 interface EditState {
   entryIndex: number;
   scheduledDate: string;
-  timeWindowStart: string;
+  timeWindowStart: string | undefined;
   durationMinutes: number;
   energyRequired: EnergyLevel;
 }
@@ -87,6 +87,17 @@ function getDayName(isoDate: string): string {
   return DAY_NAMES[d.getDay()];
 }
 
+function slotOf(entry: PlaceTasksEntry): 'morning' | 'afternoon' | 'evening' {
+  if (entry.after_milepost === 'breakfast') return 'morning';
+  if (entry.after_milepost === 'dinner') return 'evening';
+  if (entry.after_milepost === 'lunch') return 'afternoon';
+  // Fixed tasks: bucket by wall-clock time
+  const t = entry.time_window_start ?? '12:00';
+  if (t < '12:00') return 'morning';
+  if (t < '17:00') return 'afternoon';
+  return 'evening';
+}
+
 function buildDayCards(entries: PlaceTasksEntry[], start: string, end: string): DayCard[] {
   const allDates = datesBetween(start, end);
   return allDates.map(date => {
@@ -94,28 +105,19 @@ function buildDayCards(entries: PlaceTasksEntry[], start: string, end: string): 
       .map((entry, idx) => ({ entry, idx }))
       .filter(({ entry }) => entry.scheduled_date === date);
 
-    const morningTasks: TaskRow[] = dayEntries
-      .filter(({ entry }) => entry.time_window_start < '12:00')
-      .sort((a, b) => a.entry.time_window_start.localeCompare(b.entry.time_window_start))
-      .map(({ entry, idx }) => ({ kind: 'task' as const, entry, entryIndex: idx }));
-
-    const afternoonTasks: TaskRow[] = dayEntries
-      .filter(({ entry }) => entry.time_window_start >= '12:00' && entry.time_window_start < '17:00')
-      .sort((a, b) => a.entry.time_window_start.localeCompare(b.entry.time_window_start))
-      .map(({ entry, idx }) => ({ kind: 'task' as const, entry, entryIndex: idx }));
-
-    const eveningTasks: TaskRow[] = dayEntries
-      .filter(({ entry }) => entry.time_window_start >= '17:00')
-      .sort((a, b) => a.entry.time_window_start.localeCompare(b.entry.time_window_start))
-      .map(({ entry, idx }) => ({ kind: 'task' as const, entry, entryIndex: idx }));
+    const bySlot = (slot: 'morning' | 'afternoon' | 'evening'): TaskRow[] =>
+      dayEntries
+        .filter(({ entry }) => slotOf(entry) === slot)
+        .sort((a, b) => (a.entry.time_window_start ?? '').localeCompare(b.entry.time_window_start ?? ''))
+        .map(({ entry, idx }) => ({ kind: 'task' as const, entry, entryIndex: idx }));
 
     const rows: DayRow[] = [
       { kind: 'meal', label: 'BREAKFAST' },
-      ...morningTasks,
+      ...bySlot('morning'),
       { kind: 'meal', label: 'LUNCH' },
-      ...afternoonTasks,
+      ...bySlot('afternoon'),
       { kind: 'meal', label: 'DINNER' },
-      ...eveningTasks,
+      ...bySlot('evening'),
     ];
 
     return {
@@ -253,6 +255,10 @@ function buildDayCards(entries: PlaceTasksEntry[], start: string, end: string): 
                     <div class="task-row">
                       @if (row.entry.time_window_start) {
                         <span class="task-time">{{ row.entry.time_window_start }}</span>
+                      } @else {
+                        <span class="task-time task-time--slot">
+                          {{ row.entry.after_milepost === 'breakfast' ? 'Morning' : row.entry.after_milepost === 'dinner' ? 'Evening' : 'Afternoon' }}
+                        </span>
                       }
                       <span class="task-title">{{ row.entry.title }}</span>
                       <div class="task-meta">
@@ -687,10 +693,12 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
 
     this.entries.update(list => {
       const updated = [...list];
+      const hasFixedTime = !!edit.timeWindowStart;
       updated[edit.entryIndex] = {
         ...updated[edit.entryIndex],
         scheduled_date: edit.scheduledDate,
-        time_window_start: edit.timeWindowStart,
+        time_window_start: hasFixedTime ? edit.timeWindowStart : undefined,
+        after_milepost: hasFixedTime ? undefined : updated[edit.entryIndex].after_milepost,
         duration_minutes: edit.durationMinutes,
         energy_required: edit.energyRequired,
       };
@@ -719,7 +727,8 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       date: entry.scheduled_date,
       task_type: entry.task_type,
       title: entry.title,
-      scheduled_start: entry.time_window_start,
+      scheduled_start: entry.time_window_start ?? '12:00',
+      after_milepost: entry.after_milepost,
       duration_minutes: entry.duration_minutes,
       energy_required: entry.energy_required,
     }));
