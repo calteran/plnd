@@ -183,8 +183,8 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
         <!-- Added routines -->
         @if (routines().length > 0) {
           <div class="routines-block">
-          <span class="routines-label">Your routines</span>
-          <div class="added-chips" aria-label="Added routines">
+            <span class="routines-label">Your routines</span>
+            <div class="added-chips" aria-label="Added routines">
             @for (routine of routines(); track routine.localId) {
               @if (editingId() === routine.localId) {
                 <div class="routine-edit-card">
@@ -255,8 +255,8 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
               }
             }
           </div>
-          </div>
-        }
+        </div>
+      }
       </section>
 
       <hr class="divider" />
