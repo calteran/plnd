@@ -152,7 +152,11 @@ export function expandTemplatesToEntries(
       matchingDates = dates;
     } else if (rule.startsWith('FREQ=WEEKLY;BYDAY=')) {
       const byday = rule.replace('FREQ=WEEKLY;BYDAY=', '');
-      const targetDays = new Set(byday.split(',').map(d => RRULE_DAY_MAP[d] ?? -1));
+      const targetDays = new Set(
+        byday.split(',')
+          .map(d => RRULE_DAY_MAP[d])
+          .filter((n): n is number => n !== undefined),
+      );
       matchingDates = dates.filter(d => targetDays.has(new Date(`${d}T12:00:00`).getDay()));
     } else {
       // FREQ=MONTHLY, FREQ=YEARLY, bare FREQ=WEEKLY, unknown — skip client expansion.
