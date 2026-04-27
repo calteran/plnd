@@ -472,7 +472,7 @@ impl Tool for PlaceTasksTool {
                     "description": "One entry per task from the input list",
                     "items": {
                         "type": "object",
-                        "required": ["title", "scheduled_date", "time_window_start",
+                        "required": ["title", "scheduled_date",
                                      "duration_minutes", "energy_required", "task_type"],
                         "additionalProperties": false,
                         "properties": {
@@ -485,9 +485,19 @@ impl Tool for PlaceTasksTool {
                                 "format": "date",
                                 "description": "ISO date within the plan period"
                             },
+                            "after_milepost": {
+                                "type": "string",
+                                "enum": ["breakfast", "lunch", "dinner"],
+                                "description": "Time-of-day anchor for floating tasks \
+                                                (breakfast = morning, lunch = midday/afternoon, \
+                                                dinner = evening). Use for most tasks. \
+                                                Mutually exclusive with time_window_start."
+                            },
                             "time_window_start": {
                                 "type": "string",
-                                "description": "Wall-clock start time as HH:MM"
+                                "description": "Exact wall-clock start as HH:MM — for fixed tasks \
+                                                only (appointments, medication doses, scheduled calls). \
+                                                Mutually exclusive with after_milepost."
                             },
                             "duration_minutes": {
                                 "type": "integer",
@@ -502,7 +512,9 @@ impl Tool for PlaceTasksTool {
                             },
                             "task_type": {
                                 "type": "string",
-                                "description": "floating (can shift) or fixed (must be at exact time)"
+                                "enum": ["work", "exercise", "leisure",
+                                         "appointment", "medication", "custom"],
+                                "description": "Domain category that best fits the task"
                             }
                         }
                     }
@@ -713,6 +725,50 @@ mod tests {
                 "duration_minutes": 30,
                 "energy_required": "low",
                 "task_type": "floating"
+            }]
+        });
+        let result = tool.execute(&ctx, input.clone()).await.unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn place_tasks_tool_schema_does_not_require_time_window_start() {
+        let schema = PlaceTasksTool.schema();
+        let items = &schema["properties"]["entries"]["items"];
+        let required = items["required"].as_array().unwrap();
+        assert!(
+            !required
+                .iter()
+                .any(|v| v.as_str() == Some("time_window_start")),
+            "time_window_start must not be required — floating tasks use after_milepost"
+        );
+        assert!(
+            items["properties"].get("after_milepost").is_some(),
+            "after_milepost must be a declared property"
+        );
+        let variants: Vec<_> = items["properties"]["after_milepost"]["enum"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_str())
+            .collect();
+        assert_eq!(variants, vec!["breakfast", "lunch", "dinner"]);
+    }
+
+    #[tokio::test]
+    async fn place_tasks_tool_accepts_floating_task_with_after_milepost() {
+        let tool = PlaceTasksTool;
+        let ctx = ToolContext {
+            user_id: uuid::Uuid::new_v4(),
+        };
+        let input = serde_json::json!({
+            "entries": [{
+                "title": "Review expense report",
+                "scheduled_date": "2026-04-24",
+                "after_milepost": "lunch",
+                "duration_minutes": 45,
+                "energy_required": "medium",
+                "task_type": "work"
             }]
         });
         let result = tool.execute(&ctx, input.clone()).await.unwrap();

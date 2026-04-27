@@ -270,7 +270,7 @@ const PLACE_TASKS_RESPONSE_SCHEMA: &str = r##"{
         "duration_minutes":  { "type": "integer", "minimum": 1, "maximum": 480 },
         "energy_required":   { "type": "string", "enum": ["low", "medium", "high"] },
         "after_milepost":    { "type": "string", "enum": ["breakfast", "lunch", "dinner"] },
-        "time_window_start": { "type": "string" }
+        "time_window_start": { "type": "string", "pattern": "^[0-2][0-9]:[0-5][0-9]$" }
       }
     }
   }
@@ -897,5 +897,37 @@ mod tests {
             }]
         });
         assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn place_tasks_validator_rejects_non_time_string_in_time_window_start() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "entries": [{
+                "title": "Task",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "lunch",
+                "duration_minutes": 30,
+                "energy_required": "low",
+                "task_type": "work"
+            }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn place_tasks_validator_accepts_valid_hhmm_time_window_start() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "entries": [{
+                "title": "Doctor appointment",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "14:30",
+                "duration_minutes": 60,
+                "energy_required": "medium",
+                "task_type": "appointment"
+            }]
+        });
+        assert!(v.is_valid(&ok));
     }
 }
