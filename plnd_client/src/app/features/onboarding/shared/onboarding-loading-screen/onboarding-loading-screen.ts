@@ -42,14 +42,16 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-const MAX_KEEP     = 6;
-const MIN_DELAY_MS = 1100;
-const MAX_DELAY_MS = 2400;
+export const MAX_KEEP              = 6;
+export const MIN_DELAY_MS          = 1100;
+export const MAX_DELAY_MS          = 2400;
+export const TYPING_GAP_MS         = 150;
+export const EASTER_EGG_EVERY      = 15;
+export const MAX_PERSONALISED_NAMES = 5;
 
 @Component({
   selector: 'app-onboarding-loading-screen',
   standalone: true,
-  imports: [],
   template: `
     <div class="loading-screen">
 
@@ -197,7 +199,8 @@ export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
   protected readonly messages   = signal<ChatMessage[]>([]);
   protected readonly showTyping = signal(false);
 
-  private readonly timers: ReturnType<typeof setTimeout>[] = [];
+  private pendingT1: ReturnType<typeof setTimeout> | null = null;
+  private pendingT2: ReturnType<typeof setTimeout> | null = null;
   private msgIdCounter = 0;
 
   private personalisedPool: MessagePart[][] = [];
@@ -213,8 +216,8 @@ export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
-    for (const t of this.timers) clearTimeout(t);
-    this.timers.length = 0;
+    if (this.pendingT1 !== null) clearTimeout(this.pendingT1);
+    if (this.pendingT2 !== null) clearTimeout(this.pendingT2);
   }
 
   private buildPersonalisedPool(): MessagePart[][] {
@@ -237,7 +240,7 @@ export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
       n => [{ text: 'Reserving buffer after ' }, { text: n, isTag: true }, { text: '…' }],
     ];
 
-    for (const name of names.slice(0, 5)) {
+    for (const name of names.slice(0, MAX_PERSONALISED_NAMES)) {
       const tpl = templates[Math.floor(Math.random() * templates.length)];
       msgs.push(tpl(name));
     }
@@ -254,7 +257,7 @@ export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
     }
 
     this.eggCounter++;
-    if (this.eggCounter % 15 === 0) return EASTER_EGG;
+    if (this.eggCounter % EASTER_EGG_EVERY === 0) return EASTER_EGG;
 
     if (this.genericIdx >= this.genericPool.length) {
       this.genericPool = shuffle([...GENERIC_MESSAGES]);
@@ -266,16 +269,18 @@ export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
   private scheduleNext(): void {
     this.showTyping.set(true);
     const ms = MIN_DELAY_MS + Math.random() * (MAX_DELAY_MS - MIN_DELAY_MS);
-    const t1 = setTimeout(() => {
+    this.pendingT1 = setTimeout(() => {
+      this.pendingT1 = null;
       this.showTyping.set(false);
       this.msgIdCounter++;
       this.messages.update(prev => {
         const next = [...prev, { id: this.msgIdCounter, parts: this.nextMessage() }];
         return next.length > MAX_KEEP ? next.slice(next.length - MAX_KEEP) : next;
       });
-      const t2 = setTimeout(() => this.scheduleNext(), 150);
-      this.timers.push(t2);
+      this.pendingT2 = setTimeout(() => {
+        this.pendingT2 = null;
+        this.scheduleNext();
+      }, TYPING_GAP_MS);
     }, ms);
-    this.timers.push(t1);
   }
 }
