@@ -75,11 +75,13 @@ function makeStateMock(
   const taskNamesSignal: WritableSignal<string[]> = signal(taskNames);
   const periodSignal: WritableSignal<{ start: string; end: string } | null> = signal(period);
   const templatesSignal: WritableSignal<ScheduleTemplate[]> = signal(scheduleTemplates);
+  const routineCountSignal: WritableSignal<number> = signal(0);
 
   return {
     upcomingTaskNames: taskNamesSignal.asReadonly(),
     planPeriod: periodSignal.asReadonly(),
     scheduleTemplates: templatesSignal.asReadonly(),
+    totalRoutines: routineCountSignal.asReadonly(),
     setPlacedTasks: jasmine.createSpy('setPlacedTasks'),
     markComplete: jasmine.createSpy('markComplete'),
   };
