@@ -261,16 +261,16 @@ const PLACE_TASKS_RESPONSE_SCHEMA: &str = r##"{
   "definitions": {
     "PlacedTask": {
       "type": "object",
-      "required": ["title", "scheduled_date", "time_window_start",
-                   "duration_minutes", "energy_required", "task_type"],
+      "required": ["title", "scheduled_date", "duration_minutes", "energy_required", "task_type"],
       "additionalProperties": false,
       "properties": {
         "title":             { "type": "string" },
         "scheduled_date":    { "type": "string", "format": "date" },
-        "time_window_start": { "type": "string" },
+        "task_type":         { "type": "string", "enum": ["work", "exercise", "leisure", "appointment", "medication", "custom"] },
         "duration_minutes":  { "type": "integer", "minimum": 1, "maximum": 480 },
         "energy_required":   { "type": "string", "enum": ["low", "medium", "high"] },
-        "task_type":         { "type": "string" }
+        "after_milepost":    { "type": "string", "enum": ["breakfast", "lunch", "dinner"] },
+        "time_window_start": { "type": "string" }
       }
     }
   }
@@ -762,16 +762,32 @@ mod tests {
     }
 
     #[test]
-    fn place_tasks_validator_accepts_valid_entry() {
+    fn place_tasks_validator_accepts_floating_entry() {
         let v = UseCase::PlaceTasks.response_validator().unwrap();
         let ok = serde_json::json!({
             "entries": [{
                 "title": "Call dentist",
                 "scheduled_date": "2026-04-23",
-                "time_window_start": "10:00",
+                "after_milepost": "lunch",
                 "duration_minutes": 30,
                 "energy_required": "low",
-                "task_type": "floating"
+                "task_type": "appointment"
+            }]
+        });
+        assert!(v.is_valid(&ok));
+    }
+
+    #[test]
+    fn place_tasks_validator_accepts_fixed_entry() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "entries": [{
+                "title": "Doctor appointment",
+                "scheduled_date": "2026-04-23",
+                "time_window_start": "10:00",
+                "duration_minutes": 60,
+                "energy_required": "medium",
+                "task_type": "appointment"
             }]
         });
         assert!(v.is_valid(&ok));
@@ -791,9 +807,25 @@ mod tests {
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "time_window_start": "10:00",
+                "after_milepost": "lunch",
                 "duration_minutes": 30,
                 "energy_required": "extreme",
+                "task_type": "work"
+            }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn place_tasks_validator_rejects_invalid_task_type() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "entries": [{
+                "title": "Task",
+                "scheduled_date": "2026-04-23",
+                "after_milepost": "breakfast",
+                "duration_minutes": 30,
+                "energy_required": "low",
                 "task_type": "floating"
             }]
         });
@@ -807,28 +839,31 @@ mod tests {
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "time_window_start": "10:00",
+                "after_milepost": "lunch",
                 "duration_minutes": 0,
                 "energy_required": "low",
-                "task_type": "floating"
+                "task_type": "work"
             }]
         });
         assert!(!v.is_valid(&bad));
     }
 
     #[test]
-    fn place_tasks_validator_rejects_missing_time_window() {
+    fn place_tasks_validator_accepts_entry_without_time_anchor() {
+        // Neither time_window_start nor after_milepost is required by the schema;
+        // the agent prompt instructs one should always be present, but the schema
+        // itself doesn't enforce mutual exclusion.
         let v = UseCase::PlaceTasks.response_validator().unwrap();
-        let bad = serde_json::json!({
+        let ok = serde_json::json!({
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
                 "duration_minutes": 30,
                 "energy_required": "low",
-                "task_type": "floating"
+                "task_type": "work"
             }]
         });
-        assert!(!v.is_valid(&bad));
+        assert!(v.is_valid(&ok));
     }
 
     #[test]
@@ -838,11 +873,27 @@ mod tests {
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "time_window_start": "10:00",
+                "after_milepost": "lunch",
                 "duration_minutes": 30,
                 "energy_required": "low",
-                "task_type": "floating",
+                "task_type": "work",
                 "surprise": "boom"
+            }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn place_tasks_validator_rejects_invalid_after_milepost() {
+        let v = UseCase::PlaceTasks.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "entries": [{
+                "title": "Task",
+                "scheduled_date": "2026-04-23",
+                "after_milepost": "brunch",
+                "duration_minutes": 30,
+                "energy_required": "low",
+                "task_type": "work"
             }]
         });
         assert!(!v.is_valid(&bad));

@@ -586,6 +586,7 @@ export class OnboardingHubComponent {
       entries,
       placed_tasks: this.onboardingState.placedTasks(),
       meal_habit_ids: this.onboardingState.mealHabits().map(h => h.id),
+      schedule_template_ids: this.onboardingState.scheduleTemplates().map(t => t.template_id),
     };
 
     const apiBase = this.config.getConfig().api.baseUrl;

@@ -109,6 +109,9 @@ pub struct PostSchedulePlanRequest {
     /// Meal habit IDs to expand into recurring meal entries across plan_start–plan_end.
     #[serde(default)]
     pub meal_habit_ids: Vec<Uuid>,
+    /// Schedule template IDs to expand into recurring task entries across plan_start–plan_end.
+    #[serde(default)]
+    pub schedule_template_ids: Vec<Uuid>,
 }
 
 // ---------------------------------------------------------------------------
@@ -280,11 +283,13 @@ pub struct PlaceTasksRequest {
 pub struct PlaceTasksEntry {
     pub title: String,
     pub scheduled_date: NaiveDate,
-    /// Wall-clock start time as "HH:MM"
-    pub time_window_start: String,
+    pub task_type: String,
     pub duration_minutes: u32,
     pub energy_required: String,
-    pub task_type: String,
+    /// Meal anchor for floating tasks — mutually exclusive with `time_window_start`.
+    pub after_milepost: Option<String>,
+    /// Wall-clock start time "HH:MM" for fixed tasks — mutually exclusive with `after_milepost`.
+    pub time_window_start: Option<String>,
 }
 
 #[cfg(test)]
@@ -332,19 +337,36 @@ mod place_tasks_tests {
     }
 
     #[test]
-    fn place_tasks_entry_deserializes() {
+    fn place_tasks_entry_deserializes_floating() {
         let json = r#"{
             "title": "Call dentist",
             "scheduled_date": "2026-04-23",
-            "time_window_start": "10:00",
+            "after_milepost": "lunch",
             "duration_minutes": 30,
             "energy_required": "low",
-            "task_type": "floating"
+            "task_type": "appointment"
         }"#;
         let entry: PlaceTasksEntry = serde_json::from_str(json).unwrap();
         assert_eq!(entry.title, "Call dentist");
         assert_eq!(entry.duration_minutes, 30);
         assert_eq!(entry.energy_required, "low");
+        assert_eq!(entry.after_milepost.as_deref(), Some("lunch"));
+        assert!(entry.time_window_start.is_none());
+    }
+
+    #[test]
+    fn place_tasks_entry_deserializes_fixed() {
+        let json = r#"{
+            "title": "Doctor appointment",
+            "scheduled_date": "2026-04-23",
+            "time_window_start": "10:00",
+            "duration_minutes": 60,
+            "energy_required": "medium",
+            "task_type": "appointment"
+        }"#;
+        let entry: PlaceTasksEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.time_window_start.as_deref(), Some("10:00"));
+        assert!(entry.after_milepost.is_none());
     }
 
     #[test]
@@ -352,10 +374,11 @@ mod place_tasks_tests {
         let entry = PlaceTasksEntry {
             title: "Call dentist".to_string(),
             scheduled_date: chrono::NaiveDate::from_ymd_opt(2026, 4, 23).unwrap(),
-            time_window_start: "10:00".to_string(),
+            task_type: "appointment".to_string(),
             duration_minutes: 30,
             energy_required: "low".to_string(),
-            task_type: "floating".to_string(),
+            after_milepost: Some("lunch".to_string()),
+            time_window_start: None,
         };
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("\"scheduled_date\":\"2026-04-23\""));

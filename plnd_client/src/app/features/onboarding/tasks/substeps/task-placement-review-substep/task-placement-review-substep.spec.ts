@@ -331,7 +331,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
     expect(placedArg.length).toBe(3);
     expect(placedArg[0].date).toBe(MOCK_ENTRIES[0].scheduled_date);
-    expect(placedArg[0].scheduled_start).toBe(MOCK_ENTRIES[0].time_window_start);
+    expect(placedArg[0].scheduled_start).toBe(MOCK_ENTRIES[0].time_window_start!);
     expect(placedArg[0].task_type).toBe(MOCK_ENTRIES[0].task_type);
 
     expect(stateMock.markComplete).toHaveBeenCalledWith('tasks');

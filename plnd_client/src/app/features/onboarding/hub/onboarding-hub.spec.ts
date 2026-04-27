@@ -36,6 +36,7 @@ function makeStateMock() {
     mealPlan: signal(null).asReadonly(),
     placedTasks: signal([]).asReadonly(),
     mealHabits: signal([]).asReadonly(),
+    scheduleTemplates: signal([]).asReadonly(),
   };
 }
 
