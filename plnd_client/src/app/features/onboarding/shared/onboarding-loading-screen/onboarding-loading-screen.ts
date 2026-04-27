@@ -15,7 +15,7 @@ function plain(text: string): MessagePart[] {
 }
 
 const GENERIC_MESSAGES: MessagePart[][] = [
-  plain('Analysing your energy patterns…'),
+  plain('Analyzing your energy patterns…'),
   plain('Negotiating with Tuesday…'),
   plain('Untangling your week…'),
   plain('Coaxing tasks into sensible order…'),
@@ -24,7 +24,7 @@ const GENERIC_MESSAGES: MessagePart[][] = [
   plain('Aligning the cosmic schedule…'),
   plain('Applying temporal smoothing…'),
   plain('Herding cats (metaphorically)…'),
-  plain('Optimising for sanity…'),
+  plain('Optimizing for sanity…'),
   plain('Cross-referencing your best hours…'),
   plain('Resolving scheduling paradoxes…'),
   plain('Defragmenting your week…'),
@@ -69,7 +69,7 @@ export const MAX_PERSONALISED_NAMES = 5;
       </div>
 
       <div class="chat-window">
-        <div class="chat-list">
+        <div class="chat-list" role="log" aria-live="polite" aria-label="Plan building progress">
           @for (msg of messages(); track msg.id) {
             <div class="bubble entering">
               @for (part of msg.parts; track $index) {
@@ -100,7 +100,7 @@ export const MAX_PERSONALISED_NAMES = 5;
       align-items: center;
       gap: 18px;
       padding: 28px 24px 32px;
-      background: #fef9f0;
+      background: var(--color-surface-warm);
       min-height: 340px;
     }
 
@@ -145,7 +145,7 @@ export const MAX_PERSONALISED_NAMES = 5;
       border-radius: 18px; border-bottom-left-radius: 4px;
       font-size: 13px; line-height: 1.45;
       color: var(--color-text-primary, #78350f);
-      background: #fffbf0;
+      background: var(--color-surface-meal);
       border: 1px solid var(--color-accent-border, #fde68a);
       max-width: 88%;
     }
@@ -171,7 +171,7 @@ export const MAX_PERSONALISED_NAMES = 5;
       margin-bottom: 8px;
       padding: 10px 14px;
       border-radius: 18px; border-bottom-left-radius: 4px;
-      background: #fffbf0;
+      background: var(--color-surface-meal);
       border: 1px solid var(--color-accent-border, #fde68a);
       display: inline-flex; gap: 4px; align-items: center;
       animation: bubbleIn 0.3s ease forwards;
