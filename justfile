@@ -94,9 +94,9 @@ client:
 db:
     docker compose up -d db
 
-# Stop all containers
+# Stop all containers and remove volumes (next `just dev` starts with a clean DB)
 stop:
-    docker compose down
+    docker compose down -v
 
 alias down := stop
 
