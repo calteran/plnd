@@ -913,7 +913,10 @@ mod tests {
                     "task_type": "work"
                 }]
             });
-            assert!(!v.is_valid(&bad), "expected rejection for time_window_start={bad_time}");
+            assert!(
+                !v.is_valid(&bad),
+                "expected rejection for time_window_start={bad_time}"
+            );
         }
     }
 
@@ -931,7 +934,10 @@ mod tests {
                     "task_type": "appointment"
                 }]
             });
-            assert!(v.is_valid(&ok), "expected acceptance for time_window_start={good_time}");
+            assert!(
+                v.is_valid(&ok),
+                "expected acceptance for time_window_start={good_time}"
+            );
         }
     }
 }
