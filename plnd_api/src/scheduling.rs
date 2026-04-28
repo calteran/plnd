@@ -39,8 +39,7 @@ pub fn has_floating_instance_in_window(rule: &str, start: NaiveDate, end: NaiveD
     match freq {
         "WEEKLY" => !rule_uc.contains("BYDAY="),
         "MONTHLY" => {
-            let Some(day) = param_value(&rule_uc, "BYMONTHDAY")
-                .and_then(|v| v.parse::<u32>().ok())
+            let Some(day) = param_value(&rule_uc, "BYMONTHDAY").and_then(|v| v.parse::<u32>().ok())
             else {
                 return false;
             };
@@ -154,10 +153,7 @@ mod tests {
     fn weekly_byday_mo_we_fr_over_week() {
         let rule = "FREQ=WEEKLY;BYDAY=MO,WE,FR";
         let dates = constrained_dates_for_rule(rule, d(2026, 4, 27), d(2026, 5, 3));
-        assert_eq!(
-            dates,
-            vec![d(2026, 4, 27), d(2026, 4, 29), d(2026, 5, 1)]
-        );
+        assert_eq!(dates, vec![d(2026, 4, 27), d(2026, 4, 29), d(2026, 5, 1)]);
     }
 
     #[test]
@@ -168,11 +164,8 @@ mod tests {
 
     #[test]
     fn monthly_returns_empty_constrained() {
-        let dates = constrained_dates_for_rule(
-            "FREQ=MONTHLY;BYMONTHDAY=15",
-            d(2026, 4, 27),
-            d(2026, 5, 3),
-        );
+        let dates =
+            constrained_dates_for_rule("FREQ=MONTHLY;BYMONTHDAY=15", d(2026, 4, 27), d(2026, 5, 3));
         assert!(dates.is_empty());
     }
 
@@ -283,8 +276,14 @@ mod tests {
 
     #[test]
     fn rrule_byday_mo_matches_mondays_only() {
-        assert!(date_matches_recurrence(d(2026, 4, 27), "FREQ=WEEKLY;BYDAY=MO"));
-        assert!(!date_matches_recurrence(d(2026, 4, 28), "FREQ=WEEKLY;BYDAY=MO"));
+        assert!(date_matches_recurrence(
+            d(2026, 4, 27),
+            "FREQ=WEEKLY;BYDAY=MO"
+        ));
+        assert!(!date_matches_recurrence(
+            d(2026, 4, 28),
+            "FREQ=WEEKLY;BYDAY=MO"
+        ));
     }
 
     #[test]
