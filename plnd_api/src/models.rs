@@ -272,10 +272,26 @@ pub struct MealAdhocResolveResponse {
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct RoutineTemplateInput {
+    pub title: String,
+    pub task_type: String,
+    /// RRULE string: "FREQ=DAILY", "FREQ=WEEKLY;BYDAY=MO,WE", "FREQ=MONTHLY;BYMONTHDAY=15", etc.
+    pub recurrence_rule: String,
+    pub duration_minutes: u32,
+    pub energy_required: String,
+    /// Preferred window start as "HH:MM".
+    pub time_window_start: Option<String>,
+    /// Preferred window end as "HH:MM".
+    pub time_window_end: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct PlaceTasksRequest {
     pub task_names: Vec<String>,
     pub plan_start: NaiveDate,
     pub plan_end: NaiveDate,
+    #[serde(default)]
+    pub routine_templates: Vec<RoutineTemplateInput>,
 }
 
 /// One scheduled task entry returned by `POST /agent/place-tasks`.
@@ -382,6 +398,34 @@ mod place_tasks_tests {
         };
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("\"scheduled_date\":\"2026-04-23\""));
+    }
+
+    #[test]
+    fn routine_template_input_deserializes_fully() {
+        let json = r#"{
+            "title": "Medication",
+            "task_type": "medication",
+            "recurrence_rule": "FREQ=DAILY",
+            "duration_minutes": 15,
+            "energy_required": "low",
+            "time_window_start": "08:00",
+            "time_window_end": "08:30"
+        }"#;
+        let t: RoutineTemplateInput = serde_json::from_str(json).unwrap();
+        assert_eq!(t.title, "Medication");
+        assert_eq!(t.recurrence_rule, "FREQ=DAILY");
+        assert_eq!(t.time_window_start, Some("08:00".to_string()));
+    }
+
+    #[test]
+    fn place_tasks_request_backward_compatible_without_templates() {
+        let json = r#"{
+            "task_names": ["Buy groceries"],
+            "plan_start": "2026-04-28",
+            "plan_end": "2026-05-04"
+        }"#;
+        let req: PlaceTasksRequest = serde_json::from_str(json).unwrap();
+        assert!(req.routine_templates.is_empty());
     }
 }
 
