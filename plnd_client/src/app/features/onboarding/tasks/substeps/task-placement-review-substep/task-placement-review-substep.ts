@@ -16,8 +16,8 @@ import {
   PlaceTasksEntry,
   PlanEntryRequest,
   EnergyLevel,
+  RoutineTemplateInput,
 } from '../../../../../core/models/week-plan';
-import { ScheduleTemplate } from '../../../../../core/models/schedule-template';
 import { OnboardingLoadingScreenComponent } from '../../../shared/onboarding-loading-screen/onboarding-loading-screen';
 
 // ── Meal slot divider definitions ────────────────────────────────────────────
@@ -32,10 +32,7 @@ interface MealSlotDivider {
 interface TaskRow {
   kind: 'task';
   entry: PlaceTasksEntry;
-  // index into the task entries array; -1 for display-only routine rows
   entryIndex: number;
-  // routine rows are display-only — the backend expands templates via schedule_template_ids
-  isRoutine: boolean;
 }
 
 type DayRow = MealSlotDivider | TaskRow;
@@ -103,30 +100,24 @@ function slotOf(entry: PlaceTasksEntry): 'morning' | 'afternoon' | 'evening' {
 }
 
 function buildDayCards(
-  taskEntries: PlaceTasksEntry[],
-  routineEntries: PlaceTasksEntry[],
+  entries: PlaceTasksEntry[],
   start: string,
   end: string,
 ): DayCard[] {
   const allDates = datesBetween(start, end);
   return allDates.map(date => {
-    const dayTasks = taskEntries
-      .map((entry, idx) => ({ entry, idx, isRoutine: false }))
-      .filter(({ entry }) => entry.scheduled_date === date);
-
-    const dayRoutines = routineEntries
-      .map((entry, idx) => ({ entry, idx, isRoutine: true }))
+    const dayEntries = entries
+      .map((entry, idx) => ({ entry, idx }))
       .filter(({ entry }) => entry.scheduled_date === date);
 
     const bySlot = (slot: 'morning' | 'afternoon' | 'evening'): TaskRow[] =>
-      [...dayTasks, ...dayRoutines]
+      dayEntries
         .filter(({ entry }) => slotOf(entry) === slot)
         .sort((a, b) => (a.entry.time_window_start ?? '').localeCompare(b.entry.time_window_start ?? ''))
-        .map(({ entry, idx, isRoutine }) => ({
+        .map(({ entry, idx }) => ({
           kind: 'task' as const,
           entry,
-          entryIndex: isRoutine ? -1 : idx,
-          isRoutine,
+          entryIndex: idx,
         }));
 
     const rows: DayRow[] = [
@@ -145,60 +136,6 @@ function buildDayCards(
       rows,
     };
   });
-}
-
-// ── Routine expansion ─────────────────────────────────────────────────────────
-
-const RRULE_DAY_MAP: Record<string, number> = {
-  SU: 0, MO: 1, TU: 2, WE: 3, TH: 4, FR: 5, SA: 6,
-};
-
-export function expandTemplatesToEntries(
-  templates: ScheduleTemplate[],
-  planStart: string,
-  planEnd: string,
-): PlaceTasksEntry[] {
-  const dates = datesBetween(planStart, planEnd);
-  const entries: PlaceTasksEntry[] = [];
-
-  for (const t of templates) {
-    const rule = t.recurrence_rule ?? '';
-    let matchingDates: string[];
-
-    if (rule === 'FREQ=DAILY') {
-      matchingDates = dates;
-    } else if (rule.startsWith('FREQ=WEEKLY')) {
-      // Parse BYDAY by splitting on ';' so extra params (e.g. INTERVAL=2) don't break matching.
-      const parts = rule.split(';');
-      const bydayPart = parts.find(p => p.startsWith('BYDAY='));
-      if (!bydayPart) continue; // bare FREQ=WEEKLY with no days — skip
-      const byday = bydayPart.slice('BYDAY='.length);
-      const targetDays = new Set(
-        byday.split(',')
-          .map(d => RRULE_DAY_MAP[d])
-          .filter((n): n is number => n !== undefined),
-      );
-      matchingDates = dates.filter(d => targetDays.has(new Date(`${d}T12:00:00`).getDay()));
-    } else {
-      // FREQ=MONTHLY, FREQ=YEARLY, unknown — skip client expansion.
-      // Backend handles these via schedule_template_ids.
-      continue;
-    }
-
-    for (const date of matchingDates) {
-      entries.push({
-        title: t.title,
-        scheduled_date: date,
-        task_type: t.task_type,
-        duration_minutes: t.duration_minutes ?? 30,
-        energy_required: t.energy_required,
-        // Preserve null as undefined; slotOf() defaults undefined to '12:00' (afternoon slot)
-        time_window_start: t.time_window_start ?? undefined,
-      });
-    }
-  }
-
-  return entries;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -326,7 +263,7 @@ export function expandTemplatesToEntries(
                     </div>
                   } @else {
                     <!-- Default task row -->
-                    <div class="task-row" [class.task-row--routine]="row.isRoutine">
+                    <div class="task-row">
                       @if (row.entry.time_window_start) {
                         <span class="task-time">{{ row.entry.time_window_start }}</span>
                       }
@@ -335,14 +272,12 @@ export function expandTemplatesToEntries(
                         <span class="energy-badge energy-badge--{{ row.entry.energy_required }}">
                           {{ row.entry.energy_required }}
                         </span>
-                        @if (!row.isRoutine) {
-                          <button
-                            type="button"
-                            class="edit-btn"
-                            (click)="openEdit(row.entryIndex)"
-                            [attr.aria-label]="'Edit ' + row.entry.title"
-                          >Edit</button>
-                        }
+                        <button
+                          type="button"
+                          class="edit-btn"
+                          (click)="openEdit(row.entryIndex)"
+                          [attr.aria-label]="'Edit ' + row.entry.title"
+                        >Edit</button>
                       </div>
                     </div>
                   }
@@ -620,24 +555,6 @@ export function expandTemplatesToEntries(
       color: #dc2626;
     }
 
-    /* ── Routine rows ── */
-
-    .task-row--routine {
-      opacity: 0.85;
-    }
-
-    .routine-badge {
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 2px 7px;
-      border-radius: 4px;
-      background: #e0e7ff;
-      color: #4338ca;
-      border: 1px solid #c7d2fe;
-    }
-
     /* ── Meal slot note ── */
 
     .meal-slot-note {
@@ -682,11 +599,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   readonly isEmpty = signal(false);
   readonly loadingTaskNames    = signal<string[]>([]);
   readonly loadingRoutineCount = signal<number>(0);
-  /** Agent-placed one-off task entries — the only items saved as placed_tasks. */
   readonly entries = signal<PlaceTasksEntry[]>([]);
-  /** Routine instances expanded from templates for preview only — NOT saved as placed_tasks.
-   *  The backend expands these independently via schedule_template_ids. */
-  readonly routineDisplayEntries = signal<PlaceTasksEntry[]>([]);
   readonly editState = signal<EditState | null>(null);
   readonly dayCards = signal<DayCard[]>([]);
 
@@ -717,30 +630,27 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     const period = this.stateService.planPeriod();
     if (!period) return;
 
+    const routineTemplates: RoutineTemplateInput[] = this.stateService.scheduleTemplates()
+      .filter(t => t.recurrence_rule !== null)
+      .map(t => ({
+        title: t.title,
+        task_type: t.task_type,
+        recurrence_rule: t.recurrence_rule!,
+        duration_minutes: t.duration_minutes ?? 30,
+        energy_required: t.energy_required,
+        time_window_start: t.time_window_start ?? undefined,
+        time_window_end: t.time_window_end ?? undefined,
+      }));
+
     this.loadingTaskNames.set(taskNames);
     this.loadingRoutineCount.set(this.stateService.totalRoutines());
     this.isLoading.set(true);
     this.hasError.set(false);
     this.editState.set(null);
 
-    // Expand routine templates for preview — these are display-only.
-    // The backend independently expands them via schedule_template_ids.
-    const routineEntries = expandTemplatesToEntries(
-      this.stateService.scheduleTemplates(),
-      period.start,
-      period.end,
-    );
-    this.routineDisplayEntries.set(routineEntries);
-
-    if (taskNames.length === 0) {
-      this.entries.set([]);
-      this.dayCards.set(buildDayCards([], routineEntries, period.start, period.end));
-      this.isLoading.set(false);
-      return;
-    }
-
     const body: PlaceTasksRequest = {
       task_names: taskNames,
+      routine_templates: routineTemplates,
       plan_start: period.start,
       plan_end: period.end,
     };
@@ -750,7 +660,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.entries.set(result);
-          this.dayCards.set(buildDayCards(result, routineEntries, period.start, period.end));
+          this.dayCards.set(buildDayCards(result, period.start, period.end));
           this.isLoading.set(false);
         },
         error: () => {
@@ -764,7 +674,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
 
   rowTrack(row: DayRow): string {
     if (row.kind === 'meal') return `meal-${row.label}`;
-    return `${row.isRoutine ? 'routine' : 'task'}-${row.entryIndex}`;
+    return `task-${row.entryIndex}`;
   }
 
   // ── Edit actions ──────────────────────────────────────────────────────────
@@ -819,7 +729,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     });
 
     this.editState.set(null);
-    this.dayCards.set(buildDayCards(this.entries(), this.routineDisplayEntries(), period.start, period.end));
+    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end));
   }
 
   removeEntry(entryIndex: number): void {
@@ -830,7 +740,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     this.editState.set(null);
 
     // Re-index: rebuild day cards from the updated (re-indexed) entries
-    this.dayCards.set(buildDayCards(this.entries(), this.routineDisplayEntries(), period.start, period.end));
+    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end));
   }
 
   // ── Save & Return ─────────────────────────────────────────────────────────
