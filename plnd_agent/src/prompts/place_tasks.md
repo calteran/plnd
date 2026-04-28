@@ -58,6 +58,7 @@ Recurring routines appear as pre-classified lines in `prior_context`.
 
 Each line names the routine, its type, duration, energy level, optional preferred time window,
 and the exact `scheduled_date`. Produce one `PlaceTasksEntry` per line:
+- Use the provided `duration` and `energy level` values exactly as stated.
 - Use the `scheduled_date` stated in the line — do not move it to a different day.
 - Set `time_window_start` to an `"HH:MM"` that fits the preferred window (if stated) and the
   user's energy pattern. Do **not** set `after_milepost` for routine instances.

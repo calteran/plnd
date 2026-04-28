@@ -37,7 +37,7 @@ pub fn has_floating_instance_in_window(rule: &str, start: NaiveDate, end: NaiveD
     }
     let freq = param_value(&rule_uc, "FREQ").unwrap_or_default();
     match freq {
-        "WEEKLY" => !rule_uc.contains("BYDAY="),
+        "WEEKLY" => param_value(&rule_uc, "BYDAY").is_none(),
         "MONTHLY" => {
             let Some(day) = param_value(&rule_uc, "BYMONTHDAY").and_then(|v| v.parse::<u32>().ok())
             else {
@@ -60,11 +60,9 @@ pub fn has_floating_instance_in_window(rule: &str, start: NaiveDate, end: NaiveD
 
 /// True if `date` falls on a weekday in the `BYDAY=` component of an **uppercase** RRULE string.
 pub(crate) fn byday_matches(date: NaiveDate, rule_uc: &str) -> bool {
-    let Some(pos) = rule_uc.find("BYDAY=") else {
+    let Some(byday_value) = param_value(rule_uc, "BYDAY") else {
         return false;
     };
-    let after = &rule_uc[pos + 6..];
-    let byday_value = after.split(';').next().unwrap_or(after);
     let target = date.weekday();
     byday_value
         .split(',')
@@ -104,10 +102,10 @@ fn weekday_from_abbrev(abbrev: &str) -> Option<Weekday> {
 
 fn param_value<'a>(rule_uc: &'a str, key: &str) -> Option<&'a str> {
     let needle = format!("{key}=");
-    rule_uc
-        .split(';')
-        .find(|p| p.starts_with(needle.as_str()))
-        .map(|p| &p[needle.len()..])
+    rule_uc.split(';').find_map(|p| {
+        let p = p.trim();
+        p.starts_with(needle.as_str()).then(|| &p[needle.len()..])
+    })
 }
 
 fn iter_window(start: NaiveDate, end: NaiveDate) -> impl Iterator<Item = NaiveDate> {

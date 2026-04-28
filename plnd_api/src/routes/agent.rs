@@ -436,6 +436,7 @@ fn time_hint_str(start: &Option<String>, end: &Option<String>) -> String {
             e.replace(['\n', '\r'], " ")
         ),
         (Some(s), None) => format!(" preferred start {}", s.replace(['\n', '\r'], " ")),
+        (None, Some(e)) => format!(" preferred end {}", e.replace(['\n', '\r'], " ")),
         _ => String::new(),
     }
 }
@@ -972,5 +973,11 @@ mod tests {
     fn time_hint_with_no_bounds() {
         let hint = super::time_hint_str(&None, &None);
         assert!(hint.is_empty());
+    }
+
+    #[test]
+    fn time_hint_with_end_only() {
+        let hint = super::time_hint_str(&None, &Some("09:00".to_string()));
+        assert_eq!(hint, " preferred end 09:00");
     }
 }
