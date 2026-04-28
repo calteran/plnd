@@ -428,15 +428,11 @@ fn routine_prior_context(
     ctx
 }
 
-fn time_hint_str(start: &Option<String>, end: &Option<String>) -> String {
-    match (start.as_deref(), end.as_deref()) {
-        (Some(s), Some(e)) => format!(
-            " preferred {}–{}",
-            s.replace(['\n', '\r'], " "),
-            e.replace(['\n', '\r'], " ")
-        ),
-        (Some(s), None) => format!(" preferred start {}", s.replace(['\n', '\r'], " ")),
-        (None, Some(e)) => format!(" preferred end {}", e.replace(['\n', '\r'], " ")),
+fn time_hint_str(start: &Option<chrono::NaiveTime>, end: &Option<chrono::NaiveTime>) -> String {
+    match (start, end) {
+        (Some(s), Some(e)) => format!(" preferred {}–{}", s.format("%H:%M"), e.format("%H:%M")),
+        (Some(s), None) => format!(" preferred start {}", s.format("%H:%M")),
+        (None, Some(e)) => format!(" preferred end {}", e.format("%H:%M")),
         _ => String::new(),
     }
 }
@@ -911,7 +907,9 @@ mod tests {
             recurrence_rule: rule.to_string(),
             duration_minutes: 15,
             energy_required: "low".to_string(),
-            time_window_start: start_hint.map(|s| s.to_string()),
+            time_window_start: start_hint.map(|s| {
+                chrono::NaiveTime::parse_from_str(s, "%H:%M").expect("test helper: bad time string")
+            }),
             time_window_end: None,
         }
     }
@@ -959,13 +957,16 @@ mod tests {
 
     #[test]
     fn time_hint_with_both_bounds() {
-        let hint = super::time_hint_str(&Some("08:00".to_string()), &Some("09:00".to_string()));
+        let start = chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        let end = chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap();
+        let hint = super::time_hint_str(&Some(start), &Some(end));
         assert_eq!(hint, " preferred 08:00–09:00");
     }
 
     #[test]
     fn time_hint_with_start_only() {
-        let hint = super::time_hint_str(&Some("08:00".to_string()), &None);
+        let start = chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        let hint = super::time_hint_str(&Some(start), &None);
         assert_eq!(hint, " preferred start 08:00");
     }
 
@@ -977,7 +978,8 @@ mod tests {
 
     #[test]
     fn time_hint_with_end_only() {
-        let hint = super::time_hint_str(&None, &Some("09:00".to_string()));
+        let end = chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap();
+        let hint = super::time_hint_str(&None, &Some(end));
         assert_eq!(hint, " preferred end 09:00");
     }
 }

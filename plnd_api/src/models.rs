@@ -279,10 +279,12 @@ pub struct RoutineTemplateInput {
     pub recurrence_rule: String,
     pub duration_minutes: u32,
     pub energy_required: String,
-    /// Preferred window start as "HH:MM".
-    pub time_window_start: Option<String>,
-    /// Preferred window end as "HH:MM".
-    pub time_window_end: Option<String>,
+    /// Preferred window start as "HH:MM"; rejected at deserialization if not a valid time.
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub time_window_start: Option<NaiveTime>,
+    /// Preferred window end as "HH:MM"; rejected at deserialization if not a valid time.
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub time_window_end: Option<NaiveTime>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -414,7 +416,31 @@ mod place_tasks_tests {
         let t: RoutineTemplateInput = serde_json::from_str(json).unwrap();
         assert_eq!(t.title, "Medication");
         assert_eq!(t.recurrence_rule, "FREQ=DAILY");
-        assert_eq!(t.time_window_start, Some("08:00".to_string()));
+        assert_eq!(
+            t.time_window_start,
+            Some(chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap())
+        );
+    }
+
+    #[test]
+    fn routine_template_input_rejects_invalid_time_window() {
+        for bad in &["25:99", "not-a-time", "24:00"] {
+            let json = format!(
+                r#"{{
+                    "title": "Medication",
+                    "task_type": "medication",
+                    "recurrence_rule": "FREQ=DAILY",
+                    "duration_minutes": 15,
+                    "energy_required": "low",
+                    "time_window_start": "{bad}"
+                }}"#
+            );
+            let result: Result<RoutineTemplateInput, _> = serde_json::from_str(&json);
+            assert!(
+                result.is_err(),
+                "expected deserialization to fail for time_window_start={bad}"
+            );
+        }
     }
 
     #[test]
