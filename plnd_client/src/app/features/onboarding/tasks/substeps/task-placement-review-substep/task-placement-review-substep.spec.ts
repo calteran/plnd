@@ -5,7 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { Router } from '@angular/router';
-import { TaskPlacementReviewSubstepComponent, expandTemplatesToEntries } from './task-placement-review-substep';
+import { TaskPlacementReviewSubstepComponent } from './task-placement-review-substep';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { ConfigService } from '../../../../../core/services/config.service';
 import { PlaceTasksEntry, PlanEntryRequest } from '../../../../../core/models/week-plan';
@@ -174,6 +174,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(req.request.method).toBe('POST');
     expect(req.request.body).toEqual({
       task_names: ['Morning Walk', 'Read Book', 'Evening Run'],
+      routine_templates: [],
       plan_start: PLAN_PERIOD.start,
       plan_end: PLAN_PERIOD.end,
     });
@@ -439,13 +440,28 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
   // ── Routines-only (no tasks) ─────────────────────────────────────────────────
 
-  it('shows day-card grid without making an HTTP call when only routines exist', fakeAsync(async () => {
+  it('shows loading screen, calls agent, and shows Edit buttons for routines-only scenario', fakeAsync(async () => {
     const template = makeTemplate({ recurrence_rule: 'FREQ=DAILY' });
+    const routinePlacedEntries: PlaceTasksEntry[] = [
+      { title: 'Daily Routine', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
+      { title: 'Daily Routine', scheduled_date: '2026-04-29', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
+      { title: 'Daily Routine', scheduled_date: '2026-04-30', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
+    ];
     const { fixture, component, stateMock, httpController, router } = await setup([], PLAN_PERIOD, [template]);
     fixture.detectChanges();
 
-    // No HTTP request should be made — routines are display-only
-    httpController.expectNone(`${API_BASE}/agent/place-tasks`);
+    // Loading screen visible while agent is in flight
+    expect(fixture.nativeElement.querySelector('app-onboarding-loading-screen')).not.toBeNull();
+
+    // Agent IS called even for routines-only — it schedules templates server-side
+    const req = httpController.expectOne(`${API_BASE}/agent/place-tasks`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body.task_names).toEqual([]);
+    expect(req.request.body.routine_templates.length).toBe(1);
+    expect(req.request.body.routine_templates[0].title).toBe('Daily Routine');
+    req.flush(routinePlacedEntries);
+    fixture.detectChanges();
+    tick(10000);
 
     const dayCards = fixture.nativeElement.querySelectorAll('.day-card');
     expect(dayCards.length).toBe(3);
@@ -454,27 +470,29 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     ).map(el => el.textContent?.trim() ?? '');
     expect(taskTitles).toContain('Daily Routine');
 
-    // Routine rows show no badge and no Edit button
-    expect(fixture.nativeElement.querySelectorAll('.routine-badge').length).toBe(0);
-    expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(0);
+    // All returned rows have Edit buttons
+    expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(3);
 
-    // Save & Return must NOT include routine entries in placed_tasks
-    const completeSpy = jasmine.createSpy('complete');
-    component.complete.subscribe(completeSpy);
+    // Save & Return sends LLM-placed routine entries as placed_tasks
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
-
-    const saveBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
-    saveBtn.click();
+    component.complete.subscribe(jasmine.createSpy('complete'));
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.save-btn')!.click();
     fixture.detectChanges();
     tick();
 
-    expect(stateMock.setPlacedTasks).toHaveBeenCalledWith([]);
+    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
+    expect(placedArg.length).toBe(3);
+    expect(placedArg[0].title).toBe('Daily Routine');
   }));
 
-  // ── Routines + tasks (merged) ─────────────────────────────────────────────────
+  // ── Routines + tasks (unified agent response) ─────────────────────────────────
 
-  it('shows both agent-placed tasks and routine previews in day cards', fakeAsync(async () => {
+  it('shows both routine instances and one-off tasks from a unified agent response', fakeAsync(async () => {
     const template = makeTemplate({ title: 'Medication', recurrence_rule: 'FREQ=DAILY' });
+    const agentEntries: PlaceTasksEntry[] = [
+      MOCK_ENTRIES[0], // Morning Walk
+      { title: 'Medication', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
+    ];
     const { fixture, component, stateMock, httpController, router } = await setup(
       ['Morning Walk'],
       PLAN_PERIOD,
@@ -482,9 +500,14 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     );
     fixture.detectChanges();
 
-    // Agent call is made for the task
-    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([MOCK_ENTRIES[0]]);
+    // Agent receives both task_names and routine_templates
+    const req = httpController.expectOne(`${API_BASE}/agent/place-tasks`);
+    expect(req.request.body.task_names).toEqual(['Morning Walk']);
+    expect(req.request.body.routine_templates.length).toBe(1);
+    expect(req.request.body.routine_templates[0].title).toBe('Medication');
+    req.flush(agentEntries);
     fixture.detectChanges();
+    tick(10000);
 
     const taskTitles: string[] = Array.from<HTMLElement>(
       fixture.nativeElement.querySelectorAll('.task-title')
@@ -492,102 +515,66 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(taskTitles).toContain('Morning Walk');
     expect(taskTitles).toContain('Medication');
 
-    // Routine rows show no badge; only the non-routine task has an Edit button
-    expect(fixture.nativeElement.querySelectorAll('.routine-badge').length).toBe(0);
-    expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(1);
+    // All rows have Edit buttons — no more display-only rows
+    expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(2);
 
-    // Save & Return must include only the task in placed_tasks, NOT routine entries
+    // Save & Return sends ALL entries (routine + one-off) as placed_tasks
     spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
     component.complete.subscribe(jasmine.createSpy('complete'));
-
-    const saveBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
-    saveBtn.click();
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.save-btn')!.click();
     fixture.detectChanges();
     tick();
 
     const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
-    expect(placedArg.length).toBe(1);
-    expect(placedArg[0].title).toBe('Morning Walk');
+    expect(placedArg.length).toBe(2);
+    expect(placedArg.map(e => e.title)).toContain('Morning Walk');
+    expect(placedArg.map(e => e.title)).toContain('Medication');
   }));
 
+  // ── Edit / remove work on any row ────────────────────────────────────────────
+
+  it('opening Edit on any row opens the edit form and saves correctly', async () => {
+    const { fixture, component, httpController } = await setup();
+    fixture.detectChanges();
+
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
+    fixture.detectChanges();
+
+    // Open edit on entry 1 (Read Book, index 1)
+    component.openEdit(1);
+    fixture.detectChanges();
+
+    expect(fixture.nativeElement.querySelector('.task-row--editing')).not.toBeNull();
+
+    component.onEditDate('2026-04-30');
+    component.onEditDuration(90);
+    component.saveEdit();
+    fixture.detectChanges();
+
+    const updated = component.entries()[1];
+    expect(updated.scheduled_date).toBe('2026-04-30');
+    expect(updated.duration_minutes).toBe(90);
+    expect(fixture.nativeElement.querySelector('.task-row--editing')).toBeNull();
+  });
+
+  it('removing an entry re-indexes the list so subsequent edits target the correct entry', async () => {
+    const { fixture, component, httpController } = await setup();
+    fixture.detectChanges();
+
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
+    fixture.detectChanges();
+
+    // Remove first entry (Morning Walk, index 0)
+    component.removeEntry(0);
+    fixture.detectChanges();
+
+    expect(component.entries().length).toBe(2);
+    // Read Book was index 1, now index 0
+    expect(component.entries()[0].title).toBe('Read Book');
+    // Opening edit 0 should target Read Book
+    component.openEdit(0);
+    expect(component.editState()?.entryIndex).toBe(0);
+  });
+
 });
 
-// ── expandTemplatesToEntries (pure function — no Angular DI) ──────────────────
-
-describe('expandTemplatesToEntries', () => {
-  const START = '2026-04-28'; // Tuesday
-  const END   = '2026-04-30'; // Thursday (3 days: Tue, Wed, Thu)
-
-  it('returns empty array for empty templates', () => {
-    expect(expandTemplatesToEntries([], START, END)).toEqual([]);
-  });
-
-  it('expands FREQ=DAILY to one entry per day in the plan period', () => {
-    const template = makeTemplate({ recurrence_rule: 'FREQ=DAILY' });
-    const result = expandTemplatesToEntries([template], START, END);
-    expect(result.length).toBe(3);
-    expect(result.map(e => e.scheduled_date)).toEqual(['2026-04-28', '2026-04-29', '2026-04-30']);
-  });
-
-  it('expands FREQ=WEEKLY;BYDAY=TU,TH to only matching weekdays', () => {
-    // Apr 28=Tue, Apr 29=Wed, Apr 30=Thu → Tue and Thu match
-    const template = makeTemplate({ recurrence_rule: 'FREQ=WEEKLY;BYDAY=TU,TH' });
-    const result = expandTemplatesToEntries([template], START, END);
-    expect(result.length).toBe(2);
-    expect(result.map(e => e.scheduled_date)).toEqual(['2026-04-28', '2026-04-30']);
-  });
-
-  it('skips FREQ=MONTHLY (no client expansion)', () => {
-    const template = makeTemplate({ recurrence_rule: 'FREQ=MONTHLY' });
-    expect(expandTemplatesToEntries([template], START, END)).toEqual([]);
-  });
-
-  it('skips FREQ=YEARLY (no client expansion)', () => {
-    const template = makeTemplate({ recurrence_rule: 'FREQ=YEARLY' });
-    expect(expandTemplatesToEntries([template], START, END)).toEqual([]);
-  });
-
-  it('skips bare FREQ=WEEKLY with no BYDAY', () => {
-    const template = makeTemplate({ recurrence_rule: 'FREQ=WEEKLY' });
-    expect(expandTemplatesToEntries([template], START, END)).toEqual([]);
-  });
-
-  it('expands FREQ=WEEKLY;INTERVAL=2;BYDAY=TU correctly despite extra RRULE params', () => {
-    // INTERVAL=2 is not enforced client-side (backend handles it) but BYDAY must still be parsed
-    const template = makeTemplate({ recurrence_rule: 'FREQ=WEEKLY;INTERVAL=2;BYDAY=TU' });
-    const result = expandTemplatesToEntries([template], START, END);
-    // Apr 28=Tue is in range; we only check that BYDAY was parsed and Tue matched
-    expect(result.some(e => e.scheduled_date === '2026-04-28')).toBeTrue();
-  });
-
-  it('uses undefined time_window_start when template has none (lets slotOf default to afternoon)', () => {
-    const template = makeTemplate({ recurrence_rule: 'FREQ=DAILY', time_window_start: null });
-    const result = expandTemplatesToEntries([template], START, END);
-    expect(result[0].time_window_start).toBeUndefined();
-  });
-
-  it('uses 30 as default duration_minutes when template has none', () => {
-    const template = makeTemplate({ recurrence_rule: 'FREQ=DAILY', duration_minutes: null });
-    const result = expandTemplatesToEntries([template], START, END);
-    expect(result[0].duration_minutes).toBe(30);
-  });
-
-  it('maps template fields to PlaceTasksEntry correctly', () => {
-    const template = makeTemplate({
-      title: 'Meditation',
-      task_type: 'custom',
-      recurrence_rule: 'FREQ=DAILY',
-      time_window_start: '07:00',
-      duration_minutes: 20,
-      energy_required: 'low',
-    });
-    const result = expandTemplatesToEntries([template], START, END);
-    expect(result[0]).toEqual(jasmine.objectContaining({
-      title: 'Meditation',
-      task_type: 'custom',
-      time_window_start: '07:00',
-      duration_minutes: 20,
-      energy_required: 'low',
-    }));
-  });
-});

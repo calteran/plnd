@@ -91,6 +91,7 @@ describe('AgentService', () => {
   it('POSTs to /agent/place-tasks with the request body', () => {
     const req: PlaceTasksRequest = {
       task_names: ['Morning Walk'],
+      routine_templates: [],
       plan_start: '2026-04-28',
       plan_end: '2026-04-30',
     };

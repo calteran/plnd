@@ -134,8 +134,19 @@ export interface PlanEntryRequest {
 
 // -- Task Placement ----------------------------------------------------------
 
+export interface RoutineTemplateInput {
+  title: string;
+  task_type: string;
+  recurrence_rule: string;
+  duration_minutes: number;
+  energy_required: EnergyLevel;
+  time_window_start?: string;
+  time_window_end?: string;
+}
+
 export interface PlaceTasksRequest {
   task_names: string[];
+  routine_templates: RoutineTemplateInput[];
   plan_start: string; // ISO date
   plan_end: string;   // ISO date
 }
