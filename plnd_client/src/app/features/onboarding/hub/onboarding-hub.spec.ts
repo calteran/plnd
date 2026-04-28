@@ -428,6 +428,7 @@ describe('OnboardingHubComponent', () => {
 
   it('commitPlan() sends schedule_template_ids as empty array and routine instances via placed_tasks', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const placedTask = { task_type: 'custom', title: 'Morning Run', scheduled_date: '2026-05-05', duration_minutes: 30, energy_required: 'low' } as any;
     // Routine instances travel via placed_tasks; template IDs are deliberately omitted so
     // the backend does not re-expand templates and create duplicate schedule_entries.
