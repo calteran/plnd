@@ -426,6 +426,32 @@ describe('OnboardingHubComponent', () => {
     expect(err?.textContent).toContain('Something went wrong');
   });
 
+  it('commitPlan() sends schedule_template_ids as empty array and routine instances via placed_tasks', () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const placedTask = { task_type: 'custom', title: 'Morning Run', scheduled_date: '2026-05-05', duration_minutes: 30, energy_required: 'low' } as any;
+    // Routine instances travel via placed_tasks; template IDs are deliberately omitted so
+    // the backend does not re-expand templates and create duplicate schedule_entries.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stateMock as any).placedTasks = signal([placedTask]).asReadonly();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stateMock as any).scheduleTemplates = signal([
+      { template_id: 'tmpl-abc', title: 'Morning Run' },
+    ]).asReadonly();
+    stateMock.planPeriodSignal.set({ start: '2026-05-05', end: '2026-05-11' });
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+
+    fixture.componentInstance.commitPlan();
+
+    const req = httpTesting.expectOne(r => r.method === 'POST' && r.url.includes('/schedule/plan'));
+    expect(req.request.body.schedule_template_ids).toEqual([]);
+    expect(req.request.body.placed_tasks).toEqual([placedTask]);
+    req.flush({ committed: 1, planning_task_status: 'completed' });
+
+    httpTesting.verify();
+  });
+
   it('commitPlan() shows error banner and re-enables CTA when /schedule/plan fails', fakeAsync(() => {
     const httpTesting = TestBed.inject(HttpTestingController);
     stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
