@@ -167,6 +167,13 @@ let ctx = AgentContext {
 };
 ```
 
+**Guard change:** The existing early-exit check in `post_place_tasks` currently returns an error (or skips the call) when `task_names` is empty. Update it to only skip when *both* `task_names` is empty AND `routine_templates` is empty — a request with only routine templates is valid and should proceed:
+```rust
+if body.task_names.is_empty() && body.routine_templates.is_empty() {
+    return Err(/* existing empty-input error */);
+}
+```
+
 Note: if `task_names` is empty but instances were generated, `ctx.input` is an empty string. The prompt update below handles this.
 
 **`plnd_agent/src/prompts/place_tasks.md`** — add after the core workflow, before output rules:
@@ -186,8 +193,10 @@ within the specified window. Place it where it best fits given the user's energy
 other tasks.
 
 Include every listed routine instance (fixed and floating) in your output using the
-same `place_tasks` tool format as one-off tasks. If `<user_input>` is empty, your
-output should consist entirely of the routine instances from the prior context.
+same `place_tasks` tool format as one-off tasks. Combine them with any tasks listed
+in `<user_input>` — the final output must contain both routine instances and one-off
+tasks. If `<user_input>` is empty, your output should consist entirely of the routine
+instances from the prior context.
 ```
 
 **Tests:**
@@ -283,6 +292,12 @@ loadPlacement(): void {
       time_window_end: t.time_window_end ?? undefined,
     }));
 
+  if (taskNames.length === 0 && routineTemplates.length === 0) {
+    this.entries.set([]);
+    this.dayCards.set(buildDayCards([], period.start, period.end));
+    return;
+  }
+
   this.loadingTaskNames.set(taskNames);
   this.loadingRoutineCount.set(routineTemplates.length);
   this.isLoading.set(true);
@@ -312,7 +327,7 @@ loadPlacement(): void {
 }
 ```
 
-Note: the early "no agent call for routines-only" path is removed. The agent is always called — even for routines-only scenarios the LLM picks times. The `isEmpty()` guard (no tasks AND no templates) still prevents the call when truly empty.
+Note: the early "no agent call for routines-only" path is removed. The agent is always called — even for routines-only scenarios the LLM picks times. The explicit guard above (`taskNames.length === 0 && routineTemplates.length === 0`) still prevents the call when truly empty and clears any stale entries.
 
 Remove `routineDisplayEntries` signal declaration and all references. Update `saveEdit()` and `removeEntry()` to pass only `this.entries()` as the single argument to `buildDayCards()`.
 
