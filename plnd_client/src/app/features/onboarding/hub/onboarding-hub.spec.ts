@@ -8,6 +8,8 @@ import { OnboardingHubComponent } from './onboarding-hub';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { MealEntry, PlanEntryRequest, PostSchedulePlanRequest } from '../../../core/models/week-plan';
+import { MealHabitResponse } from '../../../core/models/meal-habit';
 
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
@@ -449,6 +451,83 @@ describe('OnboardingHubComponent', () => {
     expect(req.request.body.placed_tasks).toEqual([placedTask]);
     req.flush({ committed: 1, planning_task_status: 'completed' });
 
+    httpTesting.verify();
+  });
+
+  it('commitPlan() sends correct request body for all fields', () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+
+    const mealWithRef: MealEntry = {
+      date: '2026-05-01',
+      occasion: 'breakfast',
+      meal_ref: { type: 'catalog', id: 'meal-abc' },
+    };
+    const mealNoRef: MealEntry = {
+      date: '2026-05-02',
+      occasion: 'lunch',
+      meal_ref: null,
+      title: 'Salad',
+    };
+    const placedTask: PlanEntryRequest = {
+      date: '2026-05-01',
+      task_type: 'routine',
+      title: 'Morning Walk',
+      scheduled_start: '07:00',
+      duration_minutes: 20,
+      energy_required: 'low',
+    };
+    const habit: MealHabitResponse = {
+      id: 'habit-1',
+      user_id: 'user-1',
+      meal_name: 'Oatmeal',
+      slot: 'breakfast',
+      recurrence_rule: 'RRULE:FREQ=DAILY',
+      created_at: '2026-01-01T00:00:00Z',
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stateMock as any).mealPlan = signal({ plan_start: '2026-05-01', meals: [mealWithRef, mealNoRef] }).asReadonly();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stateMock as any).placedTasks = signal([placedTask]).asReadonly();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stateMock as any).mealHabits = signal([habit]).asReadonly();
+    stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
+    (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
+    fixture.detectChanges();
+
+    fixture.componentInstance.commitPlan();
+
+    const req = httpTesting.expectOne(r => r.method === 'POST' && r.url.includes('/schedule/plan'));
+    const body = req.request.body as PostSchedulePlanRequest;
+
+    expect(body.plan_start).toBe('2026-05-01');
+    expect(body.plan_end).toBe('2026-05-14');
+    expect(body.planning_task_id).toBe('00000000-0000-0000-0000-000000000000');
+    expect(body.schedule_template_ids).toEqual([]);
+    expect(body.placed_tasks).toEqual([placedTask]);
+    expect(body.meal_habit_ids).toEqual(['habit-1']);
+    expect(body.entries).toEqual([
+      {
+        date: '2026-05-01',
+        task_type: 'meal',
+        task_ref_id: 'meal-abc',
+        task_ref_type: 'catalog',
+        title: undefined,
+        scheduled_start: '08:00',
+        after_milepost: 'breakfast',
+      },
+      {
+        date: '2026-05-02',
+        task_type: 'meal',
+        task_ref_id: undefined,
+        task_ref_type: undefined,
+        title: 'Salad',
+        scheduled_start: '12:00',
+        after_milepost: 'lunch',
+      },
+    ]);
+
+    req.flush({ committed: 2, planning_task_status: 'completed' });
     httpTesting.verify();
   });
 
