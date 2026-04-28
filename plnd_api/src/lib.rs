@@ -7,6 +7,7 @@ pub mod briefing;
 pub mod config;
 pub mod middleware;
 pub mod models;
+pub mod scheduling;
 pub mod openapi;
 pub mod routes;
 pub mod state;

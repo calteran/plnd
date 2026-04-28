@@ -15,7 +15,8 @@ use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
 };
-use chrono::{Datelike, NaiveDate, Weekday};
+use chrono::{Datelike, NaiveDate};
+use crate::scheduling::{date_matches_recurrence, is_recognised_recurrence};
 use plnd_data::Error;
 use plnd_data::models::{
     CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput, ScheduleTemplate,
@@ -68,55 +69,6 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
 // ---------------------------------------------------------------------------
 // Meal habit expansion helpers
 // ---------------------------------------------------------------------------
-
-/// Returns true if `date` matches the given `recurrence_rule`.
-///
-/// Supported patterns (case-insensitive):
-/// - `"daily"` — every day
-/// - `"weekdays"` — Monday–Friday
-/// - `"weekends"` — Saturday–Sunday
-/// - RRULE-style with `BYDAY=` (e.g. `"FREQ=WEEKLY;BYDAY=MO"`) — specific weekday(s)
-///
-/// Unknown patterns return false. Callers should pre-screen with `is_recognised_recurrence`
-/// to log a single warning rather than one per date.
-fn date_matches_recurrence(date: NaiveDate, rule: &str) -> bool {
-    let rule_lc = rule.to_lowercase();
-    match rule_lc.as_str() {
-        "daily" => true,
-        "weekdays" => date.weekday().num_days_from_monday() < 5,
-        "weekends" => date.weekday().num_days_from_monday() >= 5,
-        _ => {
-            // Parse RRULE-style BYDAY token: "FREQ=WEEKLY;BYDAY=MO,WE"
-            if let Some(byday_start) = rule_lc.find("byday=") {
-                let after = &rule_lc[byday_start + 6..];
-                let byday_value = after.split(';').next().unwrap_or(after);
-                let target_weekday = date.weekday();
-                return byday_value
-                    .split(',')
-                    .any(|abbrev| weekday_from_abbrev(abbrev.trim()) == Some(target_weekday));
-            }
-            false
-        }
-    }
-}
-
-fn weekday_from_abbrev(abbrev: &str) -> Option<Weekday> {
-    match abbrev {
-        "mo" => Some(Weekday::Mon),
-        "tu" => Some(Weekday::Tue),
-        "we" => Some(Weekday::Wed),
-        "th" => Some(Weekday::Thu),
-        "fr" => Some(Weekday::Fri),
-        "sa" => Some(Weekday::Sat),
-        "su" => Some(Weekday::Sun),
-        _ => None,
-    }
-}
-
-fn is_recognised_recurrence(rule: &str) -> bool {
-    let rule_lc = rule.to_lowercase();
-    matches!(rule_lc.as_str(), "daily" | "weekdays" | "weekends") || rule_lc.contains("byday=")
-}
 
 /// Expands a single meal habit into one `PlanEntryInput` per matching date in [plan_start, plan_end].
 /// Caller must guarantee that `plan_end - plan_start <= 366 days` (enforced in `post_plan`).
@@ -480,68 +432,6 @@ mod tests {
 
     fn date(y: i32, m: u32, d: u32) -> NaiveDate {
         NaiveDate::from_ymd_opt(y, m, d).unwrap()
-    }
-
-    // -----------------------------------------------------------------------
-    // date_matches_recurrence
-    // -----------------------------------------------------------------------
-
-    #[test]
-    fn daily_matches_every_day() {
-        assert!(date_matches_recurrence(date(2026, 4, 27), "daily")); // Monday
-        assert!(date_matches_recurrence(date(2026, 4, 28), "daily")); // Tuesday
-        assert!(date_matches_recurrence(date(2026, 5, 2), "daily")); // Saturday
-        assert!(date_matches_recurrence(date(2026, 5, 3), "daily")); // Sunday
-    }
-
-    #[test]
-    fn weekdays_matches_mon_to_fri_only() {
-        assert!(date_matches_recurrence(date(2026, 4, 27), "weekdays")); // Monday
-        assert!(date_matches_recurrence(date(2026, 4, 28), "weekdays")); // Tuesday
-        assert!(date_matches_recurrence(date(2026, 5, 1), "weekdays")); // Friday
-        assert!(!date_matches_recurrence(date(2026, 5, 2), "weekdays")); // Saturday
-        assert!(!date_matches_recurrence(date(2026, 5, 3), "weekdays")); // Sunday
-    }
-
-    #[test]
-    fn weekends_matches_sat_and_sun_only() {
-        assert!(date_matches_recurrence(date(2026, 5, 2), "weekends")); // Saturday
-        assert!(date_matches_recurrence(date(2026, 5, 3), "weekends")); // Sunday
-        assert!(!date_matches_recurrence(date(2026, 4, 27), "weekends")); // Monday
-        assert!(!date_matches_recurrence(date(2026, 5, 1), "weekends")); // Friday
-    }
-
-    #[test]
-    fn rrule_byday_mo_matches_mondays_only() {
-        assert!(date_matches_recurrence(
-            date(2026, 4, 27),
-            "FREQ=WEEKLY;BYDAY=MO"
-        )); // Monday
-        assert!(!date_matches_recurrence(
-            date(2026, 4, 28),
-            "FREQ=WEEKLY;BYDAY=MO"
-        )); // Tuesday
-        assert!(!date_matches_recurrence(
-            date(2026, 5, 2),
-            "FREQ=WEEKLY;BYDAY=MO"
-        )); // Saturday
-    }
-
-    #[test]
-    fn rrule_byday_multi_day() {
-        // BYDAY=MO,WE,FR → Mon, Wed, Fri
-        let rule = "FREQ=WEEKLY;BYDAY=MO,WE,FR";
-        assert!(date_matches_recurrence(date(2026, 4, 27), rule)); // Monday
-        assert!(!date_matches_recurrence(date(2026, 4, 28), rule)); // Tuesday
-        assert!(date_matches_recurrence(date(2026, 4, 29), rule)); // Wednesday
-        assert!(!date_matches_recurrence(date(2026, 4, 30), rule)); // Thursday
-        assert!(date_matches_recurrence(date(2026, 5, 1), rule)); // Friday
-    }
-
-    #[test]
-    fn unknown_recurrence_returns_false() {
-        assert!(!date_matches_recurrence(date(2026, 4, 27), "quarterly"));
-        assert!(!date_matches_recurrence(date(2026, 4, 27), ""));
     }
 
     // -----------------------------------------------------------------------
