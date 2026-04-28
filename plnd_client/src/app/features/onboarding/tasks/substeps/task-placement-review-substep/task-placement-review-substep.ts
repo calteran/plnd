@@ -631,10 +631,11 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     if (!period) return;
 
     const routineTemplates: RoutineTemplateInput[] = this.stateService.scheduleTemplates()
+      .filter(t => t.recurrence_rule !== null)
       .map(t => ({
         title: t.title,
         task_type: t.task_type,
-        recurrence_rule: t.recurrence_rule ?? '',
+        recurrence_rule: t.recurrence_rule!,
         duration_minutes: t.duration_minutes ?? 30,
         energy_required: t.energy_required,
         time_window_start: t.time_window_start ?? undefined,
