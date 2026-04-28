@@ -11,6 +11,7 @@ use crate::models::{
     MealPlanResponse, MealSuggestRequest, PlaceTasksEntry, PlaceTasksRequest, TaskEntryRequest,
     TaskEntryResponse,
 };
+use crate::scheduling::{constrained_dates_for_rule, has_floating_instance_in_window};
 use crate::state::AppState;
 
 #[derive(serde::Deserialize)]
@@ -372,6 +373,74 @@ pub async fn post_meal_plan_resolve(
     Ok(Json(response))
 }
 
+fn routine_prior_context(
+    templates: &[crate::models::RoutineTemplateInput],
+    plan_start: chrono::NaiveDate,
+    plan_end: chrono::NaiveDate,
+) -> String {
+    let mut constrained: Vec<String> = Vec::new();
+    let mut floating: Vec<String> = Vec::new();
+
+    for t in templates {
+        for date in constrained_dates_for_rule(&t.recurrence_rule, plan_start, plan_end) {
+            let hint = time_hint_str(&t.time_window_start, &t.time_window_end);
+            constrained.push(format!(
+                "- \"{}\" ({}, {} min, {} energy{}) on {date}",
+                t.title.replace(['\n', '\r'], " "),
+                t.task_type.replace(['\n', '\r'], " "),
+                t.duration_minutes,
+                t.energy_required.replace(['\n', '\r'], " "),
+                hint
+            ));
+        }
+        if has_floating_instance_in_window(&t.recurrence_rule, plan_start, plan_end) {
+            let hint = time_hint_str(&t.time_window_start, &t.time_window_end);
+            floating.push(format!(
+                "- \"{}\" ({}, {} min, {} energy{})",
+                t.title.replace(['\n', '\r'], " "),
+                t.task_type.replace(['\n', '\r'], " "),
+                t.duration_minutes,
+                t.energy_required.replace(['\n', '\r'], " "),
+                hint
+            ));
+        }
+    }
+
+    let mut ctx = String::new();
+    if !constrained.is_empty() {
+        ctx.push_str(
+            "\n[Routine instances with fixed dates — keep the date, you choose the time]\n",
+        );
+        for line in &constrained {
+            ctx.push_str(line);
+            ctx.push('\n');
+        }
+    }
+    if !floating.is_empty() {
+        ctx.push_str(&format!(
+            "\n[Routine instances to place once in the window {plan_start} through {plan_end} — you choose the day and time]\n"
+        ));
+        for line in &floating {
+            ctx.push_str(line);
+            ctx.push('\n');
+        }
+    }
+    ctx
+}
+
+fn time_hint_str(start: &Option<String>, end: &Option<String>) -> String {
+    match (start.as_deref(), end.as_deref()) {
+        (Some(s), Some(e)) => format!(
+            " preferred {}–{}",
+            s.replace(['\n', '\r'], " "),
+            e.replace(['\n', '\r'], " ")
+        ),
+        (Some(s), None) => format!(" preferred start {}", s.replace(['\n', '\r'], " ")),
+        (None, Some(e)) => format!(" preferred end {}", e.replace(['\n', '\r'], " ")),
+        _ => String::new(),
+    }
+}
+
 /// POST /agent/place-tasks — schedule a list of one-off task names across a plan period.
 ///
 /// The client POSTs task names collected during onboarding. The agent assigns each
@@ -405,10 +474,6 @@ pub async fn post_place_tasks(
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    if body.task_names.is_empty() {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
     let plan_start = body.plan_start;
     let plan_end = body.plan_end;
 
@@ -416,11 +481,19 @@ pub async fn post_place_tasks(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let routine_ctx = routine_prior_context(&body.routine_templates, plan_start, plan_end);
+    let has_work = !body.task_names.is_empty() || !routine_ctx.is_empty();
+    if !has_work {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
     let ctx = AgentContext {
         user_id,
         use_case: UseCase::PlaceTasks,
         input: body.task_names.join("\n"),
-        prior_context: Some(format!("[Period: {plan_start} through {plan_end}]\n")),
+        prior_context: Some(format!(
+            "[Period: {plan_start} through {plan_end}]\n{routine_ctx}"
+        )),
         extra: None,
     };
 
@@ -819,5 +892,92 @@ mod tests {
         assert!(end_before < start, "preceding end should trigger 400");
         assert!(end_same >= start, "same-day end is valid");
         assert!(end_after >= start, "later end is valid");
+    }
+
+    // --- routine_prior_context / time_hint_str tests ---
+
+    fn d(y: i32, m: u32, day: u32) -> chrono::NaiveDate {
+        chrono::NaiveDate::from_ymd_opt(y, m, day).unwrap()
+    }
+
+    fn tmpl(
+        title: &str,
+        rule: &str,
+        start_hint: Option<&str>,
+    ) -> crate::models::RoutineTemplateInput {
+        crate::models::RoutineTemplateInput {
+            title: title.to_string(),
+            task_type: "medication".to_string(),
+            recurrence_rule: rule.to_string(),
+            duration_minutes: 15,
+            energy_required: "low".to_string(),
+            time_window_start: start_hint.map(|s| s.to_string()),
+            time_window_end: None,
+        }
+    }
+
+    #[test]
+    fn empty_templates_returns_empty_context() {
+        let ctx = super::routine_prior_context(&[], d(2026, 4, 28), d(2026, 5, 4));
+        assert!(ctx.is_empty());
+    }
+
+    #[test]
+    fn daily_template_generates_constrained_lines() {
+        let templates = vec![tmpl("Medication", "FREQ=DAILY", Some("08:00"))];
+        let ctx = super::routine_prior_context(&templates, d(2026, 4, 28), d(2026, 4, 30));
+        assert!(ctx.contains("[Routine instances with fixed dates"));
+        assert!(ctx.contains("on 2026-04-28"));
+        assert!(ctx.contains("on 2026-04-29"));
+        assert!(ctx.contains("on 2026-04-30"));
+        assert!(!ctx.contains("[Routine instances to place once"));
+    }
+
+    #[test]
+    fn bare_weekly_generates_floating_line() {
+        let templates = vec![tmpl("Weekly Review", "FREQ=WEEKLY", None)];
+        let ctx = super::routine_prior_context(&templates, d(2026, 4, 28), d(2026, 5, 4));
+        assert!(ctx.contains("[Routine instances to place once in the window"));
+        assert!(ctx.contains("\"Weekly Review\""));
+        assert!(!ctx.contains("[Routine instances with fixed dates"));
+    }
+
+    #[test]
+    fn monthly_with_no_occurrence_produces_no_output() {
+        let templates = vec![tmpl("Monthly", "FREQ=MONTHLY;BYMONTHDAY=10", None)];
+        let ctx = super::routine_prior_context(&templates, d(2026, 4, 28), d(2026, 5, 3));
+        assert!(ctx.is_empty());
+    }
+
+    #[test]
+    fn monthly_with_occurrence_generates_floating_line() {
+        let templates = vec![tmpl("Budget Review", "FREQ=MONTHLY;BYMONTHDAY=28", None)];
+        let ctx = super::routine_prior_context(&templates, d(2026, 4, 28), d(2026, 5, 3));
+        assert!(ctx.contains("[Routine instances to place once"));
+        assert!(ctx.contains("\"Budget Review\""));
+    }
+
+    #[test]
+    fn time_hint_with_both_bounds() {
+        let hint = super::time_hint_str(&Some("08:00".to_string()), &Some("09:00".to_string()));
+        assert_eq!(hint, " preferred 08:00–09:00");
+    }
+
+    #[test]
+    fn time_hint_with_start_only() {
+        let hint = super::time_hint_str(&Some("08:00".to_string()), &None);
+        assert_eq!(hint, " preferred start 08:00");
+    }
+
+    #[test]
+    fn time_hint_with_no_bounds() {
+        let hint = super::time_hint_str(&None, &None);
+        assert!(hint.is_empty());
+    }
+
+    #[test]
+    fn time_hint_with_end_only() {
+        let hint = super::time_hint_str(&None, &Some("09:00".to_string()));
+        assert_eq!(hint, " preferred end 09:00");
     }
 }
