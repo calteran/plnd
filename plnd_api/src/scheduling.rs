@@ -13,7 +13,7 @@ pub fn constrained_dates_for_rule(rule: &str, start: NaiveDate, end: NaiveDate) 
         return Vec::new();
     }
     let freq = param_value(&rule_uc, "FREQ").unwrap_or_default();
-    match freq.as_str() {
+    match freq {
         "DAILY" => iter_window(start, end).collect(),
         "WEEKLY" if rule_uc.contains("BYDAY=") => iter_window(start, end)
             .filter(|d| byday_matches(*d, &rule_uc))
@@ -36,7 +36,7 @@ pub fn has_floating_instance_in_window(rule: &str, start: NaiveDate, end: NaiveD
         return false;
     }
     let freq = param_value(&rule_uc, "FREQ").unwrap_or_default();
-    match freq.as_str() {
+    match freq {
         "WEEKLY" => !rule_uc.contains("BYDAY="),
         "MONTHLY" => {
             let Some(day) = param_value(&rule_uc, "BYMONTHDAY")
@@ -103,22 +103,26 @@ fn weekday_from_abbrev(abbrev: &str) -> Option<Weekday> {
     }
 }
 
-fn param_value(rule_uc: &str, key: &str) -> Option<String> {
+fn param_value<'a>(rule_uc: &'a str, key: &str) -> Option<&'a str> {
     let needle = format!("{key}=");
     rule_uc
         .split(';')
         .find(|p| p.starts_with(needle.as_str()))
-        .map(|p| p[needle.len()..].to_string())
+        .map(|p| &p[needle.len()..])
 }
 
 fn iter_window(start: NaiveDate, end: NaiveDate) -> impl Iterator<Item = NaiveDate> {
     let mut current = start;
+    let mut done = false;
     std::iter::from_fn(move || {
-        if current > end {
+        if done || current > end {
             return None;
         }
         let result = current;
-        current = current.succ_opt().unwrap_or(end + chrono::Days::new(1));
+        match current.succ_opt() {
+            Some(next) => current = next,
+            None => done = true,
+        }
         Some(result)
     })
 }
@@ -263,13 +267,18 @@ mod tests {
     #[test]
     fn weekdays_matches_mon_to_fri_only() {
         assert!(date_matches_recurrence(d(2026, 4, 27), "weekdays")); // Mon
+        assert!(date_matches_recurrence(d(2026, 4, 28), "weekdays")); // Tue
+        assert!(date_matches_recurrence(d(2026, 5, 1), "weekdays")); // Fri
         assert!(!date_matches_recurrence(d(2026, 5, 2), "weekdays")); // Sat
+        assert!(!date_matches_recurrence(d(2026, 5, 3), "weekdays")); // Sun
     }
 
     #[test]
     fn weekends_matches_sat_and_sun_only() {
         assert!(date_matches_recurrence(d(2026, 5, 2), "weekends")); // Sat
+        assert!(date_matches_recurrence(d(2026, 5, 3), "weekends")); // Sun
         assert!(!date_matches_recurrence(d(2026, 4, 27), "weekends")); // Mon
+        assert!(!date_matches_recurrence(d(2026, 5, 1), "weekends")); // Fri
     }
 
     #[test]
