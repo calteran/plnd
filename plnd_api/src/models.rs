@@ -418,7 +418,7 @@ mod place_tasks_tests {
         assert_eq!(t.recurrence_rule, "FREQ=DAILY");
         assert_eq!(
             t.time_window_start,
-            Some(chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap())
+            Some(NaiveTime::from_hms_opt(8, 0, 0).unwrap())
         );
     }
 
