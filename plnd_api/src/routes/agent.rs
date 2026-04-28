@@ -386,14 +386,22 @@ fn routine_prior_context(
             let hint = time_hint_str(&t.time_window_start, &t.time_window_end);
             constrained.push(format!(
                 "- \"{}\" ({}, {} min, {} energy{}) on {date}",
-                t.title, t.task_type, t.duration_minutes, t.energy_required, hint
+                t.title.replace(['\n', '\r'], " "),
+                t.task_type.replace(['\n', '\r'], " "),
+                t.duration_minutes,
+                t.energy_required.replace(['\n', '\r'], " "),
+                hint
             ));
         }
         if has_floating_instance_in_window(&t.recurrence_rule, plan_start, plan_end) {
             let hint = time_hint_str(&t.time_window_start, &t.time_window_end);
             floating.push(format!(
                 "- \"{}\" ({}, {} min, {} energy{})",
-                t.title, t.task_type, t.duration_minutes, t.energy_required, hint
+                t.title.replace(['\n', '\r'], " "),
+                t.task_type.replace(['\n', '\r'], " "),
+                t.duration_minutes,
+                t.energy_required.replace(['\n', '\r'], " "),
+                hint
             ));
         }
     }
@@ -422,8 +430,12 @@ fn routine_prior_context(
 
 fn time_hint_str(start: &Option<String>, end: &Option<String>) -> String {
     match (start.as_deref(), end.as_deref()) {
-        (Some(s), Some(e)) => format!(" preferred {s}–{e}"),
-        (Some(s), None) => format!(" preferred start {s}"),
+        (Some(s), Some(e)) => format!(
+            " preferred {}–{}",
+            s.replace(['\n', '\r'], " "),
+            e.replace(['\n', '\r'], " ")
+        ),
+        (Some(s), None) => format!(" preferred start {}", s.replace(['\n', '\r'], " ")),
         _ => String::new(),
     }
 }
@@ -464,13 +476,13 @@ pub async fn post_place_tasks(
     let plan_start = body.plan_start;
     let plan_end = body.plan_end;
 
-    let routine_ctx = routine_prior_context(&body.routine_templates, plan_start, plan_end);
-    let has_work = !body.task_names.is_empty() || !routine_ctx.is_empty();
-    if !has_work {
+    if plan_end < plan_start {
         return Err(StatusCode::BAD_REQUEST);
     }
 
-    if plan_end < plan_start {
+    let routine_ctx = routine_prior_context(&body.routine_templates, plan_start, plan_end);
+    let has_work = !body.task_names.is_empty() || !routine_ctx.is_empty();
+    if !has_work {
         return Err(StatusCode::BAD_REQUEST);
     }
 
