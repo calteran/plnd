@@ -2,10 +2,11 @@
   "mcpServers": {
     "grafana": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@grafana/mcp-grafana"],
+      "command": "uvx",
+      "args": ["mcp-grafana"],
       "env": {
-        "GRAFANA_URL": "http://localhost:3001"
+        "GRAFANA_URL": "http://localhost:3001",
+        "GRAFANA_SERVICE_ACCOUNT_TOKEN": ""
       }
     },
     "doppler": {
