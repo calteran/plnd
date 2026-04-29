@@ -322,26 +322,26 @@ function buildDayCards(
     .error-msg {
       margin: 0;
       font-size: 14px;
-      color: #6b7280;
+      color: var(--color-text-muted);
     }
 
     .error-msg {
-      color: #dc2626;
+      color: var(--color-destructive);
     }
 
     .retry-btn {
       background: none;
-      border: 1.5px solid #d1d5db;
+      border: 1.5px solid var(--color-border-input);
       border-radius: 6px;
       padding: 6px 14px;
       font-size: 13px;
       cursor: pointer;
-      color: #374151;
+      color: var(--color-text-body);
     }
 
     .retry-btn:hover {
-      border-color: #d97706;
-      color: #d97706;
+      border-color: var(--color-accent);
+      color: var(--color-accent);
     }
 
     /* ── Day grid ── */
@@ -353,10 +353,10 @@ function buildDayCards(
     }
 
     .day-card {
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 10px;
       overflow: hidden;
-      background: #ffffff;
+      background: var(--color-surface-white);
     }
 
     .day-header {
@@ -364,19 +364,19 @@ function buildDayCards(
       align-items: baseline;
       gap: 8px;
       padding: 10px 14px;
-      background: #fef3c7;
+      background: var(--color-accent-light);
     }
 
     .day-name {
       font-size: 13px;
       font-weight: 800;
-      color: #78350f;
+      color: var(--color-text-primary);
       letter-spacing: 0.04em;
     }
 
     .day-date {
       font-size: 12px;
-      color: #92400e;
+      color: var(--color-accent-dark);
     }
 
     /* ── Meal dividers ── */
@@ -386,21 +386,21 @@ function buildDayCards(
       align-items: center;
       gap: 10px;
       padding: 6px 14px;
-      background: #fef3c7;
-      border-top: 1px solid #fde68a;
+      background: var(--color-accent-light);
+      border-top: 1px solid var(--color-accent-border);
     }
 
     .meal-label {
       font-size: 11px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
       letter-spacing: 0.06em;
       min-width: 72px;
     }
 
     .meal-placeholder {
       font-size: 12px;
-      color: #9ca3af;
+      color: var(--color-text-muted);
     }
 
     /* ── Task rows ── */
@@ -410,18 +410,18 @@ function buildDayCards(
       align-items: center;
       justify-content: space-between;
       padding: 8px 14px;
-      border-top: 1px solid #f3f4f6;
+      border-top: 1px solid var(--color-border-row);
       gap: 8px;
     }
 
     .task-row--editing {
-      background: #ffffff;
-      border-left: 3px solid #d97706;
+      background: var(--color-surface-white);
+      border-left: 3px solid var(--color-accent);
       padding-left: 11px;
     }
 
     .task-time {
-      color: #d97706;
+      color: var(--color-accent);
       font-weight: 700;
       font-size: 11px;
       margin-right: 6px;
@@ -429,7 +429,7 @@ function buildDayCards(
 
     .task-title {
       font-size: 13px;
-      color: #1f2937;
+      color: var(--color-text-body);
       flex: 1;
     }
 
@@ -448,33 +448,33 @@ function buildDayCards(
     }
 
     .energy-badge--low {
-      background: #fef9c3;
-      color: #854d0e;
+      background: color-mix(in srgb, var(--color-energy-low) 12%, transparent);
+      color: var(--color-energy-low);
     }
 
     .energy-badge--medium {
-      background: #fde68a;
-      color: #78350f;
+      background: color-mix(in srgb, var(--color-energy-medium) 12%, transparent);
+      color: var(--color-energy-medium);
     }
 
     .energy-badge--high {
-      background: #fca5a5;
-      color: #7f1d1d;
+      background: color-mix(in srgb, var(--color-energy-high) 12%, transparent);
+      color: var(--color-energy-high);
     }
 
     .edit-btn {
       background: none;
-      border: 1.5px solid #d1d5db;
+      border: 1.5px solid var(--color-border-input);
       border-radius: 5px;
       padding: 3px 9px;
       font-size: 12px;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--color-btn-neutral-text);
     }
 
     .edit-btn:hover {
-      border-color: #d97706;
-      color: #d97706;
+      border-color: var(--color-accent);
+      color: var(--color-accent);
     }
 
     /* ── Edit form ── */
@@ -493,17 +493,17 @@ function buildDayCards(
       gap: 3px;
       font-size: 11px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
 
     .edit-label {
       font-size: 11px;
       font-weight: 700;
-      color: #78350f;
+      color: var(--color-text-primary);
     }
 
     .edit-input {
-      border: 1.5px solid #fde68a;
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 5px 8px;
       font-size: 13px;
@@ -516,7 +516,7 @@ function buildDayCards(
     }
 
     .edit-input:focus {
-      border-color: #d97706;
+      border-color: var(--color-accent);
     }
 
     .edit-actions {
@@ -526,8 +526,8 @@ function buildDayCards(
     }
 
     .save-edit-btn {
-      background: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      color: var(--color-btn-accent-text);
       border: none;
       border-radius: 6px;
       padding: 6px 16px;
@@ -537,29 +537,29 @@ function buildDayCards(
     }
 
     .save-edit-btn:hover {
-      background: #b45309;
+      background: var(--color-accent-dark);
     }
 
     .remove-edit-btn {
       background: none;
-      border: 1.5px solid #d1d5db;
+      border: 1.5px solid var(--color-border-input);
       border-radius: 6px;
       padding: 6px 16px;
       font-size: 13px;
       cursor: pointer;
-      color: #6b7280;
+      color: var(--color-btn-neutral-text);
     }
 
     .remove-edit-btn:hover {
-      border-color: #dc2626;
-      color: #dc2626;
+      border-color: var(--color-destructive);
+      color: var(--color-destructive);
     }
 
     /* ── Meal slot note ── */
 
     .meal-slot-note {
       font-size: 12px;
-      color: #6b7280;
+      color: var(--color-text-muted);
       font-style: italic;
       margin: 0;
       padding: 0 4px;
@@ -569,8 +569,8 @@ function buildDayCards(
 
     .save-btn {
       align-self: flex-end;
-      background: #d97706;
-      color: #ffffff;
+      background: var(--color-accent);
+      color: var(--color-btn-accent-text);
       border: none;
       border-radius: 8px;
       padding: 10px 20px;
@@ -581,7 +581,7 @@ function buildDayCards(
     }
 
     .save-btn:hover {
-      background: #b45309;
+      background: var(--color-accent-dark);
     }
   `],
 })

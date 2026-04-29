@@ -167,7 +167,7 @@ import {
       border: none;
       cursor: pointer;
       font-size: 0.875rem;
-      color: #6366f1;
+      color: var(--color-accent);
       padding: 0.25rem 0.5rem;
     }
 
@@ -176,7 +176,7 @@ import {
     h1 { margin: 0; font-size: 1.5rem; }
 
     .loading-text,
-    .empty-text { color: #6b7280; }
+    .empty-text { color: var(--color-text-muted); }
 
     .restrictions-list {
       display: flex;
@@ -190,11 +190,11 @@ import {
     .type-heading {
       font-size: 1rem;
       font-weight: 600;
-      color: #374151;
+      color: var(--color-text-body);
       text-transform: capitalize;
       margin: 0 0 0.5rem;
       padding-bottom: 0.25rem;
-      border-bottom: 1px solid #e5e7eb;
+      border-bottom: 1px solid var(--color-btn-neutral-border);
     }
 
     .restriction-item {
@@ -203,8 +203,8 @@ import {
       justify-content: space-between;
       gap: 1rem;
       padding: 0.75rem 1rem;
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
+      background: var(--color-surface-base);
+      border: 1px solid var(--color-btn-neutral-border);
       border-radius: 8px;
     }
 
@@ -217,13 +217,13 @@ import {
 
     .item-name {
       font-weight: 500;
-      color: #111827;
+      color: var(--color-text-body);
       font-size: 0.9375rem;
     }
 
     .item-notes {
       font-size: 0.8125rem;
-      color: #6b7280;
+      color: var(--color-text-muted);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -247,12 +247,12 @@ import {
     .edit-label {
       font-size: 0.8125rem;
       font-weight: 500;
-      color: #374151;
+      color: var(--color-text-body);
     }
 
     .edit-textarea {
       padding: 0.5rem 0.75rem;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--color-border-input);
       border-radius: 6px;
       font-size: 0.875rem;
       resize: vertical;
@@ -261,11 +261,11 @@ import {
 
     .edit-textarea:focus {
       outline: none;
-      border-color: #6366f1;
+      border-color: var(--color-accent);
     }
 
-    .status-success { color: #16a34a; font-size: 0.875rem; margin: 0 0 1rem; }
-    .status-error   { color: #dc2626; font-size: 0.875rem; margin: 0 0 1rem; }
+    .status-success { color: var(--color-success); font-size: 0.875rem; margin: 0 0 1rem; }
+    .status-error   { color: var(--color-destructive); font-size: 0.875rem; margin: 0 0 1rem; }
 
     .add-section { margin-top: 2rem; }
 
@@ -281,17 +281,17 @@ import {
     label {
       font-size: 0.875rem;
       font-weight: 500;
-      color: #374151;
+      color: var(--color-text-body);
     }
 
     input,
     select,
     textarea {
       padding: 0.5rem 0.75rem;
-      border: 1px solid #d1d5db;
+      border: 1px solid var(--color-border-input);
       border-radius: 6px;
       font-size: 0.875rem;
-      background: #fff;
+      background: var(--color-surface-white);
       font-family: inherit;
     }
 
@@ -299,7 +299,7 @@ import {
     select:focus,
     textarea:focus {
       outline: none;
-      border-color: #6366f1;
+      border-color: var(--color-accent);
     }
 
     textarea { resize: vertical; }
@@ -318,17 +318,17 @@ import {
 
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .btn--primary { background: #6366f1; color: #fff; }
-    .btn--primary:hover:not(:disabled) { background: #4f46e5; }
+    .btn--primary { background: var(--color-accent); color: var(--color-btn-accent-text); }
+    .btn--primary:hover:not(:disabled) { background: var(--color-accent-dark); }
 
     .btn--secondary {
-      background: #e5e7eb;
-      color: #374151;
+      background: var(--color-btn-neutral-border);
+      color: var(--color-text-body);
     }
-    .btn--secondary:hover:not(:disabled) { background: #d1d5db; }
+    .btn--secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--color-btn-neutral-border) 80%, var(--color-surface-base)); }
 
-    .btn--danger { background: #fee2e2; color: #dc2626; }
-    .btn--danger:hover:not(:disabled) { background: #fecaca; }
+    .btn--danger { background: var(--color-destructive-light); color: var(--color-destructive); }
+    .btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--color-destructive) 20%, var(--color-surface-white)); }
   `]
 })
 export class DietaryRestrictionsComponent implements OnInit {
