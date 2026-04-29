@@ -38,6 +38,9 @@ pub enum AgentError {
         prompt_tokens: u32,
         completion_tokens: u32,
     },
+
+    #[error("schema retry produced empty output — model likely abandoned tool-call format")]
+    EmptyRetryOutput,
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────
@@ -512,11 +515,29 @@ impl AgentService {
                             violations = %violations,
                             "schema validation failed; retrying with correction message"
                         );
-                        let correction = format!(
-                            "Your previous response failed validation with the following errors:\n\n\
-                             {violations}\n\n\
-                             Please respond again with a valid JSON object matching the required schema."
-                        );
+                        // Phrase the correction differently depending on whether
+                        // the use case uses a terminal tool call or plain text
+                        // output.  Local models (e.g. Gemma via LM Studio) often
+                        // abandon tool-call format when told to "respond with a
+                        // JSON object", causing LM Studio to silently drop their
+                        // output and return empty content + empty tool_calls.
+                        let correction = match tools.terminal_tool_name() {
+                            Some(tool_name) => format!(
+                                "Your previous `{tool_name}` call failed schema validation \
+                                 with these errors:\n\n\
+                                 {violations}\n\n\
+                                 Please call `{tool_name}` again with corrected arguments \
+                                 that fix every error listed above. Do not output a bare \
+                                 JSON response — use the tool call."
+                            ),
+                            None => format!(
+                                "Your previous response failed schema validation with these \
+                                 errors:\n\n\
+                                 {violations}\n\n\
+                                 Please respond again with a corrected JSON object that \
+                                 fixes every error above."
+                            ),
+                        };
                         // Use the full conversation history from the completed run
                         // (including any intermediate tool-call turns) so the LLM
                         // has complete context when correcting its output.
@@ -529,6 +550,22 @@ impl AgentService {
                         output = agent_loop
                             .run(ctx.user_id, tier, system.clone(), retry_messages)
                             .await?;
+                        // If the model produced no content at all on retry, the
+                        // most likely cause is that it confused the tool-call
+                        // format with a text-JSON response and the provider
+                        // silently dropped the output.  Return EmptyRetryOutput
+                        // (→ HTTP 503, retry-able) rather than letting the empty
+                        // string fall through to a confusing "EOF while parsing"
+                        // SchemaValidation error (→ HTTP 422, not retry-able).
+                        if output.content.is_empty() {
+                            tracing::warn!(
+                                use_case = ?ctx.use_case,
+                                attempt = retries,
+                                "schema retry produced empty output; treating as model \
+                                 output failure"
+                            );
+                            return Err(AgentError::EmptyRetryOutput);
+                        }
                     }
                     // validate_agent_output only ever returns AgentError::SchemaValidation;
                     // this arm exists for exhaustiveness.
@@ -1758,12 +1795,129 @@ mod tests {
             panic!("correction message must be Text content");
         };
         assert!(
-            text.contains("failed validation"),
-            "correction message must mention validation failure; got: {text}"
+            text.contains("schema validation"),
+            "correction message must mention schema validation; got: {text}"
         );
         assert!(
             text.contains("not valid JSON"),
             "correction message must include the specific violation; got: {text}"
+        );
+        // For text-based use cases (no terminal tool) the message must ask for
+        // a corrected JSON object, not instruct the LLM to call a tool.
+        assert!(
+            text.contains("JSON object"),
+            "text-based correction must ask for corrected JSON object; got: {text}"
+        );
+        assert!(
+            !text.contains("tool call"),
+            "text-based correction must not instruct a tool call; got: {text}"
+        );
+    }
+
+    /// When the use case has a terminal tool, the correction message must
+    /// explicitly tell the LLM to call that tool again — not just "respond
+    /// with JSON".  This prevents local models (e.g. Gemma via LM Studio)
+    /// from switching to bare text output on retry, which causes LM Studio
+    /// to drop the response silently.
+    ///
+    /// Requires `DATABASE_URL` (provided by `just verify`) so the PlaceTasks
+    /// tool registry can be built with the memory repository.
+    #[tokio::test]
+    async fn test_schema_retry_tool_correction_mentions_tool_name() {
+        let repos = match test_db().await {
+            Some(repos) => repos,
+            None => return,
+        };
+
+        let mock = MockLlmProvider::new("test");
+        let last_request = mock.last_request_handle();
+
+        // First response: plain text that is not valid JSON for the PlaceTasks schema.
+        mock.push_response(CompletionResponse {
+            content: Some("not valid json".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+        // Second response: valid schema for PlaceTasks (empty entries array is valid).
+        mock.push_response(CompletionResponse {
+            content: Some(r#"{"entries":[]}"#.to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos);
+        let ctx = AgentContext {
+            user_id: uuid::Uuid::nil(),
+            use_case: UseCase::PlaceTasks,
+            input: "Renew passport".to_string(),
+            prior_context: None,
+            extra: None,
+        };
+
+        service.run(&ctx).await.unwrap();
+
+        let req = last_request.lock().unwrap();
+        let messages = &req.as_ref().unwrap().messages;
+        let last_user_msg = messages
+            .iter()
+            .rfind(|m| m.role == MessageRole::User)
+            .expect("correction message must be present in retry request");
+        let MessageContent::Text(ref text) = last_user_msg.content else {
+            panic!("correction message must be Text content");
+        };
+        assert!(
+            text.contains("place_tasks"),
+            "correction must name the terminal tool; got: {text}"
+        );
+        assert!(
+            text.contains("tool"),
+            "correction must reference tool calling; got: {text}"
+        );
+        assert!(
+            !text.contains("JSON object"),
+            "correction must not use bare 'JSON object' phrasing; got: {text}"
+        );
+    }
+
+    /// When a schema retry returns completely empty output — no text, no tool
+    /// calls — the agent must return `ContextWindowExhausted` (→ HTTP 503)
+    /// rather than letting the empty string fall through to a confusing
+    /// "EOF while parsing" `SchemaValidation` error (→ HTTP 422).
+    #[tokio::test]
+    async fn test_schema_retry_empty_output_returns_context_exhausted() {
+        let mock = MockLlmProvider::new("test");
+
+        // First response: not valid JSON → schema retry fires.
+        mock.push_response(CompletionResponse {
+            content: Some("not valid json".to_string()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+        // Retry response: completely empty (simulates LM Studio silently
+        // dropping the model's confused output on a long-context retry).
+        mock.push_response(CompletionResponse {
+            content: None,
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+
+        let service = AgentService::new_with_registry(make_registry(mock));
+        let ctx = AgentContext {
+            user_id: Uuid::nil(),
+            use_case: UseCase::TaskEntry,
+            input: "add task".to_string(),
+            prior_context: None,
+            extra: None,
+        };
+
+        let result = service.run(&ctx).await;
+        assert!(
+            matches!(result, Err(AgentError::EmptyRetryOutput)),
+            "empty retry output must return EmptyRetryOutput, got: {result:?}"
         );
     }
 
