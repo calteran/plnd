@@ -48,7 +48,7 @@ function makeTemplate(overrides: Partial<ScheduleTemplate> = {}): ScheduleTempla
   return {
     template_id: 'tpl-1',
     user_id: 'user-1',
-    task_type: 'custom',
+    task_type: 'general',
     title: 'Daily Routine',
     recurrence: 'daily',
     recurrence_rule: 'FREQ=DAILY',
@@ -443,9 +443,9 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   it('shows loading screen, calls agent, and shows Edit buttons for routines-only scenario', fakeAsync(async () => {
     const template = makeTemplate({ recurrence_rule: 'FREQ=DAILY' });
     const routinePlacedEntries: PlaceTasksEntry[] = [
-      { title: 'Daily Routine', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
-      { title: 'Daily Routine', scheduled_date: '2026-04-29', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
-      { title: 'Daily Routine', scheduled_date: '2026-04-30', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
+      { title: 'Daily Routine', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
+      { title: 'Daily Routine', scheduled_date: '2026-04-29', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
+      { title: 'Daily Routine', scheduled_date: '2026-04-30', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
     ];
     const { fixture, component, stateMock, httpController, router } = await setup([], PLAN_PERIOD, [template]);
     fixture.detectChanges();
@@ -491,7 +491,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     const template = makeTemplate({ title: 'Medication', recurrence_rule: 'FREQ=DAILY' });
     const agentEntries: PlaceTasksEntry[] = [
       MOCK_ENTRIES[0], // Morning Walk
-      { title: 'Medication', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'custom' },
+      { title: 'Medication', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
     ];
     const { fixture, component, stateMock, httpController, router } = await setup(
       ['Morning Walk'],

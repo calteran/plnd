@@ -384,7 +384,7 @@ export class WeekPlanService {
     for (const task of tasks) {
       entries.push({
         date: task.date,
-        task_type: task.task_type ?? 'custom',
+        task_type: task.task_type ?? 'general',
         task_ref_id: task.task_ref_id,
         task_ref_type: task.task_ref_type,
         title: task.title,

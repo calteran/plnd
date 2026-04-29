@@ -15,7 +15,7 @@ function makeTemplate(overrides: Partial<ScheduleTemplate> = {}): ScheduleTempla
   return {
     template_id: 'tmpl-1',
     user_id: 'user-1',
-    task_type: 'custom',
+    task_type: 'general',
     title: 'Morning walk',
     recurrence: 'daily',
     recurrence_rule: 'FREQ=DAILY',

@@ -431,7 +431,7 @@ describe('OnboardingHubComponent', () => {
   it('commitPlan() sends routine instances via placed_tasks (schedule_template_ids absent)', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const placedTask = { task_type: 'custom', title: 'Morning Run', scheduled_date: '2026-05-05', duration_minutes: 30, energy_required: 'low' } as any;
+    const placedTask = { task_type: 'general', title: 'Morning Run', scheduled_date: '2026-05-05', duration_minutes: 30, energy_required: 'low' } as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (stateMock as any).placedTasks = signal([placedTask]).asReadonly();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
