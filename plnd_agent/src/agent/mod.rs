@@ -7,7 +7,7 @@ use crate::config::LlmConfig;
 use crate::context::AgentContext;
 use crate::provider::{
     AnthropicProvider, CompletionRequest, LlmError, LlmProvider, Message, MessageContent,
-    MessageRole, OpenAiCompatibleProvider, ProviderRegistry, ProviderTier, ToolCall,
+    MessageRole, OpenAiCompatibleProvider, ProviderRegistry, ProviderTier, StopReason, ToolCall,
     ToolResultPart,
 };
 use crate::tools::{ToolContext, ToolError, ToolRegistry};
@@ -30,6 +30,14 @@ pub enum AgentError {
 
     #[error("agent response failed schema validation: {violations}")]
     SchemaValidation { violations: String },
+
+    #[error(
+        "LLM context window exhausted (prompt_tokens={prompt_tokens}, completion_tokens={completion_tokens})"
+    )]
+    ContextWindowExhausted {
+        prompt_tokens: u32,
+        completion_tokens: u32,
+    },
 }
 
 // ── Output ────────────────────────────────────────────────────────────────────
@@ -187,6 +195,22 @@ impl AgentLoop<'_> {
                     llm_total_tokens = usage.total_tokens,
                     "llm call complete"
                 );
+            }
+
+            // If the model was cut off by its context window, return a distinct error
+            // rather than falling through to JSON parsing (which would report a
+            // misleading "EOF while parsing" schema-validation failure).
+            if response.stop_reason == StopReason::MaxTokens {
+                let (prompt_tokens, completion_tokens) = response
+                    .usage
+                    .as_ref()
+                    .map(|u| (u.prompt_tokens, u.completion_tokens))
+                    .unwrap_or((0, 0));
+                tracing::warn!(prompt_tokens, completion_tokens, "context_window_exhausted");
+                return Err(AgentError::ContextWindowExhausted {
+                    prompt_tokens,
+                    completion_tokens,
+                });
             }
 
             // Capture any text the LLM produced alongside (or instead of) tool calls.
