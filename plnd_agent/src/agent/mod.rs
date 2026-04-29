@@ -529,7 +529,7 @@ impl AgentService {
                                 let place_tasks_hint = if tool_name == "place_tasks" {
                                     "\n\nReminder — valid enum values for every entry:\n\
                                      \u{2022} task_type: \"work\", \"exercise\", \"leisure\", \
-                                       \"appointment\", \"medication\", \"custom\" \
+                                       \"appointment\", \"medication\", \"general\" \
                                        (NEVER a meal name such as \"breakfast\")\n\
                                      \u{2022} after_milepost: \"breakfast\", \"lunch\", \"dinner\"\n\
                                      \u{2022} energy_required: \"low\", \"medium\", \"high\""

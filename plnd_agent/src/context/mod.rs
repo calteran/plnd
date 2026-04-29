@@ -266,7 +266,7 @@ const PLACE_TASKS_RESPONSE_SCHEMA: &str = r##"{
       "properties": {
         "title":             { "type": "string" },
         "scheduled_date":    { "type": "string", "format": "date" },
-        "task_type":         { "type": "string", "enum": ["work", "exercise", "leisure", "appointment", "medication", "custom"] },
+        "task_type":         { "type": "string", "enum": ["work", "exercise", "leisure", "appointment", "medication", "general"] },
         "duration_minutes":  { "type": "integer", "minimum": 1, "maximum": 480 },
         "energy_required":   { "type": "string", "enum": ["low", "medium", "high"] },
         "after_milepost":    { "type": "string", "enum": ["breakfast", "lunch", "dinner"] },
