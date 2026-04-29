@@ -174,6 +174,7 @@ export const MAX_PERSONALISED_NAMES = 5;
       background: var(--color-surface-meal);
       border: 1px solid var(--color-accent-border, #fde68a);
       display: inline-flex; gap: 4px; align-items: center;
+      align-self: flex-start;
       animation: bubbleIn 0.3s ease forwards;
     }
 
