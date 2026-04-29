@@ -25,7 +25,7 @@ fn test_valid_task_types_has_seven_values() {
     assert!(VALID_TASK_TYPES.contains(&"leisure"));
     assert!(VALID_TASK_TYPES.contains(&"appointment"));
     assert!(VALID_TASK_TYPES.contains(&"medication"));
-    assert!(VALID_TASK_TYPES.contains(&"custom"));
+    assert!(VALID_TASK_TYPES.contains(&"general"));
 }
 
 #[test]
