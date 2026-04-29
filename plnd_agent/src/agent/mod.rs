@@ -528,7 +528,13 @@ impl AgentService {
                                  {violations}\n\n\
                                  Please call `{tool_name}` again with corrected arguments \
                                  that fix every error listed above. Do not output a bare \
-                                 JSON response — use the tool call."
+                                 JSON response — use the tool call.\n\n\
+                                 Reminder — valid enum values for every entry:\n\
+                                 • task_type: \"work\", \"exercise\", \"leisure\", \
+                                   \"appointment\", \"medication\", \"custom\" \
+                                   (NEVER a meal name such as \"breakfast\")\n\
+                                 • after_milepost: \"breakfast\", \"lunch\", \"dinner\"\n\
+                                 • energy_required: \"low\", \"medium\", \"high\""
                             ),
                             None => format!(
                                 "Your previous response failed schema validation with these \
