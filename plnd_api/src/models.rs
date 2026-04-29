@@ -109,9 +109,6 @@ pub struct PostSchedulePlanRequest {
     /// Meal habit IDs to expand into recurring meal entries across plan_start–plan_end.
     #[serde(default)]
     pub meal_habit_ids: Vec<Uuid>,
-    /// Schedule template IDs to expand into recurring task entries across plan_start–plan_end.
-    #[serde(default)]
-    pub schedule_template_ids: Vec<Uuid>,
 }
 
 // ---------------------------------------------------------------------------

@@ -16,11 +16,9 @@ use axum::{
     extract::{Extension, Path, Query, State},
     http::StatusCode,
 };
-use chrono::{Datelike, NaiveDate};
+use chrono::NaiveDate;
 use plnd_data::Error;
-use plnd_data::models::{
-    CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput, ScheduleTemplate,
-};
+use plnd_data::models::{CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -102,62 +100,6 @@ fn expand_habit_to_entries(
             });
         }
         // Safe: post_plan validates plan_end - plan_start <= 366, so we never reach NaiveDate::MAX.
-        if let Some(next) = date.succ_opt() {
-            date = next;
-        } else {
-            break;
-        }
-    }
-    entries
-}
-
-/// Expands a single schedule template into one `PlanEntryInput` per matching date in [plan_start, plan_end].
-/// Caller must guarantee that `plan_end - plan_start <= 366 days` (enforced in `post_plan`).
-fn expand_template_to_entries(
-    template: &ScheduleTemplate,
-    plan_start: NaiveDate,
-    plan_end: NaiveDate,
-) -> Vec<PlanEntryInput> {
-    let mut entries = Vec::new();
-    let mut date = plan_start;
-    while date <= plan_end {
-        let matches = match template.recurrence.as_str() {
-            "daily" => true,
-            "weekdays" => date.weekday().num_days_from_monday() < 5,
-            "weekly" | "custom" => {
-                let rule = template.recurrence_rule.as_deref().unwrap_or("");
-                if !is_recognised_recurrence(rule) {
-                    tracing::warn!(
-                        template_id = %template.template_id,
-                        rule = %rule,
-                        "unrecognised schedule template recurrence_rule — skipping expansion"
-                    );
-                    break;
-                }
-                date_matches_recurrence(date, rule)
-            }
-            _ => {
-                tracing::warn!(
-                    template_id = %template.template_id,
-                    recurrence = %template.recurrence,
-                    "unknown schedule template recurrence — skipping expansion"
-                );
-                break;
-            }
-        };
-        if matches {
-            entries.push(PlanEntryInput {
-                date,
-                task_type: template.task_type.clone(),
-                title: Some(template.title.clone()),
-                task_ref_id: template.task_ref_id,
-                task_ref_type: template.task_ref_type.clone(),
-                scheduled_start: template.time_window_start,
-                after_milepost: None,
-                duration_minutes: template.duration_minutes,
-                energy_required: Some(template.energy_required.clone()),
-            });
-        }
         if let Some(next) = date.succ_opt() {
             date = next;
         } else {
@@ -308,30 +250,6 @@ pub async fn post_plan(
         {
             entries.extend(expand_habit_to_entries(
                 &habit,
-                body.plan_start,
-                body.plan_end,
-            ));
-        }
-    }
-
-    // Expand schedule templates into recurring task entries across the plan period
-    if !body.schedule_template_ids.is_empty() {
-        let template_id_set: HashSet<Uuid> = body.schedule_template_ids.into_iter().collect();
-        let all_templates = state
-            .repos
-            .schedule_template
-            .list_templates_for_user(user_id)
-            .await
-            .map_err(|e| {
-                tracing::error!(error = %e, "schedule_template list_for_user error");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
-        for template in all_templates
-            .into_iter()
-            .filter(|t| template_id_set.contains(&t.template_id))
-        {
-            entries.extend(expand_template_to_entries(
-                &template,
                 body.plan_start,
                 body.plan_end,
             ));
