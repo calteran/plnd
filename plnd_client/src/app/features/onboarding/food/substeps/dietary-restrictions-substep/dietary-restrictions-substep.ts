@@ -4,10 +4,10 @@ import { RestrictionType } from '../../../../../core/models/dietary-restriction'
 
 type DisplayRestrictionType = 'allergy' | 'intolerance' | 'cultural_religious';
 
-const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: string; badgeColor: string; badgeBg: string }> = {
-  allergy:            { label: 'Allergy',             borderColor: '#fca5a5', badgeColor: '#dc2626', badgeBg: '#fee2e2' },
-  intolerance:        { label: 'Intolerance',          borderColor: '#fde68a', badgeColor: '#b45309', badgeBg: '#fef3c7' },
-  cultural_religious: { label: 'Cultural / Religious', borderColor: '#c4b5fd', badgeColor: '#7c3aed', badgeBg: '#ede9fe' },
+const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string }> = {
+  allergy:            { label: 'Allergy' },
+  intolerance:        { label: 'Intolerance' },
+  cultural_religious: { label: 'Cultural / Religious' },
 };
 
 @Component({
@@ -22,8 +22,10 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: 
         <div class="type-row">
           @for (dt of displayTypes; track dt) {
             <button type="button" class="type-btn"
+              [class.type-btn--allergy]="dt === 'allergy'"
+              [class.type-btn--intolerance]="dt === 'intolerance'"
+              [class.type-btn--cultural_religious]="dt === 'cultural_religious'"
               [class.type-btn--active]="selectedDisplayType() === dt"
-              [style.border-color]="typeConfig[dt].borderColor"
               (click)="selectedDisplayType.set(dt)"
             >{{ typeConfig[dt].label }}</button>
           }
@@ -63,8 +65,9 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: 
             } @else {
               <div class="card-default" (click)="startEdit(r)">
                 <span class="type-badge"
-                  [style.color]="typeConfig[displayTypeFor(r.restriction_type)].badgeColor"
-                  [style.background]="typeConfig[displayTypeFor(r.restriction_type)].badgeBg"
+                  [class.type-badge--allergy]="displayTypeFor(r.restriction_type) === 'allergy'"
+                  [class.type-badge--intolerance]="displayTypeFor(r.restriction_type) === 'intolerance'"
+                  [class.type-badge--cultural_religious]="displayTypeFor(r.restriction_type) === 'cultural_religious'"
                 >{{ typeConfig[displayTypeFor(r.restriction_type)].label }}</span>
                 <span class="card-name">{{ r.name }}</span>
                 @if (r.notes) { <span class="card-notes">{{ r.notes }}</span> }
@@ -78,31 +81,37 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string; borderColor: 
   `,
   styles: [`
     .restrictions-substep { display: flex; flex-direction: column; gap: 16px; }
-    .banner { background: var(--color-accent-light,#fef3c7); border: 1.5px solid var(--color-accent-border,#fde68a); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--color-accent-dark,#78350f); }
+    .banner { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--color-accent-dark); }
     .entry-area { display: flex; flex-direction: column; gap: 8px; }
     .type-row { display: flex; gap: 6px; flex-wrap: wrap; }
-    .type-btn { border: 1.5px solid #d1d5db; background: #fff; border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: #6b7280; }
-    .type-btn--active { font-weight: 700; color: #1f2937; }
+    .type-btn { border: 1.5px solid var(--color-border-input); background: var(--color-surface-white); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; color: var(--color-btn-neutral-text); }
+    .type-btn--allergy { border-color: var(--color-destructive-border); }
+    .type-btn--intolerance { border-color: var(--color-accent-border); }
+    .type-btn--cultural_religious { border-color: var(--color-purple-border); }
+    .type-btn--active { font-weight: 700; color: var(--color-text-body); }
     .name-row { display: flex; gap: 8px; align-items: center; }
-    .name-input { flex: 1; border: 1.5px solid #d1d5db; border-radius: 6px; padding: 7px 10px; font-size: 13px; }
-    .btn-add-note { background: none; border: none; color: var(--color-accent,#d97706); font-size: 12px; cursor: pointer; }
-    .btn-add { background: var(--color-accent,#d97706); color: #fff; border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
-    .note-input { width: 100%; border: 1.5px solid #d1d5db; border-radius: 6px; padding: 7px 10px; font-size: 13px; resize: vertical; box-sizing: border-box; }
-    .error { color: #dc2626; font-size: 12px; margin: 0; }
+    .name-input { flex: 1; border: 1.5px solid var(--color-border-input); border-radius: 6px; padding: 7px 10px; font-size: 13px; }
+    .btn-add-note { background: none; border: none; color: var(--color-accent); font-size: 12px; cursor: pointer; }
+    .btn-add { background: var(--color-accent); color: var(--color-btn-accent-text); border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .note-input { width: 100%; border: 1.5px solid var(--color-border-input); border-radius: 6px; padding: 7px 10px; font-size: 13px; resize: vertical; box-sizing: border-box; }
+    .error { color: var(--color-destructive); font-size: 12px; margin: 0; }
     .cards { display: flex; flex-direction: column; gap: 8px; }
-    .restriction-card { position: relative; border: 1.5px solid #e5e7eb; border-radius: 8px; overflow: hidden; transition: opacity 0.15s; }
+    .restriction-card { position: relative; border: 1.5px solid var(--color-btn-neutral-border); border-radius: 8px; overflow: hidden; transition: opacity 0.15s; }
     .card-default { padding: 10px 40px 10px 12px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
-    .card-default:hover { background: #f9fafb; }
+    .card-default:hover { background: var(--color-surface-base); }
     .type-badge { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 6px; align-self: flex-start; }
-    .card-name { font-size: 13px; font-weight: 500; color: #1f2937; }
-    .card-notes { font-size: 12px; color: #6b7280; }
-    .btn-remove { position: absolute; top: 8px; right: 8px; background: none; border: none; font-size: 13px; color: #9ca3af; cursor: pointer; line-height: 1; }
-    .btn-remove:hover { color: #dc2626; }
+    .type-badge--allergy { color: var(--color-destructive); background: var(--color-destructive-light); }
+    .type-badge--intolerance { color: var(--color-accent-dark); background: var(--color-accent-light); }
+    .type-badge--cultural_religious { color: var(--color-purple); background: var(--color-purple-light); }
+    .card-name { font-size: 13px; font-weight: 500; color: var(--color-text-body); }
+    .card-notes { font-size: 12px; color: var(--color-text-muted); }
+    .btn-remove { position: absolute; top: 8px; right: 8px; background: none; border: none; font-size: 13px; color: var(--color-text-muted); cursor: pointer; line-height: 1; }
+    .btn-remove:hover { color: var(--color-destructive); }
     .card-edit { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
-    .edit-name-readonly { font-size: 13px; font-weight: 600; color: #1f2937; margin: 0; }
+    .edit-name-readonly { font-size: 13px; font-weight: 600; color: var(--color-text-body); margin: 0; }
     .edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    .btn-cancel { background: none; border: 1.5px solid #d1d5db; border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
-    .btn-save { background: var(--color-accent,#d97706); color: #fff; border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
+    .btn-cancel { background: none; border: 1.5px solid var(--color-border-input); border-radius: 6px; padding: 5px 12px; font-size: 12px; cursor: pointer; }
+    .btn-save { background: var(--color-accent); color: var(--color-btn-accent-text); border: none; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
   `],
 })
 export class DietaryRestrictionsSubstepComponent implements OnInit {
