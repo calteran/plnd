@@ -29,7 +29,7 @@ export const MOCK_SCHEDULE_TYPE_WEEKENDS = {
 
 export const MOCK_TEMPLATE_MORNING_WALK = {
   template_id: 'tmpl-morning-walk-uuid',
-  task_type: 'custom',
+  task_type: 'general',
   title: 'Morning walk',
   recurrence: 'daily',
   recurrence_rule: 'FREQ=DAILY',
@@ -46,7 +46,7 @@ export const MOCK_PLACED_TASKS = [
     time_window_start: '07:30',
     duration_minutes: 30,
     energy_required: 'high',
-    task_type: 'custom',
+    task_type: 'general',
   },
   {
     title: 'Read book',
@@ -54,7 +54,7 @@ export const MOCK_PLACED_TASKS = [
     time_window_start: '20:00',
     duration_minutes: 45,
     energy_required: 'low',
-    task_type: 'custom',
+    task_type: 'general',
   },
 ];
 

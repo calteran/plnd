@@ -78,7 +78,7 @@ pub async fn create_weekly_plan_task(
 }
 
 /// Create a user-defined task with a given title, energy level, date, and duration.
-/// Inserts into `tasks` (type=`'custom'`) and `generic_tasks` (category=`'user_created'`)
+/// Inserts into `tasks` (type=`'general'`) and `generic_tasks` (category=`'user_created'`)
 /// in a single transaction.
 ///
 /// - `date` — the calendar date for the task (always required)

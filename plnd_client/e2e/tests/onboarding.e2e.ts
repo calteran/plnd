@@ -92,7 +92,7 @@ async function landAtTaskPlacement(page: Page): Promise<void> {
   // Register the POST-handling mock before any click so the request is intercepted correctly.
   await page.route(`${API_BASE}/schedule/templates`, route => {
     if (route.request().method() === 'POST') {
-      route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning run', task_type: 'custom' } });
+      route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning run', task_type: 'general' } });
     } else {
       route.fulfill({ status: 200, json: [] });
     }
