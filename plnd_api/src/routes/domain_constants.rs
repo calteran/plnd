@@ -9,7 +9,7 @@ pub const VALID_TASK_TYPES: &[&str] = &[
     "leisure",
     "appointment",
     "medication",
-    "custom",
+    "general",
 ];
 
 pub const VALID_ENERGY_LEVELS: &[&str] = &["low", "medium", "high"];
