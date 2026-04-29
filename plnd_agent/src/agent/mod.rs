@@ -31,7 +31,9 @@ pub enum AgentError {
     #[error("agent response failed schema validation: {violations}")]
     SchemaValidation { violations: String },
 
-    #[error("LLM context window exhausted (prompt_tokens={prompt_tokens}, completion_tokens={completion_tokens})")]
+    #[error(
+        "LLM context window exhausted (prompt_tokens={prompt_tokens}, completion_tokens={completion_tokens})"
+    )]
     ContextWindowExhausted {
         prompt_tokens: u32,
         completion_tokens: u32,
@@ -204,11 +206,7 @@ impl AgentLoop<'_> {
                     .as_ref()
                     .map(|u| (u.prompt_tokens, u.completion_tokens))
                     .unwrap_or((0, 0));
-                tracing::warn!(
-                    prompt_tokens,
-                    completion_tokens,
-                    "context_window_exhausted"
-                );
+                tracing::warn!(prompt_tokens, completion_tokens, "context_window_exhausted");
                 return Err(AgentError::ContextWindowExhausted {
                     prompt_tokens,
                     completion_tokens,
