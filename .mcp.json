@@ -1,5 +1,13 @@
 {
   "mcpServers": {
+    "grafana": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@grafana/mcp-grafana"],
+      "env": {
+        "GRAFANA_URL": "http://localhost:3001"
+      }
+    },
     "doppler": {
       "type": "stdio",
       "command": "npx",
