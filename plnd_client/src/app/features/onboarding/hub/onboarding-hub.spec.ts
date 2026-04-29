@@ -446,6 +446,7 @@ describe('OnboardingHubComponent', () => {
 
     const req = httpTesting.expectOne(r => r.method === 'POST' && r.url.includes('/schedule/plan'));
     expect(req.request.body.placed_tasks).toEqual([placedTask]);
+    expect((req.request.body as any).schedule_template_ids).toBeUndefined();
     req.flush({ committed: 1, planning_task_status: 'completed' });
 
     httpTesting.verify();

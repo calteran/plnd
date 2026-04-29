@@ -173,7 +173,6 @@ export interface PostSchedulePlanRequest {
   carryover_decisions?: Record<string, CarryoverDecision>;
   placed_tasks?: PlanEntryRequest[];
   meal_habit_ids?: string[];
-  schedule_template_ids?: string[];
 }
 
 export interface PostSchedulePlanResponse {
