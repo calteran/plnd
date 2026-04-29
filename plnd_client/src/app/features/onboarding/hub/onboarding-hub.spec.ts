@@ -446,6 +446,7 @@ describe('OnboardingHubComponent', () => {
 
     const req = httpTesting.expectOne(r => r.method === 'POST' && r.url.includes('/schedule/plan'));
     expect(req.request.body.placed_tasks).toEqual([placedTask]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((req.request.body as any).schedule_template_ids).toBeUndefined();
     req.flush({ committed: 1, planning_task_status: 'completed' });
 
