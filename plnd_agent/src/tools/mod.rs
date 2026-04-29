@@ -133,6 +133,19 @@ impl ToolRegistry {
             .map(|t| t.is_terminal())
             .unwrap_or(false)
     }
+
+    /// Returns the name of the sole registered terminal tool, if exactly one
+    /// exists.  Returns `None` when zero or multiple terminal tools are
+    /// registered — the latter case is ambiguous, so the caller falls back to
+    /// a generic correction message.
+    pub fn terminal_tool_name(&self) -> Option<&str> {
+        let mut terminals = self.tools.values().filter(|t| t.is_terminal());
+        let first = terminals.next()?;
+        if terminals.next().is_some() {
+            return None;
+        }
+        Some(first.name())
+    }
 }
 
 // ── Registry factory ──────────────────────────────────────────────────────────
@@ -199,4 +212,112 @@ pub(crate) fn build_tool_registry(
         }
     }
     registry
+}
+
+// ── Unit tests ────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct NonTerminalTool;
+
+    #[async_trait::async_trait]
+    impl Tool for NonTerminalTool {
+        fn name(&self) -> &str {
+            "non_terminal"
+        }
+        fn description(&self) -> &str {
+            ""
+        }
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({})
+        }
+        async fn execute(
+            &self,
+            _ctx: &ToolContext,
+            _input: serde_json::Value,
+        ) -> Result<serde_json::Value, ToolError> {
+            Ok(serde_json::json!({}))
+        }
+    }
+
+    struct MyTerminalTool;
+
+    #[async_trait::async_trait]
+    impl Tool for MyTerminalTool {
+        fn name(&self) -> &str {
+            "submit_result"
+        }
+        fn description(&self) -> &str {
+            ""
+        }
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({})
+        }
+        fn is_terminal(&self) -> bool {
+            true
+        }
+        async fn execute(
+            &self,
+            _ctx: &ToolContext,
+            _input: serde_json::Value,
+        ) -> Result<serde_json::Value, ToolError> {
+            Ok(serde_json::json!({}))
+        }
+    }
+
+    struct AnotherTerminalTool;
+
+    #[async_trait::async_trait]
+    impl Tool for AnotherTerminalTool {
+        fn name(&self) -> &str {
+            "another_terminal"
+        }
+        fn description(&self) -> &str {
+            ""
+        }
+        fn schema(&self) -> serde_json::Value {
+            serde_json::json!({})
+        }
+        fn is_terminal(&self) -> bool {
+            true
+        }
+        async fn execute(
+            &self,
+            _ctx: &ToolContext,
+            _input: serde_json::Value,
+        ) -> Result<serde_json::Value, ToolError> {
+            Ok(serde_json::json!({}))
+        }
+    }
+
+    #[test]
+    fn terminal_tool_name_returns_none_when_no_terminal_tool() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(NonTerminalTool));
+        assert_eq!(registry.terminal_tool_name(), None);
+    }
+
+    #[test]
+    fn terminal_tool_name_returns_name_when_terminal_tool_registered() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(NonTerminalTool));
+        registry.register(Arc::new(MyTerminalTool));
+        assert_eq!(registry.terminal_tool_name(), Some("submit_result"));
+    }
+
+    #[test]
+    fn terminal_tool_name_returns_none_for_empty_registry() {
+        let registry = ToolRegistry::new();
+        assert_eq!(registry.terminal_tool_name(), None);
+    }
+
+    #[test]
+    fn terminal_tool_name_returns_none_when_multiple_terminal_tools() {
+        let mut registry = ToolRegistry::new();
+        registry.register(Arc::new(MyTerminalTool));
+        registry.register(Arc::new(AnotherTerminalTool));
+        assert_eq!(registry.terminal_tool_name(), None);
+    }
 }
