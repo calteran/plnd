@@ -89,6 +89,7 @@ pub async fn post_task(
         // SchemaValidation is logged at error level in AgentService::run() with
         // use_case, violation details, and a content snippet.
         AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        AgentError::ContextWindowExhausted { .. } => StatusCode::SERVICE_UNAVAILABLE,
         _ => {
             tracing::error!(error = %e, "agent run failed");
             StatusCode::INTERNAL_SERVER_ERROR
@@ -156,6 +157,7 @@ pub async fn post_meal_plan(
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
         AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        AgentError::ContextWindowExhausted { .. } => StatusCode::SERVICE_UNAVAILABLE,
         _ => {
             tracing::error!(error = %e, "agent meal-plan run failed");
             StatusCode::INTERNAL_SERVER_ERROR
@@ -223,6 +225,7 @@ pub async fn post_meal_plan_rebalance(
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
         AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        AgentError::ContextWindowExhausted { .. } => StatusCode::SERVICE_UNAVAILABLE,
         _ => {
             tracing::error!(error = %e, "agent meal-plan rebalance run failed");
             StatusCode::INTERNAL_SERVER_ERROR
@@ -294,6 +297,7 @@ pub async fn post_meal_plan_suggest(
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
         AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        AgentError::ContextWindowExhausted { .. } => StatusCode::SERVICE_UNAVAILABLE,
         _ => {
             tracing::error!(error = %e, "agent meal-plan suggest run failed");
             StatusCode::INTERNAL_SERVER_ERROR
@@ -358,6 +362,7 @@ pub async fn post_meal_plan_resolve(
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
         AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        AgentError::ContextWindowExhausted { .. } => StatusCode::SERVICE_UNAVAILABLE,
         _ => {
             tracing::error!(error = %e, "agent meal-plan resolve run failed");
             StatusCode::INTERNAL_SERVER_ERROR
@@ -495,6 +500,7 @@ pub async fn post_place_tasks(
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
         AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
+        AgentError::ContextWindowExhausted { .. } => StatusCode::SERVICE_UNAVAILABLE,
         _ => {
             tracing::error!(error = %e, "agent place-tasks run failed");
             StatusCode::INTERNAL_SERVER_ERROR
