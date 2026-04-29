@@ -18,9 +18,7 @@ use axum::{
 };
 use chrono::NaiveDate;
 use plnd_data::Error;
-use plnd_data::models::{
-    CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput,
-};
+use plnd_data::models::{CarryoverDecision, CommitPlanInput, MealHabit, PlanEntryInput};
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
