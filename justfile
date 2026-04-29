@@ -65,16 +65,11 @@ dev:
     doppler run -- docker compose up -d --wait --wait-timeout 120
     echo "→ Infrastructure healthy."
     LM_MODEL="${LM_STUDIO_MODEL:-google/gemma-4-26b-a4b}"
-    echo "→ Warming LM Studio model: $LM_MODEL"
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:1234/v1/chat/completions \
+    echo "→ Kicking off LM Studio warm-up for: $LM_MODEL (not waiting for response)"
+    curl -s -o /dev/null -X POST http://localhost:1234/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d "{\"model\": \"$LM_MODEL\", \"messages\": [{\"role\": \"user\", \"content\": \"hi\"}], \"max_tokens\": 1}" \
-      2>/dev/null || true)
-    if [ "$http_code" = "200" ]; then
-      echo "  ✓ Model ready"
-    else
-      echo "  ⚠  LM Studio not reachable — model will load on first inference request"
-    fi
+      2>/dev/null & disown 2>/dev/null || true
     echo "→ Starting API and client..."
     mprocs
 
