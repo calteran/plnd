@@ -53,7 +53,7 @@ pub async fn create_weekly_plan_task(
 
     let task: Task = sqlx::query_as::<_, Task>(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, energy_required, status)
-         VALUES ($1, 'Plan your week', 'custom', $2, 'low', 'planned')
+         VALUES ($1, 'Plan your week', 'general', $2, 'low', 'planned')
          RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
                    energy_required, status, is_milepost, created_at, updated_at",
     )
@@ -78,7 +78,7 @@ pub async fn create_weekly_plan_task(
 }
 
 /// Create a user-defined task with a given title, energy level, date, and duration.
-/// Inserts into `tasks` (type=`'custom'`) and `generic_tasks` (category=`'user_created'`)
+/// Inserts into `tasks` (type=`'general'`) and `generic_tasks` (category=`'user_created'`)
 /// in a single transaction.
 ///
 /// - `date` — the calendar date for the task (always required)
@@ -100,7 +100,7 @@ pub async fn create_user_task(
 
     let task: Task = sqlx::query_as::<_, Task>(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, duration_minutes, energy_required, status)
-         VALUES ($1, $2, 'custom', $3, $4, $5, 'planned')
+         VALUES ($1, $2, 'general', $3, $4, $5, 'planned')
          RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
                    energy_required, status, is_milepost, created_at, updated_at",
     )
@@ -127,7 +127,7 @@ pub async fn create_user_task(
     sqlx::query(
         "INSERT INTO schedule_entries
            (user_id, task_type, task_ref_id, title, date, scheduled_start, scheduled_end, after_milepost, status)
-         VALUES ($1, 'custom', $2, $3, $4, $5, $6, $7, 'planned')",
+         VALUES ($1, 'general', $2, $3, $4, $5, $6, $7, 'planned')",
     )
     .bind(user_id)
     .bind(task.task_id)
@@ -187,7 +187,7 @@ mod tests {
         // Verify Task fields
         assert_eq!(task.user_id, uid);
         assert_eq!(task.title, "Plan your week");
-        assert_eq!(task.task_type, "custom");
+        assert_eq!(task.task_type, "general");
         assert_eq!(task.energy_required, "low");
         assert_eq!(task.status, "planned");
 
@@ -264,7 +264,7 @@ mod tests {
 
         assert_eq!(task.user_id, uid);
         assert_eq!(task.title, "Buy groceries");
-        assert_eq!(task.task_type, "custom");
+        assert_eq!(task.task_type, "general");
         assert_eq!(task.energy_required, "medium");
         assert_eq!(task.status, "planned");
         assert_eq!(task.duration_minutes, Some(30));

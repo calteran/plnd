@@ -27,15 +27,15 @@ fn test_plan_entry_request_serde() {
 }
 
 #[test]
-fn test_plan_entry_request_custom_task_with_title() {
+fn test_plan_entry_request_general_task_with_title() {
     let json = r#"{
         "date": "2026-03-24",
-        "task_type": "custom",
+        "task_type": "general",
         "title": "Morning walk",
         "scheduled_start": "07:00"
     }"#;
     let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
-    assert_eq!(req.task_type, "custom");
+    assert_eq!(req.task_type, "general");
     assert_eq!(req.title, Some("Morning walk".to_string()));
     assert!(req.task_ref_id.is_none());
 }

@@ -143,7 +143,7 @@ describe('ScheduleService', () => {
     httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
       entries: [{
         entry_id: 't3',
-        task_type: 'custom',
+        task_type: 'general',
         title: 'Reply to dentist email',
         status: 'planned',
         date: '2026-04-02',

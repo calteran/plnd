@@ -155,14 +155,14 @@ describe('WeekPlanService', () => {
     });
 
     it('should append a task via addFloatingTask', () => {
-      service.addFloatingTask({ title: 'Call dentist', energy: 'low', task_type: 'custom' });
+      service.addFloatingTask({ title: 'Call dentist', energy: 'low', task_type: 'general' });
       expect(service.floatingTasks().length).toBe(1);
       expect(service.floatingTasks()[0].title).toBe('Call dentist');
     });
 
     it('should remove a task by index via removeFloatingTask', () => {
-      service.addFloatingTask({ title: 'Task A', energy: 'low', task_type: 'custom' });
-      service.addFloatingTask({ title: 'Task B', energy: 'medium', task_type: 'custom' });
+      service.addFloatingTask({ title: 'Task A', energy: 'low', task_type: 'general' });
+      service.addFloatingTask({ title: 'Task B', energy: 'medium', task_type: 'general' });
       service.removeFloatingTask(0);
       expect(service.floatingTasks().length).toBe(1);
       expect(service.floatingTasks()[0].title).toBe('Task B');
@@ -170,7 +170,7 @@ describe('WeekPlanService', () => {
 
     it('should include floatingTasks in saveDraft', () => {
       service.initSession('2026-03-24', '2026-03-30');
-      service.addFloatingTask({ title: 'Call dentist', energy: 'low', task_type: 'custom' });
+      service.addFloatingTask({ title: 'Call dentist', energy: 'low', task_type: 'general' });
       service.saveDraft();
       const draft = service.loadDraft();
       expect(draft?.floatingTasks?.length).toBe(1);

@@ -9,6 +9,7 @@ import {
   PlanStatusResponse, SchedulePeriodResponse,
   STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
+import { TaskType } from '../models/schedule-template';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
 
@@ -382,9 +383,10 @@ export class WeekPlanService {
     }
 
     for (const task of tasks) {
+      const type = (task.task_type as string) === 'custom' ? 'general' : (task.task_type ?? 'general');
       entries.push({
         date: task.date,
-        task_type: task.task_type ?? 'custom',
+        task_type: type as TaskType,
         task_ref_id: task.task_ref_id,
         task_ref_type: task.task_ref_type,
         title: task.title,

@@ -6,7 +6,7 @@ import { ScheduleTemplate } from '../models/schedule-template';
 
 const base: Omit<ScheduleTemplate, 'template_id' | 'title'> = {
   user_id: 'user-uuid',
-  task_type: 'custom',
+  task_type: 'general',
   recurrence: 'daily',
   recurrence_rule: 'FREQ=DAILY',
   time_window_start: null,
@@ -65,7 +65,7 @@ describe('ScheduleTemplatesService', () => {
   });
 
   it('load() still fetches after create() pre-populates the signal', () => {
-    service.create({ task_type: 'custom', title: 'Morning walk', recurrence: 'daily' }).subscribe();
+    service.create({ task_type: 'general', title: 'Morning walk', recurrence: 'daily' }).subscribe();
     httpMock.expectOne(r => r.method === 'POST').flush(MOCK_TEMPLATE_A);
 
     // Signal is non-null now, but load() should still fetch (loaded flag is still false)
@@ -93,7 +93,7 @@ describe('ScheduleTemplatesService', () => {
     httpMock.expectOne(r => r.method === 'GET').flush([MOCK_TEMPLATE_A]);
 
     let result: ScheduleTemplate | undefined;
-    service.create({ task_type: 'custom', title: 'Evening stretch', recurrence: 'weekdays' }).subscribe(r => (result = r));
+    service.create({ task_type: 'general', title: 'Evening stretch', recurrence: 'weekdays' }).subscribe(r => (result = r));
 
     const req = httpMock.expectOne(r => r.url.endsWith('/schedule/templates') && r.method === 'POST');
     req.flush(MOCK_TEMPLATE_B);

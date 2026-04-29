@@ -63,12 +63,12 @@ describe('PlanTasksStepComponent', () => {
     }));
   });
 
-  it('onTaskAdded should set task_type to custom for non-exercise entries', () => {
+  it('onTaskAdded should set task_type to general for non-exercise entries', () => {
     spyOn(service, 'addTask');
     const entry: AddedEntry = { label: 'Call dentist', type: 'appointment' };
     fixture.componentInstance.onTaskAdded('2026-03-25', entry);
     expect(service.addTask).toHaveBeenCalledWith(jasmine.objectContaining({
-      task_type: 'custom',
+      task_type: 'general',
     }));
   });
 
@@ -79,7 +79,7 @@ describe('PlanTasksStepComponent', () => {
     expect(service.addFloatingTask).toHaveBeenCalledWith(jasmine.objectContaining({
       title: 'Buy groceries',
       energy: 'medium',
-      task_type: 'custom',
+      task_type: 'general',
     }));
   });
 
@@ -94,7 +94,7 @@ describe('PlanTasksStepComponent', () => {
   });
 
   it('should render floating tasks inside the floating panel', () => {
-    service.addFloatingTask({ title: 'Unscheduled errand', energy: 'low', task_type: 'custom' });
+    service.addFloatingTask({ title: 'Unscheduled errand', energy: 'low', task_type: 'general' });
     fixture.detectChanges();
     const rows = fixture.nativeElement.querySelectorAll('.floating-task-row');
     expect(rows.length).toBe(1);
@@ -103,7 +103,7 @@ describe('PlanTasksStepComponent', () => {
 
   it('should call weekPlanService.removeFloatingTask when floating remove button is clicked', () => {
     spyOn(service, 'removeFloatingTask');
-    service.addFloatingTask({ title: 'Task to remove', energy: 'low', task_type: 'custom' });
+    service.addFloatingTask({ title: 'Task to remove', energy: 'low', task_type: 'general' });
     fixture.detectChanges();
     const btn: HTMLElement = fixture.nativeElement.querySelector('.floating-remove');
     btn.click();
@@ -119,8 +119,8 @@ describe('PlanTasksStepComponent', () => {
 
   it('removeTask should remove the correct task by day-local index', () => {
     spyOn(service, 'removeTask');
-    service.addTask({ date: '2026-03-24', title: 'First', energy: 'low', task_type: 'custom' });
-    service.addTask({ date: '2026-03-24', title: 'Second', energy: 'high', task_type: 'custom' });
+    service.addTask({ date: '2026-03-24', title: 'First', energy: 'low', task_type: 'general' });
+    service.addTask({ date: '2026-03-24', title: 'Second', energy: 'high', task_type: 'general' });
     fixture.detectChanges();
     // Remove the second task (day-local index 1); its global index is also 1.
     fixture.componentInstance.removeTask('2026-03-24', 1);
@@ -129,8 +129,8 @@ describe('PlanTasksStepComponent', () => {
 
   it('removeTask should resolve global index when tasks from other days precede', () => {
     spyOn(service, 'removeTask');
-    service.addTask({ date: '2026-03-24', title: 'Day1 Task', energy: 'low', task_type: 'custom' });
-    service.addTask({ date: '2026-03-25', title: 'Day2 Task', energy: 'medium', task_type: 'custom' });
+    service.addTask({ date: '2026-03-24', title: 'Day1 Task', energy: 'low', task_type: 'general' });
+    service.addTask({ date: '2026-03-25', title: 'Day2 Task', energy: 'medium', task_type: 'general' });
     fixture.detectChanges();
     // Remove the first (and only) task on day 2; its global index is 1.
     fixture.componentInstance.removeTask('2026-03-25', 0);

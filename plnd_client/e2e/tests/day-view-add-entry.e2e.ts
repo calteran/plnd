@@ -114,7 +114,7 @@ test.describe('Day View — Add Entry', () => {
     test('submitting the form adds the entry to the schedule list', async ({ page }) => {
       const SEED_ITEM = {
         entry_id: 'seed-1',
-        task_type: 'custom',
+        task_type: 'general',
         title: 'Existing task',
         status: 'planned',
         date: '2026-03-28',
@@ -122,7 +122,7 @@ test.describe('Day View — Add Entry', () => {
       };
       const NEW_ITEM = {
         entry_id: 'new-entry-1',
-        task_type: 'custom',
+        task_type: 'general',
         title: 'call mum',
         status: 'planned',
         date: '2026-03-28',

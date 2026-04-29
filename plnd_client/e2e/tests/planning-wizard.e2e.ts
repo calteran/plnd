@@ -132,7 +132,7 @@ test.describe('Planning Wizard', () => {
     const MOCK_CARRYOVER = [
       {
         entry_id: 'co-1',
-        task_type: 'custom',
+        task_type: 'general',
         title: 'Morning run',
         date: '2026-03-21',
         scheduled_start: '07:00:00',
@@ -148,7 +148,7 @@ test.describe('Planning Wizard', () => {
       },
       {
         entry_id: 'co-3',
-        task_type: 'custom',
+        task_type: 'general',
         title: 'Read book',
         date: '2026-03-23',
         scheduled_start: '20:00:00',
@@ -259,8 +259,8 @@ test.describe('Planning Wizard', () => {
 
   test.describe('Step 2 — Tasks Planning', () => {
     const MOCK_TASKS = [
-      { title: 'Morning run', energy: 'high', date: '2026-03-30', task_type: 'custom' },
-      { title: 'Read book',   energy: 'low',  date: '2026-03-30', task_type: 'custom' },
+      { title: 'Morning run', energy: 'high', date: '2026-03-30', task_type: 'general' },
+      { title: 'Read book',   energy: 'low',  date: '2026-03-30', task_type: 'general' },
     ];
 
     test.beforeEach(async ({ page }) => {

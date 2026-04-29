@@ -690,7 +690,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     const rrule = this.effectiveRrule();
     const recurrence = rruleToRecurrenceType(rrule);
     const req: CreateScheduleTemplateRequest = {
-      task_type: 'custom',
+      task_type: 'general',
       title: name,
       recurrence,
       recurrence_rule: rrule,
@@ -718,7 +718,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     if (this.isAdding()) return;
 
     const req: CreateScheduleTemplateRequest = {
-      task_type: 'custom',
+      task_type: 'general',
       title: chip.name,
       recurrence: 'daily',
       recurrence_rule: chip.rrule,

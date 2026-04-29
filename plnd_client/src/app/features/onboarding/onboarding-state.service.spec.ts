@@ -118,7 +118,7 @@ describe('OnboardingStateService', () => {
 
   it('setPlacedTasks stores the placed task entries', () => {
     const tasks: PlanEntryRequest[] = [
-      { date: '2026-04-22', task_type: 'custom', title: 'Morning run', scheduled_start: '07:00' },
+      { date: '2026-04-22', task_type: 'general', title: 'Morning run', scheduled_start: '07:00' },
     ];
     service.setPlacedTasks(tasks);
     expect(service.placedTasks()).toEqual(tasks);
@@ -152,7 +152,7 @@ describe('OnboardingStateService', () => {
   it('setScheduleTemplates stores template records', () => {
     const templates: ScheduleTemplate[] = [
       {
-        template_id: 'tmpl-1', user_id: 'u1', task_type: 'custom',
+        template_id: 'tmpl-1', user_id: 'u1', task_type: 'general',
         title: 'Morning run', recurrence: 'weekdays',
         recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
         time_window_start: '07:00', time_window_end: '08:00',
@@ -171,14 +171,14 @@ describe('OnboardingStateService', () => {
     expect(service.totalRoutines()).toBe(0);
     service.setScheduleTemplates([
       {
-        template_id: 'a', user_id: 'u1', task_type: 'custom', title: 'A',
+        template_id: 'a', user_id: 'u1', task_type: 'general', title: 'A',
         recurrence: 'daily', recurrence_rule: 'FREQ=DAILY',
         time_window_start: null, time_window_end: null, duration_minutes: null,
         energy_required: 'low', is_milepost: false, task_ref_id: null, task_ref_type: null,
         created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
       },
       {
-        template_id: 'b', user_id: 'u1', task_type: 'custom', title: 'B',
+        template_id: 'b', user_id: 'u1', task_type: 'general', title: 'B',
         recurrence: 'daily', recurrence_rule: 'FREQ=DAILY',
         time_window_start: null, time_window_end: null, duration_minutes: null,
         energy_required: 'low', is_milepost: false, task_ref_id: null, task_ref_type: null,
@@ -191,8 +191,8 @@ describe('OnboardingStateService', () => {
   it('totalTasks reflects placedTasks length', () => {
     expect(service.totalTasks()).toBe(0);
     service.setPlacedTasks([
-      { date: '2026-04-22', task_type: 'custom', title: 'Task A', scheduled_start: '09:00' },
-      { date: '2026-04-23', task_type: 'custom', title: 'Task B', scheduled_start: '10:00' },
+      { date: '2026-04-22', task_type: 'general', title: 'Task A', scheduled_start: '09:00' },
+      { date: '2026-04-23', task_type: 'general', title: 'Task B', scheduled_start: '10:00' },
     ]);
     expect(service.totalTasks()).toBe(2);
   });

@@ -294,7 +294,7 @@ export class PlanTasksStepComponent {
       title: entry.label,
       energy: 'medium',
       duration: entry.duration,
-      task_type: entry.type === 'exercise' ? 'exercise' : 'custom',
+      task_type: entry.type === 'exercise' ? 'exercise' : 'general',
     });
   }
 
@@ -303,7 +303,7 @@ export class PlanTasksStepComponent {
       title: entry.label,
       energy: 'medium',
       duration: entry.duration,
-      task_type: entry.type === 'exercise' ? 'exercise' : 'custom',
+      task_type: entry.type === 'exercise' ? 'exercise' : 'general',
     });
   }
 }

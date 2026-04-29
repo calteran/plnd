@@ -40,7 +40,7 @@ All scheduled items share a common set of fields:
 | `id` | UUID | Primary key |
 | `user_id` | UUID → users | Owner |
 | `title` | text | Display name |
-| `task_type` | enum | `meal \| exercise \| work \| leisure \| appointment \| medication \| custom` |
+| `task_type` | enum | `meal \| exercise \| work \| leisure \| appointment \| medication \| general` |
 | `scheduled_start` | timestamptz | Planned start time |
 | `duration_minutes` | integer | Expected duration |
 | `energy_required` | enum | `low \| medium \| high` |

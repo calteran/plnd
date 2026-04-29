@@ -262,7 +262,7 @@ mod tests {
             "leisure",
             "appointment",
             "medication",
-            "custom",
+            "general",
         ] {
             assert!(VALID_TASK_TYPES.contains(t), "missing task_type: {t}");
         }

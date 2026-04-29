@@ -6,8 +6,8 @@ import { seedAuth, API_BASE } from '../helpers/auth';
 // currentStep: 4 or 5 → wizard opens directly on Day Review or Confirmation
 
 const MOCK_TASKS = [
-  { title: 'Morning run', energy: 'high', date: '2026-03-30', task_type: 'custom' },
-  { title: 'Read book',   energy: 'low',  date: '2026-03-30', task_type: 'custom' },
+  { title: 'Morning run', energy: 'high', date: '2026-03-30', task_type: 'general' },
+  { title: 'Read book',   energy: 'low',  date: '2026-03-30', task_type: 'general' },
 ];
 
 async function seedWizard(page: Page): Promise<void> {

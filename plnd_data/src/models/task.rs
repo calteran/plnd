@@ -11,7 +11,7 @@ pub struct Task {
     pub task_id: Uuid,
     pub user_id: Uuid,
     pub title: String,
-    pub task_type: String, // 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'custom'
+    pub task_type: String, // 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'general'
     pub scheduled_start: Option<DateTime<Utc>>,
     pub duration_minutes: Option<i32>,
     pub energy_required: String, // 'low' | 'medium' | 'high'

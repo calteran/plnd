@@ -1,4 +1,4 @@
-export type TaskType = 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'custom';
+export type TaskType = 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'general';
 export type RecurrenceType = 'daily' | 'weekdays' | 'weekly' | 'custom';
 export type EnergyLevel = 'low' | 'medium' | 'high';
 

@@ -513,13 +513,13 @@ impl Tool for PlaceTasksTool {
                             "task_type": {
                                 "type": "string",
                                 "enum": ["work", "exercise", "leisure",
-                                         "appointment", "medication", "custom"],
+                                         "appointment", "medication", "general"],
                                 "description": "Domain category for this task. \
                                                 NEVER use meal anchor names here — \
                                                 \"breakfast\", \"lunch\", and \"dinner\" \
                                                 belong only in after_milepost. \
                                                 For personal errands or activities with \
-                                                no specific category, use \"custom\"."
+                                                no specific category, use \"general\"."
                             }
                         }
                     }

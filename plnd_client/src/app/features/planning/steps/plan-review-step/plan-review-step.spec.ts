@@ -5,7 +5,7 @@ import { PlanReviewStepComponent } from './plan-review-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 
 const MOCK_ITEM = {
-  entry_id: 'e1', title: 'Morning walk', task_type: 'custom',
+  entry_id: 'e1', title: 'Morning walk', task_type: 'general',
   date: '2026-03-20', status: 'planned',
   scheduled_start: '2026-03-20T09:00:00Z'
 };
