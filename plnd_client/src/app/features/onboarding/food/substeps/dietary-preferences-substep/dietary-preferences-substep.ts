@@ -226,7 +226,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
     .rating-entry-row { display: flex; align-items: center; gap: 8px; padding: 10px 14px; flex-wrap: wrap; }
     .search-wrap { position: relative; flex: 1; display: flex; }
     .search-wrap .text-input { width: 100%; }
-    .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface-white); border: 1.5px solid var(--color-border-input); border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); z-index: 10; max-height: 200px; overflow-y: auto; margin-top: 2px; }
+    .search-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: var(--color-surface-white); border: 1.5px solid var(--color-border-input); border-radius: 6px; box-shadow: var(--shadow-dropdown); z-index: 10; max-height: 200px; overflow-y: auto; margin-top: 2px; }
     .search-result { display: flex; flex-direction: column; width: 100%; background: none; border: none; border-bottom: 1px solid var(--color-border-row); padding: 8px 10px; text-align: left; cursor: pointer; gap: 2px; }
     .search-result:last-child { border-bottom: none; }
     .search-result:hover { background: var(--color-surface-base); }

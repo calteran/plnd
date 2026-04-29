@@ -325,7 +325,7 @@ import {
       background: var(--color-btn-neutral-border);
       color: var(--color-text-body);
     }
-    .btn--secondary:hover:not(:disabled) { background: color-mix(in srgb, var(--color-btn-neutral-border) 80%, var(--color-surface-base)); }
+    .btn--secondary:hover:not(:disabled) { filter: brightness(0.92); }
 
     .btn--danger { background: var(--color-destructive-light); color: var(--color-destructive); }
     .btn--danger:hover:not(:disabled) { background: color-mix(in srgb, var(--color-destructive) 20%, var(--color-surface-white)); }

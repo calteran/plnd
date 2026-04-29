@@ -101,7 +101,7 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string }> = {
     .card-default:hover { background: var(--color-surface-base); }
     .type-badge { font-size: 11px; font-weight: 700; border-radius: 4px; padding: 1px 6px; align-self: flex-start; }
     .type-badge--allergy { color: var(--color-destructive); background: var(--color-destructive-light); }
-    .type-badge--intolerance { color: var(--color-text-secondary); background: var(--color-accent-light); }
+    .type-badge--intolerance { color: var(--color-accent-dark); background: var(--color-accent-light); }
     .type-badge--cultural_religious { color: var(--color-purple); background: var(--color-purple-light); }
     .card-name { font-size: 13px; font-weight: 500; color: var(--color-text-body); }
     .card-notes { font-size: 12px; color: var(--color-text-muted); }
