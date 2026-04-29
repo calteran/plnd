@@ -1882,11 +1882,11 @@ mod tests {
     }
 
     /// When a schema retry returns completely empty output — no text, no tool
-    /// calls — the agent must return `ContextWindowExhausted` (→ HTTP 503)
-    /// rather than letting the empty string fall through to a confusing
-    /// "EOF while parsing" `SchemaValidation` error (→ HTTP 422).
+    /// calls — the agent must return `EmptyRetryOutput` (→ HTTP 503) rather
+    /// than letting the empty string fall through to a confusing "EOF while
+    /// parsing" `SchemaValidation` error (→ HTTP 422).
     #[tokio::test]
-    async fn test_schema_retry_empty_output_returns_context_exhausted() {
+    async fn test_schema_retry_empty_output_returns_empty_retry_output() {
         let mock = MockLlmProvider::new("test");
 
         // First response: not valid JSON → schema retry fires.
