@@ -92,7 +92,7 @@ CREATE TABLE tasks (
     task_id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id          UUID         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     title            VARCHAR(200) NOT NULL,
-    task_type        VARCHAR(20)  NOT NULL CHECK (task_type IN ('meal', 'exercise', 'work', 'leisure', 'appointment', 'medication', 'custom')),
+    task_type        VARCHAR(20)  NOT NULL CHECK (task_type IN ('meal', 'exercise', 'work', 'leisure', 'appointment', 'medication', 'general')),
     scheduled_start  TIMESTAMPTZ,
     duration_minutes INTEGER      CHECK (duration_minutes >= 0),
     energy_required  VARCHAR(10)  NOT NULL DEFAULT 'medium' CHECK (energy_required IN ('low', 'medium', 'high')),
@@ -148,7 +148,7 @@ CREATE TABLE generic_tasks (
 CREATE TABLE schedule_templates (
     template_id       UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    task_type         VARCHAR(20)  NOT NULL CHECK (task_type IN ('meal', 'exercise', 'work', 'leisure', 'appointment', 'medication', 'custom')),
+    task_type         VARCHAR(20)  NOT NULL CHECK (task_type IN ('meal', 'exercise', 'work', 'leisure', 'appointment', 'medication', 'general')),
     title             VARCHAR(200) NOT NULL,
     recurrence        VARCHAR(20)  NOT NULL CHECK (recurrence IN ('daily', 'weekdays', 'weekly', 'custom')),
     recurrence_rule   TEXT,        -- RRULE string for custom recurrence patterns
@@ -172,7 +172,7 @@ CREATE TABLE schedule_entries (
     entry_id        UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID         NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     template_id     UUID         REFERENCES schedule_templates(template_id) ON DELETE SET NULL,
-    task_type       VARCHAR(20)  NOT NULL CHECK (task_type IN ('meal', 'exercise', 'work', 'leisure', 'appointment', 'medication', 'custom')),
+    task_type       VARCHAR(20)  NOT NULL CHECK (task_type IN ('meal', 'exercise', 'work', 'leisure', 'appointment', 'medication', 'general')),
     task_ref_id     UUID,        -- polymorphic ref to catalog/user table
     task_ref_type   VARCHAR(30), -- discriminator: 'user_meal' | 'user_dish' | 'user_exercise' | ...
     date            DATE         NOT NULL,
