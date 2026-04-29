@@ -6,14 +6,9 @@ PLND (pronounced "planned") provides structured planning with extensive customiz
 
 ## Development Status
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 1 | Foundation — Rust/Axum backend, Angular frontend, Docker stack, auth | ✅ Complete |
-| Phase 2 | Core Features — domain model schema, catalog/library API, external providers, secrets management | ✅ Complete |
-| Phase 2.5 | Remaining Planning UI — meal planning, exercise planning, family support | 🔄 In Progress |
-| Phase 3+ | AI enhancements, integrations, mobile, deployment | Planned |
+Phase 3.3 — meal planning wizard — is complete. Phase 3.5 (background agent jobs) is the next planned increment.
 
-See [PLANNING.md](PLANNING.md) for the full roadmap.
+See [docs/architecture.md](docs/architecture.md) for the design reference and current roadmap.
 
 ## Tech Stack
 
@@ -53,10 +48,12 @@ just logs             # View service logs
 
 ## Documentation
 
-- [PLANNING.md](PLANNING.md) — Architecture and development roadmap
-- [DOMAIN_MODEL.md](DOMAIN_MODEL.md) — Authoritative domain and scheduling model (meal/exercise hierarchy, catalog layer, schedule templates)
+- [docs/architecture.md](docs/architecture.md) — Living architecture reference: vision, domain model, scheduling, agent design, frontend, roadmap
 - [CLAUDE.md](CLAUDE.md) — Agent configuration and project conventions
 - [AGENTS.md](AGENTS.md) — Agent maintenance directives
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Contribution guidelines
+
+Dated specs and implementation plans under `docs/superpowers/specs/` and `docs/superpowers/plans/` are point-in-time artifacts; see the README in each directory.
 
 ## License
 
