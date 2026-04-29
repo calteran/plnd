@@ -428,12 +428,10 @@ describe('OnboardingHubComponent', () => {
     expect(err?.textContent).toContain('Something went wrong');
   });
 
-  it('commitPlan() sends schedule_template_ids as empty array and routine instances via placed_tasks', () => {
+  it('commitPlan() sends routine instances via placed_tasks (schedule_template_ids absent)', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const placedTask = { task_type: 'custom', title: 'Morning Run', scheduled_date: '2026-05-05', duration_minutes: 30, energy_required: 'low' } as any;
-    // Routine instances travel via placed_tasks; template IDs are deliberately omitted so
-    // the backend does not re-expand templates and create duplicate schedule_entries.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (stateMock as any).placedTasks = signal([placedTask]).asReadonly();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -447,7 +445,6 @@ describe('OnboardingHubComponent', () => {
     fixture.componentInstance.commitPlan();
 
     const req = httpTesting.expectOne(r => r.method === 'POST' && r.url.includes('/schedule/plan'));
-    expect(req.request.body.schedule_template_ids).toEqual([]);
     expect(req.request.body.placed_tasks).toEqual([placedTask]);
     req.flush({ committed: 1, planning_task_status: 'completed' });
 
@@ -503,7 +500,6 @@ describe('OnboardingHubComponent', () => {
     expect(body.plan_start).toBe('2026-05-01');
     expect(body.plan_end).toBe('2026-05-14');
     expect(body.planning_task_id).toBe('00000000-0000-0000-0000-000000000000');
-    expect(body.schedule_template_ids).toEqual([]);
     expect(body.placed_tasks).toEqual([placedTask]);
     expect(body.meal_habit_ids).toEqual(['habit-1']);
     expect(body.entries).toEqual([
