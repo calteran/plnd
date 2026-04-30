@@ -4,11 +4,10 @@ A structured yet flexible planner/assistant designed for neurodivergent individu
 
 PLND (pronounced "planned") provides structured planning with extensive customization options, gradual exposure features, and sensory-friendly interfaces to help neurodivergent individuals who are picky eaters or struggle with nutrition and exercise.
 
-## Development Status
+## Documentation entry points
 
-Phase 3.3 — meal planning wizard — is complete. Phase 3.5 (background agent jobs) is the next planned increment.
-
-See [docs/architecture.md](docs/architecture.md) for the design reference and current roadmap.
+- [docs/architecture.md](docs/architecture.md) — Living architecture reference
+- [docs/roadmap.md](docs/roadmap.md) — Development roadmap
 
 ## Tech Stack
 
@@ -48,7 +47,8 @@ just logs             # View service logs
 
 ## Documentation
 
-- [docs/architecture.md](docs/architecture.md) — Living architecture reference: vision, domain model, scheduling, agent design, frontend, roadmap
+- [docs/architecture.md](docs/architecture.md) — Living architecture reference: vision, domain model, scheduling, agent design, frontend, cross-cutting concerns, glossary
+- [docs/roadmap.md](docs/roadmap.md) — Development roadmap
 - [CLAUDE.md](CLAUDE.md) — Agent configuration and project conventions
 - [AGENTS.md](AGENTS.md) — Agent maintenance directives
 - [CONTRIBUTING.md](CONTRIBUTING.md) — Contribution guidelines

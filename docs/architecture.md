@@ -17,10 +17,9 @@
 7. [API Surface](#7-api-surface)
 8. [Frontend Topology](#8-frontend-topology)
 9. [Cross-Cutting Concerns](#9-cross-cutting-concerns)
-10. [Roadmap](#10-roadmap)
-11. [Glossary](#11-glossary)
-12. [Document Conventions](#12-document-conventions)
-13. [Revisions](#13-revisions)
+10. [Glossary](#10-glossary)
+11. [Document Conventions](#11-document-conventions)
+12. [Revisions](#12-revisions)
 
 ---
 
@@ -56,7 +55,7 @@ These principles shaped every decision documented elsewhere in this file. When i
 
 ### 1.3 What PLND is *not*
 
-- **Not a calendar.** Calendar integration (§10) imports events as anchors but PLND is not a replacement for Google/Apple/Outlook calendars.
+- **Not a calendar.** Calendar integration imports events as anchors but PLND is not a replacement for Google/Apple/Outlook calendars.
 - **Not a fitness tracker.** Exercise scheduling exists; physiological data collection does not.
 - **Not a chat companion.** The agent is intent-driven, not conversational. It acts on input and surfaces structured results, rather than maintaining a conversation thread.
 - **Not opinionated about diet.** PLND does not advocate any specific dietary philosophy. Dietary restrictions and preferences are user-declared.
@@ -713,7 +712,7 @@ Token definitions live in `plnd_client/src/styles/_tokens.scss`; this section ca
 
 **Authentication.** OAuth-based (mock provider in dev, real provider in production). Sessions are signed JWTs validated on every protected route. Session lifetime is configurable; refresh rotation is implemented.
 
-**Authorization.** All user-scoped data is filtered by `user_id` from the auth session. There is no admin mode, no impersonation, no superuser. Family caregiver write access is a future concern (see §10).
+**Authorization.** All user-scoped data is filtered by `user_id` from the auth session. There is no admin mode, no impersonation, no superuser. Family caregiver write access is a future concern (see §3.4).
 
 **Threat model summary** — see §5.7 for prompt-specific threats. Cross-cutting threats and mitigations:
 
@@ -777,17 +776,7 @@ The **production deployment shape has not been designed yet**. The current local
 
 ---
 
-## 10. Roadmap
-
-The roadmap will be populated in subsequent revisions of this document. Two phases of work are anticipated:
-
-### 10.1 Close the delta between implementation and this document
-
-### 10.2 Push to production
-
----
-
-## 11. Glossary
+## 10. Glossary
 
 Terms used throughout this document. Where a term is **deprecated**, the replacement is noted.
 
@@ -845,23 +834,23 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 ---
 
-## 12. Document Conventions
+## 11. Document Conventions
 
-### 12.1 Status of this document
+### 11.1 Status of this document
 
 This file is the **controlling source of truth** for PLND's design. When this document and another doc disagree, this document wins. When this document is wrong, edit it — do not write a new spec to express the correction.
 
-### 12.2 Status of dated specs and plans
+### 11.2 Status of dated specs and plans
 
 Files under `docs/superpowers/specs/` and `docs/superpowers/plans/` are **point-in-time artifacts**. They capture intent at the moment of feature work and are valuable as historical context (why a thing was built the way it was), but they are **not authoritative** about current design. Each directory's `README.md` carries this notice.
 
-### 12.3 Updating this document
+### 11.3 Updating this document
 
 - A design decision settles → update the relevant section here.
 - Implementation drifts from this document → either update this document (intent has changed) or fix the drift (implementation is wrong). Pick one; do not let the divergence persist as latent debt.
 - A migration is in flight → record the target state here, capture the gap in `docs/migration-deltas.md` (a temporary working file), and delete that file when the migration completes.
 
-### 12.4 Style
+### 11.4 Style
 
 - Opinionated and clear. Hedged language ("perhaps", "might", "could possibly") obscures intent.
 - Lead with the *why*, follow with the *what*. A reader should understand the motivation before the mechanics.
@@ -870,7 +859,7 @@ Files under `docs/superpowers/specs/` and `docs/superpowers/plans/` are **point-
 
 ---
 
-## 13. Revisions
+## 12. Revisions
 
 A log of substantive changes to this document.
 
