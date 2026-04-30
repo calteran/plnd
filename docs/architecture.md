@@ -275,18 +275,23 @@ Slot boundaries are **positional** — defined by anchor order, not by exact tim
 
 ### 4.8 Planning windows
 
-A **planning window** is the temporal span the user plans at one time. The default window is one week (7 days). The user can configure shorter or longer windows.
+A **planning window** is the temporal span the user plans at one time. The default window is one week (7 days); shorter or longer windows are user-configurable.
 
-Currently the system caps planning windows at 14 days to bound LLM cost and reasoning load. The data model is open-ended — a future increase is not a schema change, just a configuration adjustment.
+Planning windows are capped at 14 days to bound LLM cost and reasoning load. The cap is a configuration choice, not a model constraint.
 
 #### Planning happens in two surfaces
 
-Planning is performed in **two** places, and both must offer the same capabilities:
+Planning is performed in **two** places:
 
-- **The onboarding wizard** — the user's first encounter with planning. It bootstraps the user's first window and **doubles as training**: the patterns the user learns here are the patterns they will repeat in every subsequent planning cycle. Onboarding is not a tutorial separate from the real product — it *is* the product, with first-run framing.
+- **The onboarding wizard** — the user's first encounter with the product. It bootstraps the user's first window and **doubles as training**: the patterns the user learns here are the patterns they will repeat in every subsequent planning cycle. Onboarding is not a tutorial separate from the real product — it *is* the product, with first-run framing.
 - **The planning wizard** — the recurring planning ritual (default weekly) the user returns to after onboarding.
 
-The two surfaces offer **equivalent capabilities** — same anchor model, same routine handling, same task and meal editing, same memory access, same paired-task and displaced-meal-flag behavior — and should be designed as similarly as possible. Differences are limited to first-run framing (onboarding) and carryover handling (planning wizard, since onboarding has no prior window to carry over from). Any feature added to one surface should be added to the other unless there is an explicit reason it cannot apply.
+The two surfaces share **capability parity**: every action and concept supported in one is supported in the other. Same anchor model, same routine handling, same task and meal editing, same memory feedback loop, same paired-task and displaced-meal-flag behavior. Any capability added to one surface is added to the other unless there is an explicit reason it cannot apply.
+
+The surfaces have **different navigation shapes**, deliberately:
+
+- **The planning wizard is linear.** Planning is a small set of spokes that all must complete — tasks, meals, and exercise. With this many spokes and a hard completion requirement, sequencing them is a feature, not a constraint: the user is guided through what's needed without having to decide where to start.
+- **The onboarding wizard is hub-and-spoke for setup content** (account, dietary restrictions, food preferences, meal pattern, accessibility settings) because those concerns are independent and revisitable. **The planning portion of onboarding uses the same linear sub-flow as the planning wizard.** That way, the user trains on the exact flow they will use every subsequent planning cycle — onboarding is a richer wrapper around the shared planning experience, not a separate variant of it.
 
 ### 4.9 The planning process
 
@@ -488,7 +493,7 @@ This is the primary defense against malformed model output reaching Angular as d
 | Angular unit | — | — | — | Component logic, signals state, services |
 | Angular integration (Playwright) | mock backend | — | fixture | Wizard flows, DOM interactions against a mocked API |
 
-CI currently runs the unit, integration, API integration, Angular unit, and Angular e2e layers. Local-LMStudio-in-CI is tracked as future work pending prompt stability.
+All layers except E2E run in CI; the E2E tier is local-only by design.
 
 ---
 
@@ -850,7 +855,7 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Personal library.** A user's own forked-and-editable copy of catalog items (`user_dishes`, `user_meals`, `user_exercises`). See [§3.2](#32-content-libraries--catalog-and-personal).
 
-**Planning window.** The temporal span the user plans at one time (default 1 week, currently capped at 14 days; the cap is a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.8](#48-planning-windows).
+**Planning window.** The temporal span the user plans at one time (default 1 week; capped at 14 days as a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.8](#48-planning-windows).
 
 **Repository.** Trait-based storage abstraction in `plnd_data::repository`. The only allowed entry point to persistent storage from outside `plnd_data`. See [§6.2](#62-repository-pattern).
 
