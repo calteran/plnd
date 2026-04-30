@@ -223,7 +223,7 @@ A task may also carry:
 
 Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.9). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
 
-**All task metadata is user-editable.** Title, duration, energy level, type, start time, meal pairing, and date can be adjusted at any time — both during planning (in the planning wizard) and on the day itself (in the day view). Every edit is captured by the memory system (§3.5), so the agent's future inferences improve from observed user preferences.
+**All task metadata is user-editable.** Title, duration, energy level, type, start time, meal pairing, and date can be adjusted at any time — in either planning surface (the onboarding wizard or the recurring planning wizard, see §4.8) and on the day itself (in the day view). Every edit is captured by the memory system (§3.5), so the agent's future inferences improve from observed user preferences.
 
 ### 4.4 Routines
 
@@ -279,7 +279,14 @@ A **planning window** is the temporal span the user plans at one time. The defau
 
 Currently the system caps planning windows at 14 days to bound LLM cost and reasoning load. The data model is open-ended — a future increase is not a schema change, just a configuration adjustment.
 
-The same planning-window concept underlies both the **planning wizard** (the recurring planning ritual, default weekly) and the **onboarding wizard** (the first-run setup that bootstraps the user's first window). One concept; two surfaces.
+#### Planning happens in two surfaces
+
+Planning is performed in **two** places, and both must offer the same capabilities:
+
+- **The onboarding wizard** — the user's first encounter with planning. It bootstraps the user's first window and **doubles as training**: the patterns the user learns here are the patterns they will repeat in every subsequent planning cycle. Onboarding is not a tutorial separate from the real product — it *is* the product, with first-run framing.
+- **The planning wizard** — the recurring planning ritual (default weekly) the user returns to after onboarding.
+
+The two surfaces offer **equivalent capabilities** — same anchor model, same routine handling, same task and meal editing, same memory access, same paired-task and displaced-meal-flag behavior — and should be designed as similarly as possible. Differences are limited to first-run framing (onboarding) and carryover handling (planning wizard, since onboarding has no prior window to carry over from). Any feature added to one surface should be added to the other unless there is an explicit reason it cannot apply.
 
 ### 4.9 The planning process
 
@@ -629,7 +636,7 @@ plnd_client/src/app/
 | `UserService` | Profile, onboarding status |
 | `PreferencesService` | Planning configuration, wake/bed, meal windows |
 | `ScheduleService` | Day view, schedule entries, plan commits |
-| `WeekPlanService` | Week aggregation; planning wizard backing store |
+| `WeekPlanService` | Week aggregation; backs both planning surfaces (onboarding and planning wizards) |
 | `ScheduleTemplatesService` | Recurring pattern CRUD |
 | `MealHabitService` | Meal habit CRUD |
 | `CatalogService` | Catalog browsing, detail retrieval |
