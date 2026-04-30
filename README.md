@@ -4,16 +4,10 @@ A structured yet flexible planner/assistant designed for neurodivergent individu
 
 PLND (pronounced "planned") provides structured planning with extensive customization options, gradual exposure features, and sensory-friendly interfaces to help neurodivergent individuals who are picky eaters or struggle with nutrition and exercise.
 
-## Development Status
+## Documentation entry points
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| Phase 1 | Foundation — Rust/Axum backend, Angular frontend, Docker stack, auth | ✅ Complete |
-| Phase 2 | Core Features — domain model schema, catalog/library API, external providers, secrets management | ✅ Complete |
-| Phase 2.5 | Remaining Planning UI — meal planning, exercise planning, family support | 🔄 In Progress |
-| Phase 3+ | AI enhancements, integrations, mobile, deployment | Planned |
-
-See [PLANNING.md](PLANNING.md) for the full roadmap.
+- [docs/architecture.md](docs/architecture.md) — Living architecture reference
+- [docs/roadmap.md](docs/roadmap.md) — Development roadmap
 
 ## Tech Stack
 
@@ -53,10 +47,13 @@ just logs             # View service logs
 
 ## Documentation
 
-- [PLANNING.md](PLANNING.md) — Architecture and development roadmap
-- [DOMAIN_MODEL.md](DOMAIN_MODEL.md) — Authoritative domain and scheduling model (meal/exercise hierarchy, catalog layer, schedule templates)
+- [docs/architecture.md](docs/architecture.md) — Living architecture reference: vision, domain model, scheduling, agent design, frontend, cross-cutting concerns, glossary
+- [docs/roadmap.md](docs/roadmap.md) — Development roadmap
 - [CLAUDE.md](CLAUDE.md) — Agent configuration and project conventions
 - [AGENTS.md](AGENTS.md) — Agent maintenance directives
+- [CONTRIBUTING.md](CONTRIBUTING.md) — Contribution guidelines
+
+Dated specs and implementation plans under `docs/superpowers/specs/` and `docs/superpowers/plans/` are point-in-time artifacts; see the README in each directory.
 
 ## License
 

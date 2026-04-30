@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Claude Code configuration for the PLND project. See PLANNING.md for the development roadmap.
+Claude Code configuration for the PLND project. See [docs/architecture.md](docs/architecture.md) for the design reference (vision, domain model, scheduling, agent architecture, roadmap).
 
 ## Project Overview
 
@@ -10,7 +10,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 
 - **Repository**: https://github.com/calteran/plnd
 
-> See [DOMAIN_MODEL.md](DOMAIN_MODEL.md) for domain architecture.
+> See [docs/architecture.md](docs/architecture.md) for the controlling design reference. Dated specs under `docs/superpowers/` are point-in-time artifacts, not authoritative.
 
 ## Critical Rules
 
