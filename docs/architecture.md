@@ -291,7 +291,9 @@ The two surfaces share **capability parity**: every action and concept supported
 The surfaces have **different navigation shapes**, deliberately:
 
 - **The planning wizard is linear.** Planning is a small set of spokes that all must complete — tasks, meals, and exercise. With this many spokes and a hard completion requirement, sequencing them is a feature, not a constraint: the user is guided through what's needed without having to decide where to start.
-- **The onboarding wizard is hub-and-spoke for setup content** (account, dietary restrictions, food preferences, meal pattern, accessibility settings) because those concerns are independent and revisitable. **The planning portion of onboarding uses the same linear sub-flow as the planning wizard.** That way, the user trains on the exact flow they will use every subsequent planning cycle — onboarding is a richer wrapper around the shared planning experience, not a separate variant of it.
+- **The onboarding wizard is hub-and-spoke for setup content** (account, dietary restrictions, food preferences, meal pattern, accessibility settings) because those concerns are independent and revisitable.
+
+How the planning portion of onboarding is presented — embedded in the hub-and-spoke, run as a linear sub-flow, or some hybrid — is an open question (see §4.12).
 
 ### 4.9 The planning process
 
@@ -342,6 +344,7 @@ These questions are acknowledged so they can be resolved through deliberate desi
 - **Meal time elasticity.** The model needs enough expressiveness to position meals sensibly given surrounding constraints (early waker with an early appointment vs. late waker with no morning constraint) without becoming a rigid timestamp schedule. The shape of this — soft windows? Anchor-relative offsets? Per-pattern defaults plus daily overrides? — is open.
 - **Routine recurrence specification.** Whether to use full RRULE flexibility or a simpler curated enum (`daily | weekdays | weekly | monthly | yearly`) plus an RRULE escape hatch for advanced users is unresolved.
 - **Cross-window carryover semantics.** When a task in one planning window goes uncompleted, the rules for surfacing it in the next window need design — the user's review step, the lookback horizon, and how memory captures patterns of repeated deferral.
+- **Onboarding's planning shape.** How onboarding presents the planning portion of the experience — as a linear sub-flow matching the planning wizard, as one or more spokes within the hub-and-spoke shell, or some hybrid — is undecided. Capability parity with the planning wizard (§4.8) is a firm requirement; navigation parity is not.
 
 ---
 
