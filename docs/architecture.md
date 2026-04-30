@@ -109,7 +109,7 @@ The domain has five primary areas: **identity**, **content libraries** (catalog 
 
 - Authentication state (sessions, OAuth provider linkage, optional credentials).
 - A user **profile** (display name, avatar, onboarding status).
-- **Preferences** — a single per-user record holding planning configuration (planning horizon, planning trigger offset, week start day, default plan length, planning time, wake/bed times, meal-window times for breakfast/lunch/dinner).
+- **Preferences** — a single per-user record holding planning configuration (planning horizon, planning trigger offset, week start day, default plan length, planning time, wake/bed times, meal-window times for breakfast/lunch/dinner) and accessibility settings (dyslexia-friendly font toggle, color-blind-safe palette toggle, etc. — see §9.3).
 - **Dietary restrictions** — a list of typed entries: `allergy`, `intolerance`, `preference`, or `cultural_religious`. Allergy and intolerance entries are enforced; preference entries are advisory.
 - **Schedule types** — alternative weekly templates the user can switch between. Each carries a days-of-week bitmask and its own wake/bed times. Useful for users with shift work, school terms, or hormonal cycle tracking.
 
@@ -173,7 +173,11 @@ Family coordination — multi-user families with members in scoped roles, shared
 
 ### 3.5 Memory & agent context
 
-The agent layer (§5) maintains a per-user memory store: persistent textual observations the agent accumulates and references on subsequent runs. Memories are typed by category (`food`, `schedule`, `energy`, `habits`, `general`) and tagged. Memory is not user-edited directly through UI — the agent writes, revises, and retires memory entries via tool calls. The user retains control via the settings UI and via natural language ("forget that I prefer X").
+The agent layer (§5) maintains a per-user memory store: persistent textual observations the agent accumulates and references on subsequent runs. Memories are typed by category (`food`, `schedule`, `energy`, `habits`, `general`) and tagged.
+
+**Memory is fed continuously.** Every edit, override, completion, deferral, skip, and manual reordering the user performs is signal for the agent to process into memory. Time-of-day strengths, energy-level windows, food preferences, and other personal rhythms are not configured up front; they accumulate from observed behavior. This is how the agent's plan quality improves over time without requiring explicit training from the user.
+
+Memory is not user-edited directly through UI — the agent writes, revises, and retires memory entries via tool calls. The user retains control via the settings UI and via natural language ("forget that I prefer X").
 
 Memory is **injected** into the agent context block at the start of each run, filtered by use case. Task entry sees `habits` + `schedule` + `energy`. Meal planning sees `food` + `habits`. The `general` category is reachable by tool but not auto-injected.
 
@@ -219,6 +223,8 @@ A task may also carry:
 
 Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.9). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
 
+**All task metadata is user-editable.** Title, duration, energy level, type, start time, meal pairing, and date can be adjusted at any time — both during planning (in the planning wizard) and on the day itself (in the day view). Every edit is captured by the memory system (§3.5), so the agent's future inferences improve from observed user preferences.
+
 ### 4.4 Routines
 
 A **routine** is a template for a recurring task. Routines exist because most users have habits and obligations that repeat — workouts, medications, weekly chores, monthly bill checks, an annual physical. Encoding these once as routines, rather than re-creating them every week, is core to the product.
@@ -246,6 +252,7 @@ Properties of meals:
 - **Daily recurrence is intrinsic.** A user with a `breakfast → lunch → dinner` pattern has those three meals every day. There is no per-meal recurrence rule; the *pattern* recurs, not individual meal entries.
 - **Dish-level recurrence is memory-driven, not structural.** "Friday is sandwich day" is a pattern the agent learns through memory, not a recurrence specification on a meal entry.
 - **Time positioning is partly elastic.** Meals are not generally fixed to a clock time, but they may be constrained by surrounding anchors. A user who wakes at 5am with an 11:30am appointment may need lunch positioned earlier than a user who wakes at 9am with no morning constraint. **The exact shape of this elasticity is an open design question** — see §4.12.
+- **Displaced-meal flag.** When a scheduled task overlaps a meal's usual time window — pushing the meal noticeably outside its expected position — the system surfaces a visible flag on the affected meal in both the planning view and the day view, so the user notices the routine has been interrupted and can choose to accept it or rearrange. See §8.4 for the visual treatment.
 - **Can host paired tasks.** A meal may have one or more tasks paired with it — tasks the user does concurrently with the meal (e.g., reading a document over lunch). See §4.3.
 
 ### 4.6 Anchors
@@ -672,6 +679,7 @@ Token definitions live in `plnd_client/src/styles/_tokens.scss`; this section ca
 - **Floating tasks (purple).** Visually distinct purple panel signals "exists in the system but not yet placed." Don't merge with scheduled content.
 - **Skeleton loading.** Sized to match content. Shimmer animation 1.4s, opacity 0.4 → 0.7 → 0.4. Preserves layout stability.
 - **Accordion expansion.** `max-height` CSS transition for in-place toggles preserving layout; `@if` for large panels carrying state. Chevron rotates 180° when open.
+- **Displaced-meal flag.** Meals that fall outside their usual time window — typically because a scheduled task displaces them — render with a small warning glyph and a subtle tone shift, visible in both the planning grid and the day view. The intent is to signal "your routine is interrupted here" without alarm; the user decides whether to accept or rearrange.
 
 **Dark mode.** Implemented via CSS custom properties on `[data-theme="dark"]`. Indigo replaces amber (amber on dark surfaces reads as caution and loses warmth). Test new features in both modes; the most common mistake is hardcoding a color in a component's SCSS instead of using a token.
 
@@ -732,6 +740,8 @@ Beyond the visual treatments noted in §8.4:
 - Live-updating regions (toast notifications, agent confirmations) use ARIA live regions with appropriate politeness.
 - Animations respect `prefers-reduced-motion`.
 - Dark mode is not just a color swap; contrast ratios are validated in both modes.
+- **Dyslexia-friendly font option.** A user preference toggles the UI to a dyslexia-friendly typeface (e.g., OpenDyslexic, Lexend, or a system equivalent). The default respects any OS-level user preference where one exists.
+- **Color-blind support.** Beyond the §8.4 principle that color is never the sole indicator, a user preference activates a color-blind-safe palette across energy badges, status colors, and accents — useful for users whose specific deficiency is not fully accommodated by the icon-and-text fallback.
 
 ### 9.4 Performance budget
 
