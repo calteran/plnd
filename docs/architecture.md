@@ -357,7 +357,7 @@ plnd_api  →  plnd_agent  →  plnd_data
  (routes)    (AI logic)    (DB + external providers)
 ```
 
-`plnd_agent` is a workspace crate that owns all AI logic. It depends on `plnd_data` for storage and on `reqwest` / `async-openai` for outbound LLM calls. It has **no Axum dependency** — this is deliberate. A future background-worker binary (Phase 3.5) imports `plnd_agent` + `plnd_data` and runs autonomously without the HTTP layer.
+`plnd_agent` is a workspace crate that owns all AI logic. It depends on `plnd_data` for storage and on `reqwest` / `async-openai` for outbound LLM calls. It has **no Axum dependency** — this is deliberate. A standalone background-worker binary imports `plnd_agent` + `plnd_data` and runs autonomously without the HTTP layer.
 
 `plnd_api` makes a single call into `AgentService::run(user_id, use_case, input)` per agent-driven request. The API layer does not load memories, resolve prompts, or execute tools — it routes auth and rate limits, then delegates.
 
@@ -373,7 +373,7 @@ pub trait LlmProvider: Send + Sync {
 
 Two tiers:
 
-- **Fast (Tier 1)** — small local model (Phi-3 mini, Llama 3.2 3B class). Used for low-latency tasks and Phase 3.5 background jobs.
+- **Fast (Tier 1)** — small local model (Phi-3 mini, Llama 3.2 3B class). Used for low-latency tasks and background jobs.
 - **Capable (Tier 2)** — larger model (Claude, GPT-4, Llama 3.2 70B class). Used for task entry, meal planning, and other primary user-facing flows.
 
 In v1 both tiers point at the same local provider (LMStudio). Switching `capable` to a cloud provider is a config change, not a code change.
@@ -779,46 +779,11 @@ The **production deployment shape has not been designed yet**. The current local
 
 ## 10. Roadmap
 
-The roadmap below is the *current state* of phasing. Phase 1 through 3.3 have shipped. This section is rewritten as work progresses; the dated specs and plans under `docs/superpowers/` capture point-in-time intent.
+The roadmap will be populated in subsequent revisions of this document. Two phases of work are anticipated:
 
-### 10.1 Phase status
+### 10.1 Close the delta between implementation and this document
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Foundation — Rust/Axum backend, Angular client, Docker, OAuth | ✅ Complete |
-| 2 | Core features — domain schema, catalog/library, external providers, secrets | ✅ Complete |
-| 2.5 | Remaining planning UI — meal planning, day view, morning briefing | ✅ Complete |
-| 3.0 | `plnd_agent` foundation — `LlmProvider`, tool registry, agent loop | ✅ Complete |
-| 3.1 | Memory system — `user_memories`, injection, memory tools | ✅ Complete |
-| 3.2 | Task entry — intent-driven scheduling | ✅ Complete |
-| 3.3 | Meal planning wizard — full-week generation, rebalance, swap, resolver | ✅ Complete |
-| 3.5 | Background agent jobs — memory coalescing, pattern detection | 🔄 Deferred — next |
-| 4 | Integration features — calendar, weather, nutrition, grocery, analytics | ⏳ Planned |
-| 5 | Mobile — Capacitor iOS implementation | ⏳ Planned |
-| 6 | Deployment & operations — k8s, CI/CD, hardening | ⏳ Planned |
-| 7 | Polish & launch | ⏳ Planned |
-
-### 10.2 Active and near-term work
-
-**Scheduling-model migration.** Realigning the implementation with the anchor/slot/placement model described in §4. This is a multi-step migration tracked separately from the phase numbering — a delta inventory and sequenced refactor plan are produced as part of architectural maintenance, not feature delivery. Migration deltas live in `docs/migration-deltas.md` (created when work begins, deleted when work closes).
-
-**Phase 3.5 — Background agent jobs.** Memory coalescing (merge duplicates, retire stale entries), pattern detection from task and schedule history, nutritional drift detection. Deployed as a `plnd_worker` standalone binary that imports `plnd_agent` and `plnd_data` directly, running on its own schedule independently of `plnd_api`.
-
-### 10.3 Deferred capability
-
-The following capabilities are referenced in Phase 1 / 2.5 planning but indefinitely deferred:
-
-- **Exercise planning UI** — backend schema exists; UI work paused pending product priority.
-- **Family support foundation** — schema exists; UI for family management, caregiver permissions, and shared planning is paused.
-
-These are deferred, not cancelled. The data model accommodates them; the question is sequencing.
-
-### 10.4 Future phases (intent-level)
-
-- **Phase 4** — calendar sync (Google/Apple/Outlook), weather integration, nutrition scanning (barcode, OCR), grocery list generation, advanced analytics, drag-and-drop scheduling.
-- **Phase 5** — Capacitor-based iOS app with offline cache, push notifications, native transitions.
-- **Phase 6** — Kubernetes deployment, CI/CD pipeline, security audit, performance optimization, zero-downtime release process.
-- **Phase 7** — final acceptance testing, user-facing documentation, launch coordination.
+### 10.2 Push to production
 
 ---
 
