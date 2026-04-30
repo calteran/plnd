@@ -165,23 +165,21 @@ Dishes and meals carry `occasion_tags TEXT[]` — soft hints for UI autocomplete
 
 ### 3.3 Scheduling
 
-The scheduling model is the most consequential architectural area in PLND, and it is treated separately from the food libraries described above. **Meals and tasks are distinct domains.** They have their own data structures and lifecycles, even though the current implementation conflates them. Both contribute to the daily schedule, but as different kinds of things. The scheduling model has its own dedicated chapter — see [§4](#4-scheduling-model).
+The scheduling model is the most consequential architectural area in PLND, and it is treated separately from the food libraries described above. **Meals and tasks are distinct domains.** They have their own data structures and lifecycles. Both contribute to the daily schedule, but as different kinds of things. The scheduling model has its own dedicated chapter — see [§4](#4-scheduling-model).
 
 ### 3.4 Family coordination
 
-Family coordination — multi-user families with members in scoped roles, shared meal events that propagate to participants' schedules, caregiver permissions — is **deferred to post-1.0**. The data model has been sketched in earlier work but is not built out, and it does not currently shape the implementation. Future design work will revisit the family domain once the single-user product reaches 1.0.
+Family coordination — multi-user families with members in scoped roles, shared meal events that propagate to participants' schedules, caregiver permissions — is **deferred to post-1.0**. Future design work will revisit the family domain once the single-user product reaches 1.0.
 
 ### 3.5 Memory & agent context
 
-The agent layer (§5) maintains a per-user memory store: persistent textual observations the agent accumulates and references on subsequent runs. Memories are typed by category (`food`, `schedule`, `energy`, `habits`, `general`) and tagged. Memory is not user-edited directly through UI — the agent writes, revises, and retires memory entries via tool calls. The user is in control via /settings (currently planned but not implemented) and via natural language ("forget that I prefer X").
+The agent layer (§5) maintains a per-user memory store: persistent textual observations the agent accumulates and references on subsequent runs. Memories are typed by category (`food`, `schedule`, `energy`, `habits`, `general`) and tagged. Memory is not user-edited directly through UI — the agent writes, revises, and retires memory entries via tool calls. The user retains control via the settings UI and via natural language ("forget that I prefer X").
 
 Memory is **injected** into the agent context block at the start of each run, filtered by use case. Task entry sees `habits` + `schedule` + `energy`. Meal planning sees `food` + `habits`. The `general` category is reachable by tool but not auto-injected.
 
 ---
 
 ## 4. Scheduling Model
-
-This section describes the **target** scheduling model. The current implementation conflates meals and tasks into a single domain; the rest of this section assumes the corrected separation regardless of present code shape.
 
 ### 4.1 Why scheduling is the load-bearing section
 
@@ -195,8 +193,7 @@ PLND splits the difference: a day is a **sequence of anchors with tasks distribu
 
 The scheduling model uses six interlocking concepts:
 
-- **Tasks** — things the user needs (or wants) to get done.
-- **Scheduled tasks** (informally: appointments) — tasks that have a specific start time.
+- **Tasks** — things the user needs (or wants) to get done. Tasks come in three flavors: **floating tasks** (no start time; live in a slot), **scheduled tasks** (have a fixed start time; informally "appointments"), and **pinned tasks** (attached to a meal; run concurrently with it).
 - **Routines** — templates for recurring tasks.
 - **Meals** — things the user eats. **A separate domain from tasks**, with its own data structures and lifecycle.
 - **Anchors** — milestones (meals + scheduled tasks + implicit start/end of day) around which tasks position themselves.
@@ -217,7 +214,8 @@ Every task always carries:
 A task may also carry:
 
 - **A start time** — making it a **scheduled task** (informally: an appointment). Doctor visits, calls, medication doses with strict timing — anything that must happen at a specific clock time. The LLM never elevates a regular task into a scheduled task without explicit user direction; that choice belongs to the user.
-- **A categorical type** — `work | exercise | leisure | medication | appointment | general` — used for filtering, badging, and tone (the agent picks differently when proposing leisure vs. work tasks). The category is orthogonal to whether the task is scheduled.
+- **A pin to a meal** — making it a **pinned task** that runs concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). One or more tasks may be pinned to the same meal. Pinning is allowed only to meals; scheduled tasks cannot host pinned tasks. See also §4.5.
+- **A categorical type** — `work | exercise | leisure | medication | appointment | general` — used for filtering, badging, and tone (the agent picks differently when proposing leisure vs. work tasks). The category is orthogonal to whether the task is scheduled or pinned.
 
 Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.9). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
 
@@ -235,11 +233,9 @@ When the system builds a schedule for a planning window, routines that apply wit
 
 Routines apply only to tasks. **Meals do not use the routine model** — they have their own domain (§4.5).
 
-The implementation table currently named `schedule_templates` covers what this document calls a routine, once the meal/task conflation is removed.
-
 ### 4.5 Meals
 
-Meals are a **separate domain** from tasks. They have their own data structures, their own lifecycle, and their own UI surface. Conflating them with tasks is the design drift that motivated this document; the rest of this section assumes they are distinct concepts even where the current implementation does not.
+Meals are a **separate domain** from tasks. They have their own data structures, their own lifecycle, and their own UI surface.
 
 A user has a **meal pattern** — an ordered sequence of named meals. The default is `breakfast → lunch → dinner`, but users can fully reconfigure: snacks, second breakfast, late-night meal, or a totally different cultural rhythm. The pattern is set during onboarding and adjustable afterward.
 
@@ -249,7 +245,8 @@ Properties of meals:
 - **Evenly spaced (typically).** The system positions meals at roughly equal intervals through the user's awake period unless other constraints push them.
 - **Daily recurrence is intrinsic.** A user with a `breakfast → lunch → dinner` pattern has those three meals every day. There is no per-meal recurrence rule; the *pattern* recurs, not individual meal entries.
 - **Dish-level recurrence is memory-driven, not structural.** "Friday is sandwich day" is a pattern the agent learns through memory, not a recurrence specification on a meal entry.
-- **Time positioning is partly elastic.** Meals are not generally pinned to a fixed clock time, but they may be constrained by surrounding anchors. A user who wakes at 5am with an 11:30am appointment may need lunch positioned earlier than a user who wakes at 9am with no morning constraint. **The exact shape of this elasticity is an open design question** — see §4.12.
+- **Time positioning is partly elastic.** Meals are not generally fixed to a clock time, but they may be constrained by surrounding anchors. A user who wakes at 5am with an 11:30am appointment may need lunch positioned earlier than a user who wakes at 9am with no morning constraint. **The exact shape of this elasticity is an open design question** — see §4.12.
+- **Can host pinned tasks.** A meal may have one or more tasks pinned to it — tasks the user does concurrently with the meal (e.g., reading a document over lunch). See §4.3.
 
 ### 4.6 Anchors
 
@@ -324,7 +321,6 @@ The user typed three tasks ("write design doc," "fold laundry + triage inbox," "
 These questions are acknowledged so they can be resolved through deliberate design, rather than baked into ad-hoc implementation choices.
 
 - **Meal time elasticity.** The model needs enough expressiveness to position meals sensibly given surrounding constraints (early waker with an early appointment vs. late waker with no morning constraint) without becoming a rigid timestamp schedule. The shape of this — soft windows? Anchor-relative offsets? Per-pattern defaults plus daily overrides? — is open.
-- **Tasks during anchors.** Earlier conversation noted a desired pattern of running a task *during* an anchor (e.g., reading a report at lunch). The slot model as defined does not express this; an explicit "concurrent" relationship, an anchor-attached child-task model, or some other formalism may be needed.
 - **Routine recurrence specification.** Whether to use full RRULE flexibility or a simpler curated enum (`daily | weekdays | weekly | monthly | yearly`) plus an RRULE escape hatch for advanced users is unresolved.
 - **Cross-window carryover semantics.** When a task in one planning window goes uncompleted, the rules for surfacing it in the next window need design — the user's review step, the lookback horizon, and how memory captures patterns of repeated deferral.
 
@@ -476,7 +472,7 @@ This is the primary defense against malformed model output reaching Angular as d
 | API integration | `MockLlmProvider` | real | real | Auth, rate limit, schema validation, envelope |
 | E2E (local only) | LMStudio | real | real | Full reasoning sanity; not run in CI |
 | Angular unit | — | — | — | Component logic, signals state, services |
-| Angular e2e (Playwright) | mock backend | — | fixture | Wizard flows, DOM interactions; **does not currently hit the full stack — see issue [#159](https://github.com/calteran/plnd/issues/159)** |
+| Angular integration (Playwright) | mock backend | — | fixture | Wizard flows, DOM interactions against a mocked API |
 
 CI currently runs the unit, integration, API integration, Angular unit, and Angular e2e layers. Local-LMStudio-in-CI is tracked as future work pending prompt stability.
 
@@ -577,11 +573,11 @@ External calls are config-driven and offline-testable — every provider has a m
 
 ### 7.3 Rate limiting
 
-Agent routes (`/agent/*`) are rate-limited per user. The limiter's bucket sizes are tuned conservatively in development and revisited as we get production data.
+Agent routes (`/agent/*`) are rate-limited per user.
 
 ### 7.4 OpenAPI
 
-`plnd_api` ships an OpenAPI document at `/api-docs/openapi.json` (utoipa-generated). The Angular client does not currently codegen from this spec — typed models are hand-maintained — but the spec is authoritative for cross-team integration.
+`plnd_api` ships an OpenAPI document at `/api-docs/openapi.json` (utoipa-generated). The spec is authoritative for cross-team integration.
 
 ---
 
@@ -740,7 +736,7 @@ Beyond the visual treatments noted in §8.4:
 ### 9.4 Performance budget
 
 - **Time-to-interactive** target: 2s on mid-range mobile over 4G for the day view.
-- **Schedule queries** must return in under 200ms for a single day's entries (current p95).
+- **Schedule queries** must return in under 200ms for a single day's entries.
 - **Agent calls** are explicitly slower (1–10s typical) and the UI handles them with skeleton loading and explicit cancel affordances.
 - **Bundle size** is monitored via Angular CLI's build budget; current configuration in `plnd_client/angular.json`.
 
@@ -813,8 +809,6 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Catalog.** The shared, externally-seeded library of ingredients, dishes, meals, and exercises. Used by the LLM as a search and matching surface; **not browsed directly by users**. See [§3.2](#32-content-libraries--catalog-and-personal).
 
-**Concurrent placement** *(open design question)*. Tasks the user wishes to perform during an anchor (e.g., reading a report at lunch) are not currently expressible in the slot model. Earlier conversation surfaced this as a desired pattern; resolution is open. See [§4.12](#412-open-design-questions).
-
 **Dietary restriction.** A user-declared constraint: allergy, intolerance, preference, or cultural/religious. Allergies and intolerances are enforced; preferences are advisory. See [§3.1](#31-identity--user-scoped-configuration).
 
 **Energy required.** Per-task field in `{low, medium, high}` capturing cognitive/physical demand. A first-class scheduling axis used by the LLM during planning. See [§4.3](#43-tasks).
@@ -831,13 +825,13 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Memory.** Persistent textual observation about a user that the agent accumulates and references. Categorized; lifecycle managed by the LLM via tools. See [§5.6](#56-memory-system).
 
-**Milepost** *(deprecated → use "anchor")*. Earlier name for fixed-time scheduling reference points. The current implementation still carries `is_milepost` and `after_milepost` fields. Replaced by the broader anchor concept. See [§4.6](#46-anchors).
+**Milepost** *(deprecated → use "anchor")*. Earlier vocabulary for fixed-time scheduling reference points. Replaced by the broader anchor concept. See [§4.6](#46-anchors).
 
 **Occasion tag.** A soft hint on a dish or meal indicating an eating context ("breakfast", "snack"). Advisory; not DB-validated. The authoritative occasion lives on the meal entry, not the food. See [§3.2.5](#325-occasion_tags-not-meal_type-enum).
 
 **Personal library.** A user's own forked-and-editable copy of catalog items (`user_dishes`, `user_meals`, `user_exercises`). See [§3.2](#32-content-libraries--catalog-and-personal).
 
-**Placement** *(deprecated)*. Earlier vocabulary for how a task related to anchors. The current model uses simpler primitives: tasks live in slots (the space between adjacent anchors), and scheduled tasks additionally carry a start time. See [§4.7](#47-slots) and [§4.3](#43-tasks).
+**Pinned task.** A task attached to a meal, intended to run concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). A meal may host one or more pinned tasks; scheduled tasks cannot host pinned tasks. See [§4.3](#43-tasks) and [§4.5](#45-meals).
 
 **Planning window.** The temporal span the user plans at one time (default 1 week, currently capped at 14 days; the cap is a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.8](#48-planning-windows).
 
@@ -848,8 +842,6 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 **Safe food.** A user-flagged dish or meal that is reliably acceptable; should never be quietly dropped from suggestions. First-class support for picky eaters. See [§3.2.4](#324-preferences-as-separate-aggregate-roots).
 
 **Schedule entry.** A concrete instance of a task on a specific date. See [§4.3](#43-tasks).
-
-**Schedule template** *(implementation name)*. The current `schedule_templates` table covers what this document calls a **routine** once the meal/task conflation is removed. New work should use the term *routine* in code, comments, and docs. See [§4.4](#44-routines).
 
 **Scheduled task.** A task with a fixed start time. Informally: an "appointment." Scheduled tasks are also anchors — their start time positions them in the day's sequence. The LLM does not promote a regular task into a scheduled task without explicit user direction. See [§4.3](#43-tasks).
 
@@ -890,9 +882,8 @@ Files under `docs/superpowers/specs/` and `docs/superpowers/plans/` are **point-
 
 ## 13. Revisions
 
-A log of substantive changes to this document. Add an entry whenever a non-trivial edit lands; small typo fixes don't need a row.
+A log of substantive changes to this document.
 
 | Date | Author | Change |
 |------|--------|--------|
-| 2026-04-29 | Robert Chambers | Initial draft of the architecture reference. Absorbs and supersedes the earlier root-level docs `PLANNING.md`, `DOMAIN_MODEL.md`, and `STYLE.md`. Marks dated specs and plans under `docs/superpowers/` as historical artifacts. |
-| 2026-04-30 | Robert Chambers | First review pass. Reframes §1.1 around the three-capability promise (tasks / meals / exercise) and "least effort required from the user." Corrects the catalog framing in §3.2.3 — catalogs are LLM-mediated, not user-browsed. Trims §3.3 to a forward-pointer; trims §3.4 Family pending post-1.0 design. **Rewrites §4 Scheduling Model from scratch** — meals and tasks are distinct domains; introduces routines (templates for recurring tasks only), planning windows, and a positional slot model. Replaces local LLM provider Ollama with LMStudio; removes Groq from supported providers. Updates §5.9 testing matrix; calls out issue [#159](https://github.com/calteran/plnd/issues/159) for incomplete Playwright coverage. Reframes §9.2 observability and §9.6 deployment to clarify that the local Docker Compose stack is dev-only and the production deployment shape is undesigned. Reviews and rewrites §11 Glossary — adds *routine*, *scheduled task*, *planning window*, *meal pattern*, *appointment*, *meal*; deprecates *concurrent placement* and *placement* with forward-pointers; updates *anchor*, *slot*, *floating task*, *carryover* per the new model; removes *family meal*. §10 Roadmap rewrite is intentionally deferred until the rest of the document stabilizes. |
+| 2026-04-30 | Robert Chambers | 1.0 — Initial publication of the architecture reference. |
