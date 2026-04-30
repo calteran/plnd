@@ -193,7 +193,7 @@ PLND splits the difference: a day is a **sequence of anchors with tasks distribu
 
 The scheduling model uses six interlocking concepts:
 
-- **Tasks** — things the user needs (or wants) to get done. Tasks come in three flavors: **floating tasks** (no start time; live in a slot), **scheduled tasks** (have a fixed start time; informally "appointments"), and **pinned tasks** (attached to a meal; run concurrently with it).
+- **Tasks** — things the user needs (or wants) to get done. Tasks come in three flavors: **floating tasks** (no start time; live in a slot), **scheduled tasks** (have a fixed start time; informally "appointments"), and **paired tasks** (paired with a meal; run concurrently with it).
 - **Routines** — templates for recurring tasks.
 - **Meals** — things the user eats. **A separate domain from tasks**, with its own data structures and lifecycle.
 - **Anchors** — milestones (meals + scheduled tasks + implicit start/end of day) around which tasks position themselves.
@@ -214,8 +214,8 @@ Every task always carries:
 A task may also carry:
 
 - **A start time** — making it a **scheduled task** (informally: an appointment). Doctor visits, calls, medication doses with strict timing — anything that must happen at a specific clock time. The LLM never elevates a regular task into a scheduled task without explicit user direction; that choice belongs to the user.
-- **A pin to a meal** — making it a **pinned task** that runs concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). One or more tasks may be pinned to the same meal. Pinning is allowed only to meals; scheduled tasks cannot host pinned tasks. See also §4.5.
-- **A categorical type** — `work | exercise | leisure | medication | appointment | general` — used for filtering, badging, and tone (the agent picks differently when proposing leisure vs. work tasks). The category is orthogonal to whether the task is scheduled or pinned.
+- **A pairing with a meal** — making it a **paired task** that runs concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). One or more tasks may be paired with the same meal. Pairing is allowed only with meals; scheduled tasks cannot host paired tasks. See also §4.5.
+- **A categorical type** — `work | exercise | leisure | medication | appointment | general` — used for filtering, badging, and tone (the agent picks differently when proposing leisure vs. work tasks). The category is orthogonal to whether the task is scheduled or paired.
 
 Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.9). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
 
@@ -246,7 +246,7 @@ Properties of meals:
 - **Daily recurrence is intrinsic.** A user with a `breakfast → lunch → dinner` pattern has those three meals every day. There is no per-meal recurrence rule; the *pattern* recurs, not individual meal entries.
 - **Dish-level recurrence is memory-driven, not structural.** "Friday is sandwich day" is a pattern the agent learns through memory, not a recurrence specification on a meal entry.
 - **Time positioning is partly elastic.** Meals are not generally fixed to a clock time, but they may be constrained by surrounding anchors. A user who wakes at 5am with an 11:30am appointment may need lunch positioned earlier than a user who wakes at 9am with no morning constraint. **The exact shape of this elasticity is an open design question** — see §4.12.
-- **Can host pinned tasks.** A meal may have one or more tasks pinned to it — tasks the user does concurrently with the meal (e.g., reading a document over lunch). See §4.3.
+- **Can host paired tasks.** A meal may have one or more tasks paired with it — tasks the user does concurrently with the meal (e.g., reading a document over lunch). See §4.3.
 
 ### 4.6 Anchors
 
@@ -829,9 +829,9 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Occasion tag.** A soft hint on a dish or meal indicating an eating context ("breakfast", "snack"). Advisory; not DB-validated. The authoritative occasion lives on the meal entry, not the food. See [§3.2.5](#325-occasion_tags-not-meal_type-enum).
 
-**Personal library.** A user's own forked-and-editable copy of catalog items (`user_dishes`, `user_meals`, `user_exercises`). See [§3.2](#32-content-libraries--catalog-and-personal).
+**Paired task.** A task paired with a meal, intended to run concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). A meal may host one or more paired tasks; scheduled tasks cannot host paired tasks. See [§4.3](#43-tasks) and [§4.5](#45-meals).
 
-**Pinned task.** A task attached to a meal, intended to run concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). A meal may host one or more pinned tasks; scheduled tasks cannot host pinned tasks. See [§4.3](#43-tasks) and [§4.5](#45-meals).
+**Personal library.** A user's own forked-and-editable copy of catalog items (`user_dishes`, `user_meals`, `user_exercises`). See [§3.2](#32-content-libraries--catalog-and-personal).
 
 **Planning window.** The temporal span the user plans at one time (default 1 week, currently capped at 14 days; the cap is a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.8](#48-planning-windows).
 
