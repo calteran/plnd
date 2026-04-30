@@ -20,6 +20,7 @@
 10. [Roadmap](#10-roadmap)
 11. [Glossary](#11-glossary)
 12. [Document Conventions](#12-document-conventions)
+13. [Revisions](#13-revisions)
 
 ---
 
@@ -29,11 +30,11 @@
 
 PLND ("planned") is a planner and assistant for neurodivergent users — particularly people who experience picky eating, decision fatigue, and difficulty maintaining steady nutrition, exercise, and daily routines. It is **not** a productivity tool that happens to be neurodivergent-friendly; the design originates from neurodivergent needs and a neurotypical user is a side-effect of those choices, not the target.
 
-The product offers three integrated capabilities:
+PLND's core promise is to manage tasks, meals, and exercise plans with the **least effort required from the user**. The product offers three integrated capabilities:
 
-1. **Daily planning** — a single day view that shows the schedule as a structured but flexible sequence of anchors and tasks.
-2. **Meal planning** — AI-assisted weekly meal proposals that respect dietary restrictions, picky-eating preferences, and family coordination.
-3. **Adaptive assistance** — an agent that classifies intent from free-text input, schedules autonomously when confidence is high, and surfaces only the genuinely ambiguous fields back to the user.
+1. **Task management.** Users capture tasks via brief free-text descriptions; the LLM classifies, sizes (duration, energy), and places them into the day's schedule. Users don't design their day step by step — they describe what they need to get done and the agent does the layout. The user retains override agency at every step, but the expectation is that the LLM does well enough that overrides are rare.
+2. **Meal planning.** The system tracks the user's meal preferences and accumulates memory of liked/disliked patterns over time. The LLM proposes weekly meal plans and on-demand suggestions, drawing on memory plus the catalog of available dishes and meals.
+3. **Exercise planning.** Similar in spirit to meal planning — preferences, memory, LLM-driven proposals — though specific design and implementation is deferred behind tasks and meals for v1.
 
 ### 1.2 Design principles
 
@@ -146,7 +147,9 @@ Without this flag, a future ingredient-data refresh would silently clobber manua
 
 #### 3.2.3 Public/personal split and the fork pattern
 
-The catalog is shared, browseable, and externally seeded. Personal libraries (`user_dishes`, `user_meals`, `user_exercises`) are fully owned: the user can rename, edit, override allergens, adjust nutrition, mark as safe food, mark as blocked. When a user "imports" a catalog item, the system copies fields into the user's library and records `catalog_*_id` as a fork-origin pointer — but there is no ongoing FK enforcement. After fork, the personal copy is independent.
+The catalog is shared and externally seeded; it is **not** browsed by users in a conventional sense. Catalog content reaches users indirectly: the LLM uses the catalog as a search space when proposing meals, dishes, or exercises, and matches free-text user input ("I want a Greek salad tonight") against the catalog — falling back to drafting a custom user-library entry when no match exists. The user-facing experience is "describe what you want, see what comes back," not "browse a directory of recipes."
+
+Personal libraries (`user_dishes`, `user_meals`, `user_exercises`) are fully owned: the user can rename, edit, override allergens, adjust nutrition, mark as safe food, mark as blocked. When a catalog item is imported into a personal library, the system copies fields and records `catalog_*_id` as a fork-origin pointer — but there is no ongoing FK enforcement. After fork, the personal copy is independent.
 
 This is a simple model that handles a hard problem: how do we let users customize without polluting the shared catalog or leaking personal edits into community data? Answer: don't share writable references; copy at fork time.
 
@@ -162,22 +165,11 @@ Dishes and meals carry `occasion_tags TEXT[]` — soft hints for UI autocomplete
 
 ### 3.3 Scheduling
 
-The scheduling model is the most consequential architectural area and has its own section — see [§4](#4-scheduling-model). At a glance:
-
-- **Tasks** are the universal scheduling unit. A meal, a workout, a work block, a medication dose, a leisure break — all tasks. Type-specific data lives in specialization tables (`meal_tasks`, `exercise_tasks`, `work_tasks`, `generic_tasks`).
-- **Schedule templates** encode recurring patterns (RRULE-based). They are not pre-materialized into instances.
-- **Schedule entries** are concrete instances on a specific date. Generated on demand when a day is opened or a week is planned.
-- **Anchors** are tasks with known fixed times (meals, appointments, fixed exercise blocks). Other tasks float around them in **slots** — implicit intervals between adjacent anchors.
-
-The current implementation predates the anchor/slot/placement vocabulary used in §4 and uses an `after_milepost` enum hardcoded to `breakfast | lunch | dinner`. That divergence is intentionally captured here as the target state; the path from current to target is Phase B / Phase C work tracked separately.
+The scheduling model is the most consequential architectural area in PLND, and it is treated separately from the food libraries described above. **Meals and tasks are distinct domains.** They have their own data structures and lifecycles, even though the current implementation conflates them. Both contribute to the daily schedule, but as different kinds of things. The scheduling model has its own dedicated chapter — see [§4](#4-scheduling-model).
 
 ### 3.4 Family coordination
 
-A **family** is a named group with **family_members** in roles (`owner`, `member`, `caregiver`). Each member's `can_plan_for` array enumerates which other members they can plan on behalf of.
-
-**Family meals** are shared eating events: a row identifying the meal, its planned date and time window, the optional underlying `user_meal_id`, and a `participants UUID[]` listing attendees. When a family meal is committed, the system creates `schedule_entries` for each participant linked to the same `family_meal_id`. Each participant sees the same dinner appear on their day; allergen and dietary-restriction warnings surface to the planner before commit.
-
-This model handles meal coordination without requiring a separate shared-calendar system.
+Family coordination — multi-user families with members in scoped roles, shared meal events that propagate to participants' schedules, caregiver permissions — is **deferred to post-1.0**. The data model has been sketched in earlier work but is not built out, and it does not currently shape the implementation. Future design work will revisit the family domain once the single-user product reaches 1.0.
 
 ### 3.5 Memory & agent context
 
@@ -189,125 +181,152 @@ Memory is **injected** into the agent context block at the start of each run, fi
 
 ## 4. Scheduling Model
 
-This section describes the **target** scheduling model. The current implementation has known divergences from this model; see "Current divergences" at the end of the section.
+This section describes the **target** scheduling model. The current implementation conflates meals and tasks into a single domain; the rest of this section assumes the corrected separation regardless of present code shape.
 
 ### 4.1 Why scheduling is the load-bearing section
 
-PLND's claim to neurodivergent fit hinges on the scheduling model. A schedule-of-timestamps model — every task pinned to a wall-clock minute — is rigid, anxiety-inducing, and breaks immediately when the day drifts (which it always does). A schedule-of-time-buckets model is too coarse to express real structure.
+PLND's claim to neurodivergent fit hinges on this model. Two failure modes shape the design:
 
-The model below splits the difference: a day is a **sequence of anchors with floating tasks in the slots between them**. Anchors are stable; slots are flexible; tasks within a slot are unordered until the user sequences them or the system suggests an order.
+A schedule of timestamps — every item pinned to a wall-clock minute — is rigid, anxiety-inducing, and breaks the moment the day drifts (which it always does). A schedule of vague time buckets is too coarse to express real structure.
 
-### 4.2 Three primitives
+PLND splits the difference: a day is a **sequence of anchors with tasks distributed in the slots between them**. Anchors order the day; slots are where floating tasks live; the user (or the LLM, on the user's behalf) arranges work within each slot. Time precision is a property of *individual* anchors and tasks, not a property of the schedule as a whole.
 
-**Anchors.** A task with a known, fixed time on a given day, around which other tasks can be positioned. Anchors come from any of:
+### 4.2 The six concepts
 
-- **Meals** with a planned time (breakfast, lunch, dinner, snacks — not constrained to three).
-- **Appointments** (medical visits, calls, school pickup, etc.).
-- **Fixed-time exercise blocks** (a 6am run, a 12pm gym session).
-- **Medication doses** with strict timing.
-- **Calendar events imported from external calendars** (Phase 4).
+The scheduling model uses six interlocking concepts:
 
-Any task whose time is *meaningful and stable* can be an anchor. The user labels anchors when needed (e.g., "Morning standup", "Pickup at school"); for meals the label is conventional ("breakfast", "lunch", "dinner") but extensible to user-defined occasions ("morning snack", "tea time").
+- **Tasks** — things the user needs (or wants) to get done.
+- **Scheduled tasks** (informally: appointments) — tasks that have a specific start time.
+- **Routines** — templates for recurring tasks.
+- **Meals** — things the user eats. **A separate domain from tasks**, with its own data structures and lifecycle.
+- **Anchors** — milestones (meals + scheduled tasks + implicit start/end of day) around which tasks position themselves.
+- **Slots** — the spaces between adjacent anchors, where floating tasks live.
+- **Planning windows** — the temporal spans the user plans at one time (default 1 week).
 
-**Slots.** Implicit intervals derived from the ordered anchor list for a day. Slots are not stored; they are computed:
+The next subsections define each in depth.
 
-- The **pre-day slot** runs from the start of day to the first anchor.
-- An **inter-anchor slot** runs between each adjacent anchor pair.
-- The **post-day slot** runs from the last anchor to the end of day.
+### 4.3 Tasks
 
-For a day with three meal anchors and one appointment anchor, there are five slots. For a day with no anchors, there is one slot (the whole day). Slots emerge from the anchor topology — they are not separately defined.
+A **task** is a unit of intent: something the user means to do. Work items, social engagements, personal hygiene, errands, leisure activities — all tasks. Examples: "review the design doc," "call the dentist," "fold laundry," "go for a 30-minute walk."
 
-**Placements.** How a task relates to anchors. A task is positioned by exactly one of:
+Every task always carries:
 
-| Placement type | Meaning |
-|----------------|---------|
-| `before(anchor)` | Lives in the pre-anchor slot, i.e. between the previous anchor (or start of day) and this anchor. |
-| `between(anchor_a, anchor_b)` | Lives in the slot between two specific adjacent anchors. |
-| `after(anchor)` | Lives in the post-anchor slot, i.e. between this anchor and the next anchor (or end of day). |
-| `concurrent_with(anchor)` | Runs during an anchor — e.g., reading a report at lunch, listening to a podcast during a workout. |
-| `fixed_time(start, duration)` | Has its own wall-clock start; *itself* an anchor. |
+- **Duration** — how long it will take. Typically inferred by the LLM from the task description and historical patterns; the user can override.
+- **Energy level** (`low | medium | high`) — the cognitive/physical demand. Typically inferred by the LLM.
 
-`before` and `after` are convenience expressions of `between` when one neighbor is implicit. The system normalizes them as needed.
+A task may also carry:
 
-### 4.3 Worked example
+- **A start time** — making it a **scheduled task** (informally: an appointment). Doctor visits, calls, medication doses with strict timing — anything that must happen at a specific clock time. The LLM never elevates a regular task into a scheduled task without explicit user direction; that choice belongs to the user.
+- **A categorical type** — `work | exercise | leisure | medication | appointment | general` — used for filtering, badging, and tone (the agent picks differently when proposing leisure vs. work tasks). The category is orthogonal to whether the task is scheduled.
 
-A user's Tuesday looks like:
+Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.9). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
+
+### 4.4 Routines
+
+A **routine** is a template for a recurring task. Routines exist because most users have habits and obligations that repeat — workouts, medications, weekly chores, monthly bill checks, an annual physical. Encoding these once as routines, rather than re-creating them every week, is core to the product.
+
+A routine carries:
+
+- A description and category, mirroring a task.
+- A recurrence specification — daily, weekdays, weekly, monthly, yearly, or anything more complex via an RRULE string.
+- Estimated duration and energy.
+
+When the system builds a schedule for a planning window, routines that apply within the window **instantiate** into concrete task entries on appropriate days. Routine instances are tasks; the routine itself is a generator.
+
+Routines apply only to tasks. **Meals do not use the routine model** — they have their own domain (§4.5).
+
+The implementation table currently named `schedule_templates` covers what this document calls a routine, once the meal/task conflation is removed.
+
+### 4.5 Meals
+
+Meals are a **separate domain** from tasks. They have their own data structures, their own lifecycle, and their own UI surface. Conflating them with tasks is the design drift that motivated this document; the rest of this section assumes they are distinct concepts even where the current implementation does not.
+
+A user has a **meal pattern** — an ordered sequence of named meals. The default is `breakfast → lunch → dinner`, but users can fully reconfigure: snacks, second breakfast, late-night meal, or a totally different cultural rhythm. The pattern is set during onboarding and adjustable afterward.
+
+Properties of meals:
+
+- **Sequential.** Meals occur in a fixed order within a day.
+- **Evenly spaced (typically).** The system positions meals at roughly equal intervals through the user's awake period unless other constraints push them.
+- **Daily recurrence is intrinsic.** A user with a `breakfast → lunch → dinner` pattern has those three meals every day. There is no per-meal recurrence rule; the *pattern* recurs, not individual meal entries.
+- **Dish-level recurrence is memory-driven, not structural.** "Friday is sandwich day" is a pattern the agent learns through memory, not a recurrence specification on a meal entry.
+- **Time positioning is partly elastic.** Meals are not generally pinned to a fixed clock time, but they may be constrained by surrounding anchors. A user who wakes at 5am with an 11:30am appointment may need lunch positioned earlier than a user who wakes at 9am with no morning constraint. **The exact shape of this elasticity is an open design question** — see §4.12.
+
+### 4.6 Anchors
+
+An **anchor** is a milestone in the day's sequence around which other tasks position themselves. Anchors come from three sources:
+
+- **Every meal** in the user's meal pattern is an anchor.
+- **Every scheduled task** (a task with a fixed start time) is an anchor.
+- **Start-of-day and end-of-day** are implicit anchors. They bound the day's first and last slots.
+
+Anchors define the *order* of the day. Their times may be fixed (a 9am standup, a 6pm dose) or partly elastic (lunch happens between breakfast and dinner without a precise minute). The slot model below depends on anchor *order*, not anchor *time*.
+
+### 4.7 Slots
+
+A **slot** is the space between two adjacent anchors. Because start-of-day and end-of-day are implicit anchors, every day has at least one slot — the whole day, if there are no other anchors.
+
+Each slot can hold **zero or more tasks**. Floating tasks (tasks without a start time) live in slots; the user, or the LLM proposing on the user's behalf, chooses which slot each task belongs to. Within a slot, tasks have no inherent order until the user sequences them or the LLM proposes one.
+
+Slot boundaries are **positional** — defined by anchor order, not by exact times. A slot between "breakfast" and "lunch" exists even if neither has a fixed clock time.
+
+### 4.8 Planning windows
+
+A **planning window** is the temporal span the user plans at one time. The default window is one week (7 days). The user can configure shorter or longer windows.
+
+Currently the system caps planning windows at 14 days to bound LLM cost and reasoning load. The data model is open-ended — a future increase is not a schema change, just a configuration adjustment.
+
+The same planning-window concept underlies both the **planning wizard** (the recurring planning ritual, default weekly) and the **onboarding wizard** (the first-run setup that bootstraps the user's first window). One concept; two surfaces.
+
+### 4.9 The planning process
+
+Building a schedule for a planning window proceeds in three conceptual passes:
+
+1. **Inventory.** The system gathers every task that should appear in the window: explicit one-off tasks the user has captured, plus task instances generated from routines that apply to days in the window.
+
+2. **LLM-driven distribution.** The LLM proposes how tasks distribute across the window's days, with the goal of **balancing energy and effort** across the period. Avoid stacking high-energy tasks; respect known low-energy periods; align tasks with the user's known time-of-day strengths; spread cognitive load.
+
+3. **Memory-informed placement.** The LLM's distribution is informed by user memory — historical context about time-of-day patterns, day-of-week patterns, and any other relevant signals the agent has accumulated. Memory replaces what would otherwise be hard-coded heuristics.
+
+The user retains final agency. Every LLM proposal is a draft the user can accept, override, or selectively modify. The expectation is that the LLM produces a plan good enough that most users accept most proposals, but the override path is always present and never penalized.
+
+### 4.10 Worked example (illustrative)
+
+A user's Tuesday during a planning window might end up looking like this. Anchors are in **bold**, slots are between them.
 
 ```
-06:30   anchor:  Wake-up routine
-07:30   anchor:  Breakfast
-        ↓ slot:  between Breakfast and Standup — task "review PR queue", floating
-09:00   anchor:  Daily standup
-        ↓ slot:  between Standup and Lunch — task "write doc", floating, energy=high
-11:00   anchor:  Doctor appointment
-12:30   anchor:  Lunch
-        ↓ concurrent: task "read report", concurrent_with Lunch
-        ↓ slot:  between Lunch and afternoon walk — task "fold laundry", floating, energy=low
-15:00   anchor:  Afternoon walk
-        ↓ slot:  between Walk and Dinner
-18:00   anchor:  Dinner
-        ↓ slot:  post-Dinner — task "vacuum filter swap" (recurring), floating, energy=medium
-22:00   bedtime
+─ start of day (06:30) ─                            ← implicit anchor
+  slot:   "morning routine, light email"
+─ Breakfast ─                                       ← meal anchor
+  slot:   "quick standup prep"
+─ Daily standup (09:00) ─                           ← scheduled-task anchor
+  slot:   "write design doc — high energy"
+─ Doctor appointment (11:00) ─                      ← scheduled-task anchor
+─ Lunch ─                                           ← meal anchor
+  slot:   "fold laundry, triage inbox — low energy"
+─ Afternoon walk (15:00) ─                          ← scheduled-task anchor
+  slot:   "deep-work block — high energy"
+─ Dinner ─                                          ← meal anchor
+  slot:   "vacuum filter swap (routine instance)"
+─ end of day (22:00) ─                              ← implicit anchor
 ```
 
-Floating tasks are shown in their slot; the user sequences them within the slot or the system suggests an order based on energy budget and prior preferences.
+The user typed three tasks ("write design doc," "fold laundry + triage inbox," "deep-work block"); one came from a routine ("vacuum filter swap"); the meals come from the user's meal pattern; the appointments came from the user's calendar or were captured directly. The LLM proposed which slot each floating task falls into, balancing the energy gradient and historical patterns.
 
-### 4.4 Templates and recurrence
+### 4.11 Non-goals
 
-**Schedule templates** encode recurring patterns: "walk the dog every weekday morning", "vacuum filter swap monthly", "Friday lunch is a sandwich". Templates carry:
+- **No full DAG.** Tasks do not declare arbitrary dependencies on other tasks. Sequencing within a slot is at most local — the LLM may suggest an order; the user may pin one.
+- **No multi-day placements.** A task lives on one specific day. "This week sometime" resolves to a specific day at planning time.
+- **No partial-day anchors.** An anchor occupies a single position in the day's sequence; multi-window or split-anchor concepts are not modeled.
+- **No second-by-second timing.** Time precision is at the minute level.
 
-- Recurrence: a simple enum (`daily`, `weekdays`, `weekly`, `custom`) plus an RRULE string for custom patterns.
-- A time window (start/end) — *not* an exact start time — to express the kind of flexibility neurodivergent scheduling needs.
-- A duration estimate.
-- Energy required.
-- A polymorphic reference to the underlying entity (a user_meal, user_dish, user_exercise, or nothing for ad-hoc tasks).
-- Whether this template generates anchors or floating tasks.
+### 4.12 Open design questions
 
-**Materialization is on demand.** Templates do not pre-create instances. When a day is opened or a week is planned, the system generates `schedule_entries` from the templates that apply on those dates. This keeps the database lean and lets template changes propagate without leaving stale rows behind.
+These questions are acknowledged so they can be resolved through deliberate design, rather than baked into ad-hoc implementation choices.
 
-### 4.5 Carryover and dynamic adjustment
-
-When a `schedule_entry`'s status changes, the system responds:
-
-| Status change | System behavior |
-|---------------|-----------------|
-| `completed` (early) | Offer to pull downstream tasks earlier in their slot, if any. |
-| `skipped` | If a meal-anchor was skipped, surface a swap suggestion. Cascade-defer dependents. |
-| `deferred` (with new placement) | Downstream tasks shift accordingly within the affected slot. |
-| `in_progress` past `scheduled_end` | Surface "compress or defer" prompt. |
-
-**Carryover across days.** Tasks not completed on their planned day are eligible for carryover into the next planning window. The user reviews carryover candidates during the planning wizard and decides per-task: accept (move forward), defer (push out), or dismiss (no longer relevant).
-
-The system intentionally limits carryover lookback to ~90 days to bound the search space.
-
-### 4.6 Energy as a scheduling axis
-
-Every task carries `energy_required ∈ {low, medium, high}`. The scheduler — and the agent that proposes plans — uses energy as a soft constraint:
-
-- Stacking two `high` tasks back-to-back surfaces a warning.
-- A `high` task placed in a known low-energy window (e.g., a Monday morning for a user whose memory says "low energy on Mondays") surfaces a softer warning.
-- The day-view UI badges energy levels visibly so the user can scan-balance their day.
-
-Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes — not just metadata.
-
-### 4.7 Non-goals
-
-- **No full DAG.** Task dependencies are at most one level deep (`after(anchor)`, `between(a, b)`, etc.). PLND does not model arbitrary task chains. If real usage demands it, revisit — but premature graph modeling adds complexity that has not earned its place.
-- **No multi-day placements.** A task lives on one day. "This week sometime" is not a placement; it's a planning-wizard concern that resolves to a specific day at commit time.
-- **No partial-day anchors.** An anchor has a single start time. Multi-window or split-anchor concepts are not modeled.
-- **No second-by-second timing.** Time windows are minute-grained; scheduling does not care about seconds.
-
-### 4.8 Current divergences (target → implementation gap)
-
-The current implementation predates the anchor/slot/placement vocabulary. Known divergences:
-
-- `schedule_entries.after_milepost` is a hardcoded enum `'breakfast' | 'lunch' | 'dinner'` rather than a reference to any anchor task. Only meals can be anchors today.
-- The agent's `place_tasks` tool schema explicitly forbids `"meal"` as a `task_type` value, encoding the meal-vs-task split at the schema level. This is a workaround for the conflated model, not the target design.
-- `is_milepost` is a boolean on `tasks`/`schedule_templates` but the live milepost check in agent code is `task_type == "meal"`. These should converge or one should be retired.
-- `concurrent_with` placement (a task running *during* an anchor) is not representable.
-- `schedule_entries.after_entry_id` exists for explicit entry-to-entry sequencing but is not exercised by the agent or wizard.
-
-These divergences are catalogued for migration, not preserved. See [§10](#10-roadmap) for sequencing.
+- **Meal time elasticity.** The model needs enough expressiveness to position meals sensibly given surrounding constraints (early waker with an early appointment vs. late waker with no morning constraint) without becoming a rigid timestamp schedule. The shape of this — soft windows? Anchor-relative offsets? Per-pattern defaults plus daily overrides? — is open.
+- **Tasks during anchors.** Earlier conversation noted a desired pattern of running a task *during* an anchor (e.g., reading a report at lunch). The slot model as defined does not express this; an explicit "concurrent" relationship, an anchor-attached child-task model, or some other formalism may be needed.
+- **Routine recurrence specification.** Whether to use full RRULE flexibility or a simpler curated enum (`daily | weekdays | weekly | monthly | yearly`) plus an RRULE escape hatch for advanced users is unresolved.
+- **Cross-window carryover semantics.** When a task in one planning window goes uncompleted, the rules for surfacing it in the next window need design — the user's review step, the lookback horizon, and how memory captures patterns of repeated deferral.
 
 ---
 
@@ -339,13 +358,13 @@ Two tiers:
 - **Fast (Tier 1)** — small local model (Phi-3 mini, Llama 3.2 3B class). Used for low-latency tasks and Phase 3.5 background jobs.
 - **Capable (Tier 2)** — larger model (Claude, GPT-4, Llama 3.2 70B class). Used for task entry, meal planning, and other primary user-facing flows.
 
-In v1 both tiers point at the same local provider (Ollama). Switching `capable` to a cloud provider is a config change, not a code change.
+In v1 both tiers point at the same local provider (LMStudio). Switching `capable` to a cloud provider is a config change, not a code change.
 
 Implementations:
 
 | Implementation | Crate | Targets |
 |----------------|-------|---------|
-| `OpenAiCompatibleProvider` | `async-openai` | Ollama, LM Studio, OpenAI, Mistral, Groq |
+| `OpenAiCompatibleProvider` | `async-openai` | LMStudio, OpenAI, Mistral |
 | `AnthropicProvider` | `reqwest` (manual JSON) | Anthropic API, AWS Bedrock |
 | `MockLlmProvider` | (test only) | Canned deterministic responses for CI |
 
@@ -455,10 +474,11 @@ This is the primary defense against malformed model output reaching Angular as d
 | Unit | `MockLlmProvider` | mock | none | Loop logic, iteration ceiling, parallel tool calls |
 | Integration | `MockLlmProvider` | real | real | Tool schemas, DB queries, memory injection |
 | API integration | `MockLlmProvider` | real | real | Auth, rate limit, schema validation, envelope |
-| E2E (local only) | Ollama | real | real | Full reasoning sanity; not run in CI |
-| Angular unit/e2e | mock backend | — | fixture | UI state machines, wizard flows |
+| E2E (local only) | LMStudio | real | real | Full reasoning sanity; not run in CI |
+| Angular unit | — | — | — | Component logic, signals state, services |
+| Angular e2e (Playwright) | mock backend | — | fixture | Wizard flows, DOM interactions; **does not currently hit the full stack — see issue [#159](https://github.com/calteran/plnd/issues/159)** |
 
-CI currently runs the first three layers. Local-Ollama-in-CI is tracked as future work pending prompt stability.
+CI currently runs the unit, integration, API integration, Angular unit, and Angular e2e layers. Local-LMStudio-in-CI is tracked as future work pending prompt stability.
 
 ---
 
@@ -698,14 +718,14 @@ Token definitions live in `plnd_client/src/styles/_tokens.scss`; this section ca
 
 ### 9.2 Observability
 
-The deployment includes the Grafana **LGTM stack** (Loki, Grafana, Tempo, Mimir) running locally via Docker Compose:
+The local development environment includes the Grafana **LGTM stack** (Loki, Grafana, Tempo, Mimir) running via Docker Compose. This is for development observability only — the production deployment shape has not been designed (see §9.6), so the production observability story is also undecided.
 
-- **Loki** — log aggregation. `plnd_api` and `plnd_agent` emit structured JSON logs.
+- **Loki** — log aggregation. All three production crates (`plnd_api`, `plnd_agent`, `plnd_data`) emit structured logs via the `tracing` crate.
 - **Tempo** — distributed tracing. OTLP-exported spans cover the agent loop, tool execution, DB queries, and external provider calls.
 - **Prometheus/Mimir** — metrics. Standard service metrics plus agent-specific (loop iterations, tool execution time, schema validation failures).
 - **Grafana** — dashboards. Local instance at `http://localhost:3001`, no auth required in dev.
 
-The Grafana MCP server is wired so an agent debugging a production-like environment can query metrics and logs directly. Dashboards check into source control under `docker/grafana/provisioning/`.
+The Grafana MCP server is wired so an agent debugging the local environment can query metrics and logs directly. Dashboards check into source control under `docker/grafana/provisioning/`.
 
 ### 9.3 Accessibility
 
@@ -730,9 +750,9 @@ Not yet a product concern — single-locale (English, US) for v1. The architectu
 
 ### 9.6 Deployment
 
-Dev: Docker Compose stack (`just dev`) — Postgres, mock OAuth, LGTM stack, API, client.
+The local development environment runs as a Docker Compose stack (`just dev`) covering Postgres, the mock OAuth provider, the LGTM observability stack, the API server, and the Angular client.
 
-Production (future, Phase 6): Kubernetes-based, with separate deployments for `plnd_api`, the future `plnd_worker`, and the static client. CI/CD via GitHub Actions; secrets via Doppler.
+The **production deployment shape has not been designed yet**. The current local setup does not imply a particular production architecture; that work is deferred until product needs solidify enough to justify infrastructure decisions.
 
 ---
 
@@ -785,47 +805,57 @@ These are deferred, not cancelled. The data model accommodates them; the questio
 
 Terms used throughout this document. Where a term is **deprecated**, the replacement is noted.
 
-**Anchor.** A task with a known fixed time on a day, around which other tasks float. See [§4.2](#42-three-primitives).
+**Anchor.** A milestone in the day's sequence around which tasks position themselves. Anchors come from three sources: every meal in the user's pattern, every scheduled task (one with a fixed start time), and the implicit start-of-day and end-of-day. Anchor *order* — not anchor *time* — defines slot boundaries. See [§4.6](#46-anchors).
 
-**Catalog.** The shared, externally-seeded library of ingredients, dishes, meals, and exercises. See [§3.2](#32-content-libraries--catalog-and-personal).
+**Appointment.** Informal synonym for **scheduled task**. See *Scheduled task*.
 
-**Carryover.** A task not completed on its planned day that becomes eligible for the next planning window. See [§4.5](#45-carryover-and-dynamic-adjustment).
+**Carryover.** A task not completed in its planning window that becomes eligible for surfacing in the next planning window. Exact rules are an open design question. See [§4.12](#412-open-design-questions).
 
-**Concurrent placement.** A task that runs *during* an anchor (e.g., reading at lunch). See [§4.2](#42-three-primitives).
+**Catalog.** The shared, externally-seeded library of ingredients, dishes, meals, and exercises. Used by the LLM as a search and matching surface; **not browsed directly by users**. See [§3.2](#32-content-libraries--catalog-and-personal).
+
+**Concurrent placement** *(open design question)*. Tasks the user wishes to perform during an anchor (e.g., reading a report at lunch) are not currently expressible in the slot model. Earlier conversation surfaced this as a desired pattern; resolution is open. See [§4.12](#412-open-design-questions).
 
 **Dietary restriction.** A user-declared constraint: allergy, intolerance, preference, or cultural/religious. Allergies and intolerances are enforced; preferences are advisory. See [§3.1](#31-identity--user-scoped-configuration).
 
-**Energy required.** Per-task field in `{low, medium, high}` capturing cognitive/physical demand. A first-class scheduling axis. See [§4.6](#46-energy-as-a-scheduling-axis).
+**Energy required.** Per-task field in `{low, medium, high}` capturing cognitive/physical demand. A first-class scheduling axis used by the LLM during planning. See [§4.3](#43-tasks).
 
-**Family meal.** A shared eating event scheduled by one family member that propagates as schedule entries to all participants. See [§3.4](#34-family-coordination).
+**Floating task.** A task without a fixed start time; lives in a slot between anchors. The user or the LLM decides which slot. See [§4.7](#47-slots).
 
 **Fork.** The act of copying a catalog item into a personal library, after which the user's copy is independent. See [§3.2.3](#323-publicpersonal-split-and-the-fork-pattern).
 
-**Floating task.** A task whose placement is relative to anchors (or unplaced) rather than pinned to a wall-clock time. See [§4.2](#42-three-primitives).
-
 **LlmProvider.** Trait abstraction over LLM backends; instances per tier (Fast / Capable). See [§5.2](#52-llmprovider-abstraction).
+
+**Meal.** A thing the user eats. Modeled as its own domain, **separate from tasks**. Meals occur in a sequential, daily-recurring pattern; their times are partly elastic and partly constrained by surrounding anchors. See [§4.5](#45-meals).
+
+**Meal pattern.** A user's ordered sequence of named meals (default: `breakfast → lunch → dinner`). The pattern recurs every day; the user can reconfigure it (snacks, second breakfast, etc.). See [§4.5](#45-meals).
 
 **Memory.** Persistent textual observation about a user that the agent accumulates and references. Categorized; lifecycle managed by the LLM via tools. See [§5.6](#56-memory-system).
 
-**Milepost** *(deprecated → use "anchor")*. Earlier name for fixed-time scheduling reference points. The current implementation uses `is_milepost` and `after_milepost` fields and a hardcoded breakfast/lunch/dinner enum. Replaced by the broader anchor concept. See [§4.8](#48-current-divergences-target--implementation-gap).
+**Milepost** *(deprecated → use "anchor")*. Earlier name for fixed-time scheduling reference points. The current implementation still carries `is_milepost` and `after_milepost` fields. Replaced by the broader anchor concept. See [§4.6](#46-anchors).
 
-**Occasion tag.** A soft hint on a dish or meal indicating an eating context ("breakfast", "snack"). Advisory; not DB-validated. The authoritative occasion lives on the schedule entry, not the food. See [§3.2.5](#325-occasion_tags-not-meal_type-enum).
+**Occasion tag.** A soft hint on a dish or meal indicating an eating context ("breakfast", "snack"). Advisory; not DB-validated. The authoritative occasion lives on the meal entry, not the food. See [§3.2.5](#325-occasion_tags-not-meal_type-enum).
 
 **Personal library.** A user's own forked-and-editable copy of catalog items (`user_dishes`, `user_meals`, `user_exercises`). See [§3.2](#32-content-libraries--catalog-and-personal).
 
-**Placement.** How a task relates to anchors: `before`, `between`, `after`, `concurrent_with`, or `fixed_time`. See [§4.2](#42-three-primitives).
+**Placement** *(deprecated)*. Earlier vocabulary for how a task related to anchors. The current model uses simpler primitives: tasks live in slots (the space between adjacent anchors), and scheduled tasks additionally carry a start time. See [§4.7](#47-slots) and [§4.3](#43-tasks).
+
+**Planning window.** The temporal span the user plans at one time (default 1 week, currently capped at 14 days; the cap is a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.8](#48-planning-windows).
 
 **Repository.** Trait-based storage abstraction in `plnd_data::repository`. The only allowed entry point to persistent storage from outside `plnd_data`. See [§6.2](#62-repository-pattern).
 
+**Routine.** A template for a recurring task. Routines define recurrence (daily, weekdays, weekly, RRULE) and instantiate concrete task entries during planning-window setup. **Meals do not use the routine model** — they have their own daily-recurring pattern. See [§4.4](#44-routines).
+
 **Safe food.** A user-flagged dish or meal that is reliably acceptable; should never be quietly dropped from suggestions. First-class support for picky eaters. See [§3.2.4](#324-preferences-as-separate-aggregate-roots).
 
-**Schedule entry.** A concrete instance of a task on a specific date. See [§4.4](#44-templates-and-recurrence).
+**Schedule entry.** A concrete instance of a task on a specific date. See [§4.3](#43-tasks).
 
-**Schedule template.** A recurring pattern definition (RRULE-based) from which schedule entries are generated on demand. See [§4.4](#44-templates-and-recurrence).
+**Schedule template** *(implementation name)*. The current `schedule_templates` table covers what this document calls a **routine** once the meal/task conflation is removed. New work should use the term *routine* in code, comments, and docs. See [§4.4](#44-routines).
 
-**Slot.** An implicit interval between two adjacent anchors (or before the first / after the last) on a day. Not stored; computed from the anchor list. See [§4.2](#42-three-primitives).
+**Scheduled task.** A task with a fixed start time. Informally: an "appointment." Scheduled tasks are also anchors — their start time positions them in the day's sequence. The LLM does not promote a regular task into a scheduled task without explicit user direction. See [§4.3](#43-tasks).
 
-**Task.** The universal scheduling unit. Specialized by `task_type` into `meal_tasks`, `exercise_tasks`, `work_tasks`, `generic_tasks`. See [§3.3](#33-scheduling).
+**Slot.** The space between two adjacent anchors (including the implicit start- and end-of-day anchors). Each slot can hold zero or more floating tasks. Slot boundaries are positional, not time-pinned. See [§4.7](#47-slots).
+
+**Task.** A unit of intent the user means to do — work, exercise, leisure, errands, medication, etc. Always carries duration and energy_required (typically LLM-inferred). May carry a start time, in which case it is also a "scheduled task." See [§4.3](#43-tasks).
 
 **Terminal tool.** A tool whose execution ends the agent loop. Each use case has exactly one. See [§5.4](#54-tools).
 
@@ -853,5 +883,16 @@ Files under `docs/superpowers/specs/` and `docs/superpowers/plans/` are **point-
 
 - Opinionated and clear. Hedged language ("perhaps", "might", "could possibly") obscures intent.
 - Lead with the *why*, follow with the *what*. A reader should understand the motivation before the mechanics.
-- Concrete examples beat abstract descriptions where the reader needs to internalize a model (see the Tuesday worked example in §4.3).
+- Concrete examples beat abstract descriptions where the reader needs to internalize a model (see the Tuesday worked example in §4.10).
 - File paths and identifier names are quoted in backticks. Tables for matrix data; bullet lists for enumeration; prose for reasoning.
+
+---
+
+## 13. Revisions
+
+A log of substantive changes to this document. Add an entry whenever a non-trivial edit lands; small typo fixes don't need a row.
+
+| Date | Author | Change |
+|------|--------|--------|
+| 2026-04-29 | Robert Chambers | Initial draft of the architecture reference. Absorbs and supersedes the earlier root-level docs `PLANNING.md`, `DOMAIN_MODEL.md`, and `STYLE.md`. Marks dated specs and plans under `docs/superpowers/` as historical artifacts. |
+| 2026-04-30 | Robert Chambers | First review pass. Reframes §1.1 around the three-capability promise (tasks / meals / exercise) and "least effort required from the user." Corrects the catalog framing in §3.2.3 — catalogs are LLM-mediated, not user-browsed. Trims §3.3 to a forward-pointer; trims §3.4 Family pending post-1.0 design. **Rewrites §4 Scheduling Model from scratch** — meals and tasks are distinct domains; introduces routines (templates for recurring tasks only), planning windows, and a positional slot model. Replaces local LLM provider Ollama with LMStudio; removes Groq from supported providers. Updates §5.9 testing matrix; calls out issue [#159](https://github.com/calteran/plnd/issues/159) for incomplete Playwright coverage. Reframes §9.2 observability and §9.6 deployment to clarify that the local Docker Compose stack is dev-only and the production deployment shape is undesigned. Reviews and rewrites §11 Glossary — adds *routine*, *scheduled task*, *planning window*, *meal pattern*, *appointment*, *meal*; deprecates *concurrent placement* and *placement* with forward-pointers; updates *anchor*, *slot*, *floating task*, *carryover* per the new model; removes *family meal*. §10 Roadmap rewrite is intentionally deferred until the rest of the document stabilizes. |
