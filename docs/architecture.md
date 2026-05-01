@@ -213,6 +213,7 @@ Every task always carries:
 
 - **Duration** — how long it will take. Typically inferred by the LLM from the task description and historical patterns; the user can override.
 - **Energy level** (`low | medium | high`) — the cognitive/physical demand. Typically inferred by the LLM.
+- **`one_shot` flag** — whether the task is meaningful only within its scheduled window (e.g., daily teeth brushing — missed yesterday is not relevant today) or remains relevant if missed (e.g., "call the dentist"). Inferred by the LLM at task creation; the user can override. Drives carryover behavior (§4.9): one-shot tasks left incomplete at window close are silently dropped; the rest surface in the next carryover review.
 
 A task may also carry:
 
@@ -222,7 +223,7 @@ A task may also carry:
 
 Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.9). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
 
-**All task metadata is user-editable.** Title, duration, energy level, type, start time, meal pairing, and date can be adjusted at any time — in either planning surface (the onboarding wizard or the recurring planning wizard, see §4.8) and on the day itself (in the day view). Every edit is captured by the memory system (§3.5), so the agent's future inferences improve from observed user preferences.
+**All task metadata is user-editable.** Title, duration, energy level, `one_shot` flag, type, start time, meal pairing, and date can be adjusted at any time — in either planning surface (the onboarding wizard or the recurring planning wizard, see §4.8) and on the day itself (in the day view). Every edit is captured by the memory system (§3.5), so the agent's future inferences improve from observed user preferences.
 
 ### 4.4 Routines
 
@@ -231,8 +232,15 @@ A **routine** is a template for a recurring task. Routines exist because most us
 A routine carries:
 
 - A description and category, mirroring a task.
-- A recurrence specification — daily, weekdays, weekly, monthly, yearly, or anything more complex via an RRULE string.
+- A **recurrence specification** (see below).
 - Estimated duration and energy.
+
+**Recurrence specification — storage and presentation are separated.**
+
+- *Storage:* the canonical persisted form of recurrence is an **RRULE string**. Every routine has one.
+- *Presentation:* progressive disclosure. The default surface offers a curated enum — `daily | weekdays | weekly | monthly | yearly` — with any directly required parameter (such as the weekday set for `weekly`). Advanced disclosure exposes the underlying RRULE for users with needs that exceed the enum.
+- *Round-trip:* when the persisted RRULE matches one of the curated enum patterns, the user-facing surface presents it as that enum value; otherwise the surface shows the advanced form.
+- *Authoring boundary:* the agent may propose values within the curated enum on the user's behalf; it never authors raw RRULE strings.
 
 When the system builds a schedule for a planning window, routines that apply within the window **instantiate** into concrete task entries on appropriate days. Routine instances are tasks; the routine itself is a generator.
 
@@ -247,11 +255,15 @@ A user has a **meal pattern** — an ordered sequence of named meals. The defaul
 Properties of meals:
 
 - **Sequential.** Meals occur in a fixed order within a day.
-- **Evenly spaced (typically).** The system positions meals at roughly equal intervals through the user's awake period unless other constraints push them.
 - **Daily recurrence is intrinsic.** A user with a `breakfast → lunch → dinner` pattern has those three meals every day. There is no per-meal recurrence rule; the *pattern* recurs, not individual meal entries.
 - **Dish-level recurrence is memory-driven, not structural.** "Friday is sandwich day" is a pattern the agent learns through memory, not a recurrence specification on a meal entry.
-- **Time positioning is partly elastic.** Meals are not generally fixed to a clock time, but they may be constrained by surrounding anchors. A user who wakes at 5am with an 11:30am appointment may need lunch positioned earlier than a user who wakes at 9am with no morning constraint. **The exact shape of this elasticity is an open design question** — see §4.12.
-- **Displaced-meal flag.** When a scheduled task overlaps a meal's usual time window — pushing the meal noticeably outside its expected position — the system surfaces a visible flag on the affected meal in both the planning view and the day view, so the user notices the routine has been interrupted and can choose to accept it or rearrange. See §8.4 for the visual treatment.
+- **Time positioning: meal windows centered on `preferred_time`.** Each meal in the pattern carries a `preferred_time` (the wall-clock time the user typically takes this meal) and a `tolerance_minutes` value. Together they define the meal's **window** — `preferred_time ± tolerance_minutes` — the zone within which the meal is acceptable. `preferred_time` is established at onboarding from the user's stated habits and **adapted over time by the memory system (§3.5)** as the agent observes when meals actually occur; it is not a routinely user-facing control. The pattern's "ordered sequence of named meals" is *implicit* in the meals' `preferred_time` values — reordering a pattern means editing a `preferred_time`, and the sequence follows.
+- **The LLM reasons about windows, not clock minutes.** Two distinct uses:
+  - *Slot budgeting:* the LLM uses **preferred-to-preferred** spacing to budget task time between adjacent meals. With breakfast at 08:00 and lunch at 12:00, the slot has roughly four hours — the LLM won't pack five hours of work into it. The user is shown "lunch" as an item in the day's flow, not "lunch at 12:00:00."
+  - *Displacement detection:* the LLM uses the **full window** to decide whether a meal can stay where it belongs. Anywhere inside the window is fine; outside the window trips the flag (next bullet).
+- **Day-level placement.** Lay out the day's fixed-time anchors (start-of-day, scheduled-task anchors, end-of-day). Each meal occupies its window between adjacent anchors as long as the window fits and pattern order is preserved. When a window cannot fit — a scheduled task overlaps it, a neighbor's window encroaches, or both — the meal is moved to the nearest viable position that preserves pattern order.
+- **Displaced-meal flag.** When the meal is forced outside its window (`preferred_time ± tolerance_minutes`), it is marked `displaced`. A visible flag surfaces on the affected meal in both the planning view and the day view so the user notices the routine has been interrupted and can choose to accept it or rearrange. See §8.4 for the visual treatment.
+- **Per-day override.** Pinning a meal to a specific clock time on a specific day creates a per-day override that turns that meal, for that day only, into a fixed-time anchor. The pattern is not mutated.
 - **Can host paired tasks.** A meal may have one or more tasks paired with it — tasks the user does concurrently with the meal (e.g., reading a document over lunch). See §4.3.
 
 ### 4.6 Anchors
@@ -289,20 +301,25 @@ The two surfaces share **capability parity**: every action and concept supported
 
 The surfaces have **different navigation shapes**, deliberately:
 
-- **The planning wizard is linear.** Planning is a small set of spokes that all must complete — tasks, meals, and exercise. With this many spokes and a hard completion requirement, sequencing them is a feature, not a constraint: the user is guided through what's needed without having to decide where to start.
-- **The onboarding wizard is hub-and-spoke for setup content** (account, dietary restrictions, food preferences, meal pattern, accessibility settings) because those concerns are independent and revisitable.
-
-How the planning portion of onboarding is presented — embedded in the hub-and-spoke, run as a linear sub-flow, or some hybrid — is an open question (see §4.12).
+- **The planning wizard is linear.** Planning is a small set of spokes that all must complete — carryover review (§4.9), tasks, meals, and exercise. With this many spokes and a hard completion requirement, sequencing them is a feature, not a constraint: the user is guided through what's needed without having to decide where to start.
+- **The onboarding wizard is hub-and-spoke.** Setup concerns (account, dietary restrictions, food preferences, meal pattern, accessibility settings) and the planning portion of onboarding are each delivered as spokes from a common hub. Capability parity with the planning wizard (above) remains firm; navigation parity is not required. Within onboarding's spokes, the same scheduling-model distinctions apply as elsewhere — meals are a separate domain from tasks (§4.5); scheduled tasks act as anchors (§4.6) and may be templated as routines (§4.4) — and are not redefined by the wizard.
 
 ### 4.9 The planning process
 
-Building a schedule for a planning window proceeds in three conceptual passes:
+Building a schedule for a planning window proceeds in four conceptual passes:
 
-1. **Inventory.** The system gathers every task that should appear in the window: explicit one-off tasks the user has captured, plus task instances generated from routines that apply to days in the window.
+1. **Carryover review.** Before composing the new window, the user reviews **all incomplete tasks from before the current planning window** — there is no lookback horizon. Tasks bearing `one_shot = true` (§4.3) are silently dropped at window close and never appear here, which is what keeps the carryover pile from growing into a guilt heap. For each surfaced task the user takes one of three actions:
+   - **carry** — include the task in the new planning window.
+   - **defer** — push the task forward without including it in this window; it will resurface in the next carryover review.
+   - **drop** — remove the task from the system entirely. The user may optionally provide a one-tap reason; reasons are optional and never synthesized by the agent.
 
-2. **LLM-driven distribution.** The LLM proposes how tasks distribute across the window's days, with the goal of **balancing energy and effort** across the period. Avoid stacking high-energy tasks; respect known low-energy periods; align tasks with the user's known time-of-day strengths; spread cognitive load.
+   Carryover review is skipped on the user's first window (onboarding), since there is nothing to carry over.
 
-3. **Memory-informed placement.** The LLM's distribution is informed by user memory — historical context about time-of-day patterns, day-of-week patterns, and any other relevant signals the agent has accumulated. Memory replaces what would otherwise be hard-coded heuristics.
+2. **Inventory.** The system gathers every task that should appear in the window: tasks carried in from the carryover step, explicit one-off tasks the user has captured, plus task instances generated from routines that apply to days in the window.
+
+3. **LLM-driven distribution.** The LLM proposes how tasks distribute across the window's days, with the goal of **balancing energy and effort** across the period. Avoid stacking high-energy tasks; respect known low-energy periods; align tasks with the user's known time-of-day strengths; spread cognitive load.
+
+4. **Memory-informed placement.** The LLM's distribution is informed by user memory — historical context about time-of-day patterns, day-of-week patterns, and **aggregate carryover-deferral patterns**. The memory system records aggregate deferral signals, not per-item reasons; persistent deferral of a given task or routine causes the agent, during this pass, to flag that intent and ask whether the underlying cadence should change or the routine should be dropped. Memory replaces what would otherwise be hard-coded heuristics.
 
 The user retains final agency. Every LLM proposal is a draft the user can accept, override, or selectively modify. The expectation is that the LLM produces a plan good enough that most users accept most proposals, but the override path is always present and never penalized.
 
@@ -335,15 +352,6 @@ The user typed three tasks ("write design doc," "fold laundry + triage inbox," "
 - **No multi-day placements.** A task lives on one specific day. "This week sometime" resolves to a specific day at planning time.
 - **No partial-day anchors.** An anchor occupies a single position in the day's sequence; multi-window or split-anchor concepts are not modeled.
 - **No second-by-second timing.** Time precision is at the minute level.
-
-### 4.12 Open design questions
-
-These questions are acknowledged so they can be resolved through deliberate design, rather than baked into ad-hoc implementation choices.
-
-- **Meal time elasticity.** The model needs enough expressiveness to position meals sensibly given surrounding constraints (early waker with an early appointment vs. late waker with no morning constraint) without becoming a rigid timestamp schedule. The shape of this — soft windows? Anchor-relative offsets? Per-pattern defaults plus daily overrides? — is open.
-- **Routine recurrence specification.** Whether to use full RRULE flexibility or a simpler curated enum (`daily | weekdays | weekly | monthly | yearly`) plus an RRULE escape hatch for advanced users is unresolved.
-- **Cross-window carryover semantics.** When a task in one planning window goes uncompleted, the rules for surfacing it in the next window need design — the user's review step, the lookback horizon, and how memory captures patterns of repeated deferral.
-- **Onboarding's planning shape.** How onboarding presents the planning portion of the experience — as a linear sub-flow matching the planning wizard, as one or more spokes within the hub-and-spoke shell, or some hybrid — is undecided. Capability parity with the planning wizard (§4.8) is a firm requirement; navigation parity is not.
 
 ---
 
@@ -784,11 +792,19 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Appointment.** Informal synonym for **scheduled task**. See *Scheduled task*.
 
-**Carryover.** A task not completed in its planning window that becomes eligible for surfacing in the next planning window. Exact rules are an open design question. See [§4.12](#412-open-design-questions).
+**Carry.** A user-issued carryover decision: include this incomplete task in the new planning window. See [§4.9](#49-the-planning-process).
+
+**Carryover.** A task not completed in its planning window that becomes eligible for surfacing in the next planning window's carryover review. There is no lookback horizon. Tasks bearing `one_shot = true` (§4.3) never enter carryover — they are silently dropped at window close. See [§4.9](#49-the-planning-process).
 
 **Catalog.** The shared, externally-seeded library of ingredients, dishes, meals, and exercises. Used by the LLM as a search and matching surface; **not browsed directly by users**. See [§3.2](#32-content-libraries--catalog-and-personal).
 
+**Defer.** A user-issued carryover decision: push the task forward without including it in this window; it will resurface in the next carryover review. See [§4.9](#49-the-planning-process).
+
 **Dietary restriction.** A user-declared constraint: allergy, intolerance, preference, or cultural/religious. Allergies and intolerances are enforced; preferences are advisory. See [§3.1](#31-identity--user-scoped-configuration).
+
+**Displaced-meal flag.** A flag set on a meal when day-level placement forces it outside its window (`preferred_time ± tolerance_minutes`), typically because a scheduled task occupied the window. Surfaced in both the planning view and the day view. See [§4.5](#45-meals) and [§8.4](#84-design-language).
+
+**Drop.** A user-issued carryover decision: remove the task from the system entirely. The user may optionally provide a one-tap reason; reasons are never synthesized by the agent. See [§4.9](#49-the-planning-process).
 
 **Energy required.** Per-task field in `{low, medium, high}` capturing cognitive/physical demand. A first-class scheduling axis used by the LLM during planning. See [§4.3](#43-tasks).
 
@@ -798,9 +814,11 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **LlmProvider.** Trait abstraction over LLM backends; instances per tier (Fast / Capable). See [§5.2](#52-llmprovider-abstraction).
 
-**Meal.** A thing the user eats. Modeled as its own domain, **separate from tasks**. Meals occur in a sequential, daily-recurring pattern; their times are partly elastic and partly constrained by surrounding anchors. See [§4.5](#45-meals).
+**Meal.** A thing the user eats. Modeled as its own domain, **separate from tasks**. Meals occur in a sequential, daily-recurring pattern; each meal carries a `preferred_time` and a `tolerance_minutes` value that together define its **meal window**. The LLM reasons about windows, not clock-minute placements. See [§4.5](#45-meals).
 
 **Meal pattern.** A user's ordered sequence of named meals (default: `breakfast → lunch → dinner`). The pattern recurs every day; the user can reconfigure it (snacks, second breakfast, etc.). See [§4.5](#45-meals).
+
+**Meal window.** The acceptable time zone for a meal — `preferred_time ± tolerance_minutes`. The LLM treats the window (not a specific clock minute) as the planning fact: tasks are budgeted around the window, displacement is measured against the window's edges. The user is shown "lunch" as an item in the day's flow, not "lunch at 12:00:00." See [§4.5](#45-meals).
 
 **Memory.** Persistent textual observation about a user that the agent accumulates and references. Categorized; lifecycle managed by the LLM via tools. See [§5.6](#56-memory-system).
 
@@ -808,15 +826,19 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Occasion tag.** A soft hint on a dish or meal indicating an eating context ("breakfast", "snack"). Advisory; not DB-validated. The authoritative occasion lives on the meal entry, not the food. See [§3.2.5](#325-occasion_tags-not-meal_type-enum).
 
+**One-shot task.** A task whose `one_shot` flag is true: the task is meaningful only within its scheduled window, and is silently dropped at window close if not completed (e.g., daily teeth brushing). Inferred by the LLM at task creation; user-overridable. See [§4.3](#43-tasks).
+
 **Paired task.** A task paired with a meal, intended to run concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). A meal may host one or more paired tasks; scheduled tasks cannot host paired tasks. See [§4.3](#43-tasks) and [§4.5](#45-meals).
 
 **Personal library.** A user's own forked-and-editable copy of catalog items (`user_dishes`, `user_meals`, `user_exercises`). See [§3.2](#32-content-libraries--catalog-and-personal).
 
 **Planning window.** The temporal span the user plans at one time (default 1 week; capped at 14 days as a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.8](#48-planning-windows).
 
+**Preferred time.** Per-meal wall-clock time at the *center* of the meal's window. Used (with `tolerance_minutes`) to construct the **meal window** and, separately, as the reference point for budgeting task time between adjacent meals (preferred-to-preferred spacing). Established at onboarding from the user's stated habits and adapted over time by the memory system as the agent observes when meals actually occur. Not a routinely user-facing control. See [§4.5](#45-meals).
+
 **Repository.** Trait-based storage abstraction in `plnd_data::repository`. The only allowed entry point to persistent storage from outside `plnd_data`. See [§6.2](#62-repository-pattern).
 
-**Routine.** A template for a recurring task. Routines define recurrence (daily, weekdays, weekly, RRULE) and instantiate concrete task entries during planning-window setup. **Meals do not use the routine model** — they have their own daily-recurring pattern. See [§4.4](#44-routines).
+**Routine.** A template for a recurring task. The canonical persisted form of recurrence is an RRULE string; the user-facing surface uses progressive disclosure — a curated enum (`daily | weekdays | weekly | monthly | yearly`) by default, with the underlying RRULE exposed only via advanced disclosure. Routines instantiate concrete task entries during planning-window setup. **Meals do not use the routine model** — they have their own daily-recurring pattern. See [§4.4](#44-routines).
 
 **Safe food.** A user-flagged dish or meal that is reliably acceptable; should never be quietly dropped from suggestions. First-class support for picky eaters. See [§3.2.4](#324-preferences-as-separate-aggregate-roots).
 
@@ -826,9 +848,11 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Slot.** The space between two adjacent anchors (including the implicit start- and end-of-day anchors). Each slot can hold zero or more floating tasks. Slot boundaries are positional, not time-pinned. See [§4.7](#47-slots).
 
-**Task.** A unit of intent the user means to do — work, exercise, leisure, errands, medication, etc. Always carries duration and energy_required (typically LLM-inferred). May carry a start time, in which case it is also a "scheduled task." See [§4.3](#43-tasks).
+**Task.** A unit of intent the user means to do — work, exercise, leisure, errands, medication, etc. Always carries duration, energy_required, and `one_shot` (all typically LLM-inferred). May carry a start time, in which case it is also a "scheduled task." See [§4.3](#43-tasks).
 
 **Terminal tool.** A tool whose execution ends the agent loop. Each use case has exactly one. See [§5.4](#54-tools).
+
+**Tolerance (meal).** Per-meal `tolerance_minutes` value defining the half-width of the **meal window** around `preferred_time`. Inside the window, the meal is undisplaced regardless of its precise clock placement; outside the window, it is marked `displaced`. See [§4.5](#45-meals).
 
 **Use case.** The unit of variation in the agent layer. Binds a system prompt, provider tier, tool subset, memory filter, and response schema. See [§5.3](#53-use-cases).
 
@@ -866,3 +890,4 @@ A log of substantive changes to this document.
 | Date | Author | Change |
 |------|--------|--------|
 | 2026-04-30 | Robert Chambers | 1.0 — Initial publication of the architecture reference. |
+| 2026-05-01 | Robert Chambers | 1.1 — Resolved all four §4.12 open design questions (meal time elasticity, routine recurrence, cross-window carryover, onboarding shape) and removed §4.12. Added `one_shot` task flag (§4.3); separated routine recurrence storage (RRULE) from presentation (curated enum + progressive disclosure) (§4.4); replaced meal elasticity with `preferred_time` + `tolerance_minutes` model (§4.5); ratified onboarding's hub-and-spoke navigation as canonical (§4.8); prepended carryover review as the first conceptual pass of the planning process (§4.9); updated glossary. |
