@@ -874,9 +874,9 @@ checksum = "4443176a9f2c162692bd3d352d745ef9413eec5782a80d8fd6f8a1ac692a07f7"
 
 [[package]]
 name = "fancy-regex"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72cf461f865c862bb7dc573f643dd6a2b6842f7c30b07882b56bd148cc2761b8"
+checksum = "e1e1dacd0d2082dfcf1351c4bdd566bbe89a2b263235a2b50058f1e130a47277"
 dependencies = [
  "bit-set",
  "regex-automata",
@@ -1649,9 +1649,9 @@ dependencies = [
 
 [[package]]
 name = "jsonschema"
-version = "0.46.2"
+version = "0.46.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50180452e7808015fe083eae3efcf1ec98b89b45dd8cc204f7b4a6b7b81ea675"
+checksum = "cbe92a2f8b00686061eab5cdcfd6f382c27f2084456e7be90ae9f0fe4a30552a"
 dependencies = [
  "ahash 0.8.12",
  "bytecount",
@@ -2374,7 +2374,7 @@ dependencies = [
  "chrono",
  "jsonschema",
  "plnd_data",
- "reqwest 0.13.2",
+ "reqwest 0.13.3",
  "rust_decimal",
  "serde",
  "serde_json",
@@ -2406,7 +2406,7 @@ dependencies = [
  "plnd_agent",
  "plnd_data",
  "plnd_seed",
- "reqwest 0.13.2",
+ "reqwest 0.13.3",
  "rust_decimal",
  "serde",
  "serde_json",
@@ -2432,7 +2432,7 @@ dependencies = [
  "feed-rs",
  "futures",
  "moka",
- "reqwest 0.13.2",
+ "reqwest 0.13.3",
  "rust_decimal",
  "serde",
  "serde_json",
@@ -2775,9 +2775,9 @@ dependencies = [
 
 [[package]]
 name = "referencing"
-version = "0.46.2"
+version = "0.46.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acb0c66c7b78c1da928bee668b5cc638c678642ff587faff6e6222f797be9d4c"
+checksum = "e125f10bdcd507598c702daada18c47fe5bfba4d7a9545b015b5d432f7168ca3"
 dependencies = [
  "ahash 0.8.12",
  "fluent-uri",
@@ -2864,9 +2864,9 @@ dependencies = [
 
 [[package]]
 name = "reqwest"
-version = "0.13.2"
+version = "0.13.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab3f43e3283ab1488b624b44b0e988d0acea0b3214e694730a055cb6b2efa801"
+checksum = "62e0021ea2c22aed41653bc7e1419abb2c97e038ff2c33d0e1309e49a97deec0"
 dependencies = [
  "base64",
  "bytes",
