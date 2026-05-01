@@ -220,6 +220,23 @@ Each day type carries:
 - **Sleep time** — the wall-clock time the day's implicit end-of-day anchor sits at.
 - **Optional per-meal overrides.** For any meal in the user's meal pattern (§4.6), the day type may override `preferred_time` and/or `tolerance_minutes`. A meal with no override on a given day type uses the meal pattern's default values. This is how a user expresses "weekend brunch later than weekday breakfast" without redesigning the pattern.
 
+#### Days that cross midnight
+
+A day type's `wake_time` and `sleep_time` are **independent wall-clock values**. The data model makes no assumption that `wake_time < sleep_time` on the 24-hour clock — a user's "day" may begin and end on different calendar dates.
+
+Two patterns occur:
+
+- **Incidental overlap.** The user's day falls mostly on a single calendar date, but the wake or sleep boundary crosses midnight (e.g., wake 23:00 with sleep at 14:00 the next day; or wake 06:00 with sleep at 01:00 the next day).
+- **Fully overnight rhythm.** The user's waking period sits primarily on the calendar date *after* their wake date — e.g., wake 20:00, sleep 12:00 the next day. Common for night-shift workers and others on a flipped schedule.
+
+Both are first-class, not edge cases.
+
+Consequences for the rest of the model:
+
+- The implicit start-of-day anchor and end-of-day anchor (§4.7) may resolve to clock times on different calendar dates. The slot model (§4.8) is unaffected because slots depend on anchor *order*, not the calendar date of the anchor.
+- A meal's `preferred_time` (§4.6) is a wall-clock value evaluated within the day's wake-to-sleep envelope. For a midnight-crossing day, a meal preferred at 02:00 may resolve to 02:00 of the calendar date *after* the user's wake date.
+- Day-view UI labeling — which calendar date (or both dates) represents "this user's day" — is a presentation concern the data model does not constrain. The day-view design owns it.
+
 #### Day-type → date mapping
 
 A day type maps to calendar dates by exactly one of two mechanisms:
@@ -304,7 +321,7 @@ An **anchor** is a milestone in the day's sequence around which other tasks posi
 
 - **Every meal** in the user's meal pattern is an anchor.
 - **Every scheduled task** (a task with a fixed start time) is an anchor.
-- **Start-of-day and end-of-day** are implicit anchors. They bound the day's first and last slots, and their clock times come from the day's day type (§4.3) — the type's wake time becomes the start-of-day anchor; its sleep time becomes the end-of-day anchor.
+- **Start-of-day and end-of-day** are implicit anchors. They bound the day's first and last slots, and their clock times come from the day's day type (§4.3) — the type's wake time becomes the start-of-day anchor; its sleep time becomes the end-of-day anchor (which may fall on the following calendar date for midnight-crossing day types).
 
 Anchors define the *order* of the day. Their times may be fixed (a 9am standup, a 6pm dose) or partly elastic (lunch happens between breakfast and dinner without a precise minute). The slot model below depends on anchor *order*, not anchor *time*.
 
@@ -832,7 +849,7 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Daily rhythm.** A user's day-shape: wake time, sleep time, and meal-time preferences, organized by **day type**. The frame everything in §4 inhabits. See [§4.3](#43-daily-rhythm).
 
-**Day type.** A named pattern of daily rhythm that applies to particular calendar dates ("Weekdays," "Weekends," "Night shift," etc.). Each day type carries its own wake/sleep times and may override per-meal `preferred_time`/`tolerance_minutes`. Mapped to dates by day-of-week bitmask or by repeating cycle. Day types are mutually exclusive within a user. See [§4.3](#43-daily-rhythm).
+**Day type.** A named pattern of daily rhythm that applies to particular calendar dates ("Weekdays," "Weekends," "Night shift," etc.). Each day type carries its own wake/sleep times and may override per-meal `preferred_time`/`tolerance_minutes`. Wake and sleep are independent wall-clock values — a day type may span midnight. Mapped to dates by day-of-week bitmask or by repeating cycle. Day types are mutually exclusive within a user. See [§4.3](#43-daily-rhythm).
 
 **Default day type.** The day type that covers any calendar date not claimed by another day type. Every user has at least one. See [§4.3](#43-daily-rhythm).
 
@@ -884,7 +901,7 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Scheduled task.** A task with a fixed start time. Informally: an "appointment." Scheduled tasks are also anchors — their start time positions them in the day's sequence. The LLM does not promote a regular task into a scheduled task without explicit user direction. See [§4.4](#44-tasks).
 
-**Sleep time.** Per-day-type wall-clock time at which the day's implicit end-of-day anchor sits. See [§4.3](#43-daily-rhythm).
+**Sleep time.** Per-day-type wall-clock time at which the day's implicit end-of-day anchor sits. Independent of `wake_time`; may fall before or after it on the 24-hour clock (and on the following calendar date for midnight-crossing day types). See [§4.3](#43-daily-rhythm).
 
 **Slot.** The space between two adjacent anchors (including the implicit start- and end-of-day anchors). Each slot can hold zero or more floating tasks. Slot boundaries are positional, not time-pinned. See [§4.8](#48-slots).
 
@@ -896,7 +913,7 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Use case.** The unit of variation in the agent layer. Binds a system prompt, provider tier, tool subset, memory filter, and response schema. See [§5.3](#53-use-cases).
 
-**Wake time.** Per-day-type wall-clock time at which the day's implicit start-of-day anchor sits. See [§4.3](#43-daily-rhythm).
+**Wake time.** Per-day-type wall-clock time at which the day's implicit start-of-day anchor sits. Independent of `sleep_time`; may fall before or after it on the 24-hour clock. See [§4.3](#43-daily-rhythm).
 
 ---
 
@@ -934,3 +951,4 @@ A log of substantive changes to this document.
 | 2026-04-30 | Robert Chambers | 1.0 — Initial publication of the architecture reference. |
 | 2026-05-01 | Robert Chambers | 1.1 — Resolved all four open design questions and removed the *Open Design Questions* section: meal time elasticity, routine recurrence, cross-window carryover, onboarding shape. Added the `one_shot` task flag (Tasks); separated routine recurrence storage (RRULE) from presentation (curated enum + progressive disclosure) in *Routines*; replaced meal elasticity with the `preferred_time` + `tolerance_minutes` model in *Meals*; ratified hub-and-spoke navigation as the canonical onboarding shape in *Planning windows*; prepended carryover review as the first conceptual pass of *The planning process*; updated glossary. |
 | 2026-05-01 | Robert Chambers | 1.2 — Added new section *Daily rhythm* before *Tasks*; renumbered subsequent §4 subsections by +1. Promoted *Daily rhythm* to the §4.2 canonical concept list (six → seven concepts). Wake/sleep times now live exclusively on day types; every user has at least one default day type. Day types may override per-meal `preferred_time` and `tolerance_minutes`. Updated §3.1 to reroute wake/sleep/meal-window state to *Daily rhythm*; updated *Anchors* to source implicit start-/end-of-day clock times from the day's day type; updated *Meals* to note day-type overrides. Glossary additions: `Daily rhythm`, `Day type`, `Default day type`, `Sleep time`, `Wake time`. |
+| 2026-05-01 | Robert Chambers | 1.3 — Designated that day types may span midnight. `wake_time` and `sleep_time` are independent wall-clock values; the data model makes no assumption that `wake_time < sleep_time`. Added *Days that cross midnight* sub-section to *Daily rhythm* with two patterns (incidental overlap, fully overnight rhythm) recognized as first-class. Updated *Anchors* to note that the end-of-day anchor may resolve to a clock time on the following calendar date. Day-view UI labeling for midnight-crossing days is acknowledged as a presentation concern owned by the day-view design. Glossary entries `Day type`, `Wake time`, `Sleep time` updated. |
