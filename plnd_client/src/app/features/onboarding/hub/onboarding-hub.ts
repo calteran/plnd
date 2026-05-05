@@ -576,7 +576,7 @@ export class OnboardingHubComponent {
       task_ref_type: m.meal_ref?.type,
       title: m.meal_ref ? undefined : m.title,
       scheduled_start: SLOT_DEFAULT_TIME[m.occasion] ?? '12:00',
-      after_milepost: m.occasion,
+      after_anchor: m.occasion,
     }));
 
     const body: PostSchedulePlanRequest = {

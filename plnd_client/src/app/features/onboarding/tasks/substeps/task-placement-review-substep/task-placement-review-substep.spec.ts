@@ -56,7 +56,7 @@ function makeTemplate(overrides: Partial<ScheduleTemplate> = {}): ScheduleTempla
     time_window_end: null,
     duration_minutes: 30,
     energy_required: 'low',
-    is_milepost: false,
+    is_anchor: false,
     task_ref_id: null,
     task_ref_type: null,
     created_at: '2026-04-01T00:00:00Z',

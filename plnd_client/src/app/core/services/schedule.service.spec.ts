@@ -87,7 +87,7 @@ describe('ScheduleService', () => {
         entry_id: 'm1',
         task_type: 'meal',
         title: null,
-        after_milepost: 'breakfast',
+        after_anchor: 'breakfast',
         status: 'planned',
         date: '2026-04-02',
         scheduled_start: '2026-04-02T08:00:00Z',

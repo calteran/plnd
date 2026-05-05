@@ -107,7 +107,7 @@ export interface ScheduleEntryDto {
   date: string;
   scheduled_start: string;
   status: string;
-  after_milepost?: string;
+  after_anchor?: string;
 }
 
 export interface SchedulePeriodResponse {
@@ -127,7 +127,7 @@ export interface PlanEntryRequest {
   task_ref_type?: string;
   title?: string;
   scheduled_start: string; // "HH:MM"
-  after_milepost?: string;
+  after_anchor?: string;
   duration_minutes?: number;
   energy_required?: EnergyLevel;
 }
@@ -158,8 +158,8 @@ export interface PlaceTasksEntry {
   duration_minutes: number;
   energy_required: EnergyLevel;
   /** Meal anchor for floating tasks — mutually exclusive with time_window_start. */
-  after_milepost?: string;
-  /** Exact start time "HH:MM" for fixed tasks — mutually exclusive with after_milepost. */
+  after_anchor?: string;
+  /** Exact start time "HH:MM" for fixed tasks — mutually exclusive with after_anchor. */
   time_window_start?: string;
 }
 

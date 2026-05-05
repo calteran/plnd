@@ -3,7 +3,7 @@ export interface ActionTaken {
   task_id?: string;
   scheduled_at?: string;
   date?: string;            // date the task was scheduled to (YYYY-MM-DD)
-  after_milepost?: string;  // meal-bucket anchor, e.g. "breakfast"
+  after_anchor?: string;  // meal anchor, e.g. "breakfast"
 }
 
 export interface ShowCheckboxSignal {

@@ -13,7 +13,7 @@ export interface ScheduleTemplate {
   time_window_end: string | null;
   duration_minutes: number | null;
   energy_required: EnergyLevel;
-  is_milepost: boolean;
+  is_anchor: boolean;
   task_ref_id: string | null;
   task_ref_type: string | null;
   created_at: string;
@@ -29,7 +29,7 @@ export interface CreateScheduleTemplateRequest {
   time_window_end?: string;
   duration_minutes?: number;
   energy_required?: EnergyLevel;
-  is_milepost?: boolean;
+  is_anchor?: boolean;
   task_ref_id?: string;
   task_ref_type?: string;
 }
@@ -42,7 +42,7 @@ export interface UpdateScheduleTemplateRequest {
   time_window_end?: string;
   duration_minutes?: number;
   energy_required?: EnergyLevel;
-  is_milepost?: boolean;
+  is_anchor?: boolean;
   task_ref_id?: string;
   task_ref_type?: string;
 }

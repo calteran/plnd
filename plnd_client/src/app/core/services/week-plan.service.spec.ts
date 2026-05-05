@@ -230,7 +230,7 @@ describe('WeekPlanService', () => {
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      const breakfast = body.entries.find(e => e.after_anchor === 'breakfast');
       expect(breakfast).toBeTruthy();
       expect(breakfast!.title).toBe('(breakfast)');
       req.flush({ committed: 3, planning_task_status: 'completed' });
@@ -243,7 +243,7 @@ describe('WeekPlanService', () => {
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      const breakfast = body.entries.find(e => e.after_anchor === 'breakfast');
       expect(breakfast!.title).toBe('Oatmeal');
       req.flush({ committed: 3, planning_task_status: 'completed' });
     });
@@ -255,7 +255,7 @@ describe('WeekPlanService', () => {
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const snack = body.entries.find(e => e.after_milepost === 'snack');
+      const snack = body.entries.find(e => e.after_anchor === 'snack');
       expect(snack).toBeTruthy();
       expect(snack!.title).toBe('Apple');
       req.flush({ committed: 4, planning_task_status: 'completed' });
@@ -268,7 +268,7 @@ describe('WeekPlanService', () => {
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      const breakfast = body.entries.find(e => e.after_anchor === 'breakfast');
       expect(breakfast).toBeUndefined();
       req.flush({ committed: 2, planning_task_status: 'completed' });
     });
@@ -280,7 +280,7 @@ describe('WeekPlanService', () => {
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const lunch = body.entries.find(e => e.after_milepost === 'lunch');
+      const lunch = body.entries.find(e => e.after_anchor === 'lunch');
       expect(lunch).toBeTruthy();
       expect(lunch!.task_ref_id).toBe('u1');
       expect(lunch!.task_ref_type).toBe('user');

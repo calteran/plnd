@@ -89,9 +89,9 @@ function getDayName(isoDate: string): string {
 }
 
 function slotOf(entry: PlaceTasksEntry): 'morning' | 'afternoon' | 'evening' {
-  if (entry.after_milepost === 'breakfast') return 'morning';
-  if (entry.after_milepost === 'dinner') return 'evening';
-  if (entry.after_milepost === 'lunch') return 'afternoon';
+  if (entry.after_anchor === 'breakfast') return 'morning';
+  if (entry.after_anchor === 'dinner') return 'evening';
+  if (entry.after_anchor === 'lunch') return 'afternoon';
   // Fixed tasks: bucket by wall-clock time
   const t = entry.time_window_start ?? '12:00';
   if (t < '12:00') return 'morning';
@@ -721,7 +721,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
         ...updated[edit.entryIndex],
         scheduled_date: edit.scheduledDate,
         time_window_start: hasFixedTime ? edit.timeWindowStart : undefined,
-        after_milepost: hasFixedTime ? undefined : updated[edit.entryIndex].after_milepost,
+        after_anchor: hasFixedTime ? undefined : updated[edit.entryIndex].after_anchor,
         duration_minutes: edit.durationMinutes,
         energy_required: edit.energyRequired,
       };
@@ -751,7 +751,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       task_type: entry.task_type,
       title: entry.title,
       scheduled_start: entry.time_window_start ?? '12:00',
-      after_milepost: entry.after_milepost,
+      after_anchor: entry.after_anchor,
       duration_minutes: entry.duration_minutes,
       energy_required: entry.energy_required,
     }));
