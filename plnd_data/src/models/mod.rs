@@ -1,20 +1,20 @@
 mod catalog;
+mod day_type;
 mod family;
 mod library;
 mod preferences;
 mod schedule;
-mod schedule_type;
 mod search;
 mod suggestion;
 mod task;
 mod user;
 
 pub use catalog::*;
+pub use day_type::*;
 pub use family::*;
 pub use library::*;
 pub use preferences::*;
 pub use schedule::*;
-pub use schedule_type::*;
 pub use search::*;
 pub use suggestion::*;
 pub use task::*;
