@@ -31,17 +31,7 @@ pub async fn get_period(
     .await
     .map_err(DatabaseError::from)?;
 
-    let carryover: Vec<ScheduleEntry> = sqlx::query_as::<_, ScheduleEntry>(&format!(
-        "SELECT {ENTRY_COLS} FROM schedule_entries
-         WHERE user_id = $1 AND date < $2
-           AND status IN ('planned', 'deferred')
-         ORDER BY date, scheduled_start"
-    ))
-    .bind(user_id)
-    .bind(start)
-    .fetch_all(pool)
-    .await
-    .map_err(DatabaseError::from)?;
+    let carryover = get_carryover(pool, user_id, start).await?;
 
     Ok(SchedulePeriodResponse { entries, carryover })
 }
@@ -52,7 +42,6 @@ pub async fn get_carryover(
     user_id: Uuid,
     before: NaiveDate,
 ) -> Result<Vec<ScheduleEntry>, DatabaseError> {
-    // TODO(#657): this query is duplicated in get_period — extract a shared helper
     sqlx::query_as::<_, ScheduleEntry>(&format!(
         "SELECT {ENTRY_COLS} FROM schedule_entries
          WHERE user_id = $1 AND date < $2

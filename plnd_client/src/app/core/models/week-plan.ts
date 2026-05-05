@@ -98,7 +98,7 @@ export interface PlanDraftShape {
   scheduledMeals: Record<string, Partial<Record<MealSlot, PlannedMeal>>>;
   scheduledTasks: PlannedTask[];
   floatingTasks?: FloatingTask[];
-  dropReasons?: Record<string, string>;
+  dropReasons?: Record<string, DropReason>;
   savedAt: string;
 }
 
@@ -180,7 +180,7 @@ export interface PostSchedulePlanRequest {
   /** Carryover decisions: entry_id → "carry" | "defer" | "drop" */
   carryover_decisions?: Record<string, CarryoverDecision>;
   /** Optional reasons for 'drop' decisions. entry_id → reason string */
-  carryover_drop_reasons?: Record<string, string>;
+  carryover_drop_reasons?: Record<string, DropReason>;
   placed_tasks?: PlanEntryRequest[];
   meal_habit_ids?: string[];
 }

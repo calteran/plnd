@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, map, noop, of, switchMap, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
 import {
-  CarryoverApiResponse, CarryoverDecision, MealEntry, MealNutrition, MealPlanState, MealRef,
+  CarryoverApiResponse, CarryoverDecision, DropReason, MealEntry, MealNutrition, MealPlanState, MealRef,
   MealSlot, PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, ScheduleEntryDto, SchedulePeriodResponse,
@@ -28,7 +28,7 @@ export class WeekPlanService {
   private readonly scheduledTasksSignal       = signal<PlannedTask[]>([]);
   private readonly scheduledMealsSignal       = signal<Record<string, Partial<Record<MealSlot, PlannedMeal>>>>({});
   private readonly carryoverDecisionsSignal   = signal<Record<string, CarryoverDecision>>({});
-  private readonly dropReasonsSignal          = signal<Record<string, string>>({});
+  private readonly dropReasonsSignal          = signal<Record<string, DropReason>>({});
   private readonly hasUnplannedHorizonSignal  = signal<boolean>(false);
   private readonly isSubmittingSignal         = signal<boolean>(false);
   private readonly planningTaskIdSignal       = signal<string>('');
@@ -196,17 +196,18 @@ export class WeekPlanService {
   setCarryoverDecision(entryId: string, decision: CarryoverDecision): void {
     this.carryoverDecisionsSignal.update(d => ({ ...d, [entryId]: decision }));
     if (decision !== 'drop') {
-      this.dropReasonsSignal.update(d =>
-        Object.fromEntries(Object.entries(d).filter(([k]) => k !== entryId))
-      );
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      this.dropReasonsSignal.update(({ [entryId]: _, ...rest }) => rest);
     }
   }
 
-  setDropReason(entryId: string, reason: string): void {
+  setDropReason(entryId: string, reason: DropReason): void {
     this.dropReasonsSignal.update(d => {
       // Toggle: if already selected, deselect
       if (d[entryId] === reason) {
-        return Object.fromEntries(Object.entries(d).filter(([k]) => k !== entryId));
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [entryId]: _, ...rest } = d;
+        return rest;
       }
       return { ...d, [entryId]: reason };
     });
