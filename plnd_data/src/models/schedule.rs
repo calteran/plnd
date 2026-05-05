@@ -63,9 +63,9 @@ pub struct ScheduleEntry {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CarryoverDecision {
-    Accept,
+    Carry,
     Defer,
-    Dismiss,
+    Drop,
 }
 
 /// Input to `schedule::commit_plan` — constructed from the HTTP request in plnd_api.

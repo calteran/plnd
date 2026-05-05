@@ -261,9 +261,9 @@ pub async fn post_plan(
         .into_iter()
         .map(|(id, d)| {
             let db_decision = match d {
-                HttpCarryoverDecision::Accept => CarryoverDecision::Accept,
+                HttpCarryoverDecision::Carry => CarryoverDecision::Carry,
                 HttpCarryoverDecision::Defer => CarryoverDecision::Defer,
-                HttpCarryoverDecision::Dismiss => CarryoverDecision::Dismiss,
+                HttpCarryoverDecision::Drop => CarryoverDecision::Drop,
             };
             (id, db_decision)
         })

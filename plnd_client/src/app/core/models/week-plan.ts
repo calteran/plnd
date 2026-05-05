@@ -1,4 +1,4 @@
-export type CarryoverDecision = 'defer' | 'dismiss' | 'accept';
+export type CarryoverDecision = 'carry' | 'defer' | 'drop';
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type EnergyLevel = 'low' | 'medium' | 'high';
 export type ApprovalState = 'proposed' | 'approved' | 'skipped';
@@ -169,7 +169,7 @@ export interface PostSchedulePlanRequest {
   planning_task_id: string;
   entries: PlanEntryRequest[];
   replace?: boolean;
-  /** Carryover decisions: entry_id → "defer" | "dismiss" | "accept" */
+  /** Carryover decisions: entry_id → "carry" | "defer" | "drop" */
   carryover_decisions?: Record<string, CarryoverDecision>;
   placed_tasks?: PlanEntryRequest[];
   meal_habit_ids?: string[];

@@ -74,16 +74,16 @@ describe('PlanReviewStepComponent', () => {
 
   // ── Decision badge default ───────────────────────────────────────────────
 
-  it('defaults to "Accept" decision before any tap', () => {
+  it('defaults to "Carry" decision before any tap', () => {
     flush([MOCK_ITEM]);
     const badge = fixture.nativeElement.querySelector('.decision-badge') as HTMLElement;
-    expect(badge.getAttribute('data-decision')).toBe('accept');
-    expect(badge.textContent).toContain('Accept');
+    expect(badge.getAttribute('data-decision')).toBe('carry');
+    expect(badge.textContent).toContain('Carry');
   });
 
   // ── Cycling behavior ─────────────────────────────────────────────────────
 
-  it('cycles Accept → Defer on first badge tap', () => {
+  it('cycles Carry → Defer on first badge tap', () => {
     spyOn(service, 'setCarryoverDecision');
     flush([MOCK_ITEM]);
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
@@ -91,7 +91,7 @@ describe('PlanReviewStepComponent', () => {
     expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'defer');
   });
 
-  it('cycles Defer → Dismiss on second badge tap', () => {
+  it('cycles Defer → Drop on second badge tap', () => {
     flush([MOCK_ITEM]);
     // Set state to defer via the real impl BEFORE spying (spy replaces without calling through)
     service.setCarryoverDecision('e1', 'defer');
@@ -99,16 +99,16 @@ describe('PlanReviewStepComponent', () => {
     spyOn(service, 'setCarryoverDecision');
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
     badge.click();
-    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'dismiss');
+    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'drop');
   });
 
-  it('cycles Dismiss → Accept on third badge tap', () => {
+  it('cycles Drop → Carry on third badge tap', () => {
     flush([MOCK_ITEM]);
-    service.setCarryoverDecision('e1', 'dismiss');
+    service.setCarryoverDecision('e1', 'drop');
     fixture.detectChanges();
     spyOn(service, 'setCarryoverDecision');
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
     badge.click();
-    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'accept');
+    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'carry');
   });
 });

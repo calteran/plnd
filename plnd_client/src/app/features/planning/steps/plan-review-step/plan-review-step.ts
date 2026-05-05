@@ -4,7 +4,7 @@ import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { CarryoverDecision } from '../../../../core/models/week-plan';
 import { formatDate, formatWeekDate } from '../../utils/date-format.utils';
 
-const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
+const DECISION_CYCLE: CarryoverDecision[] = ['carry', 'defer', 'drop'];
 const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
 
 @Component({
@@ -74,7 +74,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
                       justify-content: space-between; background: none; }
     .caret { opacity: 0.5; font-size: 9px; }
 
-    .decision-badge[data-decision="accept"] {
+    .decision-badge[data-decision="carry"] {
       background: var(--color-success-light);
       border-color: var(--color-success-border);
       color: var(--color-success);
@@ -84,7 +84,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
       border-color: var(--color-accent-border);
       color: var(--color-accent-dark);
     }
-    .decision-badge[data-decision="dismiss"] {
+    .decision-badge[data-decision="drop"] {
       background: var(--color-destructive-light);
       border-color: var(--color-destructive-border);
       color: var(--color-destructive);
@@ -121,7 +121,7 @@ export class PlanReviewStepComponent implements OnInit {
   }
 
   displayDecision(entryId: string): CarryoverDecision {
-    return this.weekPlanService.carryoverDecisions()[entryId] ?? 'accept';
+    return this.weekPlanService.carryoverDecisions()[entryId] ?? 'carry';
   }
 
   decide(entryId: string): void {

@@ -85,9 +85,9 @@ pub struct PlanEntryRequest {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum CarryoverDecision {
-    Accept,
+    Carry,
     Defer,
-    Dismiss,
+    Drop,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]

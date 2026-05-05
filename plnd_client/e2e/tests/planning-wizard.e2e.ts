@@ -201,43 +201,43 @@ test.describe('Planning Wizard', () => {
         await expect(items.nth(2).locator('.item-date')).toContainText('Mar 23');
       });
 
-      test('decision badges default to Accept for all items', async ({ page }) => {
+      test('decision badges default to Carry for all items', async ({ page }) => {
         const badges = page.locator('.decision-badge');
         await expect(badges).toHaveCount(3);
         for (let i = 0; i < 3; i++) {
-          await expect(badges.nth(i)).toHaveAttribute('data-decision', 'accept');
-          await expect(badges.nth(i)).toContainText('Accept');
+          await expect(badges.nth(i)).toHaveAttribute('data-decision', 'carry');
+          await expect(badges.nth(i)).toContainText('Carry');
         }
       });
 
-      test('clicking badge cycles Accept → Defer → Dismiss → Accept', async ({ page }) => {
+      test('clicking badge cycles Carry → Defer → Drop → Carry', async ({ page }) => {
         const badge = page.locator('.decision-badge').first();
 
-        // Initial state: Accept
-        await expect(badge).toHaveAttribute('data-decision', 'accept');
+        // Initial state: Carry
+        await expect(badge).toHaveAttribute('data-decision', 'carry');
 
-        // Click 1: Accept → Defer
+        // Click 1: Carry → Defer
         await badge.click();
         await expect(badge).toHaveAttribute('data-decision', 'defer');
         await expect(badge).toContainText('Defer');
 
-        // Click 2: Defer → Dismiss
+        // Click 2: Defer → Drop
         await badge.click();
-        await expect(badge).toHaveAttribute('data-decision', 'dismiss');
-        await expect(badge).toContainText('Dismiss');
+        await expect(badge).toHaveAttribute('data-decision', 'drop');
+        await expect(badge).toContainText('Drop');
 
-        // Click 3: Dismiss → Accept (wraps around)
+        // Click 3: Drop → Carry (wraps around)
         await badge.click();
-        await expect(badge).toHaveAttribute('data-decision', 'accept');
-        await expect(badge).toContainText('Accept');
+        await expect(badge).toHaveAttribute('data-decision', 'carry');
+        await expect(badge).toContainText('Carry');
       });
 
       test('carryover decisions persist when navigating to Step 2 and back', async ({ page }) => {
-        // Change first item to Defer, second to Dismiss
+        // Change first item to Defer, second to Drop
         const badges = page.locator('.decision-badge');
-        await badges.nth(0).click(); // accept → defer
-        await badges.nth(1).click(); // accept → defer
-        await badges.nth(1).click(); // defer  → dismiss
+        await badges.nth(0).click(); // carry → defer
+        await badges.nth(1).click(); // carry → defer
+        await badges.nth(1).click(); // defer  → drop
 
         // Navigate to Step 2
         await page.getByLabel('Next step').click();
@@ -249,8 +249,8 @@ test.describe('Planning Wizard', () => {
 
         // Decisions should still be set
         await expect(page.locator('.decision-badge').nth(0)).toHaveAttribute('data-decision', 'defer');
-        await expect(page.locator('.decision-badge').nth(1)).toHaveAttribute('data-decision', 'dismiss');
-        await expect(page.locator('.decision-badge').nth(2)).toHaveAttribute('data-decision', 'accept');
+        await expect(page.locator('.decision-badge').nth(1)).toHaveAttribute('data-decision', 'drop');
+        await expect(page.locator('.decision-badge').nth(2)).toHaveAttribute('data-decision', 'carry');
       });
     });
   });

@@ -213,7 +213,7 @@ pub async fn commit_plan(
     // Apply carryover decisions: update carry-over entries
     for (entry_id, decision) in &req.carryover_decisions {
         match decision {
-            CarryoverDecision::Accept => {
+            CarryoverDecision::Carry => {
                 // Reschedule to the new horizon start, keeping status 'planned'.
                 // Update both `date` and `scheduled_start` so the absolute TIMESTAMPTZ
                 // moves to the new date while preserving the wall-clock time (UTC).
@@ -242,7 +242,7 @@ pub async fn commit_plan(
                 .await
                 .map_err(DatabaseError::from)?;
             }
-            CarryoverDecision::Dismiss => {
+            CarryoverDecision::Drop => {
                 sqlx::query(
                     "UPDATE schedule_entries SET status = 'skipped', updated_at = NOW()
                      WHERE entry_id = $1 AND user_id = $2",
@@ -445,9 +445,9 @@ mod tests {
 
         let task_id = make_planning_task(&pool, uid, plan_start).await;
         let mut decisions = HashMap::new();
-        decisions.insert(id_accept, CarryoverDecision::Accept);
+        decisions.insert(id_accept, CarryoverDecision::Carry);
         decisions.insert(id_defer, CarryoverDecision::Defer);
-        decisions.insert(id_dismiss, CarryoverDecision::Dismiss);
+        decisions.insert(id_dismiss, CarryoverDecision::Drop);
 
         let req = CommitPlanInput {
             plan_start,
@@ -467,7 +467,7 @@ mod tests {
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(date_a, plan_start, "Accept should reschedule to plan_start");
+        assert_eq!(date_a, plan_start, "Carry should reschedule to plan_start");
         assert_eq!(status_a, "planned");
         assert_eq!(
             sched_a.unwrap().time(),
