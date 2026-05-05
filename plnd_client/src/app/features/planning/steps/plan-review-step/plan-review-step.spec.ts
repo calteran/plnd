@@ -30,7 +30,7 @@ describe('PlanReviewStepComponent', () => {
 
   function flush(carryover: typeof MOCK_ITEM[] = []) {
     fixture.detectChanges();
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({ entries: [], carryover });
+    httpMock.expectOne(r => r.url.includes('/schedule/plan/carryover')).flush({ carryover });
     fixture.detectChanges();
   }
 

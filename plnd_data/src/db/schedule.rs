@@ -46,6 +46,25 @@ pub async fn get_period(
     Ok(SchedulePeriodResponse { entries, carryover })
 }
 
+#[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_carryover"))]
+pub async fn get_carryover(
+    pool: &PgPool,
+    user_id: Uuid,
+    before: NaiveDate,
+) -> Result<Vec<ScheduleEntry>, DatabaseError> {
+    sqlx::query_as::<_, ScheduleEntry>(&format!(
+        "SELECT {ENTRY_COLS} FROM schedule_entries
+         WHERE user_id = $1 AND date < $2
+           AND status IN ('planned', 'deferred')
+         ORDER BY date, scheduled_start"
+    ))
+    .bind(user_id)
+    .bind(before)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_plan_status"))]
 pub async fn get_plan_status(
     pool: &PgPool,

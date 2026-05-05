@@ -39,4 +39,10 @@ pub trait ScheduleRepository: Send + Sync {
         entry_id: Uuid,
         status: &str,
     ) -> Result<(), crate::Error>;
+
+    async fn get_carryover(
+        &self,
+        user_id: Uuid,
+        before: NaiveDate,
+    ) -> Result<Vec<ScheduleEntry>, crate::Error>;
 }

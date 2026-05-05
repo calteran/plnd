@@ -115,6 +115,10 @@ export interface SchedulePeriodResponse {
   carryover: ScheduleEntryDto[];
 }
 
+export interface CarryoverApiResponse {
+  carryover: ScheduleEntryDto[];
+}
+
 export interface PlanStatusResponse {
   planned: boolean;
   entry_count: number;

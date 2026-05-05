@@ -27,7 +27,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
         <div class="empty-state">
           <span class="empty-emoji" aria-hidden="true">{{ emptyStateEmoji }}</span>
           <p class="empty-heading">All caught up!</p>
-          <p class="empty-sub">No unfinished items from last week to review.</p>
+          <p class="empty-sub">No incomplete tasks to carry over.</p>
         </div>
       } @else {
         <ul class="carryover-list">
@@ -116,7 +116,7 @@ export class PlanReviewStepComponent implements OnInit {
       return;
     }
     this.weekPlanService
-      .loadPeriod(this.weekPlanService.planStart(), this.weekPlanService.planEnd())
+      .loadCarryover(this.weekPlanService.planStart())
       .subscribe({ next: () => (this.loading = false), error: () => (this.loading = false) });
   }
 

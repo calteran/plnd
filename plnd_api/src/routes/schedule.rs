@@ -1,5 +1,6 @@
 use crate::api_response::{
-    PlanStatusApiResponse, PostSchedulePlanApiResponse, SchedulePeriodApiResponse,
+    CarryoverApiResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
+    SchedulePeriodApiResponse,
 };
 use crate::auth::jwt::Claims;
 use crate::models::{
@@ -26,6 +27,11 @@ use uuid::Uuid;
 pub struct PeriodQuery {
     pub start: NaiveDate,
     pub end: NaiveDate,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CarryoverParams {
+    pub before: NaiveDate,
 }
 
 // ---------------------------------------------------------------------------
@@ -150,6 +156,45 @@ pub async fn get_period(
         .map_err(|e| {
             tracing::error!(error = %e, "get_period error");
             StatusCode::INTERNAL_SERVER_ERROR
+        })
+}
+
+#[utoipa::path(
+    get,
+    path = "/schedule/plan/carryover",
+    tag = "Schedule",
+    params(
+        ("before" = NaiveDate, Query, description = "Fetch all incomplete tasks before this date (YYYY-MM-DD)"),
+    ),
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 200, description = "Carryover items", body = CarryoverApiResponse),
+        (status = 400, description = "Missing or invalid 'before' parameter"),
+        (status = 401, description = "Unauthorized"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+pub async fn get_plan_carryover(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Query(params): Query<CarryoverParams>,
+) -> Result<Json<CarryoverApiResponse>, StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    state
+        .repos
+        .schedule
+        .get_carryover(user_id, params.before)
+        .await
+        .map(CarryoverApiResponse::from)
+        .map(Json)
+        .map_err(|e| match e {
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            _ => {
+                tracing::error!(error = %e, "get_plan_carryover error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         })
 }
 

@@ -10,10 +10,10 @@ async function seedWizard(page: Page): Promise<void> {
   await page.route(`${API_BASE}/tasks/weekly-plan**`, route =>
     route.fulfill({ status: 200, json: { task_id: 'test-planning-task' } })
   );
-  await page.route(`${API_BASE}/schedule/period**`, route =>
+  await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
     route.fulfill({
       status: 200,
-      json: { carryover: [], entries: [] },
+      json: { carryover: [] },
     })
   );
   // Step 3 (Meals) auto-generates via the agent when no meals are stored.
@@ -158,11 +158,11 @@ test.describe('Planning Wizard', () => {
 
     async function seedWizardWithCarryover(page: Page): Promise<void> {
       await seedWizard(page);
-      // Override period route (LIFO — this handler runs before seedWizard's empty mock)
-      await page.route(`${API_BASE}/schedule/period**`, route =>
+      // Override carryover route (LIFO — this handler runs before seedWizard's empty mock)
+      await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
         route.fulfill({
           status: 200,
-          json: { entries: [], carryover: MOCK_CARRYOVER },
+          json: { carryover: MOCK_CARRYOVER },
         })
       );
     }

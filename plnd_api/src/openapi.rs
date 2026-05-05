@@ -2,12 +2,12 @@ use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
 use crate::api_response::{
-    CatalogDishIngredientResponse, CatalogIngredientResponse, CatalogMealDishResponse,
-    DayTypeResponse, DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse,
-    MealHabitResponse, MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
-    RoutineResponse, ScheduleEntryResponse, SchedulePeriodApiResponse, TaskResponse,
-    UserDishPrefDetailResponse, UserIngredientPrefResponse, UserMealPrefDetailResponse,
-    UserPreferencesResponse, UserResponse,
+    CarryoverApiResponse, CatalogDishIngredientResponse, CatalogIngredientResponse,
+    CatalogMealDishResponse, DayTypeResponse, DietaryRestrictionResponse, DishDetailApiResponse,
+    MealDetailApiResponse, MealHabitResponse, MealSuggestionResponse, PlanStatusApiResponse,
+    PostSchedulePlanApiResponse, RoutineResponse, ScheduleEntryResponse, SchedulePeriodApiResponse,
+    TaskResponse, UserDishPrefDetailResponse, UserIngredientPrefResponse,
+    UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealHabitRequest, MealAdhocResolveRequest,
@@ -116,6 +116,7 @@ impl Modify for BearerSecurityAddon {
         crate::routes::meal_suggestions::get_suggestions,
         // Schedule
         crate::routes::schedule::get_period,
+        crate::routes::schedule::get_plan_carryover,
         crate::routes::schedule::get_plan_status,
         crate::routes::schedule::post_plan,
         crate::routes::schedule::patch_entry_status,
@@ -164,6 +165,7 @@ impl Modify for BearerSecurityAddon {
         TaskResponse,
         // Schedule
         ScheduleEntryResponse,
+        CarryoverApiResponse,
         SchedulePeriodApiResponse,
         PlanStatusApiResponse,
         PostSchedulePlanApiResponse,

@@ -1,12 +1,12 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, noop, of, switchMap, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, noop, of, switchMap, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
 import {
-  CarryoverDecision, MealEntry, MealNutrition, MealPlanState, MealRef, MealSlot,
-  PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
+  CarryoverApiResponse, CarryoverDecision, MealEntry, MealNutrition, MealPlanState, MealRef,
+  MealSlot, PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
-  PlanStatusResponse, SchedulePeriodResponse,
+  PlanStatusResponse, ScheduleEntryDto, SchedulePeriodResponse,
   STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
 import { TaskType } from '../models/routine';
@@ -142,6 +142,15 @@ export class WeekPlanService {
           if (Object.keys(meals).length) this.scheduledMealsSignal.set(meals);
         }
       }));
+  }
+
+  loadCarryover(before: string): Observable<ScheduleEntryDto[]> {
+    return this.http
+      .get<CarryoverApiResponse>(`${this.apiBase}/schedule/plan/carryover?before=${before}`)
+      .pipe(
+        tap(resp => this.carryoverItemsSignal.set(resp.carryover)),
+        map(resp => resp.carryover),
+      );
   }
 
   checkPlanStatus(start: string, end: string): void {
