@@ -275,7 +275,10 @@ mod tests {
         ] {
             assert!(VALID_TASK_TYPES.contains(t), "missing task_type: {t}");
         }
-        assert!(!VALID_TASK_TYPES.contains(&"meal"), "meal must not be a task type");
+        assert!(
+            !VALID_TASK_TYPES.contains(&"meal"),
+            "meal must not be a task type"
+        );
         assert!(!VALID_TASK_TYPES.contains(&"invalid"));
     }
 

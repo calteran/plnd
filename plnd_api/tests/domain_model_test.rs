@@ -19,7 +19,10 @@ use plnd_data::models::{
 #[test]
 fn test_valid_task_types_has_six_values() {
     assert_eq!(VALID_TASK_TYPES.len(), 6);
-    assert!(!VALID_TASK_TYPES.contains(&"meal"), "meal is no longer a task type");
+    assert!(
+        !VALID_TASK_TYPES.contains(&"meal"),
+        "meal is no longer a task type"
+    );
     assert!(VALID_TASK_TYPES.contains(&"exercise"));
     assert!(VALID_TASK_TYPES.contains(&"work"));
     assert!(VALID_TASK_TYPES.contains(&"leisure"));

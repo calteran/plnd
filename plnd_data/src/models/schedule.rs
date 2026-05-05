@@ -88,7 +88,7 @@ pub struct CommitPlanInput {
 #[derive(Debug, Clone)]
 pub struct PlanEntryInput {
     pub date: NaiveDate,
-    pub task_type: Option<String>,  // None for meal anchor entries
+    pub task_type: Option<String>, // None for meal anchor entries
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
