@@ -10,7 +10,6 @@ pub mod memory;
 pub mod preferences;
 pub mod routine;
 pub mod schedule;
-pub mod schedule_type;
 pub mod session;
 pub mod task;
 pub mod user;

@@ -1,8 +1,8 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish, DayType,
-    DietaryRestriction, MealHabit, MealSuggestion, Routine, ScheduleEntry, Task,
-    User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
+    DietaryRestriction, MealHabit, MealSuggestion, Routine, ScheduleEntry, Task, User,
+    UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
 };
 use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
