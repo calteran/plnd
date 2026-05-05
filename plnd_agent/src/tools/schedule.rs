@@ -751,13 +751,15 @@ mod tests {
             items["properties"].get("after_anchor").is_some(),
             "after_anchor must be a declared property"
         );
-        let variants: Vec<_> = items["properties"]["after_anchor"]["enum"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter_map(|v| v.as_str())
-            .collect();
-        assert_eq!(variants, vec!["breakfast", "lunch", "dinner"]);
+        assert!(
+            items["properties"]["after_anchor"].get("enum").is_none(),
+            "after_anchor must NOT have a hardcoded enum — it accepts any slot label"
+        );
+        assert_eq!(
+            items["properties"]["after_anchor"]["type"].as_str(),
+            Some("string"),
+            "after_anchor must be typed as a free-form string"
+        );
     }
 
     #[tokio::test]
