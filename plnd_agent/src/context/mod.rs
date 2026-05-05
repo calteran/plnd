@@ -92,7 +92,7 @@ const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
       "additionalProperties": false,
       "properties": {
         "date":                 { "type": "string", "format": "date" },
-        "occasion":             { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+        "occasion":             { "type": "string", "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot)" },
         "meal_ref":             { "$ref": "#/definitions/MealRef" },
         "estimated_nutrition":  { "$ref": "#/definitions/Nutrition" }
       }
@@ -149,7 +149,7 @@ const SUGGEST_SLOT_RESPONSE_SCHEMA: &str = r##"{
   "additionalProperties": false,
   "properties": {
     "date":                { "type": "string", "format": "date" },
-    "occasion":            { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+    "occasion":            { "type": "string", "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot)" },
     "meal_ref":            { "$ref": "#/definitions/MealRef" },
     "estimated_nutrition": { "$ref": "#/definitions/Nutrition" }
   },
@@ -569,14 +569,15 @@ mod tests {
     }
 
     #[test]
-    fn suggest_slot_validator_rejects_invalid_occasion() {
+    fn suggest_slot_validator_accepts_user_defined_occasion() {
+        // occasion is now an open string — any slot name from the user's meal pattern is valid
         let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
-        let bad = serde_json::json!({
+        let ok = serde_json::json!({
             "date": "2026-04-21",
             "occasion": "brunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         });
-        assert!(!validator.is_valid(&bad));
+        assert!(validator.is_valid(&ok), "user-defined occasion name must be accepted");
     }
 
     #[test]
@@ -629,9 +630,10 @@ mod tests {
     }
 
     #[test]
-    fn meal_plan_validator_rejects_invalid_occasion() {
+    fn meal_plan_validator_accepts_user_defined_occasion() {
+        // occasion is now an open string — any slot name from the user's meal pattern is valid
         let validator = UseCase::MealPlanning.response_validator().unwrap();
-        let bad = serde_json::json!({
+        let ok = serde_json::json!({
             "plan_start": "2026-04-21",
             "meals": [
                 {
@@ -642,8 +644,8 @@ mod tests {
             ]
         });
         assert!(
-            !validator.is_valid(&bad),
-            "unknown occasion must be rejected"
+            validator.is_valid(&ok),
+            "user-defined occasion name must be accepted"
         );
     }
 
