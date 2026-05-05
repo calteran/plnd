@@ -531,7 +531,6 @@ fn test_schedule_entry_serde_with_after_anchor() {
         "status": "planned",
         "actual_start": null,
         "actual_end": null,
-        "family_meal_id": null,
         "after_anchor": "breakfast",
         "after_entry_id": null,
         "deviation_note": null,
