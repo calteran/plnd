@@ -406,7 +406,7 @@ mod tests {
         let plan_start = today + Duration::days(1);
         let plan_end = plan_start + Duration::days(6);
 
-        // Raw-insert 3 carryover entries dated before plan_start (within lookback window)
+        // Raw-insert 3 carryover entries dated before plan_start — no horizon applies
         let carryover_date = today - Duration::days(1);
         let sched = (carryover_date.and_hms_opt(9, 0, 0).unwrap()).and_utc();
 
@@ -687,6 +687,45 @@ mod tests {
         assert!(
             e.scheduled_start.is_none(),
             "meal anchor has no scheduled_start"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // get_period — no-horizon carryover
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn test_get_period_surfaces_carryover_regardless_of_age(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let plan_start = tomorrow();
+        let plan_end = plan_start + Duration::days(6);
+
+        // Raw-insert an entry dated 200 days before plan_start — well beyond any
+        // former 90-day lookback cap.
+        let old_date = plan_start - Duration::days(200);
+        let old_sched = old_date.and_hms_opt(9, 0, 0).unwrap().and_utc();
+
+        sqlx::query(
+            "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
+             VALUES ($1, 'work', 'ancient-planned', $2, $3, 'planned')",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(old_sched)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let period = get_period(&pool, uid, plan_start, plan_end).await.unwrap();
+
+        assert_eq!(
+            period.carryover.len(),
+            1,
+            "entry 200 days old must appear in carryover — no date floor is applied"
+        );
+        assert_eq!(
+            period.carryover[0].title.as_deref(),
+            Some("ancient-planned"),
         );
     }
 }
