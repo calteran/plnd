@@ -30,6 +30,7 @@ pub async fn seed_dev_user(pool: &PgPool) -> Result<(), SeedError> {
     let user_id = insert_user(&mut tx).await?;
     insert_oauth_provider(&mut tx, user_id).await?;
     insert_preferences(&mut tx, user_id).await?;
+    insert_meal_pattern_entries(&mut tx, user_id).await?;
     let user_dish_ids = fork_catalog_dishes(&mut tx, user_id).await?;
     fork_catalog_meals(&mut tx, user_id, &user_dish_ids).await?;
     seed_schedule(&mut tx, user_id).await?;
@@ -76,6 +77,30 @@ async fn insert_preferences(tx: &mut PgConnection, user_id: Uuid) -> Result<(), 
     .bind(user_id)
     .execute(tx)
     .await?;
+    Ok(())
+}
+
+async fn insert_meal_pattern_entries(tx: &mut PgConnection, user_id: Uuid) -> Result<(), SeedError> {
+    let entries: &[(&str, &str, i32, i32)] = &[
+        ("breakfast", "08:00:00", 60, 1),
+        ("lunch",     "12:00:00", 60, 2),
+        ("dinner",    "18:00:00", 60, 3),
+    ];
+    for (name, preferred_time, tolerance_minutes, sort_order) in entries {
+        sqlx::query(
+            "INSERT INTO meal_pattern_entries
+                 (entry_id, user_id, name, preferred_time, tolerance_minutes, sort_order)
+             VALUES ($1, $2, $3, $4::time, $5, $6)",
+        )
+        .bind(Uuid::new_v4())
+        .bind(user_id)
+        .bind(name)
+        .bind(preferred_time)
+        .bind(tolerance_minutes)
+        .bind(sort_order)
+        .execute(&mut *tx)
+        .await?;
+    }
     Ok(())
 }
 

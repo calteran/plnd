@@ -15,8 +15,17 @@ const STEP3_AGENT_MEALS = STEP3_MEAL_DAYS.flatMap(date =>
   }))
 );
 
+const MOCK_MEAL_PATTERN = [
+  { id: 'mp1', user_id: 'test', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp2', user_id: 'test', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp3', user_id: 'test', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, created_at: '2026-01-01T00:00:00Z' },
+];
+
 async function seedWizard(page: Page): Promise<void> {
   await seedAuth(page);
+  await page.route(`${API_BASE}/meal-pattern`, route =>
+    route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
+  );
   await page.route(`${API_BASE}/preferences/me`, route =>
     route.fulfill({ status: 200, json: MOCK_PREFS_3DAY })
   );
