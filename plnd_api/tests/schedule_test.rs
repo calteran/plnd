@@ -1,7 +1,7 @@
-use chrono::{Duration, NaiveDate, NaiveTime};
+use chrono::{NaiveDate, NaiveTime};
 use plnd_api::models::{PlanEntryRequest, PostSchedulePlanRequest};
 use plnd_api::routes::schedule::PeriodQuery;
-use plnd_data::models::CARRYOVER_LOOKBACK_DAYS;
+
 use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
@@ -86,19 +86,19 @@ fn test_post_schedule_plan_response_serde() {
 }
 
 #[test]
-fn test_carryover_lookback_window_boundary() {
-    // Carryover entries are bounded to CARRYOVER_LOOKBACK_DAYS before the period start.
-    // This verifies the date arithmetic using the real constant so the test stays in
-    // sync if the window is ever changed.
+fn test_carryover_no_lookback_horizon() {
+    // There is no lookback horizon for carryover — all planned/deferred entries
+    // before the period start are eligible, regardless of age (§4.10).
     let start = NaiveDate::from_ymd_opt(2026, 4, 1).unwrap();
-    let lookback = start - Duration::days(CARRYOVER_LOOKBACK_DAYS);
-    assert_eq!(lookback, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
-    // A day within the window should be included (>= lookback and < start)
-    let within_window = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
-    assert!(within_window >= lookback && within_window < start);
-    // A day before the window should be excluded
-    let before_window = NaiveDate::from_ymd_opt(2025, 12, 31).unwrap();
-    assert!(before_window < lookback);
+    // An entry well within a former 90-day window should be included
+    let recent = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
+    assert!(recent < start, "recent entry is before period start");
+    // An entry older than 90 days should also be included — no horizon
+    let old_entry = NaiveDate::from_ymd_opt(2025, 12, 31).unwrap();
+    assert!(
+        old_entry < start,
+        "old entry is also before period start and must not be excluded"
+    );
 }
 
 #[test]

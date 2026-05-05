@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::models::{CARRYOVER_LOOKBACK_DAYS, CarryoverDecision, CommitPlanInput, ScheduleEntry};
+use crate::models::{CarryoverDecision, CommitPlanInput, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 const ENTRY_COLS: &str =
@@ -31,16 +31,14 @@ pub async fn get_period(
     .await
     .map_err(DatabaseError::from)?;
 
-    let carryover_start = start - chrono::Duration::days(CARRYOVER_LOOKBACK_DAYS);
     let carryover: Vec<ScheduleEntry> = sqlx::query_as::<_, ScheduleEntry>(&format!(
         "SELECT {ENTRY_COLS} FROM schedule_entries
-         WHERE user_id = $1 AND date < $2 AND date >= $3
+         WHERE user_id = $1 AND date < $2
            AND status IN ('planned', 'deferred')
          ORDER BY date, scheduled_start"
     ))
     .bind(user_id)
     .bind(start)
-    .bind(carryover_start)
     .fetch_all(pool)
     .await
     .map_err(DatabaseError::from)?;
