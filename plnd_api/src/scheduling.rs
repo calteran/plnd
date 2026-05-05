@@ -82,7 +82,6 @@ fn date_matches_recurrence(date: NaiveDate, rule: &str) -> bool {
     }
 }
 
-
 fn weekday_from_abbrev(abbrev: &str) -> Option<Weekday> {
     match abbrev {
         "MO" => Some(Weekday::Mon),
