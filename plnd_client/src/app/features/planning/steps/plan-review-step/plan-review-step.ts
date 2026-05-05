@@ -1,10 +1,10 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { CarryoverDecision } from '../../../../core/models/week-plan';
+import { CarryoverDecision, DROP_REASONS, DropReason } from '../../../../core/models/week-plan';
 import { formatDate, formatWeekDate } from '../../utils/date-format.utils';
 
-const DECISION_CYCLE: CarryoverDecision[] = ['accept', 'defer', 'dismiss'];
+const DECISION_CYCLE: CarryoverDecision[] = ['carry', 'defer', 'drop'];
 const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
 
 @Component({
@@ -27,7 +27,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
         <div class="empty-state">
           <span class="empty-emoji" aria-hidden="true">{{ emptyStateEmoji }}</span>
           <p class="empty-heading">All caught up!</p>
-          <p class="empty-sub">No unfinished items from last week to review.</p>
+          <p class="empty-sub">No incomplete tasks to carry over.</p>
         </div>
       } @else {
         <ul class="carryover-list">
@@ -42,6 +42,19 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
                 {{ displayDecision(item.entry_id) | titlecase }}
                 <span class="caret">▾</span>
               </button>
+              @if (displayDecision(item.entry_id) === 'drop') {
+                <div class="reason-row">
+                  @for (reason of DROP_REASONS; track reason) {
+                    <button type="button"
+                            class="reason-chip"
+                            [class.selected]="displayReason(item.entry_id) === reason"
+                            [attr.aria-pressed]="displayReason(item.entry_id) === reason"
+                            (click)="selectReason(item.entry_id, reason)">
+                      {{ reason }}
+                    </button>
+                  }
+                </div>
+              }
             </li>
           }
         </ul>
@@ -56,7 +69,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
                       border: 1.5px solid var(--color-border-row); border-radius: 10px;
                       overflow: hidden; background: var(--color-surface-white); }
     .carryover-item { display: flex; align-items: center; gap: 9px;
-                      padding: 11px 13px;
+                      padding: 11px 13px; flex-wrap: wrap;
                       border-bottom: 1px solid var(--color-border-row); }
     .carryover-item:last-child { border-bottom: none; }
     .item-title { flex: 1; font-size: 13px; color: var(--color-text-body); }
@@ -74,7 +87,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
                       justify-content: space-between; background: none; }
     .caret { opacity: 0.5; font-size: 9px; }
 
-    .decision-badge[data-decision="accept"] {
+    .decision-badge[data-decision="carry"] {
       background: var(--color-success-light);
       border-color: var(--color-success-border);
       color: var(--color-success);
@@ -84,11 +97,22 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
       border-color: var(--color-accent-border);
       color: var(--color-accent-dark);
     }
-    .decision-badge[data-decision="dismiss"] {
+    .decision-badge[data-decision="drop"] {
       background: var(--color-destructive-light);
       border-color: var(--color-destructive-border);
       color: var(--color-destructive);
     }
+
+    /* ── Drop reason chips ───────────────────────────────── */
+    .reason-row { display: flex; flex-wrap: wrap; gap: 5px;
+                  padding: 6px 13px 10px; width: 100%; }
+    .reason-chip { font-size: 10px; font-weight: 600; border-radius: 20px;
+                   padding: 3px 9px; border: 1.5px solid var(--color-border-row);
+                   background: var(--color-surface-white); color: var(--color-text-muted);
+                   cursor: pointer; }
+    .reason-chip.selected { background: var(--color-destructive-light);
+                            border-color: var(--color-destructive-border);
+                            color: var(--color-destructive); }
 
     /* ── Loading ─────────────────────────────────── */
     .loading-text { font-size: 12px; color: var(--color-text-muted); }
@@ -109,6 +133,7 @@ export class PlanReviewStepComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   loading = true;
   readonly emptyStateEmoji = EMPTY_STATE_EMOJIS[Math.floor(Math.random() * EMPTY_STATE_EMOJIS.length)];
+  readonly DROP_REASONS = DROP_REASONS;
 
   ngOnInit(): void {
     if (!this.weekPlanService.planStart() || !this.weekPlanService.planEnd()) {
@@ -116,12 +141,20 @@ export class PlanReviewStepComponent implements OnInit {
       return;
     }
     this.weekPlanService
-      .loadPeriod(this.weekPlanService.planStart(), this.weekPlanService.planEnd())
+      .loadCarryover(this.weekPlanService.planStart())
       .subscribe({ next: () => (this.loading = false), error: () => (this.loading = false) });
   }
 
   displayDecision(entryId: string): CarryoverDecision {
-    return this.weekPlanService.carryoverDecisions()[entryId] ?? 'accept';
+    return this.weekPlanService.carryoverDecisions()[entryId] ?? 'carry';
+  }
+
+  displayReason(entryId: string): string | null {
+    return this.weekPlanService.dropReasons()[entryId] ?? null;
+  }
+
+  selectReason(entryId: string, reason: DropReason): void {
+    this.weekPlanService.setDropReason(entryId, reason);
   }
 
   decide(entryId: string): void {

@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::models::{CARRYOVER_LOOKBACK_DAYS, CarryoverDecision, CommitPlanInput, ScheduleEntry};
+use crate::models::{CarryoverDecision, CommitPlanInput, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 const ENTRY_COLS: &str =
@@ -31,21 +31,28 @@ pub async fn get_period(
     .await
     .map_err(DatabaseError::from)?;
 
-    let carryover_start = start - chrono::Duration::days(CARRYOVER_LOOKBACK_DAYS);
-    let carryover: Vec<ScheduleEntry> = sqlx::query_as::<_, ScheduleEntry>(&format!(
+    let carryover = get_carryover(pool, user_id, start).await?;
+
+    Ok(SchedulePeriodResponse { entries, carryover })
+}
+
+#[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_carryover"))]
+pub async fn get_carryover(
+    pool: &PgPool,
+    user_id: Uuid,
+    before: NaiveDate,
+) -> Result<Vec<ScheduleEntry>, DatabaseError> {
+    sqlx::query_as::<_, ScheduleEntry>(&format!(
         "SELECT {ENTRY_COLS} FROM schedule_entries
-         WHERE user_id = $1 AND date < $2 AND date >= $3
+         WHERE user_id = $1 AND date < $2
            AND status IN ('planned', 'deferred')
          ORDER BY date, scheduled_start"
     ))
     .bind(user_id)
-    .bind(start)
-    .bind(carryover_start)
+    .bind(before)
     .fetch_all(pool)
     .await
-    .map_err(DatabaseError::from)?;
-
-    Ok(SchedulePeriodResponse { entries, carryover })
+    .map_err(DatabaseError::from)
 }
 
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_plan_status"))]
@@ -215,7 +222,7 @@ pub async fn commit_plan(
     // Apply carryover decisions: update carry-over entries
     for (entry_id, decision) in &req.carryover_decisions {
         match decision {
-            CarryoverDecision::Accept => {
+            CarryoverDecision::Carry => {
                 // Reschedule to the new horizon start, keeping status 'planned'.
                 // Update both `date` and `scheduled_start` so the absolute TIMESTAMPTZ
                 // moves to the new date while preserving the wall-clock time (UTC).
@@ -244,13 +251,20 @@ pub async fn commit_plan(
                 .await
                 .map_err(DatabaseError::from)?;
             }
-            CarryoverDecision::Dismiss => {
+            CarryoverDecision::Drop => {
+                let reason = req
+                    .drop_reasons
+                    .get(entry_id)
+                    .map(String::as_str)
+                    .unwrap_or("");
                 sqlx::query(
-                    "UPDATE schedule_entries SET status = 'skipped', updated_at = NOW()
+                    "UPDATE schedule_entries
+                     SET status = 'skipped', deviation_note = NULLIF($3, ''), updated_at = NOW()
                      WHERE entry_id = $1 AND user_id = $2",
                 )
                 .bind(entry_id)
                 .bind(user_id)
+                .bind(reason)
                 .execute(&mut *tx)
                 .await
                 .map_err(DatabaseError::from)?;
@@ -361,6 +375,7 @@ mod tests {
             entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
         commit_plan(&pool, uid, &req).await.unwrap();
 
@@ -391,6 +406,7 @@ mod tests {
             ],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         let resp = commit_plan(&pool, uid, &req).await.unwrap();
@@ -408,13 +424,13 @@ mod tests {
         let plan_start = today + Duration::days(1);
         let plan_end = plan_start + Duration::days(6);
 
-        // Raw-insert 3 carryover entries dated before plan_start (within lookback window)
+        // Raw-insert 3 carryover entries dated before plan_start — no horizon applies
         let carryover_date = today - Duration::days(1);
         let sched = (carryover_date.and_hms_opt(9, 0, 0).unwrap()).and_utc();
 
-        let id_accept: Uuid = sqlx::query_scalar(
+        let id_carry: Uuid = sqlx::query_scalar(
             "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
-             VALUES ($1, 'work', 'accept-me', $2, $3, 'planned') RETURNING entry_id",
+             VALUES ($1, 'work', 'carry-me', $2, $3, 'planned') RETURNING entry_id",
         )
         .bind(uid)
         .bind(carryover_date)
@@ -434,9 +450,9 @@ mod tests {
         .await
         .unwrap();
 
-        let id_dismiss: Uuid = sqlx::query_scalar(
+        let id_drop: Uuid = sqlx::query_scalar(
             "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
-             VALUES ($1, 'work', 'dismiss-me', $2, $3, 'planned') RETURNING entry_id",
+             VALUES ($1, 'work', 'drop-me', $2, $3, 'planned') RETURNING entry_id",
         )
         .bind(uid)
         .bind(carryover_date)
@@ -447,9 +463,9 @@ mod tests {
 
         let task_id = make_planning_task(&pool, uid, plan_start).await;
         let mut decisions = HashMap::new();
-        decisions.insert(id_accept, CarryoverDecision::Accept);
+        decisions.insert(id_carry, CarryoverDecision::Carry);
         decisions.insert(id_defer, CarryoverDecision::Defer);
-        decisions.insert(id_dismiss, CarryoverDecision::Dismiss);
+        decisions.insert(id_drop, CarryoverDecision::Drop);
 
         let req = CommitPlanInput {
             plan_start,
@@ -458,6 +474,7 @@ mod tests {
             entries: vec![],
             replace: false,
             carryover_decisions: decisions,
+            drop_reasons: HashMap::new(),
         };
         commit_plan(&pool, uid, &req).await.unwrap();
 
@@ -465,11 +482,11 @@ mod tests {
             sqlx::query_as(
                 "SELECT date, status, scheduled_start FROM schedule_entries WHERE entry_id = $1",
             )
-            .bind(id_accept)
+            .bind(id_carry)
             .fetch_one(&pool)
             .await
             .unwrap();
-        assert_eq!(date_a, plan_start, "Accept should reschedule to plan_start");
+        assert_eq!(date_a, plan_start, "Carry should reschedule to plan_start");
         assert_eq!(status_a, "planned");
         assert_eq!(
             sched_a.unwrap().time(),
@@ -487,7 +504,7 @@ mod tests {
 
         let status_x: String =
             sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
-                .bind(id_dismiss)
+                .bind(id_drop)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
@@ -509,6 +526,7 @@ mod tests {
             entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
         commit_plan(&pool, uid, &initial_req).await.unwrap();
 
@@ -533,6 +551,7 @@ mod tests {
             entries: vec![bad_entry],
             replace: true,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         let result = commit_plan(&pool, uid, &bad_req).await;
@@ -584,6 +603,7 @@ mod tests {
             entries: vec![bucket_entry],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         commit_plan(&pool, uid, &req).await.unwrap();
@@ -627,6 +647,7 @@ mod tests {
             entries: vec![entry],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         commit_plan(&pool, uid, &req).await.unwrap();
@@ -672,6 +693,7 @@ mod tests {
             entries: vec![meal_entry],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         commit_plan(&pool, uid, &req).await.unwrap();
@@ -689,6 +711,45 @@ mod tests {
         assert!(
             e.scheduled_start.is_none(),
             "meal anchor has no scheduled_start"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // get_period — no-horizon carryover
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn test_get_period_surfaces_carryover_regardless_of_age(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let plan_start = tomorrow();
+        let plan_end = plan_start + Duration::days(6);
+
+        // Raw-insert an entry dated 200 days before plan_start — well beyond any
+        // former 90-day lookback cap.
+        let old_date = plan_start - Duration::days(200);
+        let old_sched = old_date.and_hms_opt(9, 0, 0).unwrap().and_utc();
+
+        sqlx::query(
+            "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
+             VALUES ($1, 'work', 'ancient-planned', $2, $3, 'planned')",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(old_sched)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let period = get_period(&pool, uid, plan_start, plan_end).await.unwrap();
+
+        assert_eq!(
+            period.carryover.len(),
+            1,
+            "entry 200 days old must appear in carryover — no date floor is applied"
+        );
+        assert_eq!(
+            period.carryover[0].title.as_deref(),
+            Some("ancient-planned"),
         );
     }
 }

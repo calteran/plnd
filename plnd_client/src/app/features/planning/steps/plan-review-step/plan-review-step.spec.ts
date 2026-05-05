@@ -30,7 +30,7 @@ describe('PlanReviewStepComponent', () => {
 
   function flush(carryover: typeof MOCK_ITEM[] = []) {
     fixture.detectChanges();
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({ entries: [], carryover });
+    httpMock.expectOne(r => r.url.includes('/schedule/plan/carryover')).flush({ carryover });
     fixture.detectChanges();
   }
 
@@ -74,16 +74,16 @@ describe('PlanReviewStepComponent', () => {
 
   // ── Decision badge default ───────────────────────────────────────────────
 
-  it('defaults to "Accept" decision before any tap', () => {
+  it('defaults to "Carry" decision before any tap', () => {
     flush([MOCK_ITEM]);
     const badge = fixture.nativeElement.querySelector('.decision-badge') as HTMLElement;
-    expect(badge.getAttribute('data-decision')).toBe('accept');
-    expect(badge.textContent).toContain('Accept');
+    expect(badge.getAttribute('data-decision')).toBe('carry');
+    expect(badge.textContent).toContain('Carry');
   });
 
   // ── Cycling behavior ─────────────────────────────────────────────────────
 
-  it('cycles Accept → Defer on first badge tap', () => {
+  it('cycles Carry → Defer on first badge tap', () => {
     spyOn(service, 'setCarryoverDecision');
     flush([MOCK_ITEM]);
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
@@ -91,7 +91,7 @@ describe('PlanReviewStepComponent', () => {
     expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'defer');
   });
 
-  it('cycles Defer → Dismiss on second badge tap', () => {
+  it('cycles Defer → Drop on second badge tap', () => {
     flush([MOCK_ITEM]);
     // Set state to defer via the real impl BEFORE spying (spy replaces without calling through)
     service.setCarryoverDecision('e1', 'defer');
@@ -99,16 +99,44 @@ describe('PlanReviewStepComponent', () => {
     spyOn(service, 'setCarryoverDecision');
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
     badge.click();
-    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'dismiss');
+    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'drop');
   });
 
-  it('cycles Dismiss → Accept on third badge tap', () => {
+  it('cycles Drop → Carry on third badge tap', () => {
     flush([MOCK_ITEM]);
-    service.setCarryoverDecision('e1', 'dismiss');
+    service.setCarryoverDecision('e1', 'drop');
     fixture.detectChanges();
     spyOn(service, 'setCarryoverDecision');
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
     badge.click();
-    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'accept');
+    expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'carry');
+  });
+
+  // ── Drop reason chips ────────────────────────────────────────────────────
+
+  it('reason row is hidden when decision is not drop', () => {
+    flush([MOCK_ITEM]);
+    // Default decision is 'carry'
+    expect(fixture.nativeElement.querySelector('.reason-row')).toBeNull();
+  });
+
+  it('reason row is shown when decision is drop', () => {
+    flush([MOCK_ITEM]);
+    service.setCarryoverDecision('e1', 'drop');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.reason-row')).not.toBeNull();
+    const chips = fixture.nativeElement.querySelectorAll('.reason-chip') as NodeListOf<HTMLElement>;
+    expect(chips.length).toBeGreaterThan(0);
+  });
+
+  it('clicking a chip calls setDropReason with correct entryId and reason', () => {
+    flush([MOCK_ITEM]);
+    service.setCarryoverDecision('e1', 'drop');
+    fixture.detectChanges();
+    spyOn(service, 'setDropReason');
+    const chip: HTMLButtonElement = fixture.nativeElement.querySelector('.reason-chip');
+    const expectedReason = chip.textContent?.trim() ?? '';
+    chip.click();
+    expect(service.setDropReason).toHaveBeenCalledWith('e1', expectedReason as Parameters<typeof service.setDropReason>[1]);
   });
 });

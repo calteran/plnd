@@ -1,4 +1,7 @@
-export type CarryoverDecision = 'defer' | 'dismiss' | 'accept';
+export type CarryoverDecision = 'carry' | 'defer' | 'drop';
+
+export const DROP_REASONS = ['Changed priority', 'No longer needed', 'Too difficult', 'Not ready'] as const;
+export type DropReason = typeof DROP_REASONS[number];
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
 export type EnergyLevel = 'low' | 'medium' | 'high';
 export type ApprovalState = 'proposed' | 'approved' | 'skipped';
@@ -95,6 +98,7 @@ export interface PlanDraftShape {
   scheduledMeals: Record<string, Partial<Record<MealSlot, PlannedMeal>>>;
   scheduledTasks: PlannedTask[];
   floatingTasks?: FloatingTask[];
+  dropReasons?: Record<string, DropReason>;
   savedAt: string;
 }
 
@@ -112,6 +116,10 @@ export interface ScheduleEntryDto {
 
 export interface SchedulePeriodResponse {
   entries: ScheduleEntryDto[];
+  carryover: ScheduleEntryDto[];
+}
+
+export interface CarryoverApiResponse {
   carryover: ScheduleEntryDto[];
 }
 
@@ -169,8 +177,10 @@ export interface PostSchedulePlanRequest {
   planning_task_id: string;
   entries: PlanEntryRequest[];
   replace?: boolean;
-  /** Carryover decisions: entry_id → "defer" | "dismiss" | "accept" */
+  /** Carryover decisions: entry_id → "carry" | "defer" | "drop" */
   carryover_decisions?: Record<string, CarryoverDecision>;
+  /** Optional reasons for 'drop' decisions. entry_id → reason string */
+  carryover_drop_reasons?: Record<string, DropReason>;
   placed_tasks?: PlanEntryRequest[];
   meal_habit_ids?: string[];
 }

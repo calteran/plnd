@@ -71,4 +71,14 @@ impl ScheduleRepository for PgScheduleRepository {
             .await
             .map_err(Into::into)
     }
+
+    async fn get_carryover(
+        &self,
+        user_id: Uuid,
+        before: NaiveDate,
+    ) -> Result<Vec<ScheduleEntry>, crate::Error> {
+        schedule::get_carryover(&self.pool, user_id, before)
+            .await
+            .map_err(Into::into)
+    }
 }

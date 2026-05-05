@@ -85,9 +85,9 @@ pub struct PlanEntryRequest {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum CarryoverDecision {
-    Accept,
+    Carry,
     Defer,
-    Dismiss,
+    Drop,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -104,6 +104,8 @@ pub struct PostSchedulePlanRequest {
     pub replace: Option<bool>,
     #[serde(default)]
     pub carryover_decisions: HashMap<Uuid, CarryoverDecision>,
+    #[serde(default)]
+    pub carryover_drop_reasons: HashMap<Uuid, String>,
     /// AI-placed one-off tasks from the Task Placement Review step.
     #[serde(default)]
     pub placed_tasks: Vec<PlanEntryRequest>,

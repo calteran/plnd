@@ -1,12 +1,12 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, noop, of, switchMap, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, noop, of, switchMap, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
 import {
-  CarryoverDecision, MealEntry, MealNutrition, MealPlanState, MealRef, MealSlot,
-  PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
+  CarryoverApiResponse, CarryoverDecision, DropReason, MealEntry, MealNutrition, MealPlanState, MealRef,
+  MealSlot, PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
-  PlanStatusResponse, SchedulePeriodResponse,
+  PlanStatusResponse, ScheduleEntryDto, SchedulePeriodResponse,
   STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
 import { TaskType } from '../models/routine';
@@ -24,10 +24,11 @@ export class WeekPlanService {
   private readonly planStartSignal            = signal<string>('');
   private readonly planEndSignal              = signal<string>('');
   private readonly currentStepSignal          = signal<number>(1);
-  private readonly carryoverItemsSignal       = signal<SchedulePeriodResponse['carryover']>([]);
+  private readonly carryoverItemsSignal       = signal<ScheduleEntryDto[]>([]);
   private readonly scheduledTasksSignal       = signal<PlannedTask[]>([]);
   private readonly scheduledMealsSignal       = signal<Record<string, Partial<Record<MealSlot, PlannedMeal>>>>({});
   private readonly carryoverDecisionsSignal   = signal<Record<string, CarryoverDecision>>({});
+  private readonly dropReasonsSignal          = signal<Record<string, DropReason>>({});
   private readonly hasUnplannedHorizonSignal  = signal<boolean>(false);
   private readonly isSubmittingSignal         = signal<boolean>(false);
   private readonly planningTaskIdSignal       = signal<string>('');
@@ -41,6 +42,7 @@ export class WeekPlanService {
   readonly scheduledTasks       = this.scheduledTasksSignal.asReadonly();
   readonly scheduledMeals       = this.scheduledMealsSignal.asReadonly();
   readonly carryoverDecisions   = this.carryoverDecisionsSignal.asReadonly();
+  readonly dropReasons          = this.dropReasonsSignal.asReadonly();
   readonly hasUnplannedHorizon  = this.hasUnplannedHorizonSignal.asReadonly();
   readonly isSubmitting         = this.isSubmittingSignal.asReadonly();
   readonly planningTaskId       = this.planningTaskIdSignal.asReadonly();
@@ -57,6 +59,7 @@ export class WeekPlanService {
       this.scheduledMealsSignal.set(draft.scheduledMeals);
       this.scheduledTasksSignal.set(draft.scheduledTasks);
       this.floatingTasksSignal.set(draft.floatingTasks ?? []);
+      if (draft.dropReasons) this.dropReasonsSignal.set(draft.dropReasons);
     } else {
       this.currentStepSignal.set(1);
       this.carryoverDecisionsSignal.set({});
@@ -81,6 +84,7 @@ export class WeekPlanService {
       scheduledMeals: this.scheduledMealsSignal(),
       scheduledTasks: this.scheduledTasksSignal(),
       floatingTasks: this.floatingTasksSignal(),
+      dropReasons: this.dropReasonsSignal(),
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(this.DRAFT_KEY, JSON.stringify(draft));
@@ -102,6 +106,7 @@ export class WeekPlanService {
     localStorage.removeItem(this.DRAFT_KEY);
   }
 
+  // Retained for re-plan mode: pre-fills scheduled tasks/meals from existing period entries.
   loadPeriod(start: string, end: string): Observable<SchedulePeriodResponse> {
     return this.http
       .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period?start=${start}&end=${end}`)
@@ -144,6 +149,15 @@ export class WeekPlanService {
       }));
   }
 
+  loadCarryover(before: string): Observable<ScheduleEntryDto[]> {
+    return this.http
+      .get<CarryoverApiResponse>(`${this.apiBase}/schedule/plan/carryover?before=${before}`)
+      .pipe(
+        tap(resp => this.carryoverItemsSignal.set(resp.carryover)),
+        map(resp => resp.carryover),
+      );
+  }
+
   checkPlanStatus(start: string, end: string): void {
     this.http
       .get<PlanStatusResponse>(`${this.apiBase}/schedule/plan/status?start=${start}&end=${end}`)
@@ -181,6 +195,22 @@ export class WeekPlanService {
 
   setCarryoverDecision(entryId: string, decision: CarryoverDecision): void {
     this.carryoverDecisionsSignal.update(d => ({ ...d, [entryId]: decision }));
+    if (decision !== 'drop') {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      this.dropReasonsSignal.update(({ [entryId]: _, ...rest }) => rest);
+    }
+  }
+
+  setDropReason(entryId: string, reason: DropReason): void {
+    this.dropReasonsSignal.update(d => {
+      // Toggle: if already selected, deselect
+      if (d[entryId] === reason) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { [entryId]: _, ...rest } = d;
+        return rest;
+      }
+      return { ...d, [entryId]: reason };
+    });
   }
 
   setMeal(date: string, slot: MealSlot, meal: PlannedMeal): void {
@@ -334,6 +364,7 @@ export class WeekPlanService {
     this.scheduledTasksSignal.set([]);
     this.scheduledMealsSignal.set({});
     this.carryoverDecisionsSignal.set({});
+    this.dropReasonsSignal.set({});
     this.hasUnplannedHorizonSignal.set(false);
     this.isSubmittingSignal.set(false);
     this.planningTaskIdSignal.set('');
@@ -401,6 +432,7 @@ export class WeekPlanService {
       entries,
       replace: replace || undefined,
       carryover_decisions: this.carryoverDecisionsSignal(),
+      carryover_drop_reasons: this.dropReasonsSignal(),
     };
   }
 }

@@ -361,6 +361,45 @@ describe('WeekPlanService', () => {
     });
   });
 
+  describe('drop reason behavior', () => {
+    beforeEach(() => {
+      service.initSession('2026-03-24', '2026-03-30');
+    });
+
+    it('setDropReason selects a reason', () => {
+      service.setDropReason('task-1', 'Changed priority');
+      expect(service.dropReasons()['task-1']).toBe('Changed priority');
+    });
+
+    it('setDropReason toggles off when same reason re-selected', () => {
+      service.setDropReason('task-1', 'No longer needed');
+      service.setDropReason('task-1', 'No longer needed');
+      expect(service.dropReasons()['task-1']).toBeUndefined();
+    });
+
+    it('setDropReason replaces when different reason selected', () => {
+      service.setDropReason('task-1', 'Changed priority');
+      service.setDropReason('task-1', 'Too difficult');
+      expect(service.dropReasons()['task-1']).toBe('Too difficult');
+    });
+
+    it('setCarryoverDecision clears drop reason when decision changes away from drop', () => {
+      service.setCarryoverDecision('task-1', 'drop');
+      service.setDropReason('task-1', 'Not ready');
+      service.setCarryoverDecision('task-1', 'carry');
+      expect(service.dropReasons()['task-1']).toBeUndefined();
+    });
+
+    it('setCarryoverDecision does not clear drop reason for other entries', () => {
+      service.setCarryoverDecision('task-1', 'drop');
+      service.setCarryoverDecision('task-2', 'drop');
+      service.setDropReason('task-1', 'Changed priority');
+      service.setDropReason('task-2', 'No longer needed');
+      service.setCarryoverDecision('task-1', 'carry');
+      expect(service.dropReasons()['task-2']).toBe('No longer needed');
+    });
+  });
+
   describe('currentState()', () => {
     it('returns a MealPlanState with all horizon days × standard slots', () => {
       service.initSession('2026-03-24', '2026-03-24');

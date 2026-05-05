@@ -23,8 +23,8 @@ async function seedWizard(page: Page): Promise<void> {
   await page.route(`${API_BASE}/tasks/weekly-plan**`, route =>
     route.fulfill({ status: 200, json: { task_id: 'test-planning-task' } })
   );
-  await page.route(`${API_BASE}/schedule/period**`, route =>
-    route.fulfill({ status: 200, json: { carryover: [], entries: [] } })
+  await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
+    route.fulfill({ json: { carryover: [] } })
   );
   // Step 3 auto-generates via agent on first entry when no meals are stored.
   await page.route(`${API_BASE}/agent/meal-plan`, route =>

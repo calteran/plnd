@@ -3,10 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-/// Maximum number of days before the period start to search for carryover entries.
-/// Older planned/deferred entries are excluded to prevent unbounded historical scans.
-pub const CARRYOVER_LOOKBACK_DAYS: i64 = 90;
-
 // ---------------------------------------------------------------------------
 // Routines (recurring patterns)
 // ---------------------------------------------------------------------------
@@ -67,9 +63,9 @@ pub struct ScheduleEntry {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CarryoverDecision {
-    Accept,
+    Carry,
     Defer,
-    Dismiss,
+    Drop,
 }
 
 /// Input to `schedule::commit_plan` — constructed from the HTTP request in plnd_api.
@@ -82,6 +78,7 @@ pub struct CommitPlanInput {
     /// Pre-resolved from the HTTP request's `Option<bool>` with a default of `false`.
     pub replace: bool,
     pub carryover_decisions: HashMap<Uuid, CarryoverDecision>,
+    pub drop_reasons: HashMap<Uuid, String>,
 }
 
 /// One schedule entry to be committed, decoded from HTTP in plnd_api.

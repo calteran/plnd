@@ -342,6 +342,10 @@ async fn main() {
         )
         .route("/tasks/weekly-plan", post(tasks::post_weekly_plan_task))
         .route("/schedule/period", get(schedule::get_period))
+        .route(
+            "/schedule/plan/carryover",
+            get(schedule::get_plan_carryover),
+        )
         .route("/schedule/plan/status", get(schedule::get_plan_status))
         .route("/schedule/plan", post(schedule::post_plan))
         .route(

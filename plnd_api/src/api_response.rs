@@ -453,6 +453,23 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
     }
 }
 
+/// API response wrapper for the carryover endpoint — all incomplete tasks before `before`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct CarryoverApiResponse {
+    pub carryover: Vec<ScheduleEntryResponse>,
+}
+
+impl From<Vec<ScheduleEntry>> for CarryoverApiResponse {
+    fn from(entries: Vec<ScheduleEntry>) -> Self {
+        Self {
+            carryover: entries
+                .into_iter()
+                .map(ScheduleEntryResponse::from)
+                .collect(),
+        }
+    }
+}
+
 /// API response wrapper for `plnd_data::query_types::SchedulePeriodResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SchedulePeriodApiResponse {
