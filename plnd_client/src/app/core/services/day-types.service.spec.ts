@@ -1,8 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { DayTypesService, bitmaskToDays, daysToBitmask } from './schedule-types.service';
-import { DayTypeResponse, CreateDayTypeRequest } from '../models/schedule-type';
+import { DayTypesService, bitmaskToDays, daysToBitmask } from './day-types.service';
+import { DayTypeResponse, CreateDayTypeRequest } from '../models/day-type';
 import { ConfigService } from './config.service';
 
 const MOCK_CONFIG = { api: { baseUrl: 'http://localhost:3000' } };

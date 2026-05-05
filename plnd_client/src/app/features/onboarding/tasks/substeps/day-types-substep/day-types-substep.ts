@@ -10,8 +10,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
-import { DayTypesService } from '../../../../../core/services/schedule-types.service';
-import { DayTypeResponse } from '../../../../../core/models/schedule-type';
+import { DayTypesService } from '../../../../../core/services/day-types.service';
+import { DayTypeResponse } from '../../../../../core/models/day-type';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 
 // Visual order of day pills: M T W T F S S (Mon–Sun, with Sun last)
@@ -91,11 +91,11 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
 }
 
 @Component({
-  selector: 'app-schedule-types-substep',
+  selector: 'app-day-types-substep',
   standalone: true,
   imports: [],
   template: `
-    <div class="schedule-types-substep">
+    <div class="day-types-substep">
 
       @for (card of cards(); track card.localId; let cardIdx = $index) {
         <div class="schedule-card">
@@ -254,7 +254,7 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
     </div>
   `,
   styles: [`
-    .schedule-types-substep {
+    .day-types-substep {
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -439,7 +439,7 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
     }
   `],
 })
-export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
+export class DayTypesSubstepComponent implements OnInit, OnDestroy {
   @Output() complete = new EventEmitter<void>();
 
   private readonly dayTypesService = inject(DayTypesService);

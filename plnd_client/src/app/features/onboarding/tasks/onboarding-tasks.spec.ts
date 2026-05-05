@@ -5,7 +5,7 @@ import { signal } from '@angular/core';
 import { OnboardingTasksComponent } from './onboarding-tasks';
 import { OnboardingStateService } from '../onboarding-state.service';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
-import { ScheduleTypesSubstepComponent } from './substeps/schedule-types-substep/schedule-types-substep';
+import { DayTypesSubstepComponent } from './substeps/day-types-substep/day-types-substep';
 import { RoutinesTasksSubstepComponent } from './substeps/routines-tasks-substep/routines-tasks-substep';
 import { TaskPlacementReviewSubstepComponent } from './substeps/task-placement-review-substep/task-placement-review-substep';
 
@@ -18,8 +18,8 @@ class PlanningPrefsStub {
   @Output() complete = new EventEmitter<void>();
 }
 
-@Component({ selector: 'app-schedule-types-substep', standalone: true, template: '' })
-class ScheduleTypesStub {
+@Component({ selector: 'app-day-types-substep', standalone: true, template: '' })
+class DayTypesStub {
   @Output() complete = new EventEmitter<void>();
 }
 
@@ -55,8 +55,8 @@ async function setup(planningPrefsComplete: boolean) {
     ],
   })
     .overrideComponent(OnboardingTasksComponent, {
-      remove: { imports: [PlanningPrefsSubstepComponent, ScheduleTypesSubstepComponent, RoutinesTasksSubstepComponent, TaskPlacementReviewSubstepComponent] },
-      add: { imports: [PlanningPrefsStub, ScheduleTypesStub, RoutinesTasksStub, TaskPlacementStub] },
+      remove: { imports: [PlanningPrefsSubstepComponent, DayTypesSubstepComponent, RoutinesTasksSubstepComponent, TaskPlacementReviewSubstepComponent] },
+      add: { imports: [PlanningPrefsStub, DayTypesStub, RoutinesTasksStub, TaskPlacementStub] },
     })
     .compileComponents();
 
@@ -206,11 +206,11 @@ describe('OnboardingTasksComponent', () => {
     expect(el).toBeTruthy();
   });
 
-  it('renders app-schedule-types-substep when activeSubstep is schedule-types', async () => {
+  it('renders app-day-types-substep when activeSubstep is schedule-types', async () => {
     const { fixture, component } = await setup(false);
     component.activeSubstep.set('schedule-types');
     fixture.detectChanges();
-    const el = fixture.nativeElement.querySelector('app-schedule-types-substep');
+    const el = fixture.nativeElement.querySelector('app-day-types-substep');
     expect(el).toBeTruthy();
   });
 

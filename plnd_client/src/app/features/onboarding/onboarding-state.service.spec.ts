@@ -6,7 +6,7 @@ import { PreferencesService } from '../../core/services/preferences.service';
 import { UserPreferences } from '../../core/models/preferences';
 import { MealEntry, PlanEntryRequest } from '../../core/models/week-plan';
 import { ScheduleTemplate } from '../../core/models/schedule-template';
-import { DayTypeResponse } from '../../core/models/schedule-type';
+import { DayTypeResponse } from '../../core/models/day-type';
 import { MealHabitResponse } from '../../core/models/meal-habit';
 
 describe('OnboardingStateService', () => {

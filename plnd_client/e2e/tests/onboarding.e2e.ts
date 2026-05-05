@@ -50,8 +50,8 @@ async function completeTasksSpoke(page: Page): Promise<void> {
   await page.locator('.btn-continue').click();
 
   // Step 2: Schedule Types
-  await expect(page.locator('.schedule-types-substep')).toBeVisible();
-  await page.locator('.schedule-types-substep .save-btn').click();
+  await expect(page.locator('.day-types-substep')).toBeVisible();
+  await page.locator('.day-types-substep .save-btn').click();
 
   // Step 3: Routines & Tasks
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
@@ -71,7 +71,7 @@ async function landAtScheduleTypes(page: Page): Promise<void> {
   await page.locator('.section-card').nth(1).click();
   await expect(page.locator('.planning-prefs')).toBeVisible();
   await page.locator('.btn-continue').click();
-  await expect(page.locator('.schedule-types-substep')).toBeVisible();
+  await expect(page.locator('.day-types-substep')).toBeVisible();
 }
 
 // Drives from hub to the Routines & Tasks substep.
@@ -82,7 +82,7 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
     route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
   );
   await landAtScheduleTypes(page);
-  await page.locator('.schedule-types-substep .save-btn').click();
+  await page.locator('.day-types-substep .save-btn').click();
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
 }
 
@@ -548,7 +548,7 @@ test.describe('Onboarding', () => {
       await expect(page.locator('.spoke-title')).toHaveText('Tasks & Routines');
 
       await expect(page.locator('.planning-prefs')).not.toBeVisible();
-      await expect(page.locator('.schedule-types-substep')).toBeVisible();
+      await expect(page.locator('.day-types-substep')).toBeVisible();
     });
   });
 

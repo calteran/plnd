@@ -4,10 +4,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
-import { ScheduleTypesSubstepComponent } from './schedule-types-substep';
-import { DayTypesService } from '../../../../../core/services/schedule-types.service';
+import { DayTypesSubstepComponent } from './day-types-substep';
+import { DayTypesService } from '../../../../../core/services/day-types.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
-import { DayTypeResponse } from '../../../../../core/models/schedule-type';
+import { DayTypeResponse } from '../../../../../core/models/day-type';
 import { PreferencesService } from '../../../../../core/services/preferences.service';
 
 const MOCK_RESPONSE: DayTypeResponse = {
@@ -41,7 +41,7 @@ function makeDayTypesSvcMock() {
   ]);
 }
 
-describe('ScheduleTypesSubstepComponent', () => {
+describe('DayTypesSubstepComponent', () => {
   async function setup(storedTypes: DayTypeResponse[] = []) {
     const stateMock = makeStateMock(storedTypes);
     const svcMock = makeDayTypesSvcMock();
@@ -54,7 +54,7 @@ describe('ScheduleTypesSubstepComponent', () => {
     };
 
     await TestBed.configureTestingModule({
-      imports: [ScheduleTypesSubstepComponent],
+      imports: [DayTypesSubstepComponent],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -65,8 +65,8 @@ describe('ScheduleTypesSubstepComponent', () => {
       ],
     }).compileComponents();
 
-    const fixture: ComponentFixture<ScheduleTypesSubstepComponent> =
-      TestBed.createComponent(ScheduleTypesSubstepComponent);
+    const fixture: ComponentFixture<DayTypesSubstepComponent> =
+      TestBed.createComponent(DayTypesSubstepComponent);
     const component = fixture.componentInstance;
     return { fixture, component, stateMock, svcMock };
   }

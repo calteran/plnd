@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ConfigService } from './config.service';
-import { DayTypeResponse, CreateDayTypeRequest } from '../models/schedule-type';
+import { DayTypeResponse, CreateDayTypeRequest } from '../models/day-type';
 
 /**
  * Converts a days bitmask to an array of day numbers.
