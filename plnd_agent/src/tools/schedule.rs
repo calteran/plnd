@@ -126,7 +126,7 @@ impl Tool for GetDayScheduleTool {
                         serde_json::Value::String(start.format("%H:%M").to_string()),
                     );
                 }
-                if let Some(bucket) = e.after_milepost {
+                if let Some(bucket) = e.after_anchor {
                     obj.insert("bucket".to_string(), serde_json::Value::String(bucket));
                 }
                 if let (Some(start), Some(end)) = (e.scheduled_start, e.scheduled_end) {

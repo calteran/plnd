@@ -7,7 +7,7 @@ use crate::models::{
     PostSchedulePlanRequest,
 };
 use crate::routes::domain_constants::{
-    VALID_AFTER_MILEPOSTS, VALID_ENERGY_LEVELS, VALID_TASK_TYPES,
+    VALID_AFTER_ANCHORS, VALID_ENERGY_LEVELS, VALID_TASK_TYPES,
 };
 use crate::scheduling::{date_matches_recurrence, is_recognised_recurrence};
 use crate::state::AppState;
@@ -38,8 +38,8 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
     if !VALID_TASK_TYPES.contains(&e.task_type.as_str()) {
         return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(ref mp) = e.after_milepost
-        && !VALID_AFTER_MILEPOSTS.contains(&mp.as_str())
+    if let Some(ref mp) = e.after_anchor
+        && !VALID_AFTER_ANCHORS.contains(&mp.as_str())
     {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -55,7 +55,7 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
         task_ref_type: e.task_ref_type,
         title: e.title,
         scheduled_start: e.scheduled_start,
-        after_milepost: e.after_milepost,
+        after_anchor: e.after_anchor,
         duration_minutes: e
             .duration_minutes
             .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
@@ -91,7 +91,7 @@ fn expand_habit_to_entries(
                 date,
                 task_type: "meal".to_string(),
                 title: Some(habit.meal_name.clone()),
-                after_milepost: Some(habit.slot.clone()),
+                after_anchor: Some(habit.slot.clone()),
                 scheduled_start: None,
                 task_ref_id: None,
                 task_ref_type: None,
@@ -383,7 +383,7 @@ mod tests {
         assert!(
             entries
                 .iter()
-                .all(|e| e.after_milepost == Some("breakfast".to_string()))
+                .all(|e| e.after_anchor == Some("breakfast".to_string()))
         );
         assert!(entries.iter().all(|e| e.scheduled_start.is_none()));
     }
@@ -450,7 +450,7 @@ mod tests {
             task_ref_type: None,
             title: Some("Test".to_string()),
             scheduled_start: None,
-            after_milepost: None,
+            after_anchor: None,
             duration_minutes: None,
             energy_required: None,
         }
@@ -466,9 +466,9 @@ mod tests {
     }
 
     #[test]
-    fn map_entry_rejects_invalid_after_milepost() {
+    fn map_entry_rejects_invalid_after_anchor() {
         let e = PlanEntryRequest {
-            after_milepost: Some("brunch".to_string()),
+            after_anchor: Some("brunch".to_string()),
             ..base_entry()
         };
         assert_eq!(map_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
@@ -487,7 +487,7 @@ mod tests {
     fn map_entry_accepts_valid_entry() {
         let e = PlanEntryRequest {
             task_type: "meal".to_string(),
-            after_milepost: Some("lunch".to_string()),
+            after_anchor: Some("lunch".to_string()),
             energy_required: Some("low".to_string()),
             ..base_entry()
         };

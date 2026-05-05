@@ -36,7 +36,7 @@ pub struct UpdateScheduleTemplateRequest {
     /// Defaults to "medium" if omitted.
     pub energy_required: Option<String>,
     /// Defaults to false if omitted.
-    pub is_milepost: Option<bool>,
+    pub is_anchor: Option<bool>,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
 }
@@ -53,7 +53,7 @@ pub struct CreateScheduleTemplateRequest {
     /// Defaults to "medium" if omitted.
     pub energy_required: Option<String>,
     /// Defaults to false if omitted.
-    pub is_milepost: Option<bool>,
+    pub is_anchor: Option<bool>,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
 }
@@ -133,7 +133,7 @@ pub async fn create_template(
             body.time_window_end,
             body.duration_minutes,
             energy,
-            body.is_milepost.unwrap_or(false),
+            body.is_anchor.unwrap_or(false),
             body.task_ref_id,
             body.task_ref_type.as_deref(),
         )
@@ -233,7 +233,7 @@ pub async fn update_template(
             body.time_window_end,
             body.duration_minutes,
             energy,
-            body.is_milepost.unwrap_or(false),
+            body.is_anchor.unwrap_or(false),
             body.task_ref_id,
             body.task_ref_type.as_deref(),
         )

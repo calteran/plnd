@@ -14,7 +14,7 @@ fn test_plan_entry_request_serde() {
         "task_ref_id": "00000000-0000-0000-0000-000000000001",
         "task_ref_type": "user_meal",
         "scheduled_start": "08:00",
-        "after_milepost": "breakfast"
+        "after_anchor": "breakfast"
     }"#;
     let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
     assert_eq!(req.task_type, "meal");
@@ -22,7 +22,7 @@ fn test_plan_entry_request_serde() {
         req.scheduled_start,
         Some(NaiveTime::from_hms_opt(8, 0, 0).unwrap())
     );
-    assert_eq!(req.after_milepost, Some("breakfast".to_string()));
+    assert_eq!(req.after_anchor, Some("breakfast".to_string()));
     assert!(req.title.is_none());
 }
 
