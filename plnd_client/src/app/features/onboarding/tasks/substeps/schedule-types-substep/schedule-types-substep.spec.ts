@@ -130,10 +130,9 @@ describe('ScheduleTypesSubstepComponent', () => {
   it('claiming a day does not affect cycle-mode cards', async () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
-    // Enable cycle mode on card 1; give it a bitmask to verify it stays untouched.
-    component.enableCycleMode(1);
-    component.updateCard(1, { days_bitmask: 0b0101 });
-    // Claim Sunday (bit 0) on card 0 — card 0 doesn't own it yet after enableCycleMode cleared card 1.
+    // Put card 1 into cycle mode with a bitmask to verify it stays untouched.
+    component.updateCard(1, { is_cycle: true, cycle_length: 1, anchor_date: null, days_bitmask: 0b0101 });
+    // Claim Sunday (bit 0) on card 0 — card 0 doesn't own it yet since card 1 is now a cycle card.
     component.toggleDay(0, 0);
     // Card 1 (cycle) should be unchanged.
     expect(component.cards()[1].days_bitmask).toBe(0b0101);
@@ -198,9 +197,9 @@ describe('ScheduleTypesSubstepComponent', () => {
     expect(fixture.nativeElement.querySelector('.remove-hint')).toBeNull();
   }));
 
-  // ── 8. "+ Add schedule type" appends a blank card ───────────────────────────
+  // ── 8. "+ Add day type" appends a blank card ────────────────────────────────
 
-  it('clicking "+ Add schedule type" appends a new blank card', async () => {
+  it('clicking "+ Add day type" appends a new blank card', async () => {
     const { fixture } = await setup();
     fixture.detectChanges();
     const addBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.add-link');
@@ -236,8 +235,8 @@ describe('ScheduleTypesSubstepComponent', () => {
   it('clicking "Non-7-day schedule?" shows cycle-length and anchor-date inputs', async () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
-    // Enable cycle mode programmatically
-    component.enableCycleMode(0);
+    // Put card 0 into cycle mode via updateCard (same path used by addCycleCard)
+    component.updateCard(0, { is_cycle: true, cycle_length: 1, anchor_date: null, days_bitmask: 0 });
     fixture.detectChanges();
     const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
     const cycleInputs: NodeListOf<HTMLInputElement> =

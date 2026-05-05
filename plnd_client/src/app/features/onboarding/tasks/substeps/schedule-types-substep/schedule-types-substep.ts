@@ -108,7 +108,7 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
               placeholder="Schedule name"
               [value]="card.name"
               (input)="updateCard(cardIdx, { name: $any($event.target).value })"
-              aria-label="Schedule type name"
+              aria-label="Day type name"
             />
             <button
               type="button"
@@ -582,15 +582,6 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
       showRemoveHint: false,
     };
     this.cards.update(list => [...list, blank]);
-  }
-
-  enableCycleMode(index: number): void {
-    this.updateCard(index, {
-      is_cycle: true,
-      cycle_length: 1,
-      anchor_date: null,
-      days_bitmask: 0,
-    });
   }
 
   disableCycleMode(index: number): void {
