@@ -16,7 +16,7 @@ pub struct Task {
     pub duration_minutes: Option<i32>,
     pub energy_required: String, // 'low' | 'medium' | 'high'
     pub status: String,          // 'planned' | 'in_progress' | 'completed' | 'skipped' | 'deferred'
-    pub is_milepost: bool,
+    pub is_anchor: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

@@ -23,7 +23,7 @@ pub trait ScheduleTemplateRepository: Send + Sync {
         time_window_end: Option<NaiveTime>,
         duration_minutes: Option<i32>,
         energy_required: &str,
-        is_milepost: bool,
+        is_anchor: bool,
         task_ref_id: Option<Uuid>,
         task_ref_type: Option<&str>,
     ) -> Result<ScheduleTemplate, crate::Error>;
@@ -43,7 +43,7 @@ pub trait ScheduleTemplateRepository: Send + Sync {
         time_window_end: Option<NaiveTime>,
         duration_minutes: Option<i32>,
         energy_required: &str,
-        is_milepost: bool,
+        is_anchor: bool,
         task_ref_id: Option<Uuid>,
         task_ref_type: Option<&str>,
     ) -> Result<Option<ScheduleTemplate>, crate::Error>;

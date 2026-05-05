@@ -9,7 +9,7 @@ use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, ScheduleP
 const ENTRY_COLS: &str =
     "entry_id, user_id, template_id, task_type, task_ref_id, task_ref_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
-     family_meal_id, after_milepost, after_entry_id, deviation_note,
+     family_meal_id, after_anchor, after_entry_id, deviation_note,
      duration_minutes, energy_required, created_at, updated_at";
 
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_period"))]
@@ -154,7 +154,7 @@ pub async fn commit_plan(
     let mut titles: Vec<Option<String>> = Vec::new();
     let mut dates: Vec<NaiveDate> = Vec::new();
     let mut scheduled_starts: Vec<Option<DateTime<Utc>>> = Vec::new();
-    let mut after_mileposts: Vec<Option<String>> = Vec::new();
+    let mut after_anchors: Vec<Option<String>> = Vec::new();
     let mut duration_minutes_vals: Vec<Option<i32>> = Vec::new();
     let mut energy_required_vals: Vec<Option<String>> = Vec::new();
 
@@ -168,7 +168,7 @@ pub async fn commit_plan(
         titles.push(entry.title.clone());
         dates.push(entry.date);
         scheduled_starts.push(scheduled_start);
-        after_mileposts.push(entry.after_milepost.clone());
+        after_anchors.push(entry.after_anchor.clone());
         duration_minutes_vals.push(entry.duration_minutes);
         energy_required_vals.push(entry.energy_required.clone());
     }
@@ -179,7 +179,7 @@ pub async fn commit_plan(
         sqlx::query(
             "INSERT INTO schedule_entries
                (user_id, task_type, task_ref_id, task_ref_type, title,
-                date, scheduled_start, status, after_milepost,
+                date, scheduled_start, status, after_anchor,
                 duration_minutes, energy_required)
              SELECT $1, unnest($2::text[]), unnest($3::uuid[]), unnest($4::text[]),
                     unnest($5::text[]), unnest($6::date[]), unnest($7::timestamptz[]),
@@ -193,7 +193,7 @@ pub async fn commit_plan(
         .bind(&titles)
         .bind(&dates)
         .bind(&scheduled_starts)
-        .bind(&after_mileposts)
+        .bind(&after_anchors)
         .bind(&duration_minutes_vals)
         .bind(&energy_required_vals)
         .execute(&mut *tx)
@@ -309,7 +309,7 @@ mod tests {
             task_ref_type: None,
             title: Some("Test task".to_string()),
             scheduled_start: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
-            after_milepost: None,
+            after_anchor: None,
             duration_minutes: None,
             energy_required: None,
         }
@@ -522,7 +522,7 @@ mod tests {
             task_ref_type: None,
             title: None,
             scheduled_start: Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
-            after_milepost: None,
+            after_anchor: None,
             duration_minutes: None,
             energy_required: None,
         };
@@ -572,7 +572,7 @@ mod tests {
             task_ref_type: None,
             title: Some("Bucket task".to_string()),
             scheduled_start: None,
-            after_milepost: Some("lunch".to_string()),
+            after_anchor: Some("lunch".to_string()),
             duration_minutes: None,
             energy_required: None,
         };
@@ -595,9 +595,9 @@ mod tests {
             "bucket task should have no scheduled_start"
         );
         assert_eq!(
-            period.entries[0].after_milepost,
+            period.entries[0].after_anchor,
             Some("lunch".to_string()),
-            "after_milepost must be preserved"
+            "after_anchor must be preserved"
         );
     }
 
@@ -615,7 +615,7 @@ mod tests {
             task_ref_type: None,
             title: Some("Timed task".to_string()),
             scheduled_start: Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
-            after_milepost: None,
+            after_anchor: None,
             duration_minutes: Some(45),
             energy_required: Some("medium".to_string()),
         };
@@ -660,7 +660,7 @@ mod tests {
             task_ref_type: None,
             title: Some("Oatmeal".to_string()),
             scheduled_start: None,
-            after_milepost: Some("breakfast".to_string()),
+            after_anchor: Some("breakfast".to_string()),
             duration_minutes: None,
             energy_required: None,
         };
@@ -682,9 +682,9 @@ mod tests {
         assert_eq!(e.task_type, "meal", "task_type must be 'meal'");
         assert_eq!(e.title.as_deref(), Some("Oatmeal"), "title must roundtrip");
         assert_eq!(
-            e.after_milepost.as_deref(),
+            e.after_anchor.as_deref(),
             Some("breakfast"),
-            "after_milepost must roundtrip"
+            "after_anchor must roundtrip"
         );
         assert!(
             e.scheduled_start.is_none(),

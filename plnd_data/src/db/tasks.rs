@@ -29,7 +29,7 @@ pub async fn create_weekly_plan_task(
     // when trigger_offset < 0 the task is scheduled before plan_start.
     let existing: Option<Task> = sqlx::query_as::<_, Task>(
         "SELECT t.task_id, t.user_id, t.title, t.task_type, t.scheduled_start,
-                t.duration_minutes, t.energy_required, t.status, t.is_milepost,
+                t.duration_minutes, t.energy_required, t.status, t.is_anchor,
                 t.created_at, t.updated_at
          FROM tasks t
          JOIN generic_tasks gt USING (task_id)
@@ -55,7 +55,7 @@ pub async fn create_weekly_plan_task(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, energy_required, status)
          VALUES ($1, 'Plan your week', 'general', $2, 'low', 'planned')
          RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
-                   energy_required, status, is_milepost, created_at, updated_at",
+                   energy_required, status, is_anchor, created_at, updated_at",
     )
     .bind(user_id)
     .bind(scheduled_start)
@@ -83,7 +83,7 @@ pub async fn create_weekly_plan_task(
 ///
 /// - `date` — the calendar date for the task (always required)
 /// - `scheduled_at` — exact start time; `None` for bucket-based placement
-/// - `after_milepost` — relative anchor (`"breakfast"` | `"lunch"` | `"dinner"`); used when `scheduled_at` is `None`
+/// - `after_anchor` — relative anchor (`"breakfast"` | `"lunch"` | `"dinner"`); used when `scheduled_at` is `None`
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip(pool), fields(table = "tasks", op = "create_user_task"))]
 pub async fn create_user_task(
@@ -94,7 +94,7 @@ pub async fn create_user_task(
     date: NaiveDate,
     scheduled_at: Option<DateTime<Utc>>,
     duration_minutes: i32,
-    after_milepost: Option<&str>,
+    after_anchor: Option<&str>,
 ) -> Result<Task, DatabaseError> {
     let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
 
@@ -102,7 +102,7 @@ pub async fn create_user_task(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, duration_minutes, energy_required, status)
          VALUES ($1, $2, 'general', $3, $4, $5, 'planned')
          RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
-                   energy_required, status, is_milepost, created_at, updated_at",
+                   energy_required, status, is_anchor, created_at, updated_at",
     )
     .bind(user_id)
     .bind(title)
@@ -126,7 +126,7 @@ pub async fn create_user_task(
         scheduled_at.map(|t| t + Duration::minutes(duration_minutes as i64));
     sqlx::query(
         "INSERT INTO schedule_entries
-           (user_id, task_type, task_ref_id, title, date, scheduled_start, scheduled_end, after_milepost, status)
+           (user_id, task_type, task_ref_id, title, date, scheduled_start, scheduled_end, after_anchor, status)
          VALUES ($1, 'general', $2, $3, $4, $5, $6, $7, 'planned')",
     )
     .bind(user_id)
@@ -135,7 +135,7 @@ pub async fn create_user_task(
     .bind(date)
     .bind(scheduled_at)
     .bind(scheduled_end)
-    .bind(after_milepost)
+    .bind(after_anchor)
     .execute(&mut *tx)
     .await
     .map_err(DatabaseError::from)?;
@@ -337,9 +337,9 @@ mod tests {
         .await
         .expect("create_user_task failed");
 
-        let (scheduled_start, after_milepost): (Option<DateTime<Utc>>, Option<String>) =
+        let (scheduled_start, after_anchor): (Option<DateTime<Utc>>, Option<String>) =
             sqlx::query_as(
-                "SELECT scheduled_start, after_milepost FROM schedule_entries
+                "SELECT scheduled_start, after_anchor FROM schedule_entries
                  WHERE task_ref_id = $1",
             )
             .bind(task.task_id)
@@ -352,9 +352,9 @@ mod tests {
             "bucket task must have no scheduled_start"
         );
         assert_eq!(
-            after_milepost,
+            after_anchor,
             Some("lunch".to_string()),
-            "after_milepost must be stored"
+            "after_anchor must be stored"
         );
     }
 }
