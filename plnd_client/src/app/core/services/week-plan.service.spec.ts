@@ -224,6 +224,18 @@ describe('WeekPlanService', () => {
       expect(planPosted).toBeTrue();
     });
 
+    it('buildCommitRequest omits task_type from meal anchor entries', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      expect(breakfast).toBeTruthy();
+      expect('task_type' in breakfast!).toBeFalse();
+      req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
+
     it('buildCommitRequest uses (slot) placeholder for a pending (no-entry) slot', () => {
       service.initSession('2026-03-24', '2026-03-24');
       service.commitPlan('task-1').subscribe();

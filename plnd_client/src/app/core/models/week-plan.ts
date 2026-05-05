@@ -100,7 +100,7 @@ export interface PlanDraftShape {
 
 export interface ScheduleEntryDto {
   entry_id: string;
-  task_type: string;
+  task_type: string | null;    // null for meal anchor entries
   task_ref_id?: string;
   task_ref_type?: string;
   title?: string;
@@ -122,7 +122,7 @@ export interface PlanStatusResponse {
 
 export interface PlanEntryRequest {
   date: string;
-  task_type: string;
+  task_type?: string;           // omit for meal anchor entries
   task_ref_id?: string;
   task_ref_type?: string;
   title?: string;

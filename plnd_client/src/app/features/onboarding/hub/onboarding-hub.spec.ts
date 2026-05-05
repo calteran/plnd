@@ -507,7 +507,7 @@ describe('OnboardingHubComponent', () => {
     expect(body.entries).toEqual([
       {
         date: '2026-05-01',
-        task_type: 'meal',
+        // task_type omitted — meal anchor entries have no task_type
         task_ref_id: 'meal-abc',
         task_ref_type: 'catalog',
         title: undefined,
@@ -516,7 +516,7 @@ describe('OnboardingHubComponent', () => {
       },
       {
         date: '2026-05-02',
-        task_type: 'meal',
+        // task_type omitted — meal anchor entries have no task_type
         task_ref_id: undefined,
         task_ref_type: undefined,
         title: 'Salad',
