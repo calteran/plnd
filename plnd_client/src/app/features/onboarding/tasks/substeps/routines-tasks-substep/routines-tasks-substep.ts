@@ -68,6 +68,7 @@ const INSPIRATION_CHIPS: InspirationChip[] = [
 /** Map an rrule string to a short human-readable chip label. */
 export function rruleToHumanLabel(rrule: string): string {
   if (rrule === 'FREQ=DAILY')   return 'daily';
+  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR') return 'weekdays';
   if (rrule === 'FREQ=WEEKLY')  return 'weekly';
   if (rrule === 'FREQ=MONTHLY') return 'monthly';
   if (rrule === 'FREQ=YEARLY')  return 'yearly';
@@ -85,6 +86,7 @@ export function rruleToHumanLabel(rrule: string): string {
 /** Parse a stored rrule string back into the form's (selectedRrule, selectedWeekDays) pair. */
 function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekDays: string[] } {
   if (rrule === 'FREQ=DAILY')   return { selectedRrule: 'FREQ=DAILY',   selectedWeekDays: [] };
+  if (rrule === 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR') return { selectedRrule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', selectedWeekDays: [] };
   if (rrule === 'FREQ=MONTHLY') return { selectedRrule: 'FREQ=MONTHLY', selectedWeekDays: [] };
   if (rrule === 'FREQ=YEARLY')  return { selectedRrule: 'FREQ=YEARLY',  selectedWeekDays: [] };
   if (rrule === 'FREQ=WEEKLY')  return { selectedRrule: 'FREQ=WEEKLY',  selectedWeekDays: [] };
