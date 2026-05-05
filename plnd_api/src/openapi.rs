@@ -3,11 +3,11 @@ use utoipa::{Modify, OpenApi};
 
 use crate::api_response::{
     CatalogDishIngredientResponse, CatalogIngredientResponse, CatalogMealDishResponse,
-    DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse, MealHabitResponse,
-    MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
-    DayTypeResponse, ScheduleEntryResponse, SchedulePeriodApiResponse, ScheduleTemplateResponse,
-    TaskResponse, UserDishPrefDetailResponse, UserIngredientPrefResponse,
-    UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
+    DayTypeResponse, DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse,
+    MealHabitResponse, MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
+    ScheduleEntryResponse, SchedulePeriodApiResponse, ScheduleTemplateResponse, TaskResponse,
+    UserDishPrefDetailResponse, UserIngredientPrefResponse, UserMealPrefDetailResponse,
+    UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealHabitRequest, MealAdhocResolveRequest,
@@ -19,9 +19,9 @@ use crate::models::{
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
     catalog_ingest::{IngestIngredientBody, IngestIngredientResponse},
+    day_types::{CreateDayTypeRequest, UpdateDayTypeRequest},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
     schedule_template::CreateScheduleTemplateRequest,
-    day_types::{CreateDayTypeRequest, UpdateDayTypeRequest},
     search::{DishSearchResponse, ExerciseSearchResponse, IngredientSearchResponse},
     user_dish_prefs::{AddIngredientBody, CreateDishBody, PatchDishBody},
     user_ingredient_prefs::UpsertIngredientPrefBody,

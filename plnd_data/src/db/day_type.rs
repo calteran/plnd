@@ -6,8 +6,7 @@ use crate::db::error::DatabaseError;
 use crate::models::DayType;
 use crate::repository::day_type::DeleteDayTypeOutcome;
 
-const COLUMNS: &str =
-    "id, user_id, name, days_bitmask, wake_time, sleep_time, is_default, \
+const COLUMNS: &str = "id, user_id, name, days_bitmask, wake_time, sleep_time, is_default, \
      is_cycle, cycle_length, anchor_date, created_at";
 
 /// List all day types for a user, ordered by created_at ascending.
@@ -203,19 +202,38 @@ mod tests {
     use crate::db::users;
 
     async fn new_user(pool: &PgPool) -> Uuid {
-        users::create(pool, &format!("{}@test.invalid", Uuid::new_v4()), None, None)
-            .await
-            .expect("failed to create test user")
-            .user_id
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
     }
 
-    fn wake() -> NaiveTime { NaiveTime::from_hms_opt(7, 0, 0).unwrap() }
-    fn sleep() -> NaiveTime { NaiveTime::from_hms_opt(22, 0, 0).unwrap() }
+    fn wake() -> NaiveTime {
+        NaiveTime::from_hms_opt(7, 0, 0).unwrap()
+    }
+    fn sleep() -> NaiveTime {
+        NaiveTime::from_hms_opt(22, 0, 0).unwrap()
+    }
 
     async fn make_type(pool: &PgPool, user_id: Uuid) -> DayType {
-        create(pool, user_id, "Weekdays", 62, wake(), sleep(), false, None, None)
-            .await
-            .expect("create failed")
+        create(
+            pool,
+            user_id,
+            "Weekdays",
+            62,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("create failed")
     }
 
     // -----------------------------------------------------------------------
@@ -232,9 +250,19 @@ mod tests {
     async fn list_for_user_returns_all_records(pool: PgPool) {
         let uid = new_user(&pool).await;
         make_type(&pool, uid).await;
-        create(&pool, uid, "Weekends", 65, wake(), sleep(), false, None, None)
-            .await
-            .unwrap();
+        create(
+            &pool,
+            uid,
+            "Weekends",
+            65,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         let result = list_for_user(&pool, uid).await.unwrap();
         assert_eq!(result.len(), 2);
@@ -268,10 +296,19 @@ mod tests {
     async fn create_second_type_sets_is_default_false(pool: PgPool) {
         let uid = new_user(&pool).await;
         make_type(&pool, uid).await;
-        let second =
-            create(&pool, uid, "Weekends", 65, wake(), sleep(), false, None, None)
-                .await
-                .unwrap();
+        let second = create(
+            &pool,
+            uid,
+            "Weekends",
+            65,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert!(!second.is_default, "second day type must not auto-default");
     }
 
@@ -294,9 +331,19 @@ mod tests {
     async fn create_cycle_type_stores_cycle_fields(pool: PgPool) {
         let uid = new_user(&pool).await;
         let anchor = chrono::NaiveDate::from_ymd_opt(2026, 1, 6).unwrap();
-        let dt = create(&pool, uid, "Cycle", 0, wake(), sleep(), true, Some(10), Some(anchor))
-            .await
-            .expect("create cycle failed");
+        let dt = create(
+            &pool,
+            uid,
+            "Cycle",
+            0,
+            wake(),
+            sleep(),
+            true,
+            Some(10),
+            Some(anchor),
+        )
+        .await
+        .expect("create cycle failed");
 
         assert!(dt.is_cycle);
         assert_eq!(dt.cycle_length, Some(10));
@@ -341,10 +388,19 @@ mod tests {
     async fn set_default_promotes_second_type(pool: PgPool) {
         let uid = new_user(&pool).await;
         let first = make_type(&pool, uid).await;
-        let second =
-            create(&pool, uid, "Weekends", 65, wake(), sleep(), false, None, None)
-                .await
-                .unwrap();
+        let second = create(
+            &pool,
+            uid,
+            "Weekends",
+            65,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert!(first.is_default);
         assert!(!second.is_default);
 
@@ -373,10 +429,21 @@ mod tests {
         let dt = make_type(&pool, uid).await;
         let new_wake = NaiveTime::from_hms_opt(6, 30, 0).unwrap();
 
-        let updated = update(&pool, dt.id, uid, "Mornings", 31, new_wake, sleep(), false, None, None)
-            .await
-            .unwrap()
-            .expect("update returned None");
+        let updated = update(
+            &pool,
+            dt.id,
+            uid,
+            "Mornings",
+            31,
+            new_wake,
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap()
+        .expect("update returned None");
 
         assert_eq!(updated.name, "Mornings");
         assert_eq!(updated.days_bitmask, 31);
@@ -386,10 +453,20 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn update_returns_none_for_unknown(pool: PgPool) {
         let uid = new_user(&pool).await;
-        let result =
-            update(&pool, Uuid::new_v4(), uid, "X", 0, wake(), sleep(), false, None, None)
-                .await
-                .unwrap();
+        let result = update(
+            &pool,
+            Uuid::new_v4(),
+            uid,
+            "X",
+            0,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert!(result.is_none());
     }
 
@@ -399,10 +476,20 @@ mod tests {
         let uid_b = new_user(&pool).await;
         let dt = make_type(&pool, uid_a).await;
 
-        let result =
-            update(&pool, dt.id, uid_b, "Hijacked", 0, wake(), sleep(), false, None, None)
-                .await
-                .unwrap();
+        let result = update(
+            &pool,
+            dt.id,
+            uid_b,
+            "Hijacked",
+            0,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert!(result.is_none());
 
         let unchanged = get_by_id(&pool, dt.id, uid_a).await.unwrap().unwrap();
@@ -419,9 +506,19 @@ mod tests {
         assert_eq!(count_for_user(&pool, uid).await.unwrap(), 0);
         make_type(&pool, uid).await;
         assert_eq!(count_for_user(&pool, uid).await.unwrap(), 1);
-        create(&pool, uid, "Weekends", 65, wake(), sleep(), false, None, None)
-            .await
-            .unwrap();
+        create(
+            &pool,
+            uid,
+            "Weekends",
+            65,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(count_for_user(&pool, uid).await.unwrap(), 2);
     }
 
@@ -433,10 +530,19 @@ mod tests {
     async fn delete_returns_deleted_when_multiple_exist(pool: PgPool) {
         let uid = new_user(&pool).await;
         let dt = make_type(&pool, uid).await;
-        let second =
-            create(&pool, uid, "Weekends", 65, wake(), sleep(), false, None, None)
-                .await
-                .unwrap();
+        let second = create(
+            &pool,
+            uid,
+            "Weekends",
+            65,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         let outcome = delete(&pool, second.id, uid).await.unwrap();
         assert!(matches!(outcome, DeleteDayTypeOutcome::Deleted));
@@ -448,9 +554,19 @@ mod tests {
     async fn delete_returns_is_default_when_deleting_default(pool: PgPool) {
         let uid = new_user(&pool).await;
         let dt = make_type(&pool, uid).await;
-        create(&pool, uid, "Weekends", 65, wake(), sleep(), false, None, None)
-            .await
-            .unwrap();
+        create(
+            &pool,
+            uid,
+            "Weekends",
+            65,
+            wake(),
+            sleep(),
+            false,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         assert!(dt.is_default);
         let outcome = delete(&pool, dt.id, uid).await.unwrap();

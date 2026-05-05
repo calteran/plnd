@@ -32,8 +32,7 @@ fn create_request_accepts_hms_time_format() {
         "sleep_time": "22:30:00",
         "is_cycle": false
     }"#;
-    let req: CreateDayTypeRequest =
-        serde_json::from_str(json).expect("HH:MM:SS format failed");
+    let req: CreateDayTypeRequest = serde_json::from_str(json).expect("HH:MM:SS format failed");
     assert!(req.wake_time.to_string().starts_with("07:00"));
     assert!(req.sleep_time.to_string().starts_with("22:30"));
 }
@@ -49,8 +48,7 @@ fn create_request_cycle_type_deserializes() {
         "cycle_length": 10,
         "anchor_date": "2026-01-06"
     }"#;
-    let req: CreateDayTypeRequest =
-        serde_json::from_str(json).expect("cycle deserialize failed");
+    let req: CreateDayTypeRequest = serde_json::from_str(json).expect("cycle deserialize failed");
     assert!(req.is_cycle);
     assert_eq!(req.cycle_length, Some(10));
     assert!(req.anchor_date.is_some());
@@ -93,8 +91,7 @@ fn update_request_deserializes() {
         "sleep_time": "23:30",
         "is_cycle": false
     }"#;
-    let req: UpdateDayTypeRequest =
-        serde_json::from_str(json).expect("update deserialize failed");
+    let req: UpdateDayTypeRequest = serde_json::from_str(json).expect("update deserialize failed");
     assert_eq!(req.name, "Weekends");
     assert_eq!(req.days_bitmask, 65);
     assert!(req.wake_time.to_string().starts_with("09:00"));
