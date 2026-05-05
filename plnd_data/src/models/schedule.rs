@@ -23,7 +23,7 @@ pub struct ScheduleTemplate {
     pub time_window_end: Option<NaiveTime>,
     pub duration_minutes: Option<i32>,
     pub energy_required: String,
-    pub is_milepost: bool,
+    pub is_anchor: bool,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>, // 'user_meal' | 'user_dish' | 'user_exercise' | ...
     pub created_at: DateTime<Utc>,
@@ -50,8 +50,8 @@ pub struct ScheduleEntry {
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
     pub family_meal_id: Option<Uuid>,
-    pub after_milepost: Option<String>, // 'breakfast' | 'lunch' | 'dinner' — temporal ordering anchor
-    pub after_entry_id: Option<Uuid>,   // explicit sequencing link
+    pub after_anchor: Option<String>, // 'breakfast' | 'lunch' | 'dinner' — temporal ordering anchor
+    pub after_entry_id: Option<Uuid>, // explicit sequencing link
     pub deviation_note: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
@@ -94,7 +94,7 @@ pub struct PlanEntryInput {
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
     pub scheduled_start: Option<NaiveTime>,
-    pub after_milepost: Option<String>,
+    pub after_anchor: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
 }

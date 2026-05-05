@@ -30,21 +30,21 @@ Before calling any tool, answer these three questions from the user's input:
 3. Call `get_day_schedule` for the **target date** to see existing entries and how tasks are distributed across buckets.
 4. Determine placement — always resolve a **`date`** (YYYY-MM-DD), then choose one of:
    - **Timed**: set `scheduled_start` (ISO 8601 datetime) when the user specifies or implies an exact time ("at 2pm", "after my 10am meeting").
-   - **Bucket cue**: set `after_milepost` when the user's words map to a bucket (see table below). Omit `scheduled_start`.
+   - **Bucket cue**: set `after_anchor` when the user's words map to a bucket (see table below). Omit `scheduled_start`.
    - **No cue**: examine the `get_day_schedule` result and pick the bucket with the fewest tasks. Omit `scheduled_start`.
    - **Dense day**: if the target day is very full and the task is low priority, you MAY place it on a nearby less-busy day instead.
 5. Choose your terminal action:
-   - **5a. All required fields known** — call `create_task` with `date`, `title`, `energy_level`, `duration_minutes`, either `scheduled_start` or `after_milepost`, and `confirmation`. This ends the session.
+   - **5a. All required fields known** — call `create_task` with `date`, `title`, `energy_level`, `duration_minutes`, either `scheduled_start` or `after_anchor`, and `confirmation`. This ends the session.
    - **5b. Any required field truly unresolvable** — call `request_clarification` with the unknown fields as `ui_signals`. Do NOT call `create_task`. This also ends the session.
 
 The only field that genuinely warrants `request_clarification` is `duration_minutes` when it is completely absent and cannot be reasonably inferred. Energy level, date, and placement can almost always be inferred.
 
 ## Bucket mapping
 
-Map natural-language timing cues to `after_milepost` values:
+Map natural-language timing cues to `after_anchor` values:
 
-| User says | `after_milepost` |
-|-----------|-----------------|
+| User says | `after_anchor` |
+|-----------|----------------|
 | "morning", "this morning", "first thing", "before lunch", "AM" | `"breakfast"` |
 | "afternoon", "after lunch", "midday", "PM", "lunchtime" | `"lunch"` |
 | "evening", "tonight", "after dinner", "end of day", "before bed" | `"dinner"` |
@@ -134,7 +134,7 @@ Rules:
 
 ## confirmation
 
-Set `confirmation` to a short, friendly summary of what was scheduled — use the `date` and either the time or the `after_milepost` anchor. This string is shown directly to the user. Examples: `"Replace vacuum filter scheduled for Tuesday at 10:00 AM (30 min, low energy)."` or `"Read docs scheduled for Wednesday after lunch (30 min, low energy)."`
+Set `confirmation` to a short, friendly summary of what was scheduled — use the `date` and either the time or the `after_anchor` anchor. This string is shown directly to the user. Examples: `"Replace vacuum filter scheduled for Tuesday at 10:00 AM (30 min, low energy)."` or `"Read docs scheduled for Wednesday after lunch (30 min, low energy)."`
 
 ## Structured output
 
@@ -143,7 +143,7 @@ The terminal tools (`create_task` and `request_clarification`) produce the final
 ```json
 {
   "actions_taken": [
-    { "type": "task_created", "task_id": "<DB-generated UUID>", "date": "YYYY-MM-DD", "after_milepost": "<breakfast | lunch | dinner | null>", "scheduled_start": "<ISO 8601 or null>" }
+    { "type": "task_created", "task_id": "<DB-generated UUID>", "date": "YYYY-MM-DD", "after_anchor": "<breakfast | lunch | dinner | null>", "scheduled_start": "<ISO 8601 or null>" }
   ],
   "ui_signals": [],
   "confirmation": "..."

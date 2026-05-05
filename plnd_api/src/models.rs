@@ -73,10 +73,10 @@ pub struct PlanEntryRequest {
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
-    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"; omit for bucket tasks (after_milepost)
+    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"; omit for bucket tasks (after_anchor)
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub scheduled_start: Option<NaiveTime>,
-    pub after_milepost: Option<String>,
+    pub after_anchor: Option<String>,
     pub duration_minutes: Option<u32>,
     pub energy_required: Option<String>,
 }
@@ -120,7 +120,7 @@ pub struct ActionTaken {
     pub r#type: String,
     pub task_id: Option<Uuid>,
     pub date: Option<NaiveDate>,
-    pub after_milepost: Option<String>,
+    pub after_anchor: Option<String>,
     pub scheduled_at: Option<DateTime<Utc>>,
 }
 
@@ -302,8 +302,8 @@ pub struct PlaceTasksEntry {
     pub duration_minutes: u32,
     pub energy_required: String,
     /// Meal anchor for floating tasks — mutually exclusive with `time_window_start`.
-    pub after_milepost: Option<String>,
-    /// Wall-clock start time "HH:MM" for fixed tasks — mutually exclusive with `after_milepost`.
+    pub after_anchor: Option<String>,
+    /// Wall-clock start time "HH:MM" for fixed tasks — mutually exclusive with `after_anchor`.
     pub time_window_start: Option<String>,
 }
 
@@ -356,7 +356,7 @@ mod place_tasks_tests {
         let json = r#"{
             "title": "Call dentist",
             "scheduled_date": "2026-04-23",
-            "after_milepost": "lunch",
+            "after_anchor": "lunch",
             "duration_minutes": 30,
             "energy_required": "low",
             "task_type": "appointment"
@@ -365,7 +365,7 @@ mod place_tasks_tests {
         assert_eq!(entry.title, "Call dentist");
         assert_eq!(entry.duration_minutes, 30);
         assert_eq!(entry.energy_required, "low");
-        assert_eq!(entry.after_milepost.as_deref(), Some("lunch"));
+        assert_eq!(entry.after_anchor.as_deref(), Some("lunch"));
         assert!(entry.time_window_start.is_none());
     }
 
@@ -381,7 +381,7 @@ mod place_tasks_tests {
         }"#;
         let entry: PlaceTasksEntry = serde_json::from_str(json).unwrap();
         assert_eq!(entry.time_window_start.as_deref(), Some("10:00"));
-        assert!(entry.after_milepost.is_none());
+        assert!(entry.after_anchor.is_none());
     }
 
     #[test]
@@ -392,7 +392,7 @@ mod place_tasks_tests {
             task_type: "appointment".to_string(),
             duration_minutes: 30,
             energy_required: "low".to_string(),
-            after_milepost: Some("lunch".to_string()),
+            after_anchor: Some("lunch".to_string()),
             time_window_start: None,
         };
         let json = serde_json::to_string(&entry).unwrap();

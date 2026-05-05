@@ -124,7 +124,7 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
 
 function mapEntry(e: ScheduleEntryDto): ScheduleItem {
   if (e.task_type === 'meal') {
-    const slot = e.after_milepost ? MEAL_SLOTS[e.after_milepost] : undefined;
+    const slot = e.after_anchor ? MEAL_SLOTS[e.after_anchor] : undefined;
     return {
       id:    e.entry_id,
       name:  slot?.name ?? e.title ?? 'Meal',

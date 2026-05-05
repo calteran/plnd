@@ -13,7 +13,7 @@ pub async fn list_for_user(
 ) -> Result<Vec<ScheduleTemplate>, DatabaseError> {
     sqlx::query_as::<_, ScheduleTemplate>(
         "SELECT template_id, user_id, task_type, title, recurrence, recurrence_rule,
-            time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
+            time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
             task_ref_id, task_ref_type, created_at, updated_at
          FROM schedule_templates WHERE user_id = $1 ORDER BY created_at ASC",
     )
@@ -37,7 +37,7 @@ pub async fn create(
     time_window_end: Option<NaiveTime>,
     duration_minutes: Option<i32>,
     energy_required: &str,
-    is_milepost: bool,
+    is_anchor: bool,
     task_ref_id: Option<Uuid>,
     task_ref_type: Option<&str>,
 ) -> Result<ScheduleTemplate, DatabaseError> {
@@ -45,10 +45,10 @@ pub async fn create(
         "INSERT INTO schedule_templates (
             user_id, task_type, title, recurrence, recurrence_rule,
             time_window_start, time_window_end, duration_minutes,
-            energy_required, is_milepost, task_ref_id, task_ref_type
+            energy_required, is_anchor, task_ref_id, task_ref_type
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING template_id, user_id, task_type, title, recurrence, recurrence_rule,
-            time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
+            time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
             task_ref_id, task_ref_type, created_at, updated_at",
     )
     .bind(user_id)
@@ -60,7 +60,7 @@ pub async fn create(
     .bind(time_window_end)
     .bind(duration_minutes)
     .bind(energy_required)
-    .bind(is_milepost)
+    .bind(is_anchor)
     .bind(task_ref_id)
     .bind(task_ref_type)
     .fetch_one(pool)
@@ -98,7 +98,7 @@ pub async fn update(
     time_window_end: Option<NaiveTime>,
     duration_minutes: Option<i32>,
     energy_required: &str,
-    is_milepost: bool,
+    is_anchor: bool,
     task_ref_id: Option<Uuid>,
     task_ref_type: Option<&str>,
 ) -> Result<Option<ScheduleTemplate>, DatabaseError> {
@@ -106,11 +106,11 @@ pub async fn update(
         "UPDATE schedule_templates
          SET title = $3, recurrence = $4, recurrence_rule = $5,
              time_window_start = $6, time_window_end = $7, duration_minutes = $8,
-             energy_required = $9, is_milepost = $10, task_ref_id = $11,
+             energy_required = $9, is_anchor = $10, task_ref_id = $11,
              task_ref_type = $12, updated_at = NOW()
          WHERE template_id = $1 AND user_id = $2
          RETURNING template_id, user_id, task_type, title, recurrence, recurrence_rule,
-             time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
+             time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
              task_ref_id, task_ref_type, created_at, updated_at",
     )
     .bind(template_id)
@@ -122,7 +122,7 @@ pub async fn update(
     .bind(time_window_end)
     .bind(duration_minutes)
     .bind(energy_required)
-    .bind(is_milepost)
+    .bind(is_anchor)
     .bind(task_ref_id)
     .bind(task_ref_type)
     .fetch_optional(pool)
@@ -193,7 +193,7 @@ mod tests {
         assert_eq!(t.title, "Breakfast");
         assert_eq!(t.recurrence, "daily");
         assert_eq!(t.energy_required, "medium");
-        assert!(!t.is_milepost);
+        assert!(!t.is_anchor);
     }
 
     #[sqlx::test(migrations = "./migrations")]

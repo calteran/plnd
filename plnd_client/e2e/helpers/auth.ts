@@ -91,7 +91,7 @@ export async function seedAuth(page: Page) {
             date: start,
             scheduled_start: `${start}T08:00:00Z`,
             status: isToday ? 'completed' : 'planned',
-            after_milepost: 'breakfast',
+            after_anchor: 'breakfast',
           },
           {
             entry_id: 'e2e-task-uuid',

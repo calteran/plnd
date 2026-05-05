@@ -512,7 +512,7 @@ describe('OnboardingHubComponent', () => {
         task_ref_type: 'catalog',
         title: undefined,
         scheduled_start: '08:00',
-        after_milepost: 'breakfast',
+        after_anchor: 'breakfast',
       },
       {
         date: '2026-05-02',
@@ -521,7 +521,7 @@ describe('OnboardingHubComponent', () => {
         task_ref_type: undefined,
         title: 'Salad',
         scheduled_start: '12:00',
-        after_milepost: 'lunch',
+        after_anchor: 'lunch',
       },
     ]);
 

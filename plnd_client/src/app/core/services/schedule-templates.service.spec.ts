@@ -13,7 +13,7 @@ const base: Omit<ScheduleTemplate, 'template_id' | 'title'> = {
   time_window_end: null,
   duration_minutes: null,
   energy_required: 'medium',
-  is_milepost: false,
+  is_anchor: false,
   task_ref_id: null,
   task_ref_type: null,
   created_at: '2026-01-01T00:00:00Z',

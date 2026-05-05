@@ -116,8 +116,8 @@ export class WeekPlanService {
           const tasks: PlannedTask[] = [];
           const meals: Record<string, Partial<Record<MealSlot, PlannedMeal>>> = {};
           for (const entry of resp.entries) {
-            if (entry.task_type === 'meal' && entry.after_milepost) {
-              const slot = entry.after_milepost as MealSlot;
+            if (entry.task_type === 'meal' && entry.after_anchor) {
+              const slot = entry.after_anchor as MealSlot;
               meals[entry.date] ??= {};
               meals[entry.date][slot] = {
                 approvalState: 'approved',
@@ -363,7 +363,7 @@ export class WeekPlanService {
           task_ref_type: resolved.mealRef?.type,
           title: resolved.mealRef ? undefined : resolved.title,
           scheduled_start: slotDefaultTime(slot),
-          after_milepost: slot,
+          after_anchor: slot,
         });
       }
       // Explicit non-standard slots (snack, etc.) — include only what was explicitly set.
@@ -377,7 +377,7 @@ export class WeekPlanService {
           task_ref_type: meal.mealRef?.type,
           title: meal.mealRef ? undefined : meal.title,
           scheduled_start: slotDefaultTime(slot),
-          after_milepost: slot,
+          after_anchor: slot,
         });
       }
     }
