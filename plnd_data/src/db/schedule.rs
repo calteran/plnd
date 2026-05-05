@@ -410,9 +410,9 @@ mod tests {
         let carryover_date = today - Duration::days(1);
         let sched = (carryover_date.and_hms_opt(9, 0, 0).unwrap()).and_utc();
 
-        let id_accept: Uuid = sqlx::query_scalar(
+        let id_carry: Uuid = sqlx::query_scalar(
             "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
-             VALUES ($1, 'work', 'accept-me', $2, $3, 'planned') RETURNING entry_id",
+             VALUES ($1, 'work', 'carry-me', $2, $3, 'planned') RETURNING entry_id",
         )
         .bind(uid)
         .bind(carryover_date)
@@ -432,9 +432,9 @@ mod tests {
         .await
         .unwrap();
 
-        let id_dismiss: Uuid = sqlx::query_scalar(
+        let id_drop: Uuid = sqlx::query_scalar(
             "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
-             VALUES ($1, 'work', 'dismiss-me', $2, $3, 'planned') RETURNING entry_id",
+             VALUES ($1, 'work', 'drop-me', $2, $3, 'planned') RETURNING entry_id",
         )
         .bind(uid)
         .bind(carryover_date)
@@ -445,9 +445,9 @@ mod tests {
 
         let task_id = make_planning_task(&pool, uid, plan_start).await;
         let mut decisions = HashMap::new();
-        decisions.insert(id_accept, CarryoverDecision::Carry);
+        decisions.insert(id_carry, CarryoverDecision::Carry);
         decisions.insert(id_defer, CarryoverDecision::Defer);
-        decisions.insert(id_dismiss, CarryoverDecision::Drop);
+        decisions.insert(id_drop, CarryoverDecision::Drop);
 
         let req = CommitPlanInput {
             plan_start,
@@ -463,7 +463,7 @@ mod tests {
             sqlx::query_as(
                 "SELECT date, status, scheduled_start FROM schedule_entries WHERE entry_id = $1",
             )
-            .bind(id_accept)
+            .bind(id_carry)
             .fetch_one(&pool)
             .await
             .unwrap();
@@ -485,7 +485,7 @@ mod tests {
 
         let status_x: String =
             sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
-                .bind(id_dismiss)
+                .bind(id_drop)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
