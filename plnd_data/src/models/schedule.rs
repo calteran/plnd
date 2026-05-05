@@ -51,7 +51,7 @@ pub struct ScheduleEntry {
     pub actual_end: Option<DateTime<Utc>>,
     pub family_meal_id: Option<Uuid>,
     pub after_anchor: Option<String>, // 'breakfast' | 'lunch' | 'dinner' — temporal ordering anchor
-    pub after_entry_id: Option<Uuid>,   // explicit sequencing link
+    pub after_entry_id: Option<Uuid>, // explicit sequencing link
     pub deviation_note: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,

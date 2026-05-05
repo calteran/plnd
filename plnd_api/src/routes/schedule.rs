@@ -6,9 +6,7 @@ use crate::models::{
     CarryoverDecision as HttpCarryoverDecision, PatchEntryStatusRequest, PlanEntryRequest,
     PostSchedulePlanRequest,
 };
-use crate::routes::domain_constants::{
-    VALID_AFTER_ANCHORS, VALID_ENERGY_LEVELS, VALID_TASK_TYPES,
-};
+use crate::routes::domain_constants::{VALID_AFTER_ANCHORS, VALID_ENERGY_LEVELS, VALID_TASK_TYPES};
 use crate::scheduling::{date_matches_recurrence, is_recognised_recurrence};
 use crate::state::AppState;
 use axum::{
