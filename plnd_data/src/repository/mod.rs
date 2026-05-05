@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 pub mod briefing;
 pub mod catalog_ingest;
+pub mod day_type;
 pub mod exercise;
 pub mod meal;
 pub mod meal_habit;
@@ -13,7 +14,6 @@ pub(crate) mod pg;
 pub mod preferences;
 pub mod schedule;
 pub mod schedule_template;
-pub mod schedule_type;
 pub mod session;
 pub mod task;
 pub mod user;
@@ -23,6 +23,7 @@ pub mod user_meal_pref;
 
 pub use briefing::BriefingRepository;
 pub use catalog_ingest::CatalogIngestRepository;
+pub use day_type::DayTypeRepository;
 pub use exercise::ExerciseRepository;
 pub use meal::MealRepository;
 pub use meal_habit::MealHabitRepository;
@@ -32,7 +33,6 @@ pub use memory::MemoryRepository;
 pub use preferences::PreferencesRepository;
 pub use schedule::ScheduleRepository;
 pub use schedule_template::ScheduleTemplateRepository;
-pub use schedule_type::ScheduleTypeRepository;
 pub use session::SessionRepository;
 pub use task::TaskRepository;
 pub use user::UserRepository;
@@ -46,6 +46,7 @@ pub use crate::models::{LocalDishResult, LocalExerciseResult, LocalIngredientRes
 pub struct Repositories {
     pub briefing: Arc<dyn BriefingRepository>,
     pub catalog_ingest: Arc<dyn CatalogIngestRepository>,
+    pub day_type: Arc<dyn DayTypeRepository>,
     pub exercise: Arc<dyn ExerciseRepository>,
     pub meal: Arc<dyn MealRepository>,
     pub meal_habit: Arc<dyn MealHabitRepository>,
@@ -55,7 +56,6 @@ pub struct Repositories {
     pub preferences: Arc<dyn PreferencesRepository>,
     pub schedule: Arc<dyn ScheduleRepository>,
     pub schedule_template: Arc<dyn ScheduleTemplateRepository>,
-    pub schedule_type: Arc<dyn ScheduleTypeRepository>,
     pub session: Arc<dyn SessionRepository>,
     pub task: Arc<dyn TaskRepository>,
     pub user: Arc<dyn UserRepository>,
@@ -79,6 +79,7 @@ impl Repositories {
             catalog_ingest: Arc::new(pg::catalog_ingest::PgCatalogIngestRepository::new(
                 pool.clone(),
             )),
+            day_type: Arc::new(pg::day_type::PgDayTypeRepository::new(pool.clone())),
             exercise: Arc::new(pg::exercise::PgExerciseRepository::new(pool.clone())),
             meal: Arc::new(pg::meal::PgMealRepository::new(pool.clone())),
             meal_habit: Arc::new(pg::meal_habit::PgMealHabitRepository::new(pool.clone())),
@@ -90,9 +91,6 @@ impl Repositories {
             preferences: Arc::new(pg::preferences::PgPreferencesRepository::new(pool.clone())),
             schedule: Arc::new(pg::schedule::PgScheduleRepository::new(pool.clone())),
             schedule_template: Arc::new(pg::schedule_template::PgScheduleTemplateRepository::new(
-                pool.clone(),
-            )),
-            schedule_type: Arc::new(pg::schedule_type::PgScheduleTypeRepository::new(
                 pool.clone(),
             )),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),
