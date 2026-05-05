@@ -2,42 +2,44 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { ScheduleTypesService, bitmaskToDays, daysToBitmask } from './schedule-types.service';
-import { ScheduleTypeResponse, CreateScheduleTypeRequest } from '../models/schedule-type';
+import { DayTypeResponse, CreateDayTypeRequest } from '../models/schedule-type';
 import { ConfigService } from './config.service';
 
 const MOCK_CONFIG = { api: { baseUrl: 'http://localhost:3000' } };
 
-const MOCK_TYPE_A: ScheduleTypeResponse = {
+const MOCK_TYPE_A: DayTypeResponse = {
   id: 'type-uuid-1',
   user_id: 'user-uuid',
   name: 'Weekday Schedule',
   days_bitmask: 62,
   wake_time: '07:00:00',
-  bed_time: '22:00:00',
+  sleep_time: '22:00:00',
+  is_default: true,
   is_cycle: false,
   cycle_length: null,
   anchor_date: null,
   created_at: '2026-01-01T00:00:00Z'
 };
 
-const MOCK_TYPE_B: ScheduleTypeResponse = {
+const MOCK_TYPE_B: DayTypeResponse = {
   id: 'type-uuid-2',
   user_id: 'user-uuid',
   name: 'Weekend Schedule',
   days_bitmask: 65,
   wake_time: '09:00:00',
-  bed_time: '23:00:00',
+  sleep_time: '23:00:00',
+  is_default: false,
   is_cycle: false,
   cycle_length: null,
   anchor_date: null,
   created_at: '2026-01-02T00:00:00Z'
 };
 
-const CREATE_REQ: CreateScheduleTypeRequest = {
+const CREATE_REQ: CreateDayTypeRequest = {
   name: 'Weekday Schedule',
   days_bitmask: 62,
   wake_time: '07:00',
-  bed_time: '22:00',
+  sleep_time: '22:00',
   is_cycle: false,
   cycle_length: null,
   anchor_date: null
@@ -68,20 +70,20 @@ describe('ScheduleTypesService', () => {
   });
 
   it('list() makes GET request to correct URL and returns response', () => {
-    let result: ScheduleTypeResponse[] | undefined;
+    let result: DayTypeResponse[] | undefined;
     service.list().subscribe(r => (result = r));
 
-    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/schedule-types' && r.method === 'GET');
+    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/day-types' && r.method === 'GET');
     req.flush([MOCK_TYPE_A, MOCK_TYPE_B]);
 
     expect(result).toEqual([MOCK_TYPE_A, MOCK_TYPE_B]);
   });
 
   it('create() makes POST request with body and returns response', () => {
-    let result: ScheduleTypeResponse | undefined;
+    let result: DayTypeResponse | undefined;
     service.create(CREATE_REQ).subscribe(r => (result = r));
 
-    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/schedule-types' && r.method === 'POST');
+    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/day-types' && r.method === 'POST');
     expect(req.request.body).toEqual(CREATE_REQ);
     req.flush(MOCK_TYPE_A);
 
@@ -89,11 +91,21 @@ describe('ScheduleTypesService', () => {
   });
 
   it('update() makes PUT request to correct URL with body and returns response', () => {
-    let result: ScheduleTypeResponse | undefined;
+    let result: DayTypeResponse | undefined;
     service.update('type-uuid-1', CREATE_REQ).subscribe(r => (result = r));
 
-    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/schedule-types/type-uuid-1' && r.method === 'PUT');
+    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/day-types/type-uuid-1' && r.method === 'PUT');
     expect(req.request.body).toEqual(CREATE_REQ);
+    req.flush(MOCK_TYPE_A);
+
+    expect(result).toEqual(MOCK_TYPE_A);
+  });
+
+  it('setDefault() makes PATCH request to correct URL and returns response', () => {
+    let result: DayTypeResponse | undefined;
+    service.setDefault('type-uuid-1').subscribe(r => (result = r));
+
+    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/day-types/type-uuid-1/default' && r.method === 'PATCH');
     req.flush(MOCK_TYPE_A);
 
     expect(result).toEqual(MOCK_TYPE_A);
@@ -103,7 +115,7 @@ describe('ScheduleTypesService', () => {
     let completed = false;
     service.delete('type-uuid-1').subscribe(() => (completed = true));
 
-    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/schedule-types/type-uuid-1' && r.method === 'DELETE');
+    const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/day-types/type-uuid-1' && r.method === 'DELETE');
     req.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(completed).toBeTrue();

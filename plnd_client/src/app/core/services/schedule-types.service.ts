@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ConfigService } from './config.service';
-import { ScheduleTypeResponse, CreateScheduleTypeRequest } from '../models/schedule-type';
+import { DayTypeResponse, CreateDayTypeRequest } from '../models/schedule-type';
 
 /**
  * Converts a days bitmask to an array of day numbers.
@@ -13,9 +13,7 @@ import { ScheduleTypeResponse, CreateScheduleTypeRequest } from '../models/sched
 export function bitmaskToDays(mask: number): number[] {
   const days: number[] = [];
   for (let i = 0; i < 7; i++) {
-    if (mask & (1 << i)) {
-      days.push(i);
-    }
+    if (mask & (1 << i)) days.push(i);
   }
   return days;
 }
@@ -30,27 +28,36 @@ export function daysToBitmask(days: number[]): number {
 }
 
 @Injectable({ providedIn: 'root' })
-export class ScheduleTypesService {
+export class DayTypesService {
   private readonly http = inject(HttpClient);
   private readonly config = inject(ConfigService);
 
-  list(): Observable<ScheduleTypeResponse[]> {
+  list(): Observable<DayTypeResponse[]> {
     const apiBase = this.config.getConfig().api.baseUrl;
-    return this.http.get<ScheduleTypeResponse[]>(`${apiBase}/schedule-types`);
+    return this.http.get<DayTypeResponse[]>(`${apiBase}/day-types`);
   }
 
-  create(req: CreateScheduleTypeRequest): Observable<ScheduleTypeResponse> {
+  create(req: CreateDayTypeRequest): Observable<DayTypeResponse> {
     const apiBase = this.config.getConfig().api.baseUrl;
-    return this.http.post<ScheduleTypeResponse>(`${apiBase}/schedule-types`, req);
+    return this.http.post<DayTypeResponse>(`${apiBase}/day-types`, req);
   }
 
-  update(id: string, req: CreateScheduleTypeRequest): Observable<ScheduleTypeResponse> {
+  update(id: string, req: CreateDayTypeRequest): Observable<DayTypeResponse> {
     const apiBase = this.config.getConfig().api.baseUrl;
-    return this.http.put<ScheduleTypeResponse>(`${apiBase}/schedule-types/${id}`, req);
+    return this.http.put<DayTypeResponse>(`${apiBase}/day-types/${id}`, req);
+  }
+
+  setDefault(id: string): Observable<DayTypeResponse> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.patch<DayTypeResponse>(`${apiBase}/day-types/${id}/default`, {});
   }
 
   delete(id: string): Observable<void> {
     const apiBase = this.config.getConfig().api.baseUrl;
-    return this.http.delete<void>(`${apiBase}/schedule-types/${id}`);
+    return this.http.delete<void>(`${apiBase}/day-types/${id}`);
   }
 }
+
+// Legacy alias — removed in Task 8 once all consumers are updated
+/** @deprecated Use DayTypesService */
+export { DayTypesService as ScheduleTypesService };
