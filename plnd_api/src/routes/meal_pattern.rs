@@ -63,7 +63,7 @@ pub async fn create_meal_pattern_entry(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     let tolerance = body.tolerance_minutes.unwrap_or(DEFAULT_TOLERANCE_MINUTES);
-    if tolerance < 0 {
+    if !(0..=720).contains(&tolerance) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
@@ -118,7 +118,7 @@ pub async fn update_meal_pattern_entry(
     }
 
     if let Some(t) = body.tolerance_minutes
-        && t < 0
+        && !(0..=720).contains(&t)
     {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }

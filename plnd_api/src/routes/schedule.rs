@@ -16,7 +16,7 @@ use axum::{
 };
 use chrono::NaiveDate;
 use plnd_data::Error;
-use plnd_data::models::{CarryoverDecision, CommitPlanInput, MealPatternEntry, PlanEntryInput};
+use plnd_data::models::{CarryoverDecision, CommitPlanInput, PlanEntryInput};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -62,43 +62,6 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             .transpose()?,
         energy_required: e.energy_required,
     })
-}
-
-// ---------------------------------------------------------------------------
-// Meal pattern expansion helper
-// ---------------------------------------------------------------------------
-
-/// Expands the user's meal pattern into one PlanEntryInput per (day × pattern entry).
-/// Daily recurrence is intrinsic per architecture §4.6 — every pattern entry appears
-/// on every day in the planning window.
-fn expand_pattern_to_entries(
-    pattern: &[MealPatternEntry],
-    plan_start: NaiveDate,
-    plan_end: NaiveDate,
-) -> Vec<PlanEntryInput> {
-    let mut entries = Vec::new();
-    let mut date = plan_start;
-    while date <= plan_end {
-        for entry in pattern {
-            entries.push(PlanEntryInput {
-                date,
-                task_type: None,
-                title: None,
-                after_anchor: Some(entry.name.clone()),
-                scheduled_start: None,
-                task_ref_id: None,
-                task_ref_type: None,
-                duration_minutes: None,
-                energy_required: None,
-            });
-        }
-        if let Some(next) = date.succ_opt() {
-            date = next;
-        } else {
-            break;
-        }
-    }
-    entries
 }
 
 // ---------------------------------------------------------------------------
@@ -263,22 +226,6 @@ pub async fn post_plan(
         .collect::<Result<Vec<_>, _>>()?;
     entries.extend(placed);
 
-    // Expand meal pattern — daily recurrence is intrinsic (architecture §4.6)
-    let pattern = state
-        .repos
-        .meal_pattern
-        .list_for_user(user_id)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "meal_pattern fetch error in post_plan");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    entries.extend(expand_pattern_to_entries(
-        &pattern,
-        body.plan_start,
-        body.plan_end,
-    ));
-
     let carryover_decisions: HashMap<Uuid, CarryoverDecision> = body
         .carryover_decisions
         .into_iter()
@@ -432,65 +379,5 @@ mod tests {
             ..base_entry()
         };
         assert!(map_entry(e).is_ok());
-    }
-}
-
-#[cfg(test)]
-mod expand_tests {
-    use super::*;
-    use chrono::NaiveDate;
-    use plnd_data::models::MealPatternEntry;
-
-    fn entry(name: &str, sort_order: i32) -> MealPatternEntry {
-        MealPatternEntry {
-            id: uuid::Uuid::new_v4(),
-            user_id: uuid::Uuid::new_v4(),
-            name: name.to_string(),
-            preferred_time: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
-            tolerance_minutes: 60,
-            sort_order,
-            created_at: chrono::Utc::now(),
-        }
-    }
-
-    #[test]
-    fn expand_fills_all_days() {
-        let pattern = [entry("Breakfast", 1), entry("Lunch", 2), entry("Dinner", 3)];
-        let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
-        let end = NaiveDate::from_ymd_opt(2025, 1, 3).unwrap();
-        let result = expand_pattern_to_entries(&pattern, start, end);
-        assert_eq!(result.len(), 9); // 3 days × 3 entries
-    }
-
-    #[test]
-    fn expand_sets_after_anchor_to_name() {
-        let pattern = [entry("Second Breakfast", 1)];
-        let day = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
-        let result = expand_pattern_to_entries(&pattern, day, day);
-        assert_eq!(result[0].after_anchor, Some("Second Breakfast".to_string()));
-    }
-
-    #[test]
-    fn expand_empty_pattern_returns_empty() {
-        let day = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
-        assert!(expand_pattern_to_entries(&[], day, day).is_empty());
-    }
-
-    #[test]
-    fn expand_single_day_range() {
-        let pattern = [entry("Lunch", 1)];
-        let day = NaiveDate::from_ymd_opt(2025, 6, 15).unwrap();
-        let result = expand_pattern_to_entries(&pattern, day, day);
-        assert_eq!(result.len(), 1);
-        assert_eq!(result[0].date, day);
-    }
-
-    #[test]
-    fn expand_preserves_pattern_order_within_each_day() {
-        let pattern = [entry("Breakfast", 1), entry("Lunch", 2)];
-        let day = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
-        let result = expand_pattern_to_entries(&pattern, day, day);
-        assert_eq!(result[0].after_anchor.as_deref(), Some("Breakfast"));
-        assert_eq!(result[1].after_anchor.as_deref(), Some("Lunch"));
     }
 }
