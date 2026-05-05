@@ -1,8 +1,8 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish,
-    DietaryRestriction, MealHabit, MealSuggestion, ScheduleEntry, ScheduleTemplate, ScheduleType,
-    Task, User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
+    DietaryRestriction, MealHabit, MealSuggestion, Routine, ScheduleEntry, ScheduleType, Task,
+    User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
 };
 use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
@@ -406,7 +406,7 @@ impl From<Task> for TaskResponse {
 pub struct ScheduleEntryResponse {
     pub entry_id: Uuid,
     pub user_id: Uuid,
-    pub template_id: Option<Uuid>,
+    pub routine_id: Option<Uuid>,
     pub task_type: String,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
@@ -432,7 +432,7 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
         Self {
             entry_id: e.entry_id,
             user_id: e.user_id,
-            template_id: e.template_id,
+            routine_id: e.routine_id,
             task_type: e.task_type,
             task_ref_id: e.task_ref_id,
             task_ref_type: e.task_ref_type,
@@ -544,10 +544,10 @@ impl From<ScheduleType> for ScheduleTypeResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::models::ScheduleTemplate`.
+/// API response wrapper for `plnd_data::models::Routine`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
-pub struct ScheduleTemplateResponse {
-    pub template_id: Uuid,
+pub struct RoutineResponse {
+    pub routine_id: Uuid,
     pub user_id: Uuid,
     pub task_type: String,
     pub title: String,
@@ -564,10 +564,10 @@ pub struct ScheduleTemplateResponse {
     pub updated_at: DateTime<Utc>,
 }
 
-impl From<ScheduleTemplate> for ScheduleTemplateResponse {
-    fn from(t: ScheduleTemplate) -> Self {
+impl From<Routine> for RoutineResponse {
+    fn from(t: Routine) -> Self {
         Self {
-            template_id: t.template_id,
+            routine_id: t.routine_id,
             user_id: t.user_id,
             task_type: t.task_type,
             title: t.title,

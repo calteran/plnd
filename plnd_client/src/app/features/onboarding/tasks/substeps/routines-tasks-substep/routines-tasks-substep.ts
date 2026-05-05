@@ -8,8 +8,8 @@ import {
   computed,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ScheduleTemplatesService } from '../../../../../core/services/schedule-templates.service';
-import { ScheduleTemplate, CreateScheduleTemplateRequest, UpdateScheduleTemplateRequest } from '../../../../../core/models/schedule-template';
+import { RoutinesService } from '../../../../../core/services/routines.service';
+import { Routine, CreateRoutineRequest, UpdateRoutineRequest } from '../../../../../core/models/routine';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 
 // ── Recurrence dropdown option ───────────────────────────────────────────────
@@ -595,7 +595,7 @@ function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' |
 export class RoutinesTasksSubstepComponent implements OnInit {
   @Output() complete = new EventEmitter<void>();
 
-  private readonly templatesService = inject(ScheduleTemplatesService);
+  private readonly templatesService = inject(RoutinesService);
   private readonly stateService = inject(OnboardingStateService);
 
   // ── Public constants used in the template ────────────────────────────────
@@ -633,8 +633,8 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   readonly taskNames = signal<string[]>([]);
 
   // ── Local routine chip state ──────────────────────────────────────────────
-  /** Local representation of a routine (backed by a ScheduleTemplate server record). */
-  readonly routines = signal<{ localId: string; name: string; rrule: string; templateId: string | null }[]>([]);
+  /** Local representation of a routine (backed by a Routine server record). */
+  readonly routines = signal<{ localId: string; name: string; rrule: string; routineId: string | null }[]>([]);
 
   // ── Inspiration chips: hidden once tapped ────────────────────────────────
   private readonly usedInspirationIds = signal<Set<string>>(new Set());
@@ -644,15 +644,15 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // Load existing templates from the service signal (already fetched by parent)
-    const existing = this.templatesService.templates();
+    // Load existing routines from the service signal (already fetched by parent)
+    const existing = this.templatesService.routines();
     if (existing && existing.length > 0) {
       this.routines.set(
         existing.map(t => ({
           localId: crypto.randomUUID(),
           name: t.title,
           rrule: t.recurrence_rule ?? 'FREQ=DAILY',
-          templateId: t.template_id,
+          routineId: t.routine_id,
         }))
       );
     }
@@ -689,7 +689,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
 
     const rrule = this.effectiveRrule();
     const recurrence = rruleToRecurrenceType(rrule);
-    const req: CreateScheduleTemplateRequest = {
+    const req: CreateRoutineRequest = {
       task_type: 'general',
       title: name,
       recurrence,
@@ -699,10 +699,10 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     this.isAdding.set(true);
     this.addError.set('');
     this.templatesService.create(req).subscribe({
-      next: (template: ScheduleTemplate) => {
+      next: (routine: Routine) => {
         this.routines.update(list => [
           ...list,
-          { localId: crypto.randomUUID(), name: template.title, rrule: template.recurrence_rule ?? rrule, templateId: template.template_id },
+          { localId: crypto.randomUUID(), name: routine.title, rrule: routine.recurrence_rule ?? rrule, routineId: routine.routine_id },
         ]);
         this.routineName = '';
         this.isAdding.set(false);
@@ -717,7 +717,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   addInspirationChip(chip: InspirationChip): void {
     if (this.isAdding()) return;
 
-    const req: CreateScheduleTemplateRequest = {
+    const req: CreateRoutineRequest = {
       task_type: 'general',
       title: chip.name,
       recurrence: 'daily',
@@ -727,11 +727,11 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     this.isAdding.set(true);
     this.addError.set('');
     this.templatesService.create(req).subscribe({
-      next: (template: ScheduleTemplate) => {
+      next: (routine: Routine) => {
         this.usedInspirationIds.update(set => new Set([...set, chip.id]));
         this.routines.update(list => [
           ...list,
-          { localId: crypto.randomUUID(), name: template.title, rrule: template.recurrence_rule ?? chip.rrule, templateId: template.template_id },
+          { localId: crypto.randomUUID(), name: routine.title, rrule: routine.recurrence_rule ?? chip.rrule, routineId: routine.routine_id },
         ]);
         this.isAdding.set(false);
       },
@@ -749,13 +749,13 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     // Remove from local list immediately
     this.routines.update(list => list.filter(r => r.localId !== localId));
 
-    // Only call delete if the template has a server-assigned ID
-    if (routine.templateId) {
-      this.templatesService.delete(routine.templateId).subscribe();
+    // Only call delete if the routine has a server-assigned ID
+    if (routine.routineId) {
+      this.templatesService.delete(routine.routineId).subscribe();
     }
   }
 
-  openEdit(routine: { localId: string; name: string; rrule: string; templateId: string | null }): void {
+  openEdit(routine: { localId: string; name: string; rrule: string; routineId: string | null }): void {
     const { selectedRrule, selectedWeekDays } = rruleToFormState(routine.rrule);
     this.editTitle = routine.name;
     this.editSelectedRrule = selectedRrule;
@@ -769,19 +769,19 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     this.editingId.set(null);
   }
 
-  saveEdit(routine: { localId: string; name: string; rrule: string; templateId: string | null }): void {
-    if (!routine.templateId || this.isSaving()) return;
+  saveEdit(routine: { localId: string; name: string; rrule: string; routineId: string | null }): void {
+    if (!routine.routineId || this.isSaving()) return;
     const title = this.editTitle.trim();
     if (!title) return;
 
     const rrule = this.editEffectiveRrule();
     const recurrence = rruleToRecurrenceType(rrule);
-    const req: UpdateScheduleTemplateRequest = { title, recurrence, recurrence_rule: rrule };
+    const req: UpdateRoutineRequest = { title, recurrence, recurrence_rule: rrule };
 
     this.isSaving.set(true);
     this.saveError.set('');
-    this.templatesService.update(routine.templateId, req).subscribe({
-      next: (updated: ScheduleTemplate) => {
+    this.templatesService.update(routine.routineId, req).subscribe({
+      next: (updated: Routine) => {
         this.routines.update(list =>
           list.map(r => r.localId === routine.localId
             ? { ...r, name: updated.title, rrule: updated.recurrence_rule ?? rrule }
@@ -816,8 +816,8 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   save(): void {
-    const templates = this.templatesService.templates() ?? [];
-    this.stateService.setScheduleTemplates(templates);
+    const routines = this.templatesService.routines() ?? [];
+    this.stateService.setRoutines(routines);
     this.stateService.setUpcomingTaskNames(this.taskNames());
     this.complete.emit();
   }

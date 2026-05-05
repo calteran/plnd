@@ -30,8 +30,8 @@ use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
     agent, auth, briefing, catalog_details, catalog_ingest, dietary_restrictions, meal_habits,
-    meal_suggestions, preferences, schedule, schedule_template, schedule_types, search, system,
-    tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    meal_suggestions, preferences, routine, schedule, schedule_types, search, system, tasks,
+    user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -349,12 +349,12 @@ async fn main() {
             patch(schedule::patch_entry_status),
         )
         .route(
-            "/schedule/templates",
-            get(schedule_template::list_templates).post(schedule_template::create_template),
+            "/routines",
+            get(routine::list_routines).post(routine::create_routine),
         )
         .route(
-            "/schedule/templates/{id}",
-            delete(schedule_template::delete_template).put(schedule_template::update_template),
+            "/routines/{id}",
+            delete(routine::delete_routine).put(routine::update_routine),
         )
         .route(
             "/schedule-types",

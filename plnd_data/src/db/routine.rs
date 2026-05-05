@@ -3,19 +3,16 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::models::ScheduleTemplate;
+use crate::models::Routine;
 
-/// List all schedule templates for a user, ordered by created_at.
-#[tracing::instrument(skip(pool), fields(table = "schedule_templates", op = "list"))]
-pub async fn list_for_user(
-    pool: &PgPool,
-    user_id: Uuid,
-) -> Result<Vec<ScheduleTemplate>, DatabaseError> {
-    sqlx::query_as::<_, ScheduleTemplate>(
-        "SELECT template_id, user_id, task_type, title, recurrence, recurrence_rule,
+/// List all routines for a user, ordered by created_at.
+#[tracing::instrument(skip(pool), fields(table = "routines", op = "list"))]
+pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<Routine>, DatabaseError> {
+    sqlx::query_as::<_, Routine>(
+        "SELECT routine_id, user_id, task_type, title, recurrence, recurrence_rule,
             time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
             task_ref_id, task_ref_type, created_at, updated_at
-         FROM schedule_templates WHERE user_id = $1 ORDER BY created_at ASC",
+         FROM routines WHERE user_id = $1 ORDER BY created_at ASC",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -23,9 +20,9 @@ pub async fn list_for_user(
     .map_err(DatabaseError::from)
 }
 
-/// Insert a new schedule template, returning the created record.
+/// Insert a new routine, returning the created record.
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(skip(pool), fields(table = "schedule_templates", op = "create"))]
+#[tracing::instrument(skip(pool), fields(table = "routines", op = "create"))]
 pub async fn create(
     pool: &PgPool,
     user_id: Uuid,
@@ -40,14 +37,14 @@ pub async fn create(
     is_milepost: bool,
     task_ref_id: Option<Uuid>,
     task_ref_type: Option<&str>,
-) -> Result<ScheduleTemplate, DatabaseError> {
-    sqlx::query_as::<_, ScheduleTemplate>(
-        "INSERT INTO schedule_templates (
+) -> Result<Routine, DatabaseError> {
+    sqlx::query_as::<_, Routine>(
+        "INSERT INTO routines (
             user_id, task_type, title, recurrence, recurrence_rule,
             time_window_start, time_window_end, duration_minutes,
             energy_required, is_milepost, task_ref_id, task_ref_type
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        RETURNING template_id, user_id, task_type, title, recurrence, recurrence_rule,
+        RETURNING routine_id, user_id, task_type, title, recurrence, recurrence_rule,
             time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
             task_ref_id, task_ref_type, created_at, updated_at",
     )
@@ -68,15 +65,11 @@ pub async fn create(
     .map_err(DatabaseError::from)
 }
 
-/// Delete a schedule template. Returns true if a row was deleted, false if not found.
-#[tracing::instrument(skip(pool), fields(table = "schedule_templates", op = "delete"))]
-pub async fn delete(
-    pool: &PgPool,
-    template_id: Uuid,
-    user_id: Uuid,
-) -> Result<bool, DatabaseError> {
-    sqlx::query("DELETE FROM schedule_templates WHERE template_id = $1 AND user_id = $2")
-        .bind(template_id)
+/// Delete a routine. Returns true if a row was deleted, false if not found.
+#[tracing::instrument(skip(pool), fields(table = "routines", op = "delete"))]
+pub async fn delete(pool: &PgPool, routine_id: Uuid, user_id: Uuid) -> Result<bool, DatabaseError> {
+    sqlx::query("DELETE FROM routines WHERE routine_id = $1 AND user_id = $2")
+        .bind(routine_id)
         .bind(user_id)
         .execute(pool)
         .await
@@ -84,12 +77,12 @@ pub async fn delete(
         .map_err(DatabaseError::from)
 }
 
-/// Update a schedule template. Returns the updated record, or None if not found / not owned.
+/// Update a routine. Returns the updated record, or None if not found / not owned.
 #[allow(clippy::too_many_arguments)]
-#[tracing::instrument(skip(pool), fields(table = "schedule_templates", op = "update"))]
+#[tracing::instrument(skip(pool), fields(table = "routines", op = "update"))]
 pub async fn update(
     pool: &PgPool,
-    template_id: Uuid,
+    routine_id: Uuid,
     user_id: Uuid,
     title: &str,
     recurrence: &str,
@@ -101,19 +94,19 @@ pub async fn update(
     is_milepost: bool,
     task_ref_id: Option<Uuid>,
     task_ref_type: Option<&str>,
-) -> Result<Option<ScheduleTemplate>, DatabaseError> {
-    sqlx::query_as::<_, ScheduleTemplate>(
-        "UPDATE schedule_templates
+) -> Result<Option<Routine>, DatabaseError> {
+    sqlx::query_as::<_, Routine>(
+        "UPDATE routines
          SET title = $3, recurrence = $4, recurrence_rule = $5,
              time_window_start = $6, time_window_end = $7, duration_minutes = $8,
              energy_required = $9, is_milepost = $10, task_ref_id = $11,
              task_ref_type = $12, updated_at = NOW()
-         WHERE template_id = $1 AND user_id = $2
-         RETURNING template_id, user_id, task_type, title, recurrence, recurrence_rule,
+         WHERE routine_id = $1 AND user_id = $2
+         RETURNING routine_id, user_id, task_type, title, recurrence, recurrence_rule,
              time_window_start, time_window_end, duration_minutes, energy_required, is_milepost,
              task_ref_id, task_ref_type, created_at, updated_at",
     )
-    .bind(template_id)
+    .bind(routine_id)
     .bind(user_id)
     .bind(title)
     .bind(recurrence)
@@ -254,7 +247,7 @@ mod tests {
         .await
         .unwrap();
 
-        let deleted = delete(&pool, t.template_id, uid).await.unwrap();
+        let deleted = delete(&pool, t.routine_id, uid).await.unwrap();
         assert!(deleted);
     }
 
@@ -292,7 +285,7 @@ mod tests {
 
         let updated = update(
             &pool,
-            t.template_id,
+            t.routine_id,
             uid,
             "Lunch",
             "weekdays",
@@ -310,7 +303,7 @@ mod tests {
 
         assert!(updated.is_some());
         let updated = updated.unwrap();
-        assert_eq!(updated.template_id, t.template_id);
+        assert_eq!(updated.routine_id, t.routine_id);
         assert_eq!(updated.title, "Lunch");
         assert_eq!(updated.recurrence, "weekdays");
         assert_eq!(updated.energy_required, "high");
@@ -361,10 +354,10 @@ mod tests {
         .await
         .unwrap();
 
-        // uid_b cannot update uid_a's template
+        // uid_b cannot update uid_a's routine
         let result = update(
             &pool,
-            t.template_id,
+            t.routine_id,
             uid_b,
             "Hacked",
             "daily",
@@ -408,8 +401,8 @@ mod tests {
         .await
         .unwrap();
 
-        // uid_b cannot delete uid_a's template
-        let deleted = delete(&pool, t.template_id, uid_b).await.unwrap();
+        // uid_b cannot delete uid_a's routine
+        let deleted = delete(&pool, t.routine_id, uid_b).await.unwrap();
         assert!(!deleted);
 
         // Record must still exist for uid_a

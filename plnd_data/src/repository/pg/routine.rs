@@ -3,33 +3,27 @@ use chrono::NaiveTime;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::{
-    db::schedule_template as db, models::ScheduleTemplate,
-    repository::schedule_template::ScheduleTemplateRepository,
-};
+use crate::{db::routine as db, models::Routine, repository::routine::RoutineRepository};
 
-pub struct PgScheduleTemplateRepository {
+pub struct PgRoutineRepository {
     pool: PgPool,
 }
 
-impl PgScheduleTemplateRepository {
+impl PgRoutineRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl ScheduleTemplateRepository for PgScheduleTemplateRepository {
-    async fn list_templates_for_user(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Vec<ScheduleTemplate>, crate::Error> {
+impl RoutineRepository for PgRoutineRepository {
+    async fn list_routines_for_user(&self, user_id: Uuid) -> Result<Vec<Routine>, crate::Error> {
         db::list_for_user(&self.pool, user_id)
             .await
             .map_err(Into::into)
     }
 
-    async fn create_template(
+    async fn create_routine(
         &self,
         user_id: Uuid,
         task_type: &str,
@@ -43,7 +37,7 @@ impl ScheduleTemplateRepository for PgScheduleTemplateRepository {
         is_milepost: bool,
         task_ref_id: Option<Uuid>,
         task_ref_type: Option<&str>,
-    ) -> Result<ScheduleTemplate, crate::Error> {
+    ) -> Result<Routine, crate::Error> {
         db::create(
             &self.pool,
             user_id,
@@ -63,19 +57,15 @@ impl ScheduleTemplateRepository for PgScheduleTemplateRepository {
         .map_err(Into::into)
     }
 
-    async fn delete_template(
-        &self,
-        user_id: Uuid,
-        template_id: Uuid,
-    ) -> Result<bool, crate::Error> {
-        db::delete(&self.pool, template_id, user_id)
+    async fn delete_routine(&self, user_id: Uuid, routine_id: Uuid) -> Result<bool, crate::Error> {
+        db::delete(&self.pool, routine_id, user_id)
             .await
             .map_err(Into::into)
     }
 
-    async fn update_template(
+    async fn update_routine(
         &self,
-        template_id: Uuid,
+        routine_id: Uuid,
         user_id: Uuid,
         title: &str,
         recurrence: &str,
@@ -87,10 +77,10 @@ impl ScheduleTemplateRepository for PgScheduleTemplateRepository {
         is_milepost: bool,
         task_ref_id: Option<Uuid>,
         task_ref_type: Option<&str>,
-    ) -> Result<Option<ScheduleTemplate>, crate::Error> {
+    ) -> Result<Option<Routine>, crate::Error> {
         db::update(
             &self.pool,
-            template_id,
+            routine_id,
             user_id,
             title,
             recurrence,

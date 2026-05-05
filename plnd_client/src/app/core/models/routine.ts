@@ -2,8 +2,8 @@ export type TaskType = 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' 
 export type RecurrenceType = 'daily' | 'weekdays' | 'weekly' | 'custom';
 export type EnergyLevel = 'low' | 'medium' | 'high';
 
-export interface ScheduleTemplate {
-  template_id: string;
+export interface Routine {
+  routine_id: string;
   user_id: string;
   task_type: TaskType;
   title: string;
@@ -20,7 +20,7 @@ export interface ScheduleTemplate {
   updated_at: string;
 }
 
-export interface CreateScheduleTemplateRequest {
+export interface CreateRoutineRequest {
   task_type: TaskType;
   title: string;
   recurrence: RecurrenceType;
@@ -34,7 +34,7 @@ export interface CreateScheduleTemplateRequest {
   task_ref_type?: string;
 }
 
-export interface UpdateScheduleTemplateRequest {
+export interface UpdateRoutineRequest {
   title: string;
   recurrence: RecurrenceType;
   recurrence_rule?: string;

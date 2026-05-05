@@ -2,7 +2,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { PreferencesService } from '../../core/services/preferences.service';
 import { MealPlanResponse, PlanEntryRequest } from '../../core/models/week-plan';
-import { ScheduleTemplate } from '../../core/models/schedule-template';
+import { Routine } from '../../core/models/routine';
 import { ScheduleTypeResponse } from '../../core/models/schedule-type';
 import { MealHabitResponse } from '../../core/models/meal-habit';
 
@@ -30,8 +30,8 @@ export class OnboardingStateService {
   private readonly scheduleTypesSignal = signal<ScheduleTypeResponse[]>([]);
   private readonly mealHabitsSignal = signal<MealHabitResponse[]>([]);
   // Held in state so the hub stats banner can read totalRoutines without extra injection.
-  // The Tasks component feeds this in after creating/fetching templates.
-  private readonly scheduleTemplatesSignal = signal<ScheduleTemplate[]>([]);
+  // The Tasks component feeds this in after creating/fetching routines.
+  private readonly routinesSignal = signal<Routine[]>([]);
 
   // ── Public read-only signals ────────────────────────────────────────────
   readonly sectionStatus = this.statusSignal.asReadonly();
@@ -43,7 +43,7 @@ export class OnboardingStateService {
   readonly placedTasks = this.placedTasksSignal.asReadonly();
   readonly scheduleTypes = this.scheduleTypesSignal.asReadonly();
   readonly mealHabits = this.mealHabitsSignal.asReadonly();
-  readonly scheduleTemplates = this.scheduleTemplatesSignal.asReadonly();
+  readonly routines = this.routinesSignal.asReadonly();
 
   // ── Computed signals ────────────────────────────────────────────────────
   readonly allSectionsComplete = computed(() =>
@@ -51,7 +51,7 @@ export class OnboardingStateService {
   );
 
   // Hub stats banner
-  readonly totalRoutines = computed(() => this.scheduleTemplatesSignal().length);
+  readonly totalRoutines = computed(() => this.routinesSignal().length);
   readonly totalTasks = computed(() => this.placedTasksSignal().length);
   // Server contract: MealPlanResponse.meals never includes skipped entries — MealEntry has
   // no skipped field and MEAL_PLAN_RESPONSE_SCHEMA in plnd_agent/src/context/mod.rs uses
@@ -113,8 +113,8 @@ export class OnboardingStateService {
     this.mealHabitsSignal.set(habits);
   }
 
-  setScheduleTemplates(templates: ScheduleTemplate[]): void {
-    this.scheduleTemplatesSignal.set(templates);
+  setRoutines(routines: Routine[]): void {
+    this.routinesSignal.set(routines);
   }
 }
 

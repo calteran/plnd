@@ -4,10 +4,10 @@ use utoipa::{Modify, OpenApi};
 use crate::api_response::{
     CatalogDishIngredientResponse, CatalogIngredientResponse, CatalogMealDishResponse,
     DietaryRestrictionResponse, DishDetailApiResponse, MealDetailApiResponse, MealHabitResponse,
-    MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse,
-    ScheduleEntryResponse, SchedulePeriodApiResponse, ScheduleTemplateResponse,
-    ScheduleTypeResponse, TaskResponse, UserDishPrefDetailResponse, UserIngredientPrefResponse,
-    UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
+    MealSuggestionResponse, PlanStatusApiResponse, PostSchedulePlanApiResponse, RoutineResponse,
+    ScheduleEntryResponse, SchedulePeriodApiResponse, ScheduleTypeResponse, TaskResponse,
+    UserDishPrefDetailResponse, UserIngredientPrefResponse, UserMealPrefDetailResponse,
+    UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealHabitRequest, MealAdhocResolveRequest,
@@ -20,7 +20,7 @@ use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
     catalog_ingest::{IngestIngredientBody, IngestIngredientResponse},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
-    schedule_template::CreateScheduleTemplateRequest,
+    routine::CreateRoutineRequest,
     schedule_types::{CreateScheduleTypeRequest, UpdateScheduleTypeRequest},
     search::{DishSearchResponse, ExerciseSearchResponse, IngredientSearchResponse},
     user_dish_prefs::{AddIngredientBody, CreateDishBody, PatchDishBody},
@@ -119,10 +119,10 @@ impl Modify for BearerSecurityAddon {
         crate::routes::schedule::get_plan_status,
         crate::routes::schedule::post_plan,
         crate::routes::schedule::patch_entry_status,
-        // Schedule Templates
-        crate::routes::schedule_template::list_templates,
-        crate::routes::schedule_template::create_template,
-        crate::routes::schedule_template::delete_template,
+        // Routines
+        crate::routes::routine::list_routines,
+        crate::routes::routine::create_routine,
+        crate::routes::routine::delete_routine,
         // Schedule Types
         crate::routes::schedule_types::list_schedule_types,
         crate::routes::schedule_types::create_schedule_type,
@@ -170,8 +170,8 @@ impl Modify for BearerSecurityAddon {
         PlanEntryRequest,
         CarryoverDecision,
         PatchEntryStatusRequest,
-        ScheduleTemplateResponse,
-        CreateScheduleTemplateRequest,
+        RoutineResponse,
+        CreateRoutineRequest,
         ScheduleTypeResponse,
         CreateScheduleTypeRequest,
         UpdateScheduleTypeRequest,
@@ -231,7 +231,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Tasks", description = "Task management (weekly planning task creation)"),
         (name = "Meal Suggestions", description = "Meal suggestions for a given date and slot"),
         (name = "Schedule", description = "Schedule period queries and weekly plan commits"),
-        (name = "Schedule Templates", description = "Recurring routine template management"),
+        (name = "Routines", description = "Recurring routine management"),
         (name = "Schedule Types", description = "User schedule type management (day patterns with wake/bed times)"),
         (name = "Agent", description = "LLM-backed task parsing and meal planning (stubs — Phase 3.2/3.3)"),
     )
