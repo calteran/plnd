@@ -38,7 +38,7 @@ pub struct Routine {
 pub struct ScheduleEntry {
     pub entry_id: Uuid,
     pub user_id: Uuid,
-    pub routine_id: Option<Uuid>, // null for ad-hoc entries
+    pub routine_id: Option<Uuid>,  // null for ad-hoc entries
     pub task_type: Option<String>, // None = meal anchor; Some(...) = task entry
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,

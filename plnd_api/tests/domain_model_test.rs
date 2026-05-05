@@ -7,9 +7,9 @@ use plnd_api::routes::domain_constants::{
 };
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
-    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask,
-    Routine, ScheduleEntry, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,
-    UserMealDish, WorkTask,
+    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, Routine,
+    ScheduleEntry, Task, UserDish, UserDishIngredient, UserExercise, UserMeal, UserMealDish,
+    WorkTask,
 };
 
 // ---------------------------------------------------------------------------
