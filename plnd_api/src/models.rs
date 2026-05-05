@@ -69,7 +69,8 @@ pub struct CreateMealHabitRequest {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct PlanEntryRequest {
     pub date: NaiveDate,
-    pub task_type: String,
+    #[serde(default)]
+    pub task_type: Option<String>,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
@@ -315,19 +316,21 @@ mod place_tasks_tests {
     fn plan_entry_request_accepts_optional_duration_and_energy() {
         let json = r#"{
             "date": "2026-04-22",
-            "task_type": "floating",
+            "task_type": "work",
             "duration_minutes": 30,
             "energy_required": "low"
         }"#;
         let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.task_type.as_deref(), Some("work"));
         assert_eq!(req.duration_minutes, Some(30));
         assert_eq!(req.energy_required.as_deref(), Some("low"));
     }
 
     #[test]
     fn plan_entry_request_duration_and_energy_default_to_none() {
-        let json = r#"{"date": "2026-04-22", "task_type": "floating"}"#;
+        let json = r#"{"date": "2026-04-22"}"#;
         let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
+        assert!(req.task_type.is_none());
         assert!(req.duration_minutes.is_none());
         assert!(req.energy_required.is_none());
     }

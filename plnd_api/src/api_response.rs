@@ -407,7 +407,7 @@ pub struct ScheduleEntryResponse {
     pub entry_id: Uuid,
     pub user_id: Uuid,
     pub routine_id: Option<Uuid>,
-    pub task_type: String,
+    pub task_type: Option<String>,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,

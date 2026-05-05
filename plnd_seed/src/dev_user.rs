@@ -180,12 +180,12 @@ async fn seed_day(
     date: NaiveDate,
     status: &str,
 ) -> Result<(), SeedError> {
-    // (task_type, wall-clock time "HH:MM", after_anchor)
-    let entries: &[(&str, &str, Option<&str>)] = &[
-        ("exercise", "07:00", None),
-        ("meal", "08:00", Some("breakfast")),
-        ("meal", "12:30", Some("lunch")),
-        ("meal", "18:30", Some("dinner")),
+    // (task_type: None = meal anchor, wall-clock time "HH:MM", after_anchor)
+    let entries: &[(Option<&str>, &str, Option<&str>)] = &[
+        (Some("exercise"), "07:00", None),
+        (None, "08:00", Some("breakfast")),
+        (None, "12:30", Some("lunch")),
+        (None, "18:30", Some("dinner")),
     ];
 
     for (task_type, hhmm, after_anchor) in entries {

@@ -7,17 +7,17 @@ use plnd_data::query_types::{
 };
 
 #[test]
-fn test_plan_entry_request_serde() {
+fn test_plan_entry_request_serde_meal_anchor() {
+    // Meal anchor entries omit task_type (None), and use after_milepost for slot
     let json = r#"{
         "date": "2026-03-24",
-        "task_type": "meal",
         "task_ref_id": "00000000-0000-0000-0000-000000000001",
         "task_ref_type": "user_meal",
         "scheduled_start": "08:00",
         "after_anchor": "breakfast"
     }"#;
     let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
-    assert_eq!(req.task_type, "meal");
+    assert_eq!(req.task_type, None);
     assert_eq!(
         req.scheduled_start,
         Some(NaiveTime::from_hms_opt(8, 0, 0).unwrap())
@@ -35,7 +35,7 @@ fn test_plan_entry_request_general_task_with_title() {
         "scheduled_start": "07:00"
     }"#;
     let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
-    assert_eq!(req.task_type, "general");
+    assert_eq!(req.task_type, Some("general".to_string()));
     assert_eq!(req.title, Some("Morning walk".to_string()));
     assert!(req.task_ref_id.is_none());
 }

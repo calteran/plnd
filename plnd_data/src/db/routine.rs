@@ -166,7 +166,7 @@ mod tests {
         let t = create(
             &pool,
             uid,
-            "meal",
+            "general",
             "Breakfast",
             Some("daily"),
             "FREQ=DAILY",
@@ -182,7 +182,7 @@ mod tests {
         .expect("create failed");
 
         assert_eq!(t.user_id, uid);
-        assert_eq!(t.task_type, "meal");
+        assert_eq!(t.task_type, "general");
         assert_eq!(t.title, "Breakfast");
         assert_eq!(t.recurrence_tag.as_deref(), Some("daily"));
         assert_eq!(t.recurrence_rule, "FREQ=DAILY");
@@ -197,7 +197,7 @@ mod tests {
         create(
             &pool,
             uid,
-            "meal",
+            "general",
             "Breakfast",
             Some("daily"),
             "FREQ=DAILY",
@@ -244,7 +244,7 @@ mod tests {
         let t = create(
             &pool,
             uid,
-            "meal",
+            "general",
             "Breakfast",
             Some("daily"),
             "FREQ=DAILY",
@@ -280,7 +280,7 @@ mod tests {
         let t = create(
             &pool,
             uid,
-            "meal",
+            "general",
             "Breakfast",
             Some("daily"),
             "FREQ=DAILY",
@@ -352,7 +352,7 @@ mod tests {
         let t = create(
             &pool,
             uid_a,
-            "meal",
+            "general",
             "Breakfast",
             Some("daily"),
             "FREQ=DAILY",
@@ -399,7 +399,7 @@ mod tests {
         let t = create(
             &pool,
             uid_a,
-            "meal",
+            "general",
             "Breakfast",
             Some("daily"),
             "FREQ=DAILY",

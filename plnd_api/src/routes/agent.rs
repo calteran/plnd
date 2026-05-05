@@ -887,12 +887,12 @@ mod tests {
             "time_window_start": "10:00",
             "duration_minutes": 30,
             "energy_required": "low",
-            "task_type": "floating"
+            "task_type": "general"
         }"#;
         let entry: PlaceTasksEntry = serde_json::from_str(json).unwrap();
         assert_eq!(entry.title, "Call dentist");
         assert_eq!(entry.duration_minutes, 30);
-        assert_eq!(entry.task_type, "floating");
+        assert_eq!(entry.task_type, "general");
     }
 
     #[test]

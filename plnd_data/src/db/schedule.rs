@@ -148,7 +148,7 @@ pub async fn commit_plan(
     }
 
     // Collect and batch-insert all new entries in a single unnest query
-    let mut task_types: Vec<String> = Vec::new();
+    let mut task_types: Vec<Option<String>> = Vec::new();
     let mut task_ref_ids: Vec<Option<Uuid>> = Vec::new();
     let mut task_ref_types: Vec<Option<String>> = Vec::new();
     let mut titles: Vec<Option<String>> = Vec::new();
@@ -304,7 +304,7 @@ mod tests {
     fn work_entry(date: NaiveDate) -> PlanEntryInput {
         PlanEntryInput {
             date,
-            task_type: "work".to_string(),
+            task_type: Some("work".to_string()),
             task_ref_id: None,
             task_ref_type: None,
             title: Some("Test task".to_string()),
@@ -517,7 +517,7 @@ mod tests {
         let task_id_2 = make_planning_task(&pool, uid, start + Duration::days(7)).await;
         let bad_entry = PlanEntryInput {
             date: start,
-            task_type: "invalid_type".to_string(), // violates CHECK constraint
+            task_type: Some("invalid_type".to_string()), // violates CHECK constraint
             task_ref_id: None,
             task_ref_type: None,
             title: None,
@@ -567,7 +567,7 @@ mod tests {
 
         let bucket_entry = PlanEntryInput {
             date: start,
-            task_type: "work".to_string(),
+            task_type: Some("work".to_string()),
             task_ref_id: None,
             task_ref_type: None,
             title: Some("Bucket task".to_string()),
@@ -610,7 +610,7 @@ mod tests {
 
         let entry = PlanEntryInput {
             date: start,
-            task_type: "work".to_string(),
+            task_type: Some("work".to_string()),
             task_ref_id: None,
             task_ref_type: None,
             title: Some("Timed task".to_string()),
@@ -646,16 +646,16 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn commit_plan_with_meal_type_entry_inserts_correctly(pool: PgPool) {
+    async fn commit_plan_with_meal_anchor_inserts_correctly(pool: PgPool) {
         let uid = new_user(&pool).await;
         let start = tomorrow();
         let end = start + Duration::days(6);
         let task_id = make_planning_task(&pool, uid, start).await;
 
-        // Simulate an expanded meal habit entry (e.g., "Oatmeal every breakfast")
+        // Meal anchor entry: task_type = None (distinct from task entries)
         let meal_entry = PlanEntryInput {
             date: start,
-            task_type: "meal".to_string(),
+            task_type: None,
             task_ref_id: None,
             task_ref_type: None,
             title: Some("Oatmeal".to_string()),
@@ -679,7 +679,7 @@ mod tests {
         let period = get_period(&pool, uid, start, end).await.unwrap();
         assert_eq!(period.entries.len(), 1);
         let e = &period.entries[0];
-        assert_eq!(e.task_type, "meal", "task_type must be 'meal'");
+        assert_eq!(e.task_type, None, "meal anchor has no task_type");
         assert_eq!(e.title.as_deref(), Some("Oatmeal"), "title must roundtrip");
         assert_eq!(
             e.after_anchor.as_deref(),
@@ -688,7 +688,7 @@ mod tests {
         );
         assert!(
             e.scheduled_start.is_none(),
-            "meal habit entry has no scheduled_start"
+            "meal anchor has no scheduled_start"
         );
     }
 }

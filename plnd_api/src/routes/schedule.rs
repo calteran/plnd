@@ -33,8 +33,11 @@ pub struct PeriodQuery {
 // ---------------------------------------------------------------------------
 
 fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
-    if !VALID_TASK_TYPES.contains(&e.task_type.as_str()) {
-        return Err(StatusCode::BAD_REQUEST);
+    // task_type is None for meal anchor entries; validate only when present
+    if let Some(ref tt) = e.task_type {
+        if !VALID_TASK_TYPES.contains(&tt.as_str()) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
     }
     if let Some(ref mp) = e.after_anchor
         && !VALID_AFTER_ANCHORS.contains(&mp.as_str())
@@ -87,7 +90,7 @@ fn expand_habit_to_entries(
         if date_matches_recurrence(date, &habit.recurrence_rule) {
             entries.push(PlanEntryInput {
                 date,
-                task_type: "meal".to_string(),
+                task_type: None,
                 title: Some(habit.meal_name.clone()),
                 after_anchor: Some(habit.slot.clone()),
                 scheduled_start: None,
@@ -372,7 +375,7 @@ mod tests {
         let end = date(2026, 4, 29); // 3 days
         let entries = expand_habit_to_entries(&habit, start, end);
         assert_eq!(entries.len(), 3);
-        assert!(entries.iter().all(|e| e.task_type == "meal"));
+        assert!(entries.iter().all(|e| e.task_type.is_none()));
         assert!(
             entries
                 .iter()
@@ -443,7 +446,7 @@ mod tests {
     fn base_entry() -> PlanEntryRequest {
         PlanEntryRequest {
             date: date(2026, 4, 27),
-            task_type: "work".to_string(),
+            task_type: Some("work".to_string()),
             task_ref_id: None,
             task_ref_type: None,
             title: Some("Test".to_string()),
@@ -457,7 +460,7 @@ mod tests {
     #[test]
     fn map_entry_rejects_invalid_task_type() {
         let e = PlanEntryRequest {
-            task_type: "invalid_type".to_string(),
+            task_type: Some("invalid_type".to_string()),
             ..base_entry()
         };
         assert_eq!(map_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
@@ -484,7 +487,7 @@ mod tests {
     #[test]
     fn map_entry_accepts_valid_entry() {
         let e = PlanEntryRequest {
-            task_type: "meal".to_string(),
+            task_type: None, // meal anchor entry — task_type omitted
             after_anchor: Some("lunch".to_string()),
             energy_required: Some("low".to_string()),
             ..base_entry()

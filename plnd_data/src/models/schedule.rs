@@ -39,7 +39,7 @@ pub struct ScheduleEntry {
     pub entry_id: Uuid,
     pub user_id: Uuid,
     pub routine_id: Option<Uuid>, // null for ad-hoc entries
-    pub task_type: String,
+    pub task_type: Option<String>, // None = meal anchor; Some(...) = task entry
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
@@ -89,7 +89,7 @@ pub struct CommitPlanInput {
 #[derive(Debug, Clone)]
 pub struct PlanEntryInput {
     pub date: NaiveDate,
-    pub task_type: String,
+    pub task_type: Option<String>,  // None for meal anchor entries
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,

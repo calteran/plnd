@@ -24,10 +24,10 @@ pub async fn yesterday_snapshot(
 ) -> Result<YesterdaySnapshot, DatabaseError> {
     sqlx::query_as::<_, YesterdaySnapshot>(
         "SELECT
-           COUNT(*) FILTER (WHERE task_type != 'meal')                       AS tasks_total,
-           COUNT(*) FILTER (WHERE task_type != 'meal' AND status = 'completed') AS tasks_done,
-           COUNT(*) FILTER (WHERE task_type = 'meal')                        AS meals_planned,
-           COUNT(*) FILTER (WHERE task_type = 'meal' AND status = 'completed')  AS meals_logged
+           COUNT(*) FILTER (WHERE task_type IS NOT NULL)                              AS tasks_total,
+           COUNT(*) FILTER (WHERE task_type IS NOT NULL AND status = 'completed')     AS tasks_done,
+           COUNT(*) FILTER (WHERE task_type IS NULL)                                  AS meals_planned,
+           COUNT(*) FILTER (WHERE task_type IS NULL AND status = 'completed')         AS meals_logged
          FROM schedule_entries
          WHERE user_id = $1 AND date = $2",
     )
@@ -101,7 +101,7 @@ mod tests {
             entries: vec![
                 PlanEntryInput {
                     date: yesterday,
-                    task_type: "work".to_string(),
+                    task_type: Some("work".to_string()),
                     task_ref_id: None,
                     task_ref_type: None,
                     title: Some("Morning work".to_string()),
@@ -112,7 +112,7 @@ mod tests {
                 },
                 PlanEntryInput {
                     date: yesterday,
-                    task_type: "work".to_string(),
+                    task_type: Some("work".to_string()),
                     task_ref_id: None,
                     task_ref_type: None,
                     title: Some("Afternoon work".to_string()),
@@ -123,7 +123,7 @@ mod tests {
                 },
                 PlanEntryInput {
                     date: yesterday,
-                    task_type: "meal".to_string(),
+                    task_type: None, // meal anchor
                     task_ref_id: None,
                     task_ref_type: None,
                     title: Some("Lunch".to_string()),
