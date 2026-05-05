@@ -20,7 +20,7 @@ impl PgMealPatternRepository {
 #[async_trait]
 impl MealPatternRepository for PgMealPatternRepository {
     async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<MealPatternEntry>, crate::Error> {
-        db::list(&self.pool, user_id).await.map_err(Into::into)
+        db::list_for_user(&self.pool, user_id).await.map_err(Into::into)
     }
 
     async fn get_by_id(&self, id: Uuid, user_id: Uuid) -> Result<Option<MealPatternEntry>, crate::Error> {

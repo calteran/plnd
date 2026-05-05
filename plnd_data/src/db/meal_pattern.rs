@@ -8,7 +8,8 @@ use crate::models::MealPatternEntry;
 const COLUMNS: &str =
     "id, user_id, name, preferred_time, tolerance_minutes, sort_order, created_at";
 
-pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<MealPatternEntry>, DatabaseError> {
+#[tracing::instrument(skip(pool), fields(table = "meal_pattern_entries", op = "list"))]
+pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<MealPatternEntry>, DatabaseError> {
     sqlx::query_as::<_, MealPatternEntry>(&format!(
         "SELECT {COLUMNS} FROM meal_pattern_entries WHERE user_id = $1 ORDER BY sort_order ASC"
     ))
@@ -18,6 +19,7 @@ pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<MealPatternEntry>,
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(skip(pool), fields(table = "meal_pattern_entries", op = "get_by_id"))]
 pub async fn get_by_id(
     pool: &PgPool,
     id: Uuid,
@@ -33,6 +35,7 @@ pub async fn get_by_id(
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(skip(pool), fields(table = "meal_pattern_entries", op = "create"))]
 pub async fn create(
     pool: &PgPool,
     user_id: Uuid,
@@ -56,6 +59,7 @@ pub async fn create(
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(skip(pool), fields(table = "meal_pattern_entries", op = "update"))]
 pub async fn update(
     pool: &PgPool,
     id: Uuid,
@@ -82,6 +86,7 @@ pub async fn update(
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(skip(pool), fields(table = "meal_pattern_entries", op = "delete"))]
 pub async fn delete(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<bool, DatabaseError> {
     sqlx::query("DELETE FROM meal_pattern_entries WHERE id = $1 AND user_id = $2")
         .bind(id)
@@ -111,7 +116,7 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn list_returns_empty_for_new_user(pool: PgPool) {
         let uid = new_user(&pool).await;
-        assert!(list(&pool, uid).await.unwrap().is_empty());
+        assert!(list_for_user(&pool, uid).await.unwrap().is_empty());
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -120,7 +125,7 @@ mod tests {
         create(&pool, uid, "Dinner", t(18, 0), 60, 3).await.unwrap();
         create(&pool, uid, "Breakfast", t(8, 0), 60, 1).await.unwrap();
         create(&pool, uid, "Lunch", t(12, 0), 60, 2).await.unwrap();
-        let rows = list(&pool, uid).await.unwrap();
+        let rows = list_for_user(&pool, uid).await.unwrap();
         let names: Vec<&str> = rows.iter().map(|r| r.name.as_str()).collect();
         assert_eq!(names, ["Breakfast", "Lunch", "Dinner"]);
     }
@@ -130,7 +135,7 @@ mod tests {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
         create(&pool, uid_a, "Breakfast", t(8, 0), 60, 1).await.unwrap();
-        assert!(list(&pool, uid_b).await.unwrap().is_empty());
+        assert!(list_for_user(&pool, uid_b).await.unwrap().is_empty());
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -213,7 +218,7 @@ mod tests {
         let uid_b = new_user(&pool).await;
         let entry = create(&pool, uid_a, "Dinner", t(18, 0), 60, 1).await.unwrap();
         assert!(!delete(&pool, entry.id, uid_b).await.unwrap());
-        assert_eq!(list(&pool, uid_a).await.unwrap().len(), 1);
+        assert_eq!(list_for_user(&pool, uid_a).await.unwrap().len(), 1);
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -229,6 +234,14 @@ mod tests {
         let uid = new_user(&pool).await;
         create(&pool, uid, "Lunch", t(12, 0), 60, 1).await.unwrap();
         let result = create(&pool, uid, "Dinner", t(18, 0), 60, 1).await;
+        assert!(result.is_err());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn tolerance_minutes_check_constraint_enforced(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        // -1 violates the CHECK constraint
+        let result = create(&pool, uid, "Lunch", t(12, 0), -1, 1).await;
         assert!(result.is_err());
     }
 }
