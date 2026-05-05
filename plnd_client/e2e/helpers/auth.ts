@@ -87,7 +87,7 @@ export async function seedAuth(page: Page) {
         entries: [
           {
             entry_id: 'e2e-meal-uuid',
-            task_type: 'meal',
+            task_type: null,
             date: start,
             scheduled_start: `${start}T08:00:00Z`,
             status: isToday ? 'completed' : 'planned',
