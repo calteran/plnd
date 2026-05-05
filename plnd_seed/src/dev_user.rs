@@ -180,7 +180,7 @@ async fn seed_day(
     date: NaiveDate,
     status: &str,
 ) -> Result<(), SeedError> {
-    // (task_type, wall-clock time "HH:MM", after_milepost)
+    // (task_type, wall-clock time "HH:MM", after_anchor)
     let entries: &[(&str, &str, Option<&str>)] = &[
         ("exercise", "07:00", None),
         ("meal", "08:00", Some("breakfast")),
@@ -188,13 +188,13 @@ async fn seed_day(
         ("meal", "18:30", Some("dinner")),
     ];
 
-    for (task_type, hhmm, after_milepost) in entries {
+    for (task_type, hhmm, after_anchor) in entries {
         let t = NaiveTime::parse_from_str(hhmm, "%H:%M").expect("hardcoded time strings are valid");
         let scheduled_start = date.and_time(t).and_utc();
 
         sqlx::query(
             "INSERT INTO schedule_entries
-                 (entry_id, user_id, task_type, date, scheduled_start, status, after_milepost)
+                 (entry_id, user_id, task_type, date, scheduled_start, status, after_anchor)
              VALUES ($1, $2, $3, $4, $5, $6, $7)",
         )
         .bind(Uuid::new_v4())
@@ -203,7 +203,7 @@ async fn seed_day(
         .bind(date)
         .bind(scheduled_start)
         .bind(status)
-        .bind(after_milepost)
+        .bind(after_anchor)
         .execute(&mut *tx)
         .await?;
     }
