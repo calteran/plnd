@@ -33,11 +33,10 @@ pub struct PeriodQuery {
 // ---------------------------------------------------------------------------
 
 fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
-    // task_type is None for meal anchor entries; validate only when present
-    if let Some(ref tt) = e.task_type {
-        if !VALID_TASK_TYPES.contains(&tt.as_str()) {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(ref tt) = e.task_type
+        && !VALID_TASK_TYPES.contains(&tt.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
     if let Some(ref mp) = e.after_anchor
         && !VALID_AFTER_ANCHORS.contains(&mp.as_str())
