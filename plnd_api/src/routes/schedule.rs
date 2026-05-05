@@ -7,7 +7,7 @@ use crate::models::{
     CarryoverDecision as HttpCarryoverDecision, PatchEntryStatusRequest, PlanEntryRequest,
     PostSchedulePlanRequest,
 };
-use crate::routes::domain_constants::{VALID_AFTER_ANCHORS, VALID_ENERGY_LEVELS, VALID_TASK_TYPES};
+use crate::routes::domain_constants::{VALID_ENERGY_LEVELS, VALID_TASK_TYPES};
 use crate::scheduling::{date_matches_recurrence, is_recognised_recurrence};
 use crate::state::AppState;
 use axum::{
@@ -41,11 +41,6 @@ pub struct CarryoverParams {
 fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
     if let Some(ref tt) = e.task_type
         && !VALID_TASK_TYPES.contains(&tt.as_str())
-    {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-    if let Some(ref mp) = e.after_anchor
-        && !VALID_AFTER_ANCHORS.contains(&mp.as_str())
     {
         return Err(StatusCode::BAD_REQUEST);
     }
@@ -512,12 +507,14 @@ mod tests {
     }
 
     #[test]
-    fn map_entry_rejects_invalid_after_anchor() {
-        let e = PlanEntryRequest {
-            after_anchor: Some("brunch".to_string()),
-            ..base_entry()
-        };
-        assert_eq!(map_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
+    fn map_entry_accepts_any_after_anchor() {
+        for label in &["brunch", "morning snack", "post-workout", "start_of_day"] {
+            let e = PlanEntryRequest {
+                after_anchor: Some((*label).to_string()),
+                ..base_entry()
+            };
+            assert!(map_entry(e).is_ok(), "after_anchor '{}' must be accepted", label);
+        }
     }
 
     #[test]

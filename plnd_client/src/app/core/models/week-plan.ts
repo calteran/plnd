@@ -111,7 +111,8 @@ export interface ScheduleEntryDto {
   date: string;
   scheduled_start: string;
   status: string;
-  after_anchor?: string;
+  after_anchor?: string;      // free-form slot label
+  slot_anchor_id?: string;    // UUID of the preceding anchor entry
 }
 
 export interface SchedulePeriodResponse {
@@ -165,7 +166,7 @@ export interface PlaceTasksEntry {
   task_type: string;
   duration_minutes: number;
   energy_required: EnergyLevel;
-  /** Meal anchor for floating tasks — mutually exclusive with time_window_start. */
+  /** Slot anchor label for floating tasks — mutually exclusive with time_window_start. */
   after_anchor?: string;
   /** Exact start time "HH:MM" for fixed tasks — mutually exclusive with after_anchor. */
   time_window_start?: string;

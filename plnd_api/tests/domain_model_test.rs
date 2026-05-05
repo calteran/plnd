@@ -1,9 +1,9 @@
 // Offline tests for domain model structs and constants.
 // No live database required — follows the dietary_restrictions_test.rs pattern.
 use plnd_api::routes::domain_constants::{
-    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_AFTER_ANCHORS, VALID_ENERGY_LEVELS,
-    VALID_FAMILY_ROLES, VALID_FOCUS_LEVELS, VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS,
-    VALID_RECURRENCE_TYPES, VALID_TASK_STATUSES, VALID_TASK_TYPES,
+    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_ENERGY_LEVELS, VALID_FAMILY_ROLES,
+    VALID_FOCUS_LEVELS, VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS, VALID_RECURRENCE_TYPES,
+    VALID_TASK_STATUSES, VALID_TASK_TYPES,
 };
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
@@ -90,14 +90,6 @@ fn test_valid_recurrence_types_has_five_values() {
     assert!(VALID_RECURRENCE_TYPES.contains(&"monthly"));
     assert!(VALID_RECURRENCE_TYPES.contains(&"yearly"));
     assert!(!VALID_RECURRENCE_TYPES.contains(&"custom"));
-}
-
-#[test]
-fn test_valid_after_anchors_has_three_values() {
-    assert_eq!(VALID_AFTER_ANCHORS.len(), 3);
-    assert!(VALID_AFTER_ANCHORS.contains(&"breakfast"));
-    assert!(VALID_AFTER_ANCHORS.contains(&"lunch"));
-    assert!(VALID_AFTER_ANCHORS.contains(&"dinner"));
 }
 
 #[test]
@@ -535,13 +527,14 @@ fn test_schedule_entry_serde_with_after_anchor() {
         "actual_start": null,
         "actual_end": null,
         "after_anchor": "breakfast",
-        "after_entry_id": null,
+        "slot_anchor_id": null,
         "deviation_note": null,
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
     let entry: ScheduleEntry = serde_json::from_str(json).expect("deserialize failed");
     assert_eq!(entry.after_anchor.as_deref(), Some("breakfast"));
+    assert!(entry.slot_anchor_id.is_none());
     assert!(entry.routine_id.is_none());
     assert!(entry.actual_start.is_none());
 }

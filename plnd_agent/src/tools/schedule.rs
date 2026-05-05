@@ -129,8 +129,8 @@ impl Tool for GetDayScheduleTool {
                         serde_json::Value::String(start.format("%H:%M").to_string()),
                     );
                 }
-                if let Some(bucket) = e.after_anchor {
-                    obj.insert("bucket".to_string(), serde_json::Value::String(bucket));
+                if let Some(slot_label) = e.after_anchor {
+                    obj.insert("slot".to_string(), serde_json::Value::String(slot_label));
                 }
                 if let (Some(start), Some(end)) = (e.scheduled_start, e.scheduled_end) {
                     let mins = (end - start).num_minutes();
@@ -399,12 +399,13 @@ fn create_task_schema() -> serde_json::Value {
             "scheduled_start": {
                 "type": "string",
                 "format": "date-time",
-                "description": "ISO 8601 datetime when the task starts. Omit for bucket-based placement."
+                "description": "ISO 8601 datetime when the task starts. Omit for slot-based placement."
             },
             "after_anchor": {
                 "type": "string",
-                "enum": ["breakfast", "lunch", "dinner"],
-                "description": "Schedule this task after a meal anchor. Use when scheduled_start is omitted."
+                "description": "Slot anchor label to position this task after. Use the 'slot' value \
+                                from an anchor entry (is_anchor = true) returned by get_day_schedule, \
+                                or a free-form occasion label. Omit when scheduled_start is set."
             },
             "duration_minutes": {
                 "type": "integer",
@@ -490,11 +491,10 @@ impl Tool for PlaceTasksTool {
                             },
                             "after_anchor": {
                                 "type": "string",
-                                "enum": ["breakfast", "lunch", "dinner"],
-                                "description": "Time-of-day anchor for floating tasks \
-                                                (breakfast = morning, lunch = midday/afternoon, \
-                                                dinner = evening). Use for most tasks. \
-                                                Mutually exclusive with time_window_start."
+                                "description": "Slot anchor label for floating tasks. Use the 'slot' \
+                                                value from an anchor entry in the schedule context \
+                                                (is_anchor = true). Mutually exclusive with \
+                                                time_window_start."
                             },
                             "time_window_start": {
                                 "type": "string",
