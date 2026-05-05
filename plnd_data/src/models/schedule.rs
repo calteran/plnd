@@ -45,8 +45,8 @@ pub struct ScheduleEntry {
     pub status: String,
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
-    pub after_anchor: Option<String>,  // free-form slot label — any anchor occasion, unconstrained
-    pub slot_anchor_id: Option<Uuid>,  // UUID of the preceding anchor schedule entry
+    pub after_anchor: Option<String>, // free-form slot label — any anchor occasion, unconstrained
+    pub slot_anchor_id: Option<Uuid>, // UUID of the preceding anchor schedule entry
     pub deviation_note: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,

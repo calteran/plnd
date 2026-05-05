@@ -897,7 +897,11 @@ mod tests {
                     "task_type": "work"
                 }]
             });
-            assert!(v.is_valid(&payload), "slot label '{}' must be accepted", label);
+            assert!(
+                v.is_valid(&payload),
+                "slot label '{}' must be accepted",
+                label
+            );
         }
     }
 

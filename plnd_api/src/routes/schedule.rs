@@ -513,7 +513,11 @@ mod tests {
                 after_anchor: Some((*label).to_string()),
                 ..base_entry()
             };
-            assert!(map_entry(e).is_ok(), "after_anchor '{}' must be accepted", label);
+            assert!(
+                map_entry(e).is_ok(),
+                "after_anchor '{}' must be accepted",
+                label
+            );
         }
     }
 
