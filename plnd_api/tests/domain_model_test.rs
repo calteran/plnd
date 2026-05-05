@@ -502,7 +502,7 @@ fn test_routine_serde_with_task_ref_type() {
         "task_type": "exercise",
         "title": "Daily Morning Run",
         "recurrence_tag": "daily",
-        "recurrence_rule": null,
+        "recurrence_rule": "FREQ=DAILY",
         "time_window_start": "07:00:00",
         "time_window_end": "08:30:00",
         "duration_minutes": 20,
