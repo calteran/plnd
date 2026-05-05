@@ -232,11 +232,11 @@ Sub-issues will be opened **per family** (or per coherent slice within a family)
 
 **Deltas:**
 
-- **J.1 Wizard omits the "exercise" step** — `plnd_client/src/app/features/planning/planning-wizard/planning-wizard.ts:101-107` (steps: Carryover, Tasks, Meals, Review, Confirm). The closest exercise affordance is `task_type === 'exercise'` smuggled through the tasks step. Either the doc needs editorial reconciliation (treat exercise as a category of task) or an exercise step needs to land. See related open question below about doc-internal consistency between §4.9 and §1.1's "deferred behind tasks and meals for v1" framing.
+- **J.1 Wizard omits the "exercise" step** — `plnd_client/src/app/features/planning/planning-wizard/planning-wizard.ts:101-107` (steps: Carryover, Tasks, Meals, Review, Confirm). The doc-internal §4.9-vs-§1.1 tension was resolved this phase via the permanently-disabled-placeholder pattern (see "Resolved during this phase" above). The onboarding hub already implements that pattern (`Exercise [disabled]` card); the planning wizard does not. Two valid resolution paths: (a) extend the placeholder pattern to the linear wizard with a permanently-disabled exercise step, or (b) document that linear wizards skip deferred spokes silently and remove the "exercise" entry from §4.9's planning-wizard spoke list (a small architecture-doc clarification). Resolution choice is a follow-on design call.
 - **J.2 Plan length offers up to 28 days** — `plnd_client/src/app/features/onboarding/shared/planning-prefs-substep` (and the comparable surface in the planning wizard); planning-prefs-substep exposes 7 / 14 / 28 options. Doc §4.9: "capped at 14 days to bound LLM cost and reasoning load." Frontend `Preferences` interface comment says `"1–90"` for `default_plan_length_days` (`plnd_client/src/app/core/models/preferences.ts:5`).
 - **J.3 Step 4 "Day Review" is hub-and-spoke within the linear shell** — `plnd_client/src/app/features/planning/steps/plan-day-grid-step/plan-day-grid-step.ts:11-23`. Borderline; logged for design judgment.
 
-**Dependencies:** J.1 may resolve via doc edit rather than code change (escalate). J.2 is a config-cap fix; check the API also enforces.
+**Dependencies:** J.1's resolution is a design call (placeholder step vs. doc clarification on linear-wizard semantics). J.2 is a config-cap fix; check the API also enforces. J.3 is borderline (logged for design judgment).
 
 ---
 
@@ -301,7 +301,7 @@ Recommended dependency-aware order (from most foundational to least):
 6. **D — Routines vs schedule_templates.** D-vocab and D-recur are independent; D-struct (D.2) entangles with A.
 7. **H — `one_shot` flag.** Independent; ships any time.
 8. **I — Carryover review vocabulary + shape.** Independent; can ship alongside H since both touch the carryover slice of the planning wizard.
-9. **J — Planning wizard shape.** J.1 may resolve via doc edit. J.2 is a config-cap fix.
+9. **J — Planning wizard shape.** J.1 is a design call (placeholder step or doc clarification). J.2 is a config-cap fix. J.3 is borderline.
 10. **K — Day-view item type taxonomy.** Independent UI fix.
 
 Pure-rename pieces (C, D-vocab, E.1, E.2, I.1) could potentially ship as a single "vocabulary alignment" PR if coordinated; doing so makes the diff legible and avoids a long tail of two-line cleanup PRs.
