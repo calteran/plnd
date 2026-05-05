@@ -4,34 +4,30 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{
-    db::schedule_type as db,
-    models::ScheduleType,
-    repository::schedule_type::{DeleteScheduleTypeOutcome, ScheduleTypeRepository},
+    db::day_type as db,
+    models::DayType,
+    repository::day_type::{DayTypeRepository, DeleteDayTypeOutcome},
 };
 
-pub struct PgScheduleTypeRepository {
+pub struct PgDayTypeRepository {
     pool: PgPool,
 }
 
-impl PgScheduleTypeRepository {
+impl PgDayTypeRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl ScheduleTypeRepository for PgScheduleTypeRepository {
-    async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<ScheduleType>, crate::Error> {
+impl DayTypeRepository for PgDayTypeRepository {
+    async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<DayType>, crate::Error> {
         db::list_for_user(&self.pool, user_id)
             .await
             .map_err(Into::into)
     }
 
-    async fn get_by_id(
-        &self,
-        id: Uuid,
-        user_id: Uuid,
-    ) -> Result<Option<ScheduleType>, crate::Error> {
+    async fn get_by_id(&self, id: Uuid, user_id: Uuid) -> Result<Option<DayType>, crate::Error> {
         db::get_by_id(&self.pool, id, user_id)
             .await
             .map_err(Into::into)
@@ -43,18 +39,18 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
         name: &str,
         days_bitmask: i32,
         wake_time: NaiveTime,
-        bed_time: NaiveTime,
+        sleep_time: NaiveTime,
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
-    ) -> Result<ScheduleType, crate::Error> {
+    ) -> Result<DayType, crate::Error> {
         db::create(
             &self.pool,
             user_id,
             name,
             days_bitmask,
             wake_time,
-            bed_time,
+            sleep_time,
             is_cycle,
             cycle_length,
             anchor_date,
@@ -70,11 +66,11 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
         name: &str,
         days_bitmask: i32,
         wake_time: NaiveTime,
-        bed_time: NaiveTime,
+        sleep_time: NaiveTime,
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
-    ) -> Result<Option<ScheduleType>, crate::Error> {
+    ) -> Result<Option<DayType>, crate::Error> {
         db::update(
             &self.pool,
             id,
@@ -82,7 +78,7 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
             name,
             days_bitmask,
             wake_time,
-            bed_time,
+            sleep_time,
             is_cycle,
             cycle_length,
             anchor_date,
@@ -91,17 +87,19 @@ impl ScheduleTypeRepository for PgScheduleTypeRepository {
         .map_err(Into::into)
     }
 
+    async fn set_default(&self, id: Uuid, user_id: Uuid) -> Result<Option<DayType>, crate::Error> {
+        db::set_default(&self.pool, id, user_id)
+            .await
+            .map_err(Into::into)
+    }
+
     async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error> {
         db::count_for_user(&self.pool, user_id)
             .await
             .map_err(Into::into)
     }
 
-    async fn delete(
-        &self,
-        id: Uuid,
-        user_id: Uuid,
-    ) -> Result<DeleteScheduleTypeOutcome, crate::Error> {
+    async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<DeleteDayTypeOutcome, crate::Error> {
         db::delete(&self.pool, id, user_id)
             .await
             .map_err(Into::into)

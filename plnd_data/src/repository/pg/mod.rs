@@ -1,5 +1,6 @@
 pub mod briefing;
 pub mod catalog_ingest;
+pub mod day_type;
 pub mod exercise;
 pub mod meal;
 pub mod meal_habit;
@@ -9,7 +10,6 @@ pub mod memory;
 pub mod preferences;
 pub mod schedule;
 pub mod schedule_template;
-pub mod schedule_type;
 pub mod session;
 pub mod task;
 pub mod user;

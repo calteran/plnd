@@ -2,25 +2,23 @@ use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveTime};
 use uuid::Uuid;
 
-use crate::models::ScheduleType;
+use crate::models::DayType;
 
-/// Outcome of an atomic schedule-type delete operation.
 #[derive(Debug, PartialEq)]
-pub enum DeleteScheduleTypeOutcome {
+pub enum DeleteDayTypeOutcome {
     Deleted,
     NotFound,
+    /// Cannot delete: this is the user's designated default day type.
+    IsDefault,
+    /// Cannot delete: this is the user's only day type.
     LastType,
 }
 
 #[async_trait]
-pub trait ScheduleTypeRepository: Send + Sync {
-    async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<ScheduleType>, crate::Error>;
+pub trait DayTypeRepository: Send + Sync {
+    async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<DayType>, crate::Error>;
 
-    async fn get_by_id(
-        &self,
-        id: Uuid,
-        user_id: Uuid,
-    ) -> Result<Option<ScheduleType>, crate::Error>;
+    async fn get_by_id(&self, id: Uuid, user_id: Uuid) -> Result<Option<DayType>, crate::Error>;
 
     #[allow(clippy::too_many_arguments)]
     async fn create(
@@ -29,11 +27,11 @@ pub trait ScheduleTypeRepository: Send + Sync {
         name: &str,
         days_bitmask: i32,
         wake_time: NaiveTime,
-        bed_time: NaiveTime,
+        sleep_time: NaiveTime,
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
-    ) -> Result<ScheduleType, crate::Error>;
+    ) -> Result<DayType, crate::Error>;
 
     #[allow(clippy::too_many_arguments)]
     async fn update(
@@ -43,17 +41,15 @@ pub trait ScheduleTypeRepository: Send + Sync {
         name: &str,
         days_bitmask: i32,
         wake_time: NaiveTime,
-        bed_time: NaiveTime,
+        sleep_time: NaiveTime,
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
-    ) -> Result<Option<ScheduleType>, crate::Error>;
+    ) -> Result<Option<DayType>, crate::Error>;
+
+    async fn set_default(&self, id: Uuid, user_id: Uuid) -> Result<Option<DayType>, crate::Error>;
 
     async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error>;
 
-    async fn delete(
-        &self,
-        id: Uuid,
-        user_id: Uuid,
-    ) -> Result<DeleteScheduleTypeOutcome, crate::Error>;
+    async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<DeleteDayTypeOutcome, crate::Error>;
 }

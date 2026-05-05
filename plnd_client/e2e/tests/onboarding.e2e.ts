@@ -4,7 +4,7 @@ import {
   MOCK_BRIEFING_WEATHER, MOCK_BRIEFING_NEWS, MOCK_BRIEFING_YESTERDAY,
 } from '../helpers/auth';
 import {
-  MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS,
+  MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS,
   MOCK_TEMPLATE_MORNING_WALK, MOCK_PLACED_TASKS, MOCK_MEAL_PLAN,
   MOCK_MEAL_HABIT, MOCK_DIETARY_RESTRICTION_ALLERGY,
   MOCK_PLAN_COMMITTED,
@@ -28,8 +28,8 @@ async function completeAccountSpoke(page: Page): Promise<void> {
 }
 
 async function completeTasksSpoke(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/schedule-types`, route =>
-    route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+  await page.route(`${API_BASE}/day-types`, route =>
+    route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
   );
   await page.route(`${API_BASE}/schedule/templates`, route => {
     if (route.request().method() === 'POST') {
@@ -50,8 +50,8 @@ async function completeTasksSpoke(page: Page): Promise<void> {
   await page.locator('.btn-continue').click();
 
   // Step 2: Schedule Types
-  await expect(page.locator('.schedule-types-substep')).toBeVisible();
-  await page.locator('.schedule-types-substep .save-btn').click();
+  await expect(page.locator('.day-types-substep')).toBeVisible();
+  await page.locator('.day-types-substep .save-btn').click();
 
   // Step 3: Routines & Tasks
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
@@ -66,23 +66,23 @@ async function completeTasksSpoke(page: Page): Promise<void> {
 
 // Navigates to tasks spoke and completes the Planning Prefs substep.
 // Page must be at /onboarding after seedOnboarding.
-// Caller is responsible for registering the /schedule-types route before calling this.
+// Caller is responsible for registering the /day-types route before calling this.
 async function landAtScheduleTypes(page: Page): Promise<void> {
   await page.locator('.section-card').nth(1).click();
   await expect(page.locator('.planning-prefs')).toBeVisible();
   await page.locator('.btn-continue').click();
-  await expect(page.locator('.schedule-types-substep')).toBeVisible();
+  await expect(page.locator('.day-types-substep')).toBeVisible();
 }
 
 // Drives from hub to the Routines & Tasks substep.
 // Caller must have already set up the /schedule/templates route.
-// This helper registers /schedule-types itself.
+// This helper registers /day-types itself.
 async function landAtRoutinesTasks(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/schedule-types`, route =>
-    route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+  await page.route(`${API_BASE}/day-types`, route =>
+    route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
   );
   await landAtScheduleTypes(page);
-  await page.locator('.schedule-types-substep .save-btn').click();
+  await page.locator('.day-types-substep .save-btn').click();
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
 }
 
@@ -529,8 +529,8 @@ test.describe('Onboarding', () => {
 
     test('shown on first entry into Food spoke; skipped on Tasks entered after', async ({ page }) => {
       await seedOnboarding(page);
-      await page.route(`${API_BASE}/schedule-types`, route =>
-        route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+      await page.route(`${API_BASE}/day-types`, route =>
+        route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
       );
       await page.route(`${API_BASE}/schedule/templates`, route =>
         route.fulfill({ status: 200, json: [] })
@@ -548,15 +548,15 @@ test.describe('Onboarding', () => {
       await expect(page.locator('.spoke-title')).toHaveText('Tasks & Routines');
 
       await expect(page.locator('.planning-prefs')).not.toBeVisible();
-      await expect(page.locator('.schedule-types-substep')).toBeVisible();
+      await expect(page.locator('.day-types-substep')).toBeVisible();
     });
   });
 
-  test.describe('Tasks spoke — Schedule Types', () => {
+  test.describe('Tasks spoke — Day Types', () => {
     test.beforeEach(async ({ page }) => {
       await seedOnboarding(page);
-      await page.route(`${API_BASE}/schedule-types`, route =>
-        route.fulfill({ status: 200, json: [MOCK_SCHEDULE_TYPE_WEEKDAYS, MOCK_SCHEDULE_TYPE_WEEKENDS] })
+      await page.route(`${API_BASE}/day-types`, route =>
+        route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
       );
       await page.goto('/onboarding');
       await landAtScheduleTypes(page);
@@ -575,8 +575,8 @@ test.describe('Onboarding', () => {
       await expect(activePills).toHaveCount(5);
     });
 
-    test('Add new schedule type via "+ Add schedule type"', async ({ page }) => {
-      await page.getByRole('button', { name: '+ Add schedule type' }).click();
+    test('Add new day type via "+ Add day type"', async ({ page }) => {
+      await page.getByRole('button', { name: '+ Add day type' }).click();
       const cards = page.locator('.schedule-card');
       await expect(cards).toHaveCount(3);
       await expect(cards.nth(2).locator('.card-name-input')).toHaveValue('');

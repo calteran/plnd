@@ -2,7 +2,7 @@ import { Component, computed, inject, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
-import { ScheduleTypesSubstepComponent } from './substeps/schedule-types-substep/schedule-types-substep';
+import { DayTypesSubstepComponent } from './substeps/day-types-substep/day-types-substep';
 import { RoutinesTasksSubstepComponent } from './substeps/routines-tasks-substep/routines-tasks-substep';
 import { TaskPlacementReviewSubstepComponent } from './substeps/task-placement-review-substep/task-placement-review-substep';
 import { OnboardingStateService } from '../onboarding-state.service';
@@ -15,7 +15,7 @@ type TasksSubstep = 'planning-prefs' | 'schedule-types' | 'routines-tasks' | 'ta
   imports: [
     SpokeChromeComponent,
     PlanningPrefsSubstepComponent,
-    ScheduleTypesSubstepComponent,
+    DayTypesSubstepComponent,
     RoutinesTasksSubstepComponent,
     TaskPlacementReviewSubstepComponent,
   ],
@@ -36,7 +36,7 @@ type TasksSubstep = 'planning-prefs' | 'schedule-types' | 'routines-tasks' | 'ta
           />
         }
         @case ('schedule-types') {
-          <app-schedule-types-substep (complete)="onSubstepComplete()" />
+          <app-day-types-substep (complete)="onSubstepComplete()" />
         }
         @case ('routines-tasks') {
           <app-routines-tasks-substep (complete)="onSubstepComplete()" />
