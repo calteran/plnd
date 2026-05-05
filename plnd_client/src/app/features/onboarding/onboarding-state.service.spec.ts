@@ -6,7 +6,7 @@ import { PreferencesService } from '../../core/services/preferences.service';
 import { UserPreferences } from '../../core/models/preferences';
 import { MealEntry, PlanEntryRequest } from '../../core/models/week-plan';
 import { ScheduleTemplate } from '../../core/models/schedule-template';
-import { ScheduleTypeResponse } from '../../core/models/schedule-type';
+import { DayTypeResponse } from '../../core/models/schedule-type';
 import { MealHabitResponse } from '../../core/models/meal-habit';
 
 describe('OnboardingStateService', () => {
@@ -93,7 +93,7 @@ describe('OnboardingStateService', () => {
     expect(service.planningPrefsComplete()).toBeFalse();
     expect(service.upcomingTaskNames()).toEqual([]);
     expect(service.placedTasks()).toEqual([]);
-    expect(service.scheduleTypes()).toEqual([]);
+    expect(service.dayTypes()).toEqual([]);
     expect(service.mealHabits()).toEqual([]);
     expect(service.scheduleTemplates()).toEqual([]);
   });
@@ -124,17 +124,17 @@ describe('OnboardingStateService', () => {
     expect(service.placedTasks()).toEqual(tasks);
   });
 
-  it('setScheduleTypes stores schedule type records', () => {
-    const types: ScheduleTypeResponse[] = [
+  it('setDayTypes stores day type records', () => {
+    const types: DayTypeResponse[] = [
       {
         id: 'st-1', user_id: 'u1', name: 'Weekdays',
-        days_bitmask: 0b0111110, wake_time: '07:00:00', bed_time: '22:00:00',
-        is_cycle: false, cycle_length: null, anchor_date: null,
+        days_bitmask: 0b0111110, wake_time: '07:00:00', sleep_time: '22:00:00',
+        is_default: false, is_cycle: false, cycle_length: null, anchor_date: null,
         created_at: '2026-04-22T00:00:00Z',
       },
     ];
-    service.setScheduleTypes(types);
-    expect(service.scheduleTypes()).toEqual(types);
+    service.setDayTypes(types);
+    expect(service.dayTypes()).toEqual(types);
   });
 
   it('setMealHabits stores meal habit records', () => {

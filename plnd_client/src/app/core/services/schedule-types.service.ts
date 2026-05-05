@@ -57,7 +57,3 @@ export class DayTypesService {
     return this.http.delete<void>(`${apiBase}/day-types/${id}`);
   }
 }
-
-// Legacy alias — removed in Task 8 once all consumers are updated
-/** @deprecated Use DayTypesService */
-export { DayTypesService as ScheduleTypesService };

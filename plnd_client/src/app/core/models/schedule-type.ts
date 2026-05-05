@@ -21,9 +21,3 @@ export interface CreateDayTypeRequest {
   cycle_length: number | null;
   anchor_date: string | null;
 }
-
-// Legacy type aliases — removed in Task 8 once all consumers are updated
-/** @deprecated Use DayTypeResponse */
-export type ScheduleTypeResponse = DayTypeResponse;
-/** @deprecated Use CreateDayTypeRequest */
-export type CreateScheduleTypeRequest = CreateDayTypeRequest;

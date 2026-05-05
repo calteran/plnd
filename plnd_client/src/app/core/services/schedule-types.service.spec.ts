@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { ScheduleTypesService, bitmaskToDays, daysToBitmask } from './schedule-types.service';
+import { DayTypesService, bitmaskToDays, daysToBitmask } from './schedule-types.service';
 import { DayTypeResponse, CreateDayTypeRequest } from '../models/schedule-type';
 import { ConfigService } from './config.service';
 
@@ -45,8 +45,8 @@ const CREATE_REQ: CreateDayTypeRequest = {
   anchor_date: null
 };
 
-describe('ScheduleTypesService', () => {
-  let service: ScheduleTypesService;
+describe('DayTypesService', () => {
+  let service: DayTypesService;
   let httpMock: HttpTestingController;
 
   beforeEach(() => {
@@ -57,7 +57,7 @@ describe('ScheduleTypesService', () => {
         { provide: ConfigService, useValue: { getConfig: () => MOCK_CONFIG } },
       ],
     });
-    service = TestBed.inject(ScheduleTypesService);
+    service = TestBed.inject(DayTypesService);
     httpMock = TestBed.inject(HttpTestingController);
   });
 

@@ -3,7 +3,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { PreferencesService } from '../../core/services/preferences.service';
 import { MealPlanResponse, PlanEntryRequest } from '../../core/models/week-plan';
 import { ScheduleTemplate } from '../../core/models/schedule-template';
-import { ScheduleTypeResponse } from '../../core/models/schedule-type';
+import { DayTypeResponse } from '../../core/models/schedule-type';
 import { MealHabitResponse } from '../../core/models/meal-habit';
 
 export type SectionId = 'account' | 'tasks' | 'food';
@@ -27,7 +27,7 @@ export class OnboardingStateService {
   private readonly planningPrefsCompleteSignal = signal<boolean>(false);
   private readonly upcomingTaskNamesSignal = signal<string[]>([]);
   private readonly placedTasksSignal = signal<PlanEntryRequest[]>([]);
-  private readonly scheduleTypesSignal = signal<ScheduleTypeResponse[]>([]);
+  private readonly dayTypesSignal = signal<DayTypeResponse[]>([]);
   private readonly mealHabitsSignal = signal<MealHabitResponse[]>([]);
   // Held in state so the hub stats banner can read totalRoutines without extra injection.
   // The Tasks component feeds this in after creating/fetching templates.
@@ -41,7 +41,7 @@ export class OnboardingStateService {
   readonly planningPrefsComplete = this.planningPrefsCompleteSignal.asReadonly();
   readonly upcomingTaskNames = this.upcomingTaskNamesSignal.asReadonly();
   readonly placedTasks = this.placedTasksSignal.asReadonly();
-  readonly scheduleTypes = this.scheduleTypesSignal.asReadonly();
+  readonly dayTypes = this.dayTypesSignal.asReadonly();
   readonly mealHabits = this.mealHabitsSignal.asReadonly();
   readonly scheduleTemplates = this.scheduleTemplatesSignal.asReadonly();
 
@@ -105,8 +105,8 @@ export class OnboardingStateService {
     this.placedTasksSignal.set(tasks);
   }
 
-  setScheduleTypes(types: ScheduleTypeResponse[]): void {
-    this.scheduleTypesSignal.set(types);
+  setDayTypes(types: DayTypeResponse[]): void {
+    this.dayTypesSignal.set(types);
   }
 
   setMealHabits(habits: MealHabitResponse[]): void {

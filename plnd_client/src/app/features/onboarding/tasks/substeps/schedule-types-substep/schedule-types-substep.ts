@@ -10,8 +10,8 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
-import { ScheduleTypesService } from '../../../../../core/services/schedule-types.service';
-import { ScheduleTypeResponse } from '../../../../../core/models/schedule-type';
+import { DayTypesService } from '../../../../../core/services/schedule-types.service';
+import { DayTypeResponse } from '../../../../../core/models/schedule-type';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 
 // Visual order of day pills: M T W T F S S (Mon–Sun, with Sun last)
@@ -38,7 +38,7 @@ interface ScheduleCard {
   name: string;
   days_bitmask: number;
   wake_time: string;
-  bed_time: string;
+  sleep_time: string;
   is_cycle: boolean;
   cycle_length: number | null;
   anchor_date: string | null;
@@ -53,7 +53,7 @@ function defaultCards(): ScheduleCard[] {
       name: 'Weekdays',
       days_bitmask: 62, // Mon–Fri: bits 1–5
       wake_time: '07:00',
-      bed_time: '22:00',
+      sleep_time: '22:00',
       is_cycle: false,
       cycle_length: null,
       anchor_date: null,
@@ -65,7 +65,7 @@ function defaultCards(): ScheduleCard[] {
       name: 'Weekends',
       days_bitmask: 65, // Sat+Sun: bits 0+6
       wake_time: '08:00',
-      bed_time: '23:00',
+      sleep_time: '23:00',
       is_cycle: false,
       cycle_length: null,
       anchor_date: null,
@@ -74,14 +74,14 @@ function defaultCards(): ScheduleCard[] {
   ];
 }
 
-function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
+function responseToCard(r: DayTypeResponse): ScheduleCard {
   return {
     localId: crypto.randomUUID(),
     id: r.id,
     name: r.name,
     // Trim seconds from "HH:MM:SS" → "HH:MM" for <input type="time">
     wake_time: r.wake_time.length > 5 ? r.wake_time.slice(0, 5) : r.wake_time,
-    bed_time: r.bed_time.length > 5 ? r.bed_time.slice(0, 5) : r.bed_time,
+    sleep_time: r.sleep_time.length > 5 ? r.sleep_time.slice(0, 5) : r.sleep_time,
     days_bitmask: r.days_bitmask,
     is_cycle: r.is_cycle,
     cycle_length: r.cycle_length,
@@ -170,12 +170,12 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
               />
             </label>
             <label class="time-label">
-              <span>Bed</span>
+              <span>Sleep</span>
               <input
                 type="time"
                 class="time-input"
-                [value]="card.bed_time"
-                (change)="updateCard(cardIdx, { bed_time: $any($event.target).value })"
+                [value]="card.sleep_time"
+                (change)="updateCard(cardIdx, { sleep_time: $any($event.target).value })"
                 required
               />
             </label>
@@ -216,12 +216,12 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
         </div>
       }
 
-      <!-- Add schedule type -->
+      <!-- Add day type -->
       <button
         type="button"
         class="add-link"
         (click)="addCard()"
-      >+ Add schedule type</button>
+      >+ Add day type</button>
       <button
         type="button"
         class="add-link"
@@ -235,12 +235,12 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
 
       <!-- Delete error -->
       @if (deleteError()) {
-        <p class="save-error">Failed to remove schedule type. Please try again.</p>
+        <p class="save-error">Failed to remove day type. Please try again.</p>
       }
 
       <!-- Save error -->
       @if (saveError()) {
-        <p class="save-error">Failed to save schedule types. Please try again.</p>
+        <p class="save-error">Failed to save day types. Please try again.</p>
       }
 
       <!-- Save & Continue button -->
@@ -442,7 +442,7 @@ function responseToCard(r: ScheduleTypeResponse): ScheduleCard {
 export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
   @Output() complete = new EventEmitter<void>();
 
-  private readonly scheduleTypesService = inject(ScheduleTypesService);
+  private readonly dayTypesService = inject(DayTypesService);
   private readonly stateService = inject(OnboardingStateService);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -459,7 +459,7 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
   private readonly DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
   ngOnInit(): void {
-    const stored = this.stateService.scheduleTypes();
+    const stored = this.stateService.dayTypes();
     if (stored.length > 0) {
       this.cards.set(stored.map(responseToCard));
     } else {
@@ -532,7 +532,7 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
     } else if (card.id) {
       // Existing server record — delete before removing from local list
       this.deleteError.set(false);
-      this.scheduleTypesService.delete(card.id)
+      this.dayTypesService.delete(card.id)
         .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe({
           next: () => {
@@ -559,7 +559,7 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
       name: '',
       days_bitmask: 0,
       wake_time: '07:00',
-      bed_time: '22:00',
+      sleep_time: '22:00',
       is_cycle: false,
       cycle_length: null,
       anchor_date: null,
@@ -575,7 +575,7 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
       name: '',
       days_bitmask: 0,
       wake_time: '07:00',
-      bed_time: '22:00',
+      sleep_time: '22:00',
       is_cycle: true,
       cycle_length: 1,
       anchor_date: null,
@@ -614,11 +614,11 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
     const missingCycle = this.cards().filter(c => c.is_cycle && (!c.cycle_length || c.cycle_length < 1 || !c.anchor_date));
 
     if (missing7Day.length > 0) {
-      this.validationError.set('All schedule types must have at least one day assigned.');
+      this.validationError.set('All day types must have at least one day assigned.');
       return;
     }
     if (missingCycle.length > 0) {
-      this.validationError.set('Cycle schedule types must have a cycle length and start date.');
+      this.validationError.set('Cycle day types must have a cycle length and start date.');
       return;
     }
 
@@ -627,19 +627,19 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
         name: card.name,
         days_bitmask: card.days_bitmask,
         wake_time: card.wake_time,
-        bed_time: card.bed_time,
+        sleep_time: card.sleep_time,
         is_cycle: card.is_cycle,
         cycle_length: card.cycle_length,
         anchor_date: card.anchor_date,
       };
       if (card.id) {
-        return this.scheduleTypesService.update(card.id, req);
+        return this.dayTypesService.update(card.id, req);
       }
-      return this.scheduleTypesService.create(req);
+      return this.dayTypesService.create(req);
     });
 
     if (requests.length === 0) {
-      this.stateService.setScheduleTypes([]);
+      this.stateService.setDayTypes([]);
       this.complete.emit();
       return;
     }
@@ -647,7 +647,7 @@ export class ScheduleTypesSubstepComponent implements OnInit, OnDestroy {
     this.isSaving.set(true);
     forkJoin(requests).subscribe({
       next: (responses) => {
-        this.stateService.setScheduleTypes(responses);
+        this.stateService.setDayTypes(responses);
         this.isSaving.set(false);
         this.complete.emit();
       },

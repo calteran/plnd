@@ -5,34 +5,35 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { ScheduleTypesSubstepComponent } from './schedule-types-substep';
-import { ScheduleTypesService } from '../../../../../core/services/schedule-types.service';
+import { DayTypesService } from '../../../../../core/services/schedule-types.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
-import { ScheduleTypeResponse } from '../../../../../core/models/schedule-type';
+import { DayTypeResponse } from '../../../../../core/models/schedule-type';
 import { PreferencesService } from '../../../../../core/services/preferences.service';
 
-const MOCK_RESPONSE: ScheduleTypeResponse = {
+const MOCK_RESPONSE: DayTypeResponse = {
   id: 'abc-123',
   user_id: 'user-1',
   name: 'Weekdays',
   days_bitmask: 62,
   wake_time: '07:00:00',
-  bed_time: '22:00:00',
+  sleep_time: '22:00:00',
+  is_default: false,
   is_cycle: false,
   cycle_length: null,
   anchor_date: null,
   created_at: '2024-01-01T00:00:00Z',
 };
 
-function makeStateMock(storedTypes: ScheduleTypeResponse[] = []) {
-  const typesSignal: WritableSignal<ScheduleTypeResponse[]> = signal(storedTypes);
+function makeStateMock(storedTypes: DayTypeResponse[] = []) {
+  const typesSignal: WritableSignal<DayTypeResponse[]> = signal(storedTypes);
   return {
-    scheduleTypes: typesSignal.asReadonly(),
-    setScheduleTypes: jasmine.createSpy('setScheduleTypes'),
+    dayTypes: typesSignal.asReadonly(),
+    setDayTypes: jasmine.createSpy('setDayTypes'),
   };
 }
 
-function makeScheduleTypesSvcMock() {
-  return jasmine.createSpyObj<ScheduleTypesService>('ScheduleTypesService', [
+function makeDayTypesSvcMock() {
+  return jasmine.createSpyObj<DayTypesService>('DayTypesService', [
     'create',
     'update',
     'list',
@@ -41,9 +42,9 @@ function makeScheduleTypesSvcMock() {
 }
 
 describe('ScheduleTypesSubstepComponent', () => {
-  async function setup(storedTypes: ScheduleTypeResponse[] = []) {
+  async function setup(storedTypes: DayTypeResponse[] = []) {
     const stateMock = makeStateMock(storedTypes);
-    const svcMock = makeScheduleTypesSvcMock();
+    const svcMock = makeDayTypesSvcMock();
     svcMock.create.and.returnValue(of(MOCK_RESPONSE));
     svcMock.update.and.returnValue(of(MOCK_RESPONSE));
 
@@ -59,7 +60,7 @@ describe('ScheduleTypesSubstepComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         { provide: OnboardingStateService, useValue: stateMock },
-        { provide: ScheduleTypesService, useValue: svcMock },
+        { provide: DayTypesService, useValue: svcMock },
         { provide: PreferencesService, useValue: prefsMock },
       ],
     }).compileComponents();
@@ -85,8 +86,8 @@ describe('ScheduleTypesSubstepComponent', () => {
 
   // ── 2. Pre-populate from stateService on return visit ───────────────────────
 
-  it('pre-populates cards from stateService.scheduleTypes() when non-empty', async () => {
-    const stored: ScheduleTypeResponse[] = [
+  it('pre-populates cards from stateService.dayTypes() when non-empty', async () => {
+    const stored: DayTypeResponse[] = [
       { ...MOCK_RESPONSE, id: 'id-1', name: 'Work Days', days_bitmask: 62 },
       { ...MOCK_RESPONSE, id: 'id-2', name: 'Rest Days', days_bitmask: 65 },
     ];
@@ -247,9 +248,9 @@ describe('ScheduleTypesSubstepComponent', () => {
     expect(types).toContain('date');
   });
 
-  // ── 10. Save: create() called, setScheduleTypes called, complete emitted ─────
+  // ── 10. Save: create() called, setDayTypes called, complete emitted ─────
 
-  it('save() calls ScheduleTypesService.create() for new cards and emits complete', async () => {
+  it('save() calls DayTypesService.create() for new cards and emits complete', async () => {
     const { fixture, component, stateMock, svcMock } = await setup();
     fixture.detectChanges();
     const completeSpy = jasmine.createSpy('complete');
@@ -258,12 +259,12 @@ describe('ScheduleTypesSubstepComponent', () => {
     fixture.detectChanges();
     // Two default cards, both new (no id)
     expect(svcMock.create).toHaveBeenCalledTimes(2);
-    expect(stateMock.setScheduleTypes).toHaveBeenCalledTimes(1);
+    expect(stateMock.setDayTypes).toHaveBeenCalledTimes(1);
     expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
   });
 
-  it('save() calls ScheduleTypesService.update() for cards with existing ids', async () => {
-    const stored: ScheduleTypeResponse[] = [
+  it('save() calls DayTypesService.update() for cards with existing ids', async () => {
+    const stored: DayTypeResponse[] = [
       { ...MOCK_RESPONSE, id: 'existing-id', name: 'Weekdays', days_bitmask: 62 },
     ];
     const { fixture, component, svcMock } = await setup(stored);
@@ -318,7 +319,7 @@ describe('ScheduleTypesSubstepComponent', () => {
     expect(completeSpy).not.toHaveBeenCalled();
     const errorEl = fixture.nativeElement.querySelector('.save-error');
     expect(errorEl).not.toBeNull();
-    expect(errorEl.textContent).toContain('Cycle schedule types must have a cycle length and start date.');
+    expect(errorEl.textContent).toContain('Cycle day types must have a cycle length and start date.');
   });
 
   // ── 12. Save error shown on API failure ──────────────────────────────────────
@@ -331,13 +332,13 @@ describe('ScheduleTypesSubstepComponent', () => {
     fixture.detectChanges();
     const errorEl = fixture.nativeElement.querySelector('.save-error');
     expect(errorEl).not.toBeNull();
-    expect(errorEl.textContent).toContain('Failed to save schedule types');
+    expect(errorEl.textContent).toContain('Failed to save day types');
   });
 
   // ── 13. onRemoveClick: server delete for existing cards ──────────────────────
 
   it('onRemoveClick() calls delete() and removes card on success when card has an id', async () => {
-    const stored: ScheduleTypeResponse[] = [
+    const stored: DayTypeResponse[] = [
       { ...MOCK_RESPONSE, id: 'del-id', name: 'To Delete', days_bitmask: 0 },
     ];
     const { component, svcMock } = await setup(stored);
@@ -351,7 +352,7 @@ describe('ScheduleTypesSubstepComponent', () => {
   });
 
   it('onRemoveClick() shows deleteError when server delete fails', async () => {
-    const stored: ScheduleTypeResponse[] = [
+    const stored: DayTypeResponse[] = [
       { ...MOCK_RESPONSE, id: 'del-id', name: 'To Delete', days_bitmask: 0 },
     ];
     const { fixture, component, svcMock } = await setup(stored);
