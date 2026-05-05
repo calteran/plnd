@@ -1,6 +1,15 @@
 import { Page } from '@playwright/test';
 import { API_BASE, MOCK_USER_NEW, MOCK_PREFS } from './auth';
 
+// Default meal pattern entries surfaced during onboarding (Food spoke, Meal Times substep).
+// Also prevents the 401 → authErrorInterceptor → logout cascade for tests that
+// use a synthetic token against the real API server.
+export const MOCK_MEAL_PATTERN = [
+  { id: 'mp1', user_id: 'test', name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp2', user_id: 'test', name: 'Lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp3', user_id: 'test', name: 'Dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, created_at: '2026-01-01T00:00:00Z' },
+];
+
 // ── Day Types ─────────────────────────────────────────────────────────────────
 
 export const MOCK_DAY_TYPE_WEEKDAYS = {
@@ -127,5 +136,10 @@ export async function seedOnboarding(page: Page): Promise<void> {
   // Handles both GET and PATCH (component only needs a 200 + valid body)
   await page.route(`${API_BASE}/preferences/me`, route =>
     route.fulfill({ status: 200, json: MOCK_PREFS })
+  );
+  // Prevents 401 → authErrorInterceptor → logout cascade; also supplies
+  // default B/L/D entries for the Meal Times substep rendering.
+  await page.route(`${API_BASE}/meal-pattern**`, route =>
+    route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
   );
 }

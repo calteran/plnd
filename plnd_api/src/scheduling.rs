@@ -82,12 +82,6 @@ fn date_matches_recurrence(date: NaiveDate, rule: &str) -> bool {
     }
 }
 
-/// True if `rule` is a pattern recognised by `date_matches_recurrence`.
-#[cfg(test)]
-fn is_recognised_recurrence(rule: &str) -> bool {
-    let rule_lc = rule.to_lowercase();
-    matches!(rule_lc.as_str(), "daily" | "weekdays" | "weekends") || rule_lc.contains("byday=")
-}
 
 fn weekday_from_abbrev(abbrev: &str) -> Option<Weekday> {
     match abbrev {
