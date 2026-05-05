@@ -14,12 +14,10 @@ use plnd_data::Error;
 use std::sync::Arc;
 use uuid::Uuid;
 
-/// Returns 422 if `rule` is `Some` but does not begin with `FREQ=`.
+/// Returns 422 if `rule` does not begin with `FREQ=`.
 /// Uppercase-only: RFC 5545 canonical form; the frontend always generates uppercase.
-fn validate_recurrence_rule(rule: Option<&str>) -> Result<(), StatusCode> {
-    if let Some(r) = rule
-        && !r.starts_with("FREQ=")
-    {
+fn validate_recurrence_rule(rule: &str) -> Result<(), StatusCode> {
+    if !rule.starts_with("FREQ=") {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     Ok(())
@@ -28,8 +26,10 @@ fn validate_recurrence_rule(rule: Option<&str>) -> Result<(), StatusCode> {
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
 pub struct UpdateRoutineRequest {
     pub title: String,
-    pub recurrence: String,
-    pub recurrence_rule: Option<String>,
+    /// RRULE canonical string, required (e.g. "FREQ=DAILY").
+    pub recurrence_rule: String,
+    /// Curated recurrence enum — optional derived presentation hint.
+    pub recurrence_tag: Option<String>,
     pub time_window_start: Option<NaiveTime>,
     pub time_window_end: Option<NaiveTime>,
     pub duration_minutes: Option<i32>,
@@ -45,8 +45,10 @@ pub struct UpdateRoutineRequest {
 pub struct CreateRoutineRequest {
     pub task_type: String,
     pub title: String,
-    pub recurrence: String,
-    pub recurrence_rule: Option<String>,
+    /// RRULE canonical string, required (e.g. "FREQ=DAILY").
+    pub recurrence_rule: String,
+    /// Curated recurrence enum — optional derived presentation hint.
+    pub recurrence_tag: Option<String>,
     pub time_window_start: Option<NaiveTime>,
     pub time_window_end: Option<NaiveTime>,
     pub duration_minutes: Option<i32>,
@@ -110,14 +112,18 @@ pub async fn create_routine(
     if !VALID_TASK_TYPES.contains(&body.task_type.as_str()) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if !VALID_RECURRENCE_TYPES.contains(&body.recurrence.as_str()) {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
     let energy = body.energy_required.as_deref().unwrap_or("medium");
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    validate_recurrence_rule(body.recurrence_rule.as_deref())?;
+    validate_recurrence_rule(&body.recurrence_rule)?;
+    if body
+        .recurrence_tag
+        .as_deref()
+        .is_some_and(|tag| !VALID_RECURRENCE_TYPES.contains(&tag))
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
@@ -127,8 +133,8 @@ pub async fn create_routine(
             user_id,
             &body.task_type,
             &body.title,
-            &body.recurrence,
-            body.recurrence_rule.as_deref(),
+            body.recurrence_tag.as_deref(),
+            &body.recurrence_rule,
             body.time_window_start,
             body.time_window_end,
             body.duration_minutes,
@@ -210,14 +216,18 @@ pub async fn update_routine(
     if body.title.trim().is_empty() {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if !VALID_RECURRENCE_TYPES.contains(&body.recurrence.as_str()) {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
     let energy = body.energy_required.as_deref().unwrap_or("medium");
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    validate_recurrence_rule(body.recurrence_rule.as_deref())?;
+    validate_recurrence_rule(&body.recurrence_rule)?;
+    if body
+        .recurrence_tag
+        .as_deref()
+        .is_some_and(|tag| !VALID_RECURRENCE_TYPES.contains(&tag))
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
@@ -227,8 +237,8 @@ pub async fn update_routine(
             routine_id,
             user_id,
             &body.title,
-            &body.recurrence,
-            body.recurrence_rule.as_deref(),
+            body.recurrence_tag.as_deref(),
+            &body.recurrence_rule,
             body.time_window_start,
             body.time_window_end,
             body.duration_minutes,
@@ -271,12 +281,13 @@ mod tests {
 
     #[test]
     fn valid_recurrences_matches_db_check_constraint() {
-        for r in &["daily", "weekdays", "weekly", "custom"] {
+        for r in &["daily", "weekdays", "weekly", "monthly", "yearly"] {
             assert!(
                 VALID_RECURRENCE_TYPES.contains(r),
                 "missing recurrence: {r}"
             );
         }
+        assert!(!VALID_RECURRENCE_TYPES.contains(&"custom"));
         assert!(!VALID_RECURRENCE_TYPES.contains(&"biweekly"));
     }
 
@@ -296,7 +307,7 @@ mod tests {
             "FREQ=MONTHLY;BYMONTHDAY=1",
         ] {
             assert!(
-                validate_recurrence_rule(Some(rule)).is_ok(),
+                validate_recurrence_rule(rule).is_ok(),
                 "should accept: {rule}"
             );
         }
@@ -306,14 +317,9 @@ mod tests {
     fn recurrence_rule_invalid_format_rejected() {
         for rule in &["garbage", "", "BYDAY=MO", "freq=weekly"] {
             assert!(
-                validate_recurrence_rule(Some(rule)).is_err(),
+                validate_recurrence_rule(rule).is_err(),
                 "should reject: {rule}"
             );
         }
-    }
-
-    #[test]
-    fn recurrence_rule_none_is_always_valid() {
-        assert!(validate_recurrence_rule(None).is_ok());
     }
 }

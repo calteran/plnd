@@ -7,7 +7,7 @@ import { Routine } from '../models/routine';
 const base: Omit<Routine, 'routine_id' | 'title'> = {
   user_id: 'user-uuid',
   task_type: 'general',
-  recurrence: 'daily',
+  recurrence_tag: 'daily',
   recurrence_rule: 'FREQ=DAILY',
   time_window_start: null,
   time_window_end: null,
@@ -21,7 +21,7 @@ const base: Omit<Routine, 'routine_id' | 'title'> = {
 };
 
 const MOCK_ROUTINE_A: Routine = { ...base, routine_id: 'tid-1', title: 'Morning walk' };
-const MOCK_ROUTINE_B: Routine = { ...base, routine_id: 'tid-2', title: 'Evening stretch', recurrence: 'weekdays', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR' };
+const MOCK_ROUTINE_B: Routine = { ...base, routine_id: 'tid-2', title: 'Evening stretch', recurrence_tag: 'weekdays', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR' };
 
 describe('RoutinesService', () => {
   let service: RoutinesService;
@@ -65,7 +65,7 @@ describe('RoutinesService', () => {
   });
 
   it('load() still fetches after create() pre-populates the signal', () => {
-    service.create({ task_type: 'general', title: 'Morning walk', recurrence: 'daily' }).subscribe();
+    service.create({ task_type: 'general', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' }).subscribe();
     httpMock.expectOne(r => r.method === 'POST').flush(MOCK_ROUTINE_A);
 
     // Signal is non-null now, but load() should still fetch (loaded flag is still false)
@@ -93,7 +93,7 @@ describe('RoutinesService', () => {
     httpMock.expectOne(r => r.method === 'GET').flush([MOCK_ROUTINE_A]);
 
     let result: Routine | undefined;
-    service.create({ task_type: 'general', title: 'Evening stretch', recurrence: 'weekdays' }).subscribe(r => (result = r));
+    service.create({ task_type: 'general', title: 'Evening stretch', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', recurrence_tag: 'weekdays' }).subscribe(r => (result = r));
 
     const req = httpMock.expectOne(r => r.url.endsWith('/routines') && r.method === 'POST');
     req.flush(MOCK_ROUTINE_B);

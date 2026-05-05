@@ -50,7 +50,7 @@ function makeTemplate(overrides: Partial<Routine> = {}): Routine {
     user_id: 'user-1',
     task_type: 'general',
     title: 'Daily Routine',
-    recurrence: 'daily',
+    recurrence_tag: 'daily',
     recurrence_rule: 'FREQ=DAILY',
     time_window_start: '08:00',
     time_window_end: null,

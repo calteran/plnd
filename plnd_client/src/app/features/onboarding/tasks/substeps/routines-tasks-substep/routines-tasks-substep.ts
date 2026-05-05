@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RoutinesService } from '../../../../../core/services/routines.service';
-import { Routine, CreateRoutineRequest, UpdateRoutineRequest } from '../../../../../core/models/routine';
+import { Routine, CreateRoutineRequest, UpdateRoutineRequest, recurrenceTagFromRrule } from '../../../../../core/models/routine';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 
 // ── Recurrence dropdown option ───────────────────────────────────────────────
@@ -20,10 +20,11 @@ interface RecurrenceOption {
 }
 
 const RECURRENCE_OPTIONS: RecurrenceOption[] = [
-  { value: 'FREQ=DAILY',   label: 'Daily' },
-  { value: 'FREQ=WEEKLY',  label: 'Weekly' },
-  { value: 'FREQ=MONTHLY', label: 'Monthly' },
-  { value: 'FREQ=YEARLY',  label: 'Yearly' },
+  { value: 'FREQ=DAILY',                        label: 'Daily'    },
+  { value: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', label: 'Weekdays' },
+  { value: 'FREQ=WEEKLY',                        label: 'Weekly'   },
+  { value: 'FREQ=MONTHLY',                       label: 'Monthly'  },
+  { value: 'FREQ=YEARLY',                        label: 'Yearly'   },
 ];
 
 // ── Day-of-week pills for "Weekly…" selector ─────────────────────────────────
@@ -94,12 +95,6 @@ function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekD
   return { selectedRrule: 'FREQ=DAILY', selectedWeekDays: [] };
 }
 
-/** Map an rrule string to the RecurrenceType expected by the API. */
-function rruleToRecurrenceType(rrule: string): 'daily' | 'weekdays' | 'weekly' | 'custom' {
-  if (rrule === 'FREQ=DAILY')          return 'daily';
-  if (rrule.startsWith('FREQ=WEEKLY')) return 'weekly';
-  return 'custom'; // FREQ=MONTHLY, FREQ=YEARLY
-}
 
 @Component({
   selector: 'app-routines-tasks-substep',
@@ -651,7 +646,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
         existing.map(t => ({
           localId: crypto.randomUUID(),
           name: t.title,
-          rrule: t.recurrence_rule ?? 'FREQ=DAILY',
+          rrule: t.recurrence_rule,
           routineId: t.routine_id,
         }))
       );
@@ -688,12 +683,12 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     if (!name) return;
 
     const rrule = this.effectiveRrule();
-    const recurrence = rruleToRecurrenceType(rrule);
+    const tag = recurrenceTagFromRrule(rrule);
     const req: CreateRoutineRequest = {
       task_type: 'general',
       title: name,
-      recurrence,
       recurrence_rule: rrule,
+      ...(tag ? { recurrence_tag: tag } : {}),
     };
 
     this.isAdding.set(true);
@@ -702,7 +697,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
       next: (routine: Routine) => {
         this.routines.update(list => [
           ...list,
-          { localId: crypto.randomUUID(), name: routine.title, rrule: routine.recurrence_rule ?? rrule, routineId: routine.routine_id },
+          { localId: crypto.randomUUID(), name: routine.title, rrule: routine.recurrence_rule, routineId: routine.routine_id },
         ]);
         this.routineName = '';
         this.isAdding.set(false);
@@ -717,11 +712,12 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   addInspirationChip(chip: InspirationChip): void {
     if (this.isAdding()) return;
 
+    const tag = recurrenceTagFromRrule(chip.rrule);
     const req: CreateRoutineRequest = {
       task_type: 'general',
       title: chip.name,
-      recurrence: 'daily',
       recurrence_rule: chip.rrule,
+      ...(tag ? { recurrence_tag: tag } : {}),
     };
 
     this.isAdding.set(true);
@@ -731,7 +727,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
         this.usedInspirationIds.update(set => new Set([...set, chip.id]));
         this.routines.update(list => [
           ...list,
-          { localId: crypto.randomUUID(), name: routine.title, rrule: routine.recurrence_rule ?? chip.rrule, routineId: routine.routine_id },
+          { localId: crypto.randomUUID(), name: routine.title, rrule: routine.recurrence_rule, routineId: routine.routine_id },
         ]);
         this.isAdding.set(false);
       },
@@ -775,8 +771,12 @@ export class RoutinesTasksSubstepComponent implements OnInit {
     if (!title) return;
 
     const rrule = this.editEffectiveRrule();
-    const recurrence = rruleToRecurrenceType(rrule);
-    const req: UpdateRoutineRequest = { title, recurrence, recurrence_rule: rrule };
+    const tag = recurrenceTagFromRrule(rrule);
+    const req: UpdateRoutineRequest = {
+      title,
+      recurrence_rule: rrule,
+      ...(tag ? { recurrence_tag: tag } : {}),
+    };
 
     this.isSaving.set(true);
     this.saveError.set('');
@@ -784,7 +784,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
       next: (updated: Routine) => {
         this.routines.update(list =>
           list.map(r => r.localId === routine.localId
-            ? { ...r, name: updated.title, rrule: updated.recurrence_rule ?? rrule }
+            ? { ...r, name: updated.title, rrule: updated.recurrence_rule }
             : r)
         );
         this.editingId.set(null);

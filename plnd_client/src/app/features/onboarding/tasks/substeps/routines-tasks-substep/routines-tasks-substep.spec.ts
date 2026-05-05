@@ -17,7 +17,7 @@ function makeTemplate(overrides: Partial<Routine> = {}): Routine {
     user_id: 'user-1',
     task_type: 'general',
     title: 'Morning walk',
-    recurrence: 'daily',
+    recurrence_tag: 'daily',
     recurrence_rule: 'FREQ=DAILY',
     time_window_start: null,
     time_window_end: null,
@@ -129,7 +129,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     fixture.detectChanges();
 
     expect(templatesSvcMock.create).toHaveBeenCalledOnceWith(
-      jasmine.objectContaining({ title: 'Yoga', recurrence: 'daily' })
+      jasmine.objectContaining({ title: 'Yoga', recurrence_rule: 'FREQ=DAILY' })
     );
 
     const chips = fixture.nativeElement.querySelectorAll('.routine-chip');
@@ -338,7 +338,7 @@ describe('RoutinesTasksSubstepComponent', () => {
 
     expect(templatesSvcMock.update).toHaveBeenCalledOnceWith(
       'tmpl-1',
-      jasmine.objectContaining({ title: 'Evening walk', recurrence: 'daily' })
+      jasmine.objectContaining({ title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' })
     );
     expect(fixture.nativeElement.querySelector('.routine-edit-card')).toBeNull();
     const chipBodyEl: HTMLButtonElement = fixture.nativeElement.querySelector('.chip-body--clickable');

@@ -1,4 +1,4 @@
-import { rruleFromRecurrence } from './routine';
+import { rruleFromRecurrence, recurrenceTagFromRrule } from './routine';
 
 describe('rruleFromRecurrence', () => {
   it('daily → FREQ=DAILY', () => {
@@ -21,15 +21,49 @@ describe('rruleFromRecurrence', () => {
     expect(rruleFromRecurrence('weekly')).toBe('FREQ=WEEKLY;BYDAY=MO');
   });
 
-  it('custom with a rule passes through the rule string', () => {
-    expect(rruleFromRecurrence('custom', undefined, 'FREQ=MONTHLY;BYMONTHDAY=1')).toBe('FREQ=MONTHLY;BYMONTHDAY=1');
+  it('monthly → FREQ=MONTHLY', () => {
+    expect(rruleFromRecurrence('monthly')).toBe('FREQ=MONTHLY');
   });
 
-  it('custom with no rule returns empty string', () => {
-    expect(rruleFromRecurrence('custom')).toBe('');
+  it('yearly → FREQ=YEARLY', () => {
+    expect(rruleFromRecurrence('yearly')).toBe('FREQ=YEARLY');
   });
 
   it('weekly with out-of-range weekDay falls back to MO', () => {
     expect(rruleFromRecurrence('weekly', 99)).toBe('FREQ=WEEKLY;BYDAY=MO');
+  });
+});
+
+describe('recurrenceTagFromRrule', () => {
+  it('FREQ=DAILY → daily', () => {
+    expect(recurrenceTagFromRrule('FREQ=DAILY')).toBe('daily');
+  });
+
+  it('FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR → weekdays', () => {
+    expect(recurrenceTagFromRrule('FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR')).toBe('weekdays');
+  });
+
+  it('FREQ=WEEKLY → weekly', () => {
+    expect(recurrenceTagFromRrule('FREQ=WEEKLY')).toBe('weekly');
+  });
+
+  it('FREQ=WEEKLY;BYDAY=MO,WE,FR → weekly', () => {
+    expect(recurrenceTagFromRrule('FREQ=WEEKLY;BYDAY=MO,WE,FR')).toBe('weekly');
+  });
+
+  it('FREQ=MONTHLY → monthly', () => {
+    expect(recurrenceTagFromRrule('FREQ=MONTHLY')).toBe('monthly');
+  });
+
+  it('FREQ=YEARLY → yearly', () => {
+    expect(recurrenceTagFromRrule('FREQ=YEARLY')).toBe('yearly');
+  });
+
+  it('FREQ=DAILY;INTERVAL=2 → null (complex RRULE)', () => {
+    expect(recurrenceTagFromRrule('FREQ=DAILY;INTERVAL=2')).toBeNull();
+  });
+
+  it('empty string → null', () => {
+    expect(recurrenceTagFromRrule('')).toBeNull();
   });
 });

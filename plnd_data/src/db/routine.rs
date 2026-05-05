@@ -9,7 +9,7 @@ use crate::models::Routine;
 #[tracing::instrument(skip(pool), fields(table = "routines", op = "list"))]
 pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<Routine>, DatabaseError> {
     sqlx::query_as::<_, Routine>(
-        "SELECT routine_id, user_id, task_type, title, recurrence, recurrence_rule,
+        "SELECT routine_id, user_id, task_type, title, recurrence_tag, recurrence_rule,
             time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
             task_ref_id, task_ref_type, created_at, updated_at
          FROM routines WHERE user_id = $1 ORDER BY created_at ASC",
@@ -28,8 +28,8 @@ pub async fn create(
     user_id: Uuid,
     task_type: &str,
     title: &str,
-    recurrence: &str,
-    recurrence_rule: Option<&str>,
+    recurrence_tag: Option<&str>,
+    recurrence_rule: &str,
     time_window_start: Option<NaiveTime>,
     time_window_end: Option<NaiveTime>,
     duration_minutes: Option<i32>,
@@ -40,18 +40,18 @@ pub async fn create(
 ) -> Result<Routine, DatabaseError> {
     sqlx::query_as::<_, Routine>(
         "INSERT INTO routines (
-            user_id, task_type, title, recurrence, recurrence_rule,
+            user_id, task_type, title, recurrence_tag, recurrence_rule,
             time_window_start, time_window_end, duration_minutes,
             energy_required, is_anchor, task_ref_id, task_ref_type
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        RETURNING routine_id, user_id, task_type, title, recurrence, recurrence_rule,
+        RETURNING routine_id, user_id, task_type, title, recurrence_tag, recurrence_rule,
             time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
             task_ref_id, task_ref_type, created_at, updated_at",
     )
     .bind(user_id)
     .bind(task_type)
     .bind(title)
-    .bind(recurrence)
+    .bind(recurrence_tag)
     .bind(recurrence_rule)
     .bind(time_window_start)
     .bind(time_window_end)
@@ -85,8 +85,8 @@ pub async fn update(
     routine_id: Uuid,
     user_id: Uuid,
     title: &str,
-    recurrence: &str,
-    recurrence_rule: Option<&str>,
+    recurrence_tag: Option<&str>,
+    recurrence_rule: &str,
     time_window_start: Option<NaiveTime>,
     time_window_end: Option<NaiveTime>,
     duration_minutes: Option<i32>,
@@ -97,19 +97,19 @@ pub async fn update(
 ) -> Result<Option<Routine>, DatabaseError> {
     sqlx::query_as::<_, Routine>(
         "UPDATE routines
-         SET title = $3, recurrence = $4, recurrence_rule = $5,
+         SET title = $3, recurrence_tag = $4, recurrence_rule = $5,
              time_window_start = $6, time_window_end = $7, duration_minutes = $8,
              energy_required = $9, is_anchor = $10, task_ref_id = $11,
              task_ref_type = $12, updated_at = NOW()
          WHERE routine_id = $1 AND user_id = $2
-         RETURNING routine_id, user_id, task_type, title, recurrence, recurrence_rule,
+         RETURNING routine_id, user_id, task_type, title, recurrence_tag, recurrence_rule,
              time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
              task_ref_id, task_ref_type, created_at, updated_at",
     )
     .bind(routine_id)
     .bind(user_id)
     .bind(title)
-    .bind(recurrence)
+    .bind(recurrence_tag)
     .bind(recurrence_rule)
     .bind(time_window_start)
     .bind(time_window_end)
@@ -168,8 +168,8 @@ mod tests {
             uid,
             "meal",
             "Breakfast",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             Some(NaiveTime::from_hms_opt(8, 0, 0).unwrap()),
             Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
             Some(30),
@@ -184,7 +184,8 @@ mod tests {
         assert_eq!(t.user_id, uid);
         assert_eq!(t.task_type, "meal");
         assert_eq!(t.title, "Breakfast");
-        assert_eq!(t.recurrence, "daily");
+        assert_eq!(t.recurrence_tag.as_deref(), Some("daily"));
+        assert_eq!(t.recurrence_rule, "FREQ=DAILY");
         assert_eq!(t.energy_required, "medium");
         assert!(!t.is_anchor);
     }
@@ -198,8 +199,8 @@ mod tests {
             uid,
             "meal",
             "Breakfast",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             None,
             None,
             None,
@@ -211,7 +212,18 @@ mod tests {
         .await
         .unwrap();
         create(
-            &pool, uid, "exercise", "Walk", "weekdays", None, None, None, None, "low", false, None,
+            &pool,
+            uid,
+            "exercise",
+            "Walk",
+            Some("weekdays"),
+            "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
+            None,
+            None,
+            None,
+            "low",
+            false,
+            None,
             None,
         )
         .await
@@ -234,8 +246,8 @@ mod tests {
             uid,
             "meal",
             "Breakfast",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             None,
             None,
             None,
@@ -270,8 +282,8 @@ mod tests {
             uid,
             "meal",
             "Breakfast",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             None,
             None,
             None,
@@ -288,8 +300,8 @@ mod tests {
             t.routine_id,
             uid,
             "Lunch",
-            "weekdays",
-            None,
+            Some("weekdays"),
+            "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR",
             None,
             None,
             None,
@@ -305,7 +317,8 @@ mod tests {
         let updated = updated.unwrap();
         assert_eq!(updated.routine_id, t.routine_id);
         assert_eq!(updated.title, "Lunch");
-        assert_eq!(updated.recurrence, "weekdays");
+        assert_eq!(updated.recurrence_tag.as_deref(), Some("weekdays"));
+        assert_eq!(updated.recurrence_rule, "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
         assert_eq!(updated.energy_required, "high");
     }
 
@@ -317,8 +330,8 @@ mod tests {
             Uuid::new_v4(),
             uid,
             "Lunch",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             None,
             None,
             None,
@@ -341,8 +354,8 @@ mod tests {
             uid_a,
             "meal",
             "Breakfast",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             None,
             None,
             None,
@@ -360,8 +373,8 @@ mod tests {
             t.routine_id,
             uid_b,
             "Hacked",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             None,
             None,
             None,
@@ -388,8 +401,8 @@ mod tests {
             uid_a,
             "meal",
             "Breakfast",
-            "daily",
-            None,
+            Some("daily"),
+            "FREQ=DAILY",
             None,
             None,
             None,

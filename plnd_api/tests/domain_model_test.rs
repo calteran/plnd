@@ -79,12 +79,14 @@ fn test_valid_priority_levels_has_three_values() {
 }
 
 #[test]
-fn test_valid_recurrence_types_has_four_values() {
-    assert_eq!(VALID_RECURRENCE_TYPES.len(), 4);
+fn test_valid_recurrence_types_has_five_values() {
+    assert_eq!(VALID_RECURRENCE_TYPES.len(), 5);
     assert!(VALID_RECURRENCE_TYPES.contains(&"daily"));
     assert!(VALID_RECURRENCE_TYPES.contains(&"weekdays"));
     assert!(VALID_RECURRENCE_TYPES.contains(&"weekly"));
-    assert!(VALID_RECURRENCE_TYPES.contains(&"custom"));
+    assert!(VALID_RECURRENCE_TYPES.contains(&"monthly"));
+    assert!(VALID_RECURRENCE_TYPES.contains(&"yearly"));
+    assert!(!VALID_RECURRENCE_TYPES.contains(&"custom"));
 }
 
 #[test]
@@ -512,8 +514,8 @@ fn test_routine_serde_with_task_ref_type() {
         "user_id": "00000000-0000-0000-0000-000000000099",
         "task_type": "meal",
         "title": "Daily Breakfast",
-        "recurrence": "daily",
-        "recurrence_rule": null,
+        "recurrence_tag": "daily",
+        "recurrence_rule": "FREQ=DAILY",
         "time_window_start": "07:00:00",
         "time_window_end": "08:30:00",
         "duration_minutes": 20,
@@ -527,7 +529,7 @@ fn test_routine_serde_with_task_ref_type() {
     let routine: Routine = serde_json::from_str(json).expect("deserialize failed");
     assert!(routine.is_anchor);
     assert_eq!(routine.task_ref_type.as_deref(), Some("user_meal"));
-    assert_eq!(routine.recurrence, "daily");
+    assert_eq!(routine.recurrence_tag.as_deref(), Some("daily"));
 }
 
 #[test]
