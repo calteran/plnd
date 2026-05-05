@@ -117,7 +117,7 @@ impl Tool for GetDayScheduleTool {
                     serde_json::Value::String(e.task_type.clone()),
                 );
                 obj.insert(
-                    "is_milepost".to_string(),
+                    "is_anchor".to_string(),
                     serde_json::Value::Bool(e.task_type == "meal"),
                 );
                 if let Some(start) = e.scheduled_start {
@@ -228,15 +228,15 @@ impl Tool for CreateTaskTool {
             None => None,
         };
 
-        let after_milepost = input
-            .get("after_milepost")
+        let after_anchor = input
+            .get("after_anchor")
             .and_then(|v| v.as_str())
             .map(str::to_string);
 
-        if scheduled_start.is_none() && after_milepost.is_none() {
+        if scheduled_start.is_none() && after_anchor.is_none() {
             return Err(ToolError::InvalidInput {
                 tool: self.name().to_string(),
-                reason: "at least one of 'after_milepost' or 'scheduled_start' must be provided"
+                reason: "at least one of 'after_anchor' or 'scheduled_start' must be provided"
                     .to_string(),
             });
         }
@@ -273,7 +273,7 @@ impl Tool for CreateTaskTool {
                 date,
                 scheduled_start,
                 duration_minutes,
-                after_milepost.as_deref(),
+                after_anchor.as_deref(),
             )
             .await
             .map_err(|e| db_err(self.name(), e))?;
@@ -283,7 +283,7 @@ impl Tool for CreateTaskTool {
                 "type": "task_created",
                 "task_id": task.task_id,
                 "date": date.to_string(),
-                "after_milepost": after_milepost,
+                "after_anchor": after_anchor,
                 "scheduled_at": scheduled_start
             }],
             "ui_signals": ui_signals,
@@ -398,7 +398,7 @@ fn create_task_schema() -> serde_json::Value {
                 "format": "date-time",
                 "description": "ISO 8601 datetime when the task starts. Omit for bucket-based placement."
             },
-            "after_milepost": {
+            "after_anchor": {
                 "type": "string",
                 "enum": ["breakfast", "lunch", "dinner"],
                 "description": "Schedule this task after a meal anchor. Use when scheduled_start is omitted."
@@ -485,7 +485,7 @@ impl Tool for PlaceTasksTool {
                                 "format": "date",
                                 "description": "ISO date within the plan period"
                             },
-                            "after_milepost": {
+                            "after_anchor": {
                                 "type": "string",
                                 "enum": ["breakfast", "lunch", "dinner"],
                                 "description": "Time-of-day anchor for floating tasks \
@@ -497,7 +497,7 @@ impl Tool for PlaceTasksTool {
                                 "type": "string",
                                 "description": "Exact wall-clock start as HH:MM — for fixed tasks \
                                                 only (appointments, medication doses, scheduled calls). \
-                                                Mutually exclusive with after_milepost."
+                                                Mutually exclusive with after_anchor."
                             },
                             "duration_minutes": {
                                 "type": "integer",
@@ -517,7 +517,7 @@ impl Tool for PlaceTasksTool {
                                 "description": "Domain category for this task. \
                                                 NEVER use meal anchor names here — \
                                                 \"breakfast\", \"lunch\", and \"dinner\" \
-                                                belong only in after_milepost. \
+                                                belong only in after_anchor. \
                                                 For personal errands or activities with \
                                                 no specific category, use \"general\"."
                             }
@@ -745,13 +745,13 @@ mod tests {
             !required
                 .iter()
                 .any(|v| v.as_str() == Some("time_window_start")),
-            "time_window_start must not be required — floating tasks use after_milepost"
+            "time_window_start must not be required — floating tasks use after_anchor"
         );
         assert!(
-            items["properties"].get("after_milepost").is_some(),
-            "after_milepost must be a declared property"
+            items["properties"].get("after_anchor").is_some(),
+            "after_anchor must be a declared property"
         );
-        let variants: Vec<_> = items["properties"]["after_milepost"]["enum"]
+        let variants: Vec<_> = items["properties"]["after_anchor"]["enum"]
             .as_array()
             .unwrap()
             .iter()
@@ -761,7 +761,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn place_tasks_tool_accepts_floating_task_with_after_milepost() {
+    async fn place_tasks_tool_accepts_floating_task_with_after_anchor() {
         let tool = PlaceTasksTool;
         let ctx = ToolContext {
             user_id: uuid::Uuid::new_v4(),
@@ -770,7 +770,7 @@ mod tests {
             "entries": [{
                 "title": "Review expense report",
                 "scheduled_date": "2026-04-24",
-                "after_milepost": "lunch",
+                "after_anchor": "lunch",
                 "duration_minutes": 45,
                 "energy_required": "medium",
                 "task_type": "work"

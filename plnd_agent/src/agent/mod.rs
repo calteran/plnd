@@ -524,14 +524,14 @@ impl AgentService {
                         let correction = match tools.terminal_tool_name() {
                             Some(tool_name) => {
                                 // PlaceTasks entries share similar-sounding enums for
-                                // task_type and after_milepost. Append a targeted reminder
+                                // task_type and after_anchor. Append a targeted reminder
                                 // so the model does not confuse them on retry.
                                 let place_tasks_hint = if tool_name == "place_tasks" {
                                     "\n\nReminder — valid enum values for every entry:\n\
                                      \u{2022} task_type: \"work\", \"exercise\", \"leisure\", \
                                        \"appointment\", \"medication\", \"general\" \
                                        (NEVER a meal name such as \"breakfast\")\n\
-                                     \u{2022} after_milepost: \"breakfast\", \"lunch\", \"dinner\"\n\
+                                     \u{2022} after_anchor: \"breakfast\", \"lunch\", \"dinner\"\n\
                                      \u{2022} energy_required: \"low\", \"medium\", \"high\""
                                 } else {
                                     ""
@@ -2050,13 +2050,13 @@ mod schema_validation_tests {
 
     #[test]
     fn valid_bucket_task_created_passes() {
-        // Bucket task: task_id + date + after_milepost, no scheduled_at.
+        // Bucket task: task_id + date + after_anchor, no scheduled_at.
         let json = r#"{
             "actions_taken": [{
                 "type": "task_created",
                 "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                 "date": "2026-04-05",
-                "after_milepost": "after_lunch"
+                "after_anchor": "after_lunch"
             }],
             "ui_signals": [],
             "confirmation": "Scheduled after lunch on Sunday."

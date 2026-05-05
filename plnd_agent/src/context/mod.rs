@@ -20,7 +20,7 @@ const PLACE_TASKS_PROMPT: &str = include_str!("../prompts/place_tasks.md");
 /// - When `actions_taken[i].type == "task_created"`, both `task_id` and
 ///   `date` must be present and non-null (the `if/then` conditional).
 /// - `scheduled_at` is optional for all action types (used for timed tasks).
-/// - `after_milepost` is optional (used for bucket-scheduled tasks).
+/// - `after_anchor` is optional (used for bucket-scheduled tasks).
 const TASK_ENTRY_RESPONSE_SCHEMA: &str = r##"{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "TaskEntryResponse",
@@ -41,7 +41,7 @@ const TASK_ENTRY_RESPONSE_SCHEMA: &str = r##"{
         "type":           { "type": "string" },
         "task_id":        { "oneOf": [{ "type": "string", "format": "uuid" }, { "type": "null" }] },
         "date":           { "oneOf": [{ "type": "string", "format": "date" }, { "type": "null" }] },
-        "after_milepost": { "oneOf": [{ "type": "string" }, { "type": "null" }] },
+        "after_anchor": { "oneOf": [{ "type": "string" }, { "type": "null" }] },
         "scheduled_at":   { "oneOf": [{ "type": "string", "format": "date-time" }, { "type": "null" }] }
       },
       "if":   { "properties": { "type": { "const": "task_created" } }, "required": ["type"] },
@@ -269,7 +269,7 @@ const PLACE_TASKS_RESPONSE_SCHEMA: &str = r##"{
         "task_type":         { "type": "string", "enum": ["work", "exercise", "leisure", "appointment", "medication", "general"] },
         "duration_minutes":  { "type": "integer", "minimum": 1, "maximum": 480 },
         "energy_required":   { "type": "string", "enum": ["low", "medium", "high"] },
-        "after_milepost":    { "type": "string", "enum": ["breakfast", "lunch", "dinner"] },
+        "after_anchor":      { "type": "string", "enum": ["breakfast", "lunch", "dinner"] },
         "time_window_start": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
       }
     }
@@ -679,7 +679,7 @@ mod tests {
                 "type": "task_created",
                 "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
                 "date": "2026-04-10",
-                "after_milepost": "after_lunch"
+                "after_anchor": "after_lunch"
             }],
             "ui_signals": [],
             "confirmation": "Scheduled after lunch on Thursday."
@@ -768,7 +768,7 @@ mod tests {
             "entries": [{
                 "title": "Call dentist",
                 "scheduled_date": "2026-04-23",
-                "after_milepost": "lunch",
+                "after_anchor": "lunch",
                 "duration_minutes": 30,
                 "energy_required": "low",
                 "task_type": "appointment"
@@ -807,7 +807,7 @@ mod tests {
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "after_milepost": "lunch",
+                "after_anchor": "lunch",
                 "duration_minutes": 30,
                 "energy_required": "extreme",
                 "task_type": "work"
@@ -823,7 +823,7 @@ mod tests {
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "after_milepost": "breakfast",
+                "after_anchor": "breakfast",
                 "duration_minutes": 30,
                 "energy_required": "low",
                 "task_type": "floating"
@@ -839,7 +839,7 @@ mod tests {
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "after_milepost": "lunch",
+                "after_anchor": "lunch",
                 "duration_minutes": 0,
                 "energy_required": "low",
                 "task_type": "work"
@@ -850,7 +850,7 @@ mod tests {
 
     #[test]
     fn place_tasks_validator_accepts_entry_without_time_anchor() {
-        // Neither time_window_start nor after_milepost is required by the schema;
+        // Neither time_window_start nor after_anchor is required by the schema;
         // the agent prompt instructs one should always be present, but the schema
         // itself doesn't enforce mutual exclusion.
         let v = UseCase::PlaceTasks.response_validator().unwrap();
@@ -873,7 +873,7 @@ mod tests {
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "after_milepost": "lunch",
+                "after_anchor": "lunch",
                 "duration_minutes": 30,
                 "energy_required": "low",
                 "task_type": "work",
@@ -884,13 +884,13 @@ mod tests {
     }
 
     #[test]
-    fn place_tasks_validator_rejects_invalid_after_milepost() {
+    fn place_tasks_validator_rejects_invalid_after_anchor() {
         let v = UseCase::PlaceTasks.response_validator().unwrap();
         let bad = serde_json::json!({
             "entries": [{
                 "title": "Task",
                 "scheduled_date": "2026-04-23",
-                "after_milepost": "brunch",
+                "after_anchor": "brunch",
                 "duration_minutes": 30,
                 "energy_required": "low",
                 "task_type": "work"
