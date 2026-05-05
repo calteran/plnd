@@ -24,7 +24,7 @@ export class WeekPlanService {
   private readonly planStartSignal            = signal<string>('');
   private readonly planEndSignal              = signal<string>('');
   private readonly currentStepSignal          = signal<number>(1);
-  private readonly carryoverItemsSignal       = signal<SchedulePeriodResponse['carryover']>([]);
+  private readonly carryoverItemsSignal       = signal<ScheduleEntryDto[]>([]);
   private readonly scheduledTasksSignal       = signal<PlannedTask[]>([]);
   private readonly scheduledMealsSignal       = signal<Record<string, Partial<Record<MealSlot, PlannedMeal>>>>({});
   private readonly carryoverDecisionsSignal   = signal<Record<string, CarryoverDecision>>({});
@@ -106,6 +106,7 @@ export class WeekPlanService {
     localStorage.removeItem(this.DRAFT_KEY);
   }
 
+  // Retained for re-plan mode: pre-fills scheduled tasks/meals from existing period entries.
   loadPeriod(start: string, end: string): Observable<SchedulePeriodResponse> {
     return this.http
       .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period?start=${start}&end=${end}`)

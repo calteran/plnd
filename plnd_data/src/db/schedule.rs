@@ -52,6 +52,7 @@ pub async fn get_carryover(
     user_id: Uuid,
     before: NaiveDate,
 ) -> Result<Vec<ScheduleEntry>, DatabaseError> {
+    // TODO(#657): this query is duplicated in get_period — extract a shared helper
     sqlx::query_as::<_, ScheduleEntry>(&format!(
         "SELECT {ENTRY_COLS} FROM schedule_entries
          WHERE user_id = $1 AND date < $2
