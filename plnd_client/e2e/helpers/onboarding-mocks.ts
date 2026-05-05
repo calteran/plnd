@@ -1,25 +1,27 @@
 import { Page } from '@playwright/test';
 import { API_BASE, MOCK_USER_NEW, MOCK_PREFS } from './auth';
 
-// ── Schedule Types ────────────────────────────────────────────────────────────
+// ── Day Types ─────────────────────────────────────────────────────────────────
 
-export const MOCK_SCHEDULE_TYPE_WEEKDAYS = {
+export const MOCK_DAY_TYPE_WEEKDAYS = {
   id: 'st-weekdays-uuid',
   name: 'Weekdays',
   days_bitmask: 62,
   wake_time: '07:00:00',
-  bed_time: '22:00:00',
+  sleep_time: '22:00:00',
+  is_default: true,
   is_cycle: false,
   cycle_length: null,
   anchor_date: null,
 };
 
-export const MOCK_SCHEDULE_TYPE_WEEKENDS = {
+export const MOCK_DAY_TYPE_WEEKENDS = {
   id: 'st-weekends-uuid',
   name: 'Weekends',
   days_bitmask: 65,
   wake_time: '08:00:00',
-  bed_time: '23:00:00',
+  sleep_time: '23:00:00',
+  is_default: false,
   is_cycle: false,
   cycle_length: null,
   anchor_date: null,
