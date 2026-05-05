@@ -273,7 +273,11 @@ pub async fn post_plan(
             tracing::error!(error = %e, "meal_pattern fetch error in post_plan");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    entries.extend(expand_pattern_to_entries(&pattern, body.plan_start, body.plan_end));
+    entries.extend(expand_pattern_to_entries(
+        &pattern,
+        body.plan_start,
+        body.plan_end,
+    ));
 
     let carryover_decisions: HashMap<Uuid, CarryoverDecision> = body
         .carryover_decisions
@@ -453,7 +457,7 @@ mod expand_tests {
     fn expand_fills_all_days() {
         let pattern = [entry("Breakfast", 1), entry("Lunch", 2), entry("Dinner", 3)];
         let start = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
-        let end   = NaiveDate::from_ymd_opt(2025, 1, 3).unwrap();
+        let end = NaiveDate::from_ymd_opt(2025, 1, 3).unwrap();
         let result = expand_pattern_to_entries(&pattern, start, end);
         assert_eq!(result.len(), 9); // 3 days × 3 entries
     }

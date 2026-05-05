@@ -9,7 +9,10 @@ const COLUMNS: &str =
     "id, user_id, name, preferred_time, tolerance_minutes, sort_order, created_at";
 
 #[tracing::instrument(skip(pool), fields(table = "meal_pattern_entries", op = "list"))]
-pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<MealPatternEntry>, DatabaseError> {
+pub async fn list_for_user(
+    pool: &PgPool,
+    user_id: Uuid,
+) -> Result<Vec<MealPatternEntry>, DatabaseError> {
     sqlx::query_as::<_, MealPatternEntry>(&format!(
         "SELECT {COLUMNS} FROM meal_pattern_entries WHERE user_id = $1 ORDER BY sort_order ASC"
     ))
@@ -103,10 +106,15 @@ mod tests {
     use crate::db::users;
 
     async fn new_user(pool: &PgPool) -> Uuid {
-        users::create(pool, &format!("{}@test.invalid", Uuid::new_v4()), None, None)
-            .await
-            .expect("create user")
-            .user_id
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("create user")
+        .user_id
     }
 
     fn t(hh: u32, mm: u32) -> NaiveTime {
@@ -123,7 +131,9 @@ mod tests {
     async fn list_orders_by_sort_order(pool: PgPool) {
         let uid = new_user(&pool).await;
         create(&pool, uid, "Dinner", t(18, 0), 60, 3).await.unwrap();
-        create(&pool, uid, "Breakfast", t(8, 0), 60, 1).await.unwrap();
+        create(&pool, uid, "Breakfast", t(8, 0), 60, 1)
+            .await
+            .unwrap();
         create(&pool, uid, "Lunch", t(12, 0), 60, 2).await.unwrap();
         let rows = list_for_user(&pool, uid).await.unwrap();
         let names: Vec<&str> = rows.iter().map(|r| r.name.as_str()).collect();
@@ -134,14 +144,18 @@ mod tests {
     async fn list_excludes_other_users(pool: PgPool) {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
-        create(&pool, uid_a, "Breakfast", t(8, 0), 60, 1).await.unwrap();
+        create(&pool, uid_a, "Breakfast", t(8, 0), 60, 1)
+            .await
+            .unwrap();
         assert!(list_for_user(&pool, uid_b).await.unwrap().is_empty());
     }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn create_returns_entry_with_all_fields(pool: PgPool) {
         let uid = new_user(&pool).await;
-        let entry = create(&pool, uid, "Second Breakfast", t(10, 30), 45, 2).await.unwrap();
+        let entry = create(&pool, uid, "Second Breakfast", t(10, 30), 45, 2)
+            .await
+            .unwrap();
         assert_eq!(entry.user_id, uid);
         assert_eq!(entry.name, "Second Breakfast");
         assert_eq!(entry.preferred_time, t(10, 30));
@@ -161,14 +175,21 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn get_by_id_returns_none_for_unknown(pool: PgPool) {
         let uid = new_user(&pool).await;
-        assert!(get_by_id(&pool, Uuid::new_v4(), uid).await.unwrap().is_none());
+        assert!(
+            get_by_id(&pool, Uuid::new_v4(), uid)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn get_by_id_enforces_user_isolation(pool: PgPool) {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
-        let entry = create(&pool, uid_a, "Lunch", t(12, 0), 60, 1).await.unwrap();
+        let entry = create(&pool, uid_a, "Lunch", t(12, 0), 60, 1)
+            .await
+            .unwrap();
         assert!(get_by_id(&pool, entry.id, uid_b).await.unwrap().is_none());
     }
 
@@ -188,15 +209,27 @@ mod tests {
     #[sqlx::test(migrations = "./migrations")]
     async fn update_returns_none_for_unknown(pool: PgPool) {
         let uid = new_user(&pool).await;
-        assert!(update(&pool, Uuid::new_v4(), uid, "X", t(8, 0), 60, 1).await.unwrap().is_none());
+        assert!(
+            update(&pool, Uuid::new_v4(), uid, "X", t(8, 0), 60, 1)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn update_enforces_user_isolation(pool: PgPool) {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
-        let entry = create(&pool, uid_a, "Lunch", t(12, 0), 60, 1).await.unwrap();
-        assert!(update(&pool, entry.id, uid_b, "X", t(8, 0), 60, 1).await.unwrap().is_none());
+        let entry = create(&pool, uid_a, "Lunch", t(12, 0), 60, 1)
+            .await
+            .unwrap();
+        assert!(
+            update(&pool, entry.id, uid_b, "X", t(8, 0), 60, 1)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -216,7 +249,9 @@ mod tests {
     async fn delete_enforces_user_isolation(pool: PgPool) {
         let uid_a = new_user(&pool).await;
         let uid_b = new_user(&pool).await;
-        let entry = create(&pool, uid_a, "Dinner", t(18, 0), 60, 1).await.unwrap();
+        let entry = create(&pool, uid_a, "Dinner", t(18, 0), 60, 1)
+            .await
+            .unwrap();
         assert!(!delete(&pool, entry.id, uid_b).await.unwrap());
         assert_eq!(list_for_user(&pool, uid_a).await.unwrap().len(), 1);
     }

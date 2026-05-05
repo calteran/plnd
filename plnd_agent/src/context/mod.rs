@@ -577,7 +577,10 @@ mod tests {
             "occasion": "brunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         });
-        assert!(validator.is_valid(&ok), "user-defined occasion name must be accepted");
+        assert!(
+            validator.is_valid(&ok),
+            "user-defined occasion name must be accepted"
+        );
     }
 
     #[test]

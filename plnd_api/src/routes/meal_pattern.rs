@@ -70,7 +70,13 @@ pub async fn create_meal_pattern_entry(
     state
         .repos
         .meal_pattern
-        .create(user_id, name, body.preferred_time, tolerance, body.sort_order)
+        .create(
+            user_id,
+            name,
+            body.preferred_time,
+            tolerance,
+            body.sort_order,
+        )
         .await
         .map(|e| (StatusCode::CREATED, Json(MealPatternEntryResponse::from(e))))
         .map_err(|e| match e {

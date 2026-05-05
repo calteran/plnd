@@ -80,11 +80,14 @@ async fn insert_preferences(tx: &mut PgConnection, user_id: Uuid) -> Result<(), 
     Ok(())
 }
 
-async fn insert_meal_pattern_entries(tx: &mut PgConnection, user_id: Uuid) -> Result<(), SeedError> {
+async fn insert_meal_pattern_entries(
+    tx: &mut PgConnection,
+    user_id: Uuid,
+) -> Result<(), SeedError> {
     let entries: &[(&str, &str, i32, i32)] = &[
         ("breakfast", "08:00:00", 60, 1),
-        ("lunch",     "12:00:00", 60, 2),
-        ("dinner",    "18:00:00", 60, 3),
+        ("lunch", "12:00:00", 60, 2),
+        ("dinner", "18:00:00", 60, 3),
     ];
     for (name, preferred_time, tolerance_minutes, sort_order) in entries {
         sqlx::query(

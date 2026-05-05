@@ -20,11 +20,19 @@ impl PgMealPatternRepository {
 #[async_trait]
 impl MealPatternRepository for PgMealPatternRepository {
     async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<MealPatternEntry>, crate::Error> {
-        db::list_for_user(&self.pool, user_id).await.map_err(Into::into)
+        db::list_for_user(&self.pool, user_id)
+            .await
+            .map_err(Into::into)
     }
 
-    async fn get_by_id(&self, id: Uuid, user_id: Uuid) -> Result<Option<MealPatternEntry>, crate::Error> {
-        db::get_by_id(&self.pool, id, user_id).await.map_err(Into::into)
+    async fn get_by_id(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+    ) -> Result<Option<MealPatternEntry>, crate::Error> {
+        db::get_by_id(&self.pool, id, user_id)
+            .await
+            .map_err(Into::into)
     }
 
     async fn create(
@@ -35,9 +43,16 @@ impl MealPatternRepository for PgMealPatternRepository {
         tolerance_minutes: i32,
         sort_order: i32,
     ) -> Result<MealPatternEntry, crate::Error> {
-        db::create(&self.pool, user_id, name, preferred_time, tolerance_minutes, sort_order)
-            .await
-            .map_err(Into::into)
+        db::create(
+            &self.pool,
+            user_id,
+            name,
+            preferred_time,
+            tolerance_minutes,
+            sort_order,
+        )
+        .await
+        .map_err(Into::into)
     }
 
     async fn update(
@@ -49,12 +64,22 @@ impl MealPatternRepository for PgMealPatternRepository {
         tolerance_minutes: i32,
         sort_order: i32,
     ) -> Result<Option<MealPatternEntry>, crate::Error> {
-        db::update(&self.pool, id, user_id, name, preferred_time, tolerance_minutes, sort_order)
-            .await
-            .map_err(Into::into)
+        db::update(
+            &self.pool,
+            id,
+            user_id,
+            name,
+            preferred_time,
+            tolerance_minutes,
+            sort_order,
+        )
+        .await
+        .map_err(Into::into)
     }
 
     async fn delete(&self, id: Uuid, user_id: Uuid) -> Result<bool, crate::Error> {
-        db::delete(&self.pool, id, user_id).await.map_err(Into::into)
+        db::delete(&self.pool, id, user_id)
+            .await
+            .map_err(Into::into)
     }
 }

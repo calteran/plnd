@@ -1203,8 +1203,15 @@ mod tests {
         let schema = search_meal_catalog_schema();
         let occasion = &schema["properties"]["occasion"];
         assert_eq!(occasion["type"], "string");
-        assert!(occasion.get("enum").is_none(), "occasion must not be a closed enum");
-        assert!(occasion["description"].as_str().is_some_and(|s| s.contains("slot")));
+        assert!(
+            occasion.get("enum").is_none(),
+            "occasion must not be a closed enum"
+        );
+        assert!(
+            occasion["description"]
+                .as_str()
+                .is_some_and(|s| s.contains("slot"))
+        );
     }
 
     #[test]
