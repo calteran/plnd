@@ -786,7 +786,7 @@ impl Tool for ResolveMealDescriptionTool {
                 },
                 "occasion_tags": {
                     "type": "array",
-                    "items": { "type": "string", "description": "Meal slot name from the user's pattern" },
+                    "items": { "type": "string", "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)" },
                     "description": "Required when kind='new'. Occasions this meal fits."
                 },
                 "estimated_nutrition": {
@@ -1204,7 +1204,7 @@ mod tests {
         let occasion = &schema["properties"]["occasion"];
         assert_eq!(occasion["type"], "string");
         assert!(occasion.get("enum").is_none(), "occasion must not be a closed enum");
-        assert!(occasion["description"].as_str().is_some_and(|s| s.contains("meal")));
+        assert!(occasion["description"].as_str().is_some_and(|s| s.contains("slot")));
     }
 
     #[test]
