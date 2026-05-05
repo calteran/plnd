@@ -230,7 +230,7 @@ describe('WeekPlanService', () => {
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const breakfast = body.entries.find(e => e.after_milepost === 'breakfast');
+      const breakfast = body.entries.find(e => e.after_anchor === 'breakfast');
       expect(breakfast).toBeTruthy();
       expect('task_type' in breakfast!).toBeFalse();
       req.flush({ committed: 3, planning_task_status: 'completed' });
