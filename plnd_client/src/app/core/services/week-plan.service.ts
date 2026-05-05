@@ -7,9 +7,10 @@ import {
   MealSlot, PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, ScheduleEntryDto, SchedulePeriodResponse,
-  STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
 import { TaskType } from '../models/routine';
+import { MealPatternService } from './meal-pattern.service';
+import { preferredTimeHHMM } from '../models/meal-pattern';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
 
@@ -17,6 +18,7 @@ interface WeeklyPlanTaskResponse { task_id: string; }
 export class WeekPlanService {
   private readonly http    = inject(HttpClient);
   private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
+  private readonly mealPatternService = inject(MealPatternService);
 
   private readonly DRAFT_KEY = 'plnd:plan-draft';
   private readonly SCHEMA_VERSION = 2;
@@ -280,7 +282,8 @@ export class WeekPlanService {
   currentState(): MealPlanState {
     const meals = this.scheduledMealsSignal();
     const entries = this.horizonDays().flatMap(date =>
-      STANDARD_MEAL_SLOTS.map(slot => {
+      this.mealPatternService.entries().map(patternEntry => {
+        const slot = patternEntry.name;
         const meal = meals[date]?.[slot];
         return {
           date,
@@ -379,35 +382,16 @@ export class WeekPlanService {
     const entries: PlanEntryRequest[] = [];
 
     for (const date of this.horizonDays()) {
-      for (const slot of STANDARD_MEAL_SLOTS) {
+      for (const patternEntry of this.mealPatternService.entries()) {
+        const slot = patternEntry.name;
         const meal = meals[date]?.[slot];
         if (meal?.approvalState === 'skipped') continue;
-        const resolved: PlannedMeal = meal ?? {
-          approvalState: 'proposed',
-          mealRef: null,
-          title: `(${slot})`,
-        };
         entries.push({
           date,
-          // task_type omitted — meal anchor entries have no task_type
-          task_ref_id: resolved.mealRef?.id,
-          task_ref_type: resolved.mealRef?.type,
-          title: resolved.mealRef ? undefined : resolved.title,
-          scheduled_start: slotDefaultTime(slot),
-          after_anchor: slot,
-        });
-      }
-      // Explicit non-standard slots (snack, etc.) — include only what was explicitly set.
-      for (const [slotKey, meal] of Object.entries(meals[date] ?? {})) {
-        const slot = slotKey as MealSlot;
-        if (STANDARD_MEAL_SLOTS.includes(slot) || !meal || meal.approvalState === 'skipped') continue;
-        entries.push({
-          date,
-          // task_type omitted — meal anchor entries have no task_type
-          task_ref_id: meal.mealRef?.id,
-          task_ref_type: meal.mealRef?.type,
-          title: meal.mealRef ? undefined : meal.title,
-          scheduled_start: slotDefaultTime(slot),
+          task_ref_id: meal?.mealRef?.id,
+          task_ref_type: meal?.mealRef?.type as 'catalog' | 'user' | undefined,
+          title: meal?.mealRef ? undefined : (meal?.title ?? `(${slot})`),
+          scheduled_start: preferredTimeHHMM(patternEntry.preferred_time),
           after_anchor: slot,
         });
       }
@@ -440,14 +424,4 @@ export class WeekPlanService {
 /** Extracts "HH:MM" from an ISO timestamp string using UTC hours/minutes. */
 function utcHHMM(iso: string): string {
   return new Date(iso).toISOString().slice(11, 16);
-}
-
-function slotDefaultTime(slot: MealSlot): string {
-  const map: Record<MealSlot, string> = {
-    breakfast: '08:00',
-    lunch: '12:00',
-    dinner: '18:00',
-    snack: '15:00',
-  };
-  return map[slot];
 }
