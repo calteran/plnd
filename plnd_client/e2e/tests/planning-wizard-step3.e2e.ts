@@ -305,9 +305,12 @@ test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
   });
 
   test('Refresh modal shows the correct unapproved count', async ({ page }) => {
+    test.setTimeout(15_000);
+    // Wait for auto-generate to complete before clicking
+    await expect(page.locator('.gc').first().locator('.gc-approve')).toBeVisible();
     // Approve one meal first
     await page.locator('.gc').first().locator('.gc-approve').click();
-    await expect(page.locator('.btn-refresh-all')).toBeVisible();
+    await expect(page.locator('.btn-refresh-all')).toBeVisible({ timeout: 8_000 });
     const badge = page.locator('.badge');
     // 9 total − 1 approved = 8 unapproved
     await expect(badge).toHaveText('8');
@@ -317,6 +320,9 @@ test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
   });
 
   test('confirm Refresh — approved meal is unchanged, proposed cells are refreshed', async ({ page }) => {
+    test.setTimeout(15_000);
+    // Wait for auto-generate to complete before clicking
+    await expect(page.locator('.gc').first().locator('.gc-approve')).toBeVisible();
     // Approve first cell
     await page.locator('.gc').first().locator('.gc-approve').click();
     const approvedText = await page.locator('.gc').first().locator('.gc-text.approved-t').textContent();
