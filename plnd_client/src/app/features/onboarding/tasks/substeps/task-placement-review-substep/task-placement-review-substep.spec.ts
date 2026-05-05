@@ -8,6 +8,8 @@ import { Router } from '@angular/router';
 import { TaskPlacementReviewSubstepComponent } from './task-placement-review-substep';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { ConfigService } from '../../../../../core/services/config.service';
+import { MealPatternService } from '../../../../../core/services/meal-pattern.service';
+import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 import { PlaceTasksEntry, PlanEntryRequest } from '../../../../../core/models/week-plan';
 import { Routine } from '../../../../../core/models/routine';
 
@@ -100,6 +102,15 @@ async function setup(
 ) {
   const stateMock = makeStateMock(taskNames, period, routines);
 
+  const mealPatternMock = {
+    load: jasmine.createSpy('load'),
+    entries: signal<MealPatternEntry[]>([
+      { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' },
+      { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', created_at: '' },
+      { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', created_at: '' },
+    ]).asReadonly(),
+  };
+
   await TestBed.configureTestingModule({
     imports: [TaskPlacementReviewSubstepComponent],
     providers: [
@@ -108,6 +119,7 @@ async function setup(
       provideRouter([]),
       { provide: OnboardingStateService, useValue: stateMock },
       { provide: ConfigService, useValue: CONFIG_MOCK },
+      { provide: MealPatternService, useValue: mealPatternMock },
     ],
   }).compileComponents();
 

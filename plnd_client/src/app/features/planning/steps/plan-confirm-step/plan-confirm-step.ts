@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
+import { MealPatternService } from '../../../../core/services/meal-pattern.service';
 import { formatWeekDate } from '../../utils/date-format.utils';
 
 @Component({
@@ -103,6 +103,7 @@ import { formatWeekDate } from '../../utils/date-format.utils';
 })
 export class PlanConfirmStepComponent {
   readonly weekPlanService = inject(WeekPlanService);
+  private readonly mealPatternService = inject(MealPatternService);
   private readonly router = inject(Router);
 
   errorMessage = '';
@@ -113,15 +114,17 @@ export class PlanConfirmStepComponent {
   readonly mealCoverage = computed(() => {
     const days = this.weekPlanService.horizonDays();
     if (days.length === 0) return 0;
+    const slotNames = this.mealPatternService.entries().map(e => e.name);
+    if (slotNames.length === 0) return 0;
     const meals = this.weekPlanService.scheduledMeals();
     const covered = days.reduce((acc, d) => {
       const daySlots = meals[d] ?? {};
-      return acc + STANDARD_MEAL_SLOTS.filter(s => {
+      return acc + slotNames.filter(s => {
         const entry = daySlots[s];
         return !entry || entry.approvalState !== 'skipped';
       }).length;
     }, 0);
-    return Math.round((covered / (days.length * STANDARD_MEAL_SLOTS.length)) * 100);
+    return Math.round((covered / (days.length * slotNames.length)) * 100);
   });
 
   readonly formatWeekDate = formatWeekDate;

@@ -4,7 +4,6 @@ import { PreferencesService } from '../../core/services/preferences.service';
 import { MealPlanResponse, PlanEntryRequest } from '../../core/models/week-plan';
 import { Routine } from '../../core/models/routine';
 import { DayTypeResponse } from '../../core/models/day-type';
-import { MealHabitResponse } from '../../core/models/meal-habit';
 
 export type SectionId = 'account' | 'tasks' | 'food';
 export type SectionStatus = 'not-started' | 'complete';
@@ -28,7 +27,6 @@ export class OnboardingStateService {
   private readonly upcomingTaskNamesSignal = signal<string[]>([]);
   private readonly placedTasksSignal = signal<PlanEntryRequest[]>([]);
   private readonly dayTypesSignal = signal<DayTypeResponse[]>([]);
-  private readonly mealHabitsSignal = signal<MealHabitResponse[]>([]);
   // Held in state so the hub stats banner can read totalRoutines without extra injection.
   // The Tasks component feeds this in after creating/fetching routines.
   private readonly routinesSignal = signal<Routine[]>([]);
@@ -42,7 +40,6 @@ export class OnboardingStateService {
   readonly upcomingTaskNames = this.upcomingTaskNamesSignal.asReadonly();
   readonly placedTasks = this.placedTasksSignal.asReadonly();
   readonly dayTypes = this.dayTypesSignal.asReadonly();
-  readonly mealHabits = this.mealHabitsSignal.asReadonly();
   readonly routines = this.routinesSignal.asReadonly();
 
   // ── Computed signals ────────────────────────────────────────────────────
@@ -107,10 +104,6 @@ export class OnboardingStateService {
 
   setDayTypes(types: DayTypeResponse[]): void {
     this.dayTypesSignal.set(types);
-  }
-
-  setMealHabits(habits: MealHabitResponse[]): void {
-    this.mealHabitsSignal.set(habits);
   }
 
   setRoutines(routines: Routine[]): void {

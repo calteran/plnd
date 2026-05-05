@@ -3,12 +3,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
+import { MealPatternService } from '../../../../core/services/meal-pattern.service';
 import { formatDayName, formatDayDate, daysInRange } from '../../utils/date-format.utils';
-import { MealPlanResponse, MealSlot, PlannedMeal, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
-
-const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
-  breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner',
-};
+import { MealPlanResponse, MealSlot, PlannedMeal } from '../../../../core/models/week-plan';
 
 @Component({
   selector: 'app-plan-meals-step',
@@ -62,64 +59,64 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
         }
 
         <!-- One row per meal slot -->
-        @for (slot of slots; track slot) {
+        @for (entry of slots(); track entry.id) {
           <div class="cell-slot-label">
-            <span class="slot-lbl">{{ slotLabel(slot) }}</span>
+            <span class="slot-lbl">{{ entry.name }}</span>
           </div>
           @for (day of horizonDays(); track day) {
             <div class="gc"
-                 [class.approved-g]="isApproved(day, slot)"
-                 [class.skipped-g]="isSkipped(day, slot)"
-                 [class.gc-editing]="isCellEditing(day, slot)"
-                 [class.gc-loading]="isGenerating() && !getMeal(day, slot)">
+                 [class.approved-g]="isApproved(day, entry.name)"
+                 [class.skipped-g]="isSkipped(day, entry.name)"
+                 [class.gc-editing]="isCellEditing(day, entry.name)"
+                 [class.gc-loading]="isGenerating() && !getMeal(day, entry.name)">
 
-              @if (isGenerating() && !getMeal(day, slot)) {
+              @if (isGenerating() && !getMeal(day, entry.name)) {
                 <!-- Skeleton shimmer while auto-generating -->
                 <div class="gc-skeleton"></div>
 
-              } @else if (isSkipped(day, slot)) {
+              } @else if (isSkipped(day, entry.name)) {
                 <span class="gc-text skip-t">— skipped</span>
                 <div class="gc-actions">
                   <button class="gc-undo" type="button"
-                          (click)="undoSkip(day, slot)">undo</button>
+                          (click)="undoSkip(day, entry.name)">undo</button>
                 </div>
 
-              } @else if (isCellEditing(day, slot)) {
+              } @else if (isCellEditing(day, entry.name)) {
                 <input #mealInput
                        class="mock-input"
                        type="text"
                        [value]="editingValue()"
-                       (keydown.enter)="confirmEdit(day, slot, mealInput.value)"
+                       (keydown.enter)="confirmEdit(day, entry.name, mealInput.value)"
                        (keydown.escape)="cancelEdit()"
                        (blur)="cancelEdit()">
                 <span class="input-hint">Enter · Esc to cancel</span>
 
-              } @else if (isApproved(day, slot)) {
+              } @else if (isApproved(day, entry.name)) {
                 <button class="gc-x" type="button"
                         data-tip="Skip this meal"
-                        (click)="skipMeal(day, slot)">×</button>
-                <span class="gc-text approved-t">{{ getMeal(day, slot)?.title ?? '' }}</span>
+                        (click)="skipMeal(day, entry.name)">×</button>
+                <span class="gc-text approved-t">{{ getMeal(day, entry.name)?.title ?? '' }}</span>
                 <div class="gc-actions">
                   <button class="gc-edit-custom" type="button"
-                          (click)="startEdit(day, slot)">✏️ edit</button>
+                          (click)="startEdit(day, entry.name)">✏️ edit</button>
                 </div>
 
               } @else {
                 <!-- Proposed meal -->
                 <button class="gc-x" type="button"
                         data-tip="Skip this meal"
-                        (click)="skipMeal(day, slot)">×</button>
-                <span class="gc-text">{{ getMeal(day, slot)?.title ?? '—' }}</span>
+                        (click)="skipMeal(day, entry.name)">×</button>
+                <span class="gc-text">{{ getMeal(day, entry.name)?.title ?? '—' }}</span>
                 <div class="gc-actions">
                   <button class="gc-approve" type="button"
                           data-tip="Approve this meal"
-                          (click)="approveMeal(day, slot)">✓</button>
+                          (click)="approveMeal(day, entry.name)">✓</button>
                   <button class="gc-pick" type="button"
                           data-tip="Edit this meal"
-                          (click)="startEdit(day, slot)">✏️</button>
+                          (click)="startEdit(day, entry.name)">✏️</button>
                   <button class="gc-suggest" type="button"
                           data-tip="Suggest a different meal"
-                          (click)="refreshSlot(day, slot)">🔀</button>
+                          (click)="refreshSlot(day, entry.name)">🔀</button>
                 </div>
               }
 
@@ -333,6 +330,7 @@ const SLOT_LABELS: Partial<Record<MealSlot, string>> = {
 export class PlanMealsStepComponent implements OnInit {
   private readonly weekPlanService         = inject(WeekPlanService);
   private readonly mealPlannerAgentService = inject(MealPlannerAgentService);
+  private readonly mealPatternService      = inject(MealPatternService);
   private readonly destroyRef              = inject(DestroyRef);
 
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
@@ -342,7 +340,7 @@ export class PlanMealsStepComponent implements OnInit {
   readonly planStart = input<string | undefined>(undefined);
   readonly planEnd   = input<string | undefined>(undefined);
 
-  readonly slots = STANDARD_MEAL_SLOTS;
+  readonly slots = computed(() => this.mealPatternService.entries());
 
   readonly horizonDays = computed(() => {
     const start = this.planStart();
@@ -362,14 +360,16 @@ export class PlanMealsStepComponent implements OnInit {
 
   readonly unapprovedCount = computed(() => {
     const meals = this.weekPlanService.scheduledMeals();
+    const slotNames = this.slots().map(s => s.name);
     return this.horizonDays().reduce((n, date) =>
-      n + STANDARD_MEAL_SLOTS.filter(
+      n + slotNames.filter(
         slot => (meals[date]?.[slot]?.approvalState ?? 'proposed') === 'proposed'
       ).length,
     0);
   });
 
   ngOnInit(): void {
+    this.mealPatternService.load();
     const meals  = this.weekPlanService.scheduledMeals();
     const hasAny = this.horizonDays().some(d => Object.keys(meals[d] ?? {}).length > 0);
     if (!hasAny) {
@@ -396,10 +396,6 @@ export class PlanMealsStepComponent implements OnInit {
 
   readonly formatDayName = formatDayName;
   readonly formatDayDate = formatDayDate;
-
-  slotLabel(slot: MealSlot): string {
-    return SLOT_LABELS[slot] ?? slot;
-  }
 
   // ── Cell state queries ─────────────────────────────────────
 

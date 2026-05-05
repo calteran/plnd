@@ -10,6 +10,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { AgentService } from '../../../../../core/services/agent.service';
+import { MealPatternService } from '../../../../../core/services/meal-pattern.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import {
   PlaceTasksRequest,
@@ -18,15 +19,14 @@ import {
   EnergyLevel,
   RoutineTemplateInput,
 } from '../../../../../core/models/week-plan';
+import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 import { OnboardingLoadingScreenComponent } from '../../../shared/onboarding-loading-screen/onboarding-loading-screen';
 
 // ── Meal slot divider definitions ────────────────────────────────────────────
 
-type MealSlotLabel = 'BREAKFAST' | 'LUNCH' | 'DINNER';
-
 interface MealSlotDivider {
   kind: 'meal';
-  label: MealSlotLabel;
+  label: string;
 }
 
 interface TaskRow {
@@ -88,10 +88,16 @@ function getDayName(isoDate: string): string {
   return DAY_NAMES[d.getDay()];
 }
 
-function slotOf(entry: PlaceTasksEntry): 'morning' | 'afternoon' | 'evening' {
-  if (entry.after_anchor === 'breakfast') return 'morning';
-  if (entry.after_anchor === 'dinner') return 'evening';
-  if (entry.after_anchor === 'lunch') return 'afternoon';
+function bucketOf(entry: PlaceTasksEntry, anchorNames: Set<string>): 'morning' | 'afternoon' | 'evening' {
+  // If after_anchor matches a known pattern entry name (case-insensitive), bucket by name keyword.
+  if (entry.after_anchor) {
+    const lower = entry.after_anchor.toLowerCase();
+    if (anchorNames.has(lower)) {
+      if (lower.includes('breakfast') || lower.includes('morning')) return 'morning';
+      if (lower.includes('dinner') || lower.includes('supper') || lower.includes('evening')) return 'evening';
+      return 'afternoon';
+    }
+  }
   // Fixed tasks: bucket by wall-clock time
   const t = entry.time_window_start ?? '12:00';
   if (t < '12:00') return 'morning';
@@ -103,8 +109,10 @@ function buildDayCards(
   entries: PlaceTasksEntry[],
   start: string,
   end: string,
+  pattern: MealPatternEntry[],
 ): DayCard[] {
   const allDates = datesBetween(start, end);
+  const anchorNames = new Set(pattern.map(p => p.name.toLowerCase()));
   return allDates.map(date => {
     const dayEntries = entries
       .map((entry, idx) => ({ entry, idx }))
@@ -112,7 +120,7 @@ function buildDayCards(
 
     const bySlot = (slot: 'morning' | 'afternoon' | 'evening'): TaskRow[] =>
       dayEntries
-        .filter(({ entry }) => slotOf(entry) === slot)
+        .filter(({ entry }) => bucketOf(entry, anchorNames) === slot)
         .sort((a, b) => (a.entry.time_window_start ?? '').localeCompare(b.entry.time_window_start ?? ''))
         .map(({ entry, idx }) => ({
           kind: 'task' as const,
@@ -120,14 +128,33 @@ function buildDayCards(
           entryIndex: idx,
         }));
 
-    const rows: DayRow[] = [
-      { kind: 'meal', label: 'BREAKFAST' },
-      ...bySlot('morning'),
-      { kind: 'meal', label: 'LUNCH' },
-      ...bySlot('afternoon'),
-      { kind: 'meal', label: 'DINNER' },
-      ...bySlot('evening'),
-    ];
+    // Build interleaved rows: each pattern anchor becomes a meal divider, with tasks
+    // distributed by the bucket their after_anchor or time_window_start falls into.
+    const rows: DayRow[] = [];
+    if (pattern.length === 0) {
+      // No pattern loaded — just list all tasks sorted by time
+      rows.push(...bySlot('morning'), ...bySlot('afternoon'), ...bySlot('evening'));
+    } else {
+      const buckets: ('morning' | 'afternoon' | 'evening')[] = pattern.map(p => {
+        const lower = p.name.toLowerCase();
+        if (lower.includes('breakfast') || lower.includes('morning')) return 'morning';
+        if (lower.includes('dinner') || lower.includes('supper') || lower.includes('evening')) return 'evening';
+        return 'afternoon';
+      });
+      const consumed = new Set<'morning' | 'afternoon' | 'evening'>();
+      pattern.forEach((p, i) => {
+        rows.push({ kind: 'meal', label: p.name.toUpperCase() });
+        const bucket = buckets[i];
+        if (!consumed.has(bucket)) {
+          rows.push(...bySlot(bucket));
+          consumed.add(bucket);
+        }
+      });
+      // Append any unconsumed buckets so no task is dropped from view
+      (['morning', 'afternoon', 'evening'] as const).forEach(b => {
+        if (!consumed.has(b)) rows.push(...bySlot(b));
+      });
+    }
 
     return {
       date,
@@ -589,6 +616,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   @Output() complete = new EventEmitter<void>();
 
   private readonly agentService = inject(AgentService);
+  private readonly mealPatternService = inject(MealPatternService);
   private readonly stateService = inject(OnboardingStateService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -607,6 +635,8 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   readonly planDates = signal<{ value: string; label: string }[]>([]);
 
   ngOnInit(): void {
+    this.mealPatternService.load();
+
     const taskNames = this.stateService.upcomingTaskNames();
     const period = this.stateService.planPeriod();
     const routines = this.stateService.routines();
@@ -660,7 +690,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.entries.set(result);
-          this.dayCards.set(buildDayCards(result, period.start, period.end));
+          this.dayCards.set(buildDayCards(result, period.start, period.end, this.mealPatternService.entries()));
           this.isLoading.set(false);
         },
         error: () => {
@@ -729,7 +759,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     });
 
     this.editState.set(null);
-    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end));
+    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, this.mealPatternService.entries()));
   }
 
   removeEntry(entryIndex: number): void {
@@ -740,7 +770,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     this.editState.set(null);
 
     // Re-index: rebuild day cards from the updated (re-indexed) entries
-    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end));
+    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, this.mealPatternService.entries()));
   }
 
   // ── Save & Return ─────────────────────────────────────────────────────────

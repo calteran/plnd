@@ -180,7 +180,6 @@ export interface PostSchedulePlanRequest {
   /** Optional reasons for 'drop' decisions. entry_id → reason string */
   carryover_drop_reasons?: Record<string, DropReason>;
   placed_tasks?: PlanEntryRequest[];
-  meal_habit_ids?: string[];
 }
 
 export interface PostSchedulePlanResponse {

@@ -9,7 +9,6 @@ import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfigService } from '../../../core/services/config.service';
 import { MealEntry, PlanEntryRequest, PostSchedulePlanRequest } from '../../../core/models/week-plan';
-import { MealHabitResponse } from '../../../core/models/meal-habit';
 
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
@@ -37,7 +36,6 @@ function makeStateMock() {
     planPeriodSignal,
     mealPlan: signal(null).asReadonly(),
     placedTasks: signal([]).asReadonly(),
-    mealHabits: signal([]).asReadonly(),
     routines: signal([]).asReadonly(),
   };
 }
@@ -475,21 +473,10 @@ describe('OnboardingHubComponent', () => {
       duration_minutes: 20,
       energy_required: 'low',
     };
-    const habit: MealHabitResponse = {
-      id: 'habit-1',
-      user_id: 'user-1',
-      meal_name: 'Oatmeal',
-      slot: 'breakfast',
-      recurrence_rule: 'RRULE:FREQ=DAILY',
-      created_at: '2026-01-01T00:00:00Z',
-    };
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (stateMock as any).mealPlan = signal({ plan_start: '2026-05-01', meals: [mealWithRef, mealNoRef] }).asReadonly();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (stateMock as any).placedTasks = signal([placedTask]).asReadonly();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (stateMock as any).mealHabits = signal([habit]).asReadonly();
     stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
     fixture.detectChanges();
@@ -503,7 +490,6 @@ describe('OnboardingHubComponent', () => {
     expect(body.plan_end).toBe('2026-05-14');
     expect(body.planning_task_id).toBe('00000000-0000-0000-0000-000000000000');
     expect(body.placed_tasks).toEqual([placedTask]);
-    expect(body.meal_habit_ids).toEqual(['habit-1']);
     expect(body.entries).toEqual([
       {
         date: '2026-05-01',

@@ -1,11 +1,27 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { PlanMealsStepComponent } from './plan-meals-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
+import { MealPatternService } from '../../../../core/services/meal-pattern.service';
 import { MealEntry, MealPlanResponse } from '../../../../core/models/week-plan';
+import { MealPatternEntry } from '../../../../core/models/meal-pattern';
+
+const PATTERN_FIXTURE: MealPatternEntry[] = [
+  { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' },
+  { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', created_at: '' },
+  { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', created_at: '' },
+];
+
+function makeMealPatternMock() {
+  return {
+    load: jasmine.createSpy('load'),
+    entries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+  };
+}
 
 function makeMockPlanResponse(days: string[]): MealPlanResponse {
   const meals: MealEntry[] = days.flatMap(date =>
@@ -43,6 +59,7 @@ describe('PlanMealsStepComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: MealPlannerAgentService, useValue: agentSpy },
+        { provide: MealPatternService, useValue: makeMealPatternMock() },
       ],
     }).compileComponents();
 

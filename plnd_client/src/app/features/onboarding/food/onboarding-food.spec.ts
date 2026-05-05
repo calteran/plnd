@@ -1,12 +1,14 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
 import { OnboardingFoodComponent } from './onboarding-food';
 import { OnboardingStateService } from '../onboarding-state.service';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
 import { DietaryRestrictionsService } from '../../../core/services/dietary-restrictions.service';
-import { MealHabitsService } from '../../../core/services/meal-habits.service';
+import { MealPatternService } from '../../../core/services/meal-pattern.service';
 import { UserMealsService } from '../../../core/services/user-meals.service';
+import { MealPatternEntry } from '../../../core/models/meal-pattern';
 
 describe('OnboardingFoodComponent', () => {
   let fixture: ComponentFixture<OnboardingFoodComponent>;
@@ -14,7 +16,7 @@ describe('OnboardingFoodComponent', () => {
 
   function buildMocks(planningPrefsComplete: boolean) {
     const mockState = jasmine.createSpyObj('OnboardingStateService',
-      ['markComplete', 'setMealPlan', 'setPlanningPrefsComplete', 'computeAndSetPlanPeriod', 'setMealHabits'],
+      ['markComplete', 'setMealPlan', 'setPlanningPrefsComplete', 'computeAndSetPlanPeriod'],
       {
         planningPrefsComplete: jasmine.createSpy().and.returnValue(planningPrefsComplete),
         planPeriod: jasmine.createSpy().and.returnValue(null),
@@ -42,7 +44,7 @@ describe('OnboardingFoodComponent', () => {
         { provide: WeekPlanService, useValue: mockWPS },
         { provide: PreferencesService, useValue: mockPrefs },
         { provide: DietaryRestrictionsService, useValue: jasmine.createSpyObj('DRS', ['load', 'create', 'update', 'delete'], { restrictions: () => [] }) },
-        { provide: MealHabitsService, useValue: jasmine.createSpyObj('MHS', ['load', 'create', 'delete'], { habits: () => [] }) },
+        { provide: MealPatternService, useValue: { load: jasmine.createSpy('load'), entries: signal<MealPatternEntry[]>([]).asReadonly() } },
         { provide: UserMealsService, useValue: jasmine.createSpyObj('UMS', ['createFromScratch', 'updateMetadata']) },
       ],
     }).compileComponents();
@@ -66,13 +68,13 @@ describe('OnboardingFoodComponent', () => {
     expect(component.internalStep()).toBe(1);
   });
 
-  it('advance() increments internalStep up to 5', async () => {
+  it('advance() increments internalStep up to 4', async () => {
     await setup();
     expect(component.internalStep()).toBe(0);
     component.advance();
     expect(component.internalStep()).toBe(1);
     for (let i = 0; i < 10; i++) component.advance();
-    expect(component.internalStep()).toBe(5);
+    expect(component.internalStep()).toBe(4);
   });
 
   it('onBack() decrements internalStep but not below min', async () => {

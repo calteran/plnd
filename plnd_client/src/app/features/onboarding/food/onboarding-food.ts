@@ -2,6 +2,7 @@ import { Component, OnInit, computed, effect, inject, signal, viewChild } from '
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
+import { MealPatternService } from '../../../core/services/meal-pattern.service';
 import { localIsoDate } from '../../../core/services/schedule.service';
 import { OnboardingStateService } from '../onboarding-state.service';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
@@ -9,8 +10,7 @@ import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/
 import { MealTimesSubstepComponent } from './substeps/meal-times-substep/meal-times-substep';
 import { DietaryRestrictionsSubstepComponent } from './substeps/dietary-restrictions-substep/dietary-restrictions-substep';
 import { DietaryPreferencesSubstepComponent } from './substeps/dietary-preferences-substep/dietary-preferences-substep';
-import { MealHabitsSubstepComponent } from './substeps/meal-habits-substep/meal-habits-substep';
-import { MealEntry, MealPlanResponse, STANDARD_MEAL_SLOTS } from '../../../core/models/week-plan';
+import { MealEntry, MealPlanResponse } from '../../../core/models/week-plan';
 import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/plan-meals-step';
 
 @Component({
@@ -22,7 +22,6 @@ import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/pla
     MealTimesSubstepComponent,
     DietaryRestrictionsSubstepComponent,
     DietaryPreferencesSubstepComponent,
-    MealHabitsSubstepComponent,
     PlanMealsStepComponent,
   ],
   template: `
@@ -48,9 +47,6 @@ import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/pla
           <app-dietary-preferences-substep (complete)="advance()" />
         }
         @case (4) {
-          <app-meal-habits-substep (complete)="advance()" />
-        }
-        @case (5) {
           @if (planStart()) {
             <app-plan-meals-step
               [firstRun]="true"
@@ -74,15 +70,15 @@ export class OnboardingFoodComponent implements OnInit {
   private readonly weekPlanService = inject(WeekPlanService);
   private readonly state = inject(OnboardingStateService);
   private readonly preferencesService = inject(PreferencesService);
+  private readonly mealPatternService = inject(MealPatternService);
   private readonly router = inject(Router);
 
   private readonly planningPrefsRef = viewChild(PlanningPrefsSubstepComponent);
   private readonly mealTimesRef = viewChild(MealTimesSubstepComponent);
   private readonly restrictionsRef = viewChild(DietaryRestrictionsSubstepComponent);
   private readonly preferencesRef = viewChild(DietaryPreferencesSubstepComponent);
-  private readonly habitsRef = viewChild(MealHabitsSubstepComponent);
 
-  readonly totalSteps = computed(() => this.state.planningPrefsComplete() ? 5 : 6);
+  readonly totalSteps = computed(() => this.state.planningPrefsComplete() ? 4 : 5);
   readonly currentStep = computed(() => {
     const step = this.internalStep();
     return this.state.planningPrefsComplete() ? step : step + 1;
@@ -91,7 +87,7 @@ export class OnboardingFoodComponent implements OnInit {
   readonly planEnd = computed(() => this.state.planPeriod()?.end ?? '');
   readonly continueDisabledForStep = computed(() => {
     if (this.internalStep() === 0) return this.planningPrefsRef()?.isSaving() ?? false;
-    return this.internalStep() === 5 && this.weekPlanService.isGenerating();
+    return this.internalStep() === 4 && this.weekPlanService.isGenerating();
   });
 
   private sessionInitialized = false;
@@ -104,7 +100,7 @@ export class OnboardingFoodComponent implements OnInit {
     // Mirror the PlanningWizardComponent pattern: call initSession() once when
     // planPeriod becomes available and the user reaches the meal plan step.
     effect(() => {
-      if (this.internalStep() !== 5) return;
+      if (this.internalStep() !== 4) return;
       const period = this.state.planPeriod();
       if (!period || this.sessionInitialized) return;
 
@@ -138,7 +134,7 @@ export class OnboardingFoodComponent implements OnInit {
   }
 
   advance(): void {
-    this.internalStep.update(s => Math.min(s + 1, 5));
+    this.internalStep.update(s => Math.min(s + 1, 4));
   }
 
   onBack(): void {
@@ -154,8 +150,7 @@ export class OnboardingFoodComponent implements OnInit {
       case 1: this.mealTimesRef()?.save(); break;
       case 2: this.restrictionsRef()?.save(); break;
       case 3: this.preferencesRef()?.save(); break;
-      case 4: this.habitsRef()?.save(); break;
-      case 5: this.finalSave(); break;
+      case 4: this.finalSave(); break;
     }
   }
 
@@ -169,10 +164,11 @@ export class OnboardingFoodComponent implements OnInit {
   private buildMealPlanResponse(): MealPlanResponse {
     const planStart = this.weekPlanService.planStart() ?? '';
     const scheduled = this.weekPlanService.scheduledMeals();
+    const slotNames = this.mealPatternService.entries().map(e => e.name);
     const meals: MealEntry[] = [];
     for (const date of this.weekPlanService.horizonDays()) {
       const daySlots = scheduled[date] ?? {};
-      for (const slot of STANDARD_MEAL_SLOTS) {
+      for (const slot of slotNames) {
         const planned = daySlots[slot];
         if (planned && planned.approvalState !== 'skipped' && planned.mealRef) {
           meals.push({
