@@ -38,8 +38,8 @@ pub struct Routine {
 pub struct ScheduleEntry {
     pub entry_id: Uuid,
     pub user_id: Uuid,
-    pub routine_id: Option<Uuid>, // null for ad-hoc entries
-    pub task_type: String,
+    pub routine_id: Option<Uuid>,  // null for ad-hoc entries
+    pub task_type: Option<String>, // None = meal anchor; Some(...) = task entry
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
@@ -49,7 +49,6 @@ pub struct ScheduleEntry {
     pub status: String,
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
-    pub family_meal_id: Option<Uuid>,
     pub after_anchor: Option<String>, // 'breakfast' | 'lunch' | 'dinner' — temporal ordering anchor
     pub after_entry_id: Option<Uuid>, // explicit sequencing link
     pub deviation_note: Option<String>,
@@ -89,7 +88,7 @@ pub struct CommitPlanInput {
 #[derive(Debug, Clone)]
 pub struct PlanEntryInput {
     pub date: NaiveDate,
-    pub task_type: String,
+    pub task_type: Option<String>, // None for meal anchor entries
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,

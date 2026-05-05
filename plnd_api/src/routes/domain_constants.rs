@@ -3,7 +3,6 @@
 // Occasion tags/labels are suggestions only — NOT DB-enforced; used for UI autocomplete.
 
 pub const VALID_TASK_TYPES: &[&str] = &[
-    "meal",
     "exercise",
     "work",
     "leisure",
@@ -45,7 +44,7 @@ pub const SUGGESTED_OCCASION_TAGS: &[&str] = &[
     "meal-prep",
 ];
 
-/// Soft eating occasion labels for scheduled meal_tasks — not DB-validated; used for UI autocomplete.
+/// Soft eating occasion labels for meal anchor entries — not DB-validated; used for UI autocomplete.
 pub const SUGGESTED_OCCASION_LABELS: &[&str] = &[
     "breakfast",
     "morning snack",

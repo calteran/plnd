@@ -523,26 +523,13 @@ impl AgentService {
                         // output and return empty content + empty tool_calls.
                         let correction = match tools.terminal_tool_name() {
                             Some(tool_name) => {
-                                // PlaceTasks entries share similar-sounding enums for
-                                // task_type and after_anchor. Append a targeted reminder
-                                // so the model does not confuse them on retry.
-                                let place_tasks_hint = if tool_name == "place_tasks" {
-                                    "\n\nReminder — valid enum values for every entry:\n\
-                                     \u{2022} task_type: \"work\", \"exercise\", \"leisure\", \
-                                       \"appointment\", \"medication\", \"general\" \
-                                       (NEVER a meal name such as \"breakfast\")\n\
-                                     \u{2022} after_anchor: \"breakfast\", \"lunch\", \"dinner\"\n\
-                                     \u{2022} energy_required: \"low\", \"medium\", \"high\""
-                                } else {
-                                    ""
-                                };
                                 format!(
                                     "Your previous `{tool_name}` call failed schema validation \
                                      with these errors:\n\n\
                                      {violations}\n\n\
                                      Please call `{tool_name}` again with corrected arguments \
                                      that fix every error listed above. Do not output a bare \
-                                     JSON response — use the tool call.{place_tasks_hint}"
+                                     JSON response — use the tool call."
                                 )
                             }
                             None => format!(

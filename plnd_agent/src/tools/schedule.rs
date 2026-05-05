@@ -100,7 +100,7 @@ impl Tool for GetDayScheduleTool {
             .await
             .map_err(|e| db_err(self.name(), e))?;
 
-        let task_count = entries.iter().filter(|e| e.task_type != "meal").count();
+        let task_count = entries.iter().filter(|e| e.task_type.is_some()).count();
         let total = entries.len();
         let summary = format!("{total} entries, {task_count} tasks between meals");
 
@@ -114,11 +114,14 @@ impl Tool for GetDayScheduleTool {
                 );
                 obj.insert(
                     "type".to_string(),
-                    serde_json::Value::String(e.task_type.clone()),
+                    match &e.task_type {
+                        Some(t) => serde_json::Value::String(t.clone()),
+                        None => serde_json::Value::String("meal_anchor".to_string()),
+                    },
                 );
                 obj.insert(
                     "is_anchor".to_string(),
-                    serde_json::Value::Bool(e.task_type == "meal"),
+                    serde_json::Value::Bool(e.task_type.is_none()),
                 );
                 if let Some(start) = e.scheduled_start {
                     obj.insert(
@@ -515,9 +518,6 @@ impl Tool for PlaceTasksTool {
                                 "enum": ["work", "exercise", "leisure",
                                          "appointment", "medication", "general"],
                                 "description": "Domain category for this task. \
-                                                NEVER use meal anchor names here — \
-                                                \"breakfast\", \"lunch\", and \"dinner\" \
-                                                belong only in after_anchor. \
                                                 For personal errands or activities with \
                                                 no specific category, use \"general\"."
                             }
@@ -729,7 +729,7 @@ mod tests {
                 "time_window_start": "10:00",
                 "duration_minutes": 30,
                 "energy_required": "low",
-                "task_type": "floating"
+                "task_type": "general"
             }]
         });
         let result = tool.execute(&ctx, input.clone()).await.unwrap();

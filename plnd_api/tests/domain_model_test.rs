@@ -7,9 +7,9 @@ use plnd_api::routes::domain_constants::{
 };
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
-    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, MealTask,
-    Routine, ScheduleEntry, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,
-    UserMealDish, WorkTask,
+    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, Routine,
+    ScheduleEntry, Task, UserDish, UserDishIngredient, UserExercise, UserMeal, UserMealDish,
+    WorkTask,
 };
 
 // ---------------------------------------------------------------------------
@@ -17,9 +17,12 @@ use plnd_data::models::{
 // ---------------------------------------------------------------------------
 
 #[test]
-fn test_valid_task_types_has_seven_values() {
-    assert_eq!(VALID_TASK_TYPES.len(), 7);
-    assert!(VALID_TASK_TYPES.contains(&"meal"));
+fn test_valid_task_types_has_six_values() {
+    assert_eq!(VALID_TASK_TYPES.len(), 6);
+    assert!(
+        !VALID_TASK_TYPES.contains(&"meal"),
+        "meal is no longer a task type"
+    );
     assert!(VALID_TASK_TYPES.contains(&"exercise"));
     assert!(VALID_TASK_TYPES.contains(&"work"));
     assert!(VALID_TASK_TYPES.contains(&"leisure"));
@@ -455,22 +458,6 @@ fn test_task_serde_round_trip() {
 }
 
 #[test]
-fn test_meal_task_serde_with_occasion_label_and_user_dish_id() {
-    // occasion_label replaces meal_type enum; user_dish_id allows scheduling a dish directly
-    let json = r#"{
-        "task_id": "00000000-0000-0000-0000-000000000013",
-        "user_meal_id": null,
-        "user_dish_id": "00000000-0000-0000-0000-000000000004",
-        "family_meal_id": null,
-        "occasion_label": "late snack"
-    }"#;
-    let mt: MealTask = serde_json::from_str(json).expect("deserialize failed");
-    assert!(mt.user_meal_id.is_none());
-    assert!(mt.user_dish_id.is_some());
-    assert_eq!(mt.occasion_label.as_deref(), Some("late snack"));
-}
-
-#[test]
 fn test_exercise_task_serde_round_trip() {
     let json = r#"{
         "task_id": "00000000-0000-0000-0000-000000000014",
@@ -512,8 +499,8 @@ fn test_routine_serde_with_task_ref_type() {
     let json = r#"{
         "routine_id": "00000000-0000-0000-0000-000000000017",
         "user_id": "00000000-0000-0000-0000-000000000099",
-        "task_type": "meal",
-        "title": "Daily Breakfast",
+        "task_type": "exercise",
+        "title": "Daily Morning Run",
         "recurrence_tag": "daily",
         "recurrence_rule": "FREQ=DAILY",
         "time_window_start": "07:00:00",
@@ -522,13 +509,13 @@ fn test_routine_serde_with_task_ref_type() {
         "energy_required": "low",
         "is_anchor": true,
         "task_ref_id": "00000000-0000-0000-0000-000000000005",
-        "task_ref_type": "user_meal",
+        "task_ref_type": "user_exercise",
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
     let routine: Routine = serde_json::from_str(json).expect("deserialize failed");
     assert!(routine.is_anchor);
-    assert_eq!(routine.task_ref_type.as_deref(), Some("user_meal"));
+    assert_eq!(routine.task_ref_type.as_deref(), Some("user_exercise"));
     assert_eq!(routine.recurrence_tag.as_deref(), Some("daily"));
 }
 
@@ -547,7 +534,6 @@ fn test_schedule_entry_serde_with_after_anchor() {
         "status": "planned",
         "actual_start": null,
         "actual_end": null,
-        "family_meal_id": null,
         "after_anchor": "breakfast",
         "after_entry_id": null,
         "deviation_note": null,

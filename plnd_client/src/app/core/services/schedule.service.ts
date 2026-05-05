@@ -123,7 +123,8 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
 };
 
 function mapEntry(e: ScheduleEntryDto): ScheduleItem {
-  if (e.task_type === 'meal') {
+  // Meal anchor entries have task_type === null
+  if (e.task_type == null) {
     const slot = e.after_anchor ? MEAL_SLOTS[e.after_anchor] : undefined;
     return {
       id:    e.entry_id,

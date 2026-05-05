@@ -116,7 +116,7 @@ export class WeekPlanService {
           const tasks: PlannedTask[] = [];
           const meals: Record<string, Partial<Record<MealSlot, PlannedMeal>>> = {};
           for (const entry of resp.entries) {
-            if (entry.task_type === 'meal' && entry.after_anchor) {
+            if (entry.task_type == null && entry.after_anchor) {
               const slot = entry.after_anchor as MealSlot;
               meals[entry.date] ??= {};
               meals[entry.date][slot] = {
@@ -129,9 +129,9 @@ export class WeekPlanService {
             } else {
               tasks.push({
                 date: entry.date,
-                title: entry.title ?? entry.task_type,
+                title: entry.title ?? entry.task_type ?? '',
                 energy: 'medium',
-                task_type: entry.task_type,
+                task_type: entry.task_type ?? undefined,
                 task_ref_id: entry.task_ref_id,
                 task_ref_type: entry.task_ref_type,
                 scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
@@ -358,7 +358,7 @@ export class WeekPlanService {
         };
         entries.push({
           date,
-          task_type: 'meal',
+          // task_type omitted — meal anchor entries have no task_type
           task_ref_id: resolved.mealRef?.id,
           task_ref_type: resolved.mealRef?.type,
           title: resolved.mealRef ? undefined : resolved.title,
@@ -372,7 +372,7 @@ export class WeekPlanService {
         if (STANDARD_MEAL_SLOTS.includes(slot) || !meal || meal.approvalState === 'skipped') continue;
         entries.push({
           date,
-          task_type: 'meal',
+          // task_type omitted — meal anchor entries have no task_type
           task_ref_id: meal.mealRef?.id,
           task_ref_type: meal.mealRef?.type,
           title: meal.mealRef ? undefined : meal.title,

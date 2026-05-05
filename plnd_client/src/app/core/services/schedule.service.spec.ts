@@ -85,7 +85,7 @@ describe('ScheduleService', () => {
     httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
       entries: [{
         entry_id: 'm1',
-        task_type: 'meal',
+        task_type: null,
         title: null,
         after_anchor: 'breakfast',
         status: 'planned',

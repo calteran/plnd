@@ -11,7 +11,7 @@ pub struct Task {
     pub task_id: Uuid,
     pub user_id: Uuid,
     pub title: String,
-    pub task_type: String, // 'meal' | 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'general'
+    pub task_type: String, // 'exercise' | 'work' | 'leisure' | 'appointment' | 'medication' | 'general'
     pub scheduled_start: Option<DateTime<Utc>>,
     pub duration_minutes: Option<i32>,
     pub energy_required: String, // 'low' | 'medium' | 'high'
@@ -24,15 +24,6 @@ pub struct Task {
 // ---------------------------------------------------------------------------
 // Task specialization tables (joined on demand by task_type)
 // ---------------------------------------------------------------------------
-
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct MealTask {
-    pub task_id: Uuid,
-    pub user_meal_id: Option<Uuid>,
-    pub user_dish_id: Option<Uuid>, // schedule a single dish without a meal wrapper
-    pub family_meal_id: Option<Uuid>,
-    pub occasion_label: Option<String>, // free-form: "breakfast", "morning snack", etc.
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct ExerciseTask {

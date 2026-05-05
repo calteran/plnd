@@ -571,7 +571,7 @@ export class OnboardingHubComponent {
     const mealPlan = this.onboardingState.mealPlan();
     const entries: PlanEntryRequest[] = (mealPlan?.meals ?? []).map(m => ({
       date: m.date,
-      task_type: 'meal',
+      // task_type omitted — meal anchor entries have no task_type
       task_ref_id: m.meal_ref?.id,
       task_ref_type: m.meal_ref?.type,
       title: m.meal_ref ? undefined : m.title,
