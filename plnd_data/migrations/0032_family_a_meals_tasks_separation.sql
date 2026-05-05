@@ -1,5 +1,6 @@
 -- Migration: remove 'meal' from the task_type vocabulary across the scheduling model.
 -- Meal anchors in schedule_entries become task_type = NULL (distinct domain, not a task subtype).
+-- Note: schedule_templates was renamed to routines in migration 0030.
 
 -- ---------------------------------------------------------------------------
 -- A.2 Drop meal_tasks specialization table (meals are not task subtypes)
@@ -30,10 +31,12 @@ ALTER TABLE schedule_entries ADD CONSTRAINT schedule_entries_task_type_check
     CHECK (task_type IS NULL OR task_type IN ('exercise', 'work', 'leisure', 'appointment', 'medication', 'general'));
 
 -- ---------------------------------------------------------------------------
--- Remove 'meal' from schedule_templates.task_type CHECK (routines are for tasks only)
+-- Remove 'meal' from routines.task_type CHECK (routines are for tasks only)
+-- Table was renamed from schedule_templates → routines in migration 0030.
 -- ---------------------------------------------------------------------------
-DELETE FROM schedule_templates WHERE task_type = 'meal';
+DELETE FROM routines WHERE task_type = 'meal';
 
-ALTER TABLE schedule_templates DROP CONSTRAINT IF EXISTS schedule_templates_task_type_check;
-ALTER TABLE schedule_templates ADD CONSTRAINT schedule_templates_task_type_check
+ALTER TABLE routines DROP CONSTRAINT IF EXISTS schedule_templates_task_type_check;
+ALTER TABLE routines DROP CONSTRAINT IF EXISTS routines_task_type_check;
+ALTER TABLE routines ADD CONSTRAINT routines_task_type_check
     CHECK (task_type IN ('exercise', 'work', 'leisure', 'appointment', 'medication', 'general'));
