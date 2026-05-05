@@ -51,9 +51,12 @@ test.describe('Planning Wizard', () => {
       await page.route(`${API_BASE}/users/me`, route =>
         route.fulfill({ status: 200, json: MOCK_USER_NEW })
       );
-      // OnboardingComponent fetches dietary-restrictions on load; mock it so the
-      // synthetic token does not trigger a real 401 → session_expired redirect.
+      // Onboarding components fetch these on load; mock them so the synthetic
+      // token does not trigger a real 401 → session_expired redirect.
       await page.route(`${API_BASE}/dietary-restrictions`, route =>
+        route.fulfill({ status: 200, json: [] })
+      );
+      await page.route(`${API_BASE}/meal-pattern**`, route =>
         route.fulfill({ status: 200, json: [] })
       );
 
