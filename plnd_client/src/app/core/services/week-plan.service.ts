@@ -389,7 +389,7 @@ export class WeekPlanService {
         entries.push({
           date,
           task_ref_id: meal?.mealRef?.id,
-          task_ref_type: meal?.mealRef?.type as 'catalog' | 'user' | undefined,
+          task_ref_type: meal?.mealRef?.type,
           title: meal?.mealRef ? undefined : (meal?.title ?? `(${slot})`),
           scheduled_start: preferredTimeHHMM(patternEntry.preferred_time),
           after_anchor: slot,

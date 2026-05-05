@@ -433,7 +433,7 @@ describe('WeekPlanService', () => {
   });
 
   describe('currentState()', () => {
-    it('returns a MealPlanState with all horizon days × standard slots', () => {
+    it('returns a MealPlanState with all horizon days × meal pattern slots', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const state = service.currentState();
       expect(state.week_start).toBe('2026-03-24');
