@@ -27,7 +27,7 @@ export class MealPatternService {
     this.loaded = true;
     this.http.get<MealPatternEntry[]>(`${this.apiBase}/meal-pattern`).subscribe({
       next: entries => this.entriesSignal.set(entries),
-      error: () => { this.loaded = false; },
+      error: (err) => { this.loaded = false; console.error('Failed to load meal pattern', err); },
     });
   }
 

@@ -3,6 +3,15 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { MealPatternService } from './meal-pattern.service';
 import { ConfigService } from './config.service';
+import { preferredTimeHHMM } from '../models/meal-pattern';
+
+describe('preferredTimeHHMM', () => {
+  it('extracts HH:MM from a Postgres TIME string', () => {
+    expect(preferredTimeHHMM('08:00:00')).toBe('08:00');
+    expect(preferredTimeHHMM('12:30:00')).toBe('12:30');
+    expect(preferredTimeHHMM('23:59:59')).toBe('23:59');
+  });
+});
 
 describe('MealPatternService', () => {
   let service: MealPatternService;
@@ -58,6 +67,7 @@ describe('MealPatternService', () => {
     service.update('1', { preferred_time: '08:00' }).subscribe();
     const req = http.expectOne(`${BASE}/meal-pattern/1`);
     expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ preferred_time: '08:00' });
     req.flush({ id: '1', name: 'Breakfast', preferred_time: '08:00:00',
                 tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' });
     expect(service.entries()[0].preferred_time).toBe('08:00:00');
@@ -78,5 +88,13 @@ describe('MealPatternService', () => {
     expect(service.entries().length).toBe(0);
     service.load();
     http.expectOne(`${BASE}/meal-pattern`).flush([]);
+  });
+
+  it('load() resets loaded flag on error so retry is possible', () => {
+    service.load();
+    http.expectOne(`${BASE}/meal-pattern`).flush('error', { status: 500, statusText: 'Server Error' });
+    service.load();
+    http.expectOne(`${BASE}/meal-pattern`).flush([]);
+    expect(service.entries().length).toBe(0);
   });
 });
