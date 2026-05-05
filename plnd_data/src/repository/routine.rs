@@ -2,17 +2,14 @@ use async_trait::async_trait;
 use chrono::NaiveTime;
 use uuid::Uuid;
 
-use crate::models::ScheduleTemplate;
+use crate::models::Routine;
 
 #[async_trait]
-pub trait ScheduleTemplateRepository: Send + Sync {
-    async fn list_templates_for_user(
-        &self,
-        user_id: Uuid,
-    ) -> Result<Vec<ScheduleTemplate>, crate::Error>;
+pub trait RoutineRepository: Send + Sync {
+    async fn list_routines_for_user(&self, user_id: Uuid) -> Result<Vec<Routine>, crate::Error>;
 
     #[allow(clippy::too_many_arguments)]
-    async fn create_template(
+    async fn create_routine(
         &self,
         user_id: Uuid,
         task_type: &str,
@@ -26,15 +23,14 @@ pub trait ScheduleTemplateRepository: Send + Sync {
         is_anchor: bool,
         task_ref_id: Option<Uuid>,
         task_ref_type: Option<&str>,
-    ) -> Result<ScheduleTemplate, crate::Error>;
+    ) -> Result<Routine, crate::Error>;
 
-    async fn delete_template(&self, user_id: Uuid, template_id: Uuid)
-    -> Result<bool, crate::Error>;
+    async fn delete_routine(&self, user_id: Uuid, routine_id: Uuid) -> Result<bool, crate::Error>;
 
     #[allow(clippy::too_many_arguments)]
-    async fn update_template(
+    async fn update_routine(
         &self,
-        template_id: Uuid,
+        routine_id: Uuid,
         user_id: Uuid,
         title: &str,
         recurrence: &str,
@@ -46,5 +42,5 @@ pub trait ScheduleTemplateRepository: Send + Sync {
         is_anchor: bool,
         task_ref_id: Option<Uuid>,
         task_ref_type: Option<&str>,
-    ) -> Result<Option<ScheduleTemplate>, crate::Error>;
+    ) -> Result<Option<Routine>, crate::Error>;
 }

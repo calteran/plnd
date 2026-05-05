@@ -9,7 +9,7 @@ import {
   PlanStatusResponse, SchedulePeriodResponse,
   STANDARD_MEAL_SLOTS,
 } from '../models/week-plan';
-import { TaskType } from '../models/schedule-template';
+import { TaskType } from '../models/routine';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
 

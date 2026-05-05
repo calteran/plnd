@@ -27,10 +27,10 @@ export const MOCK_DAY_TYPE_WEEKENDS = {
   anchor_date: null,
 };
 
-// ── Schedule Templates (Routines) ─────────────────────────────────────────────
+// ── Routines ──────────────────────────────────────────────────────────────────
 
 export const MOCK_TEMPLATE_MORNING_WALK = {
-  template_id: 'tmpl-morning-walk-uuid',
+  routine_id: 'tmpl-morning-walk-uuid',
   task_type: 'general',
   title: 'Morning walk',
   recurrence: 'daily',

@@ -5,7 +5,7 @@ import { OnboardingStateService, computeFirstPlanPeriod, SectionId } from './onb
 import { PreferencesService } from '../../core/services/preferences.service';
 import { UserPreferences } from '../../core/models/preferences';
 import { MealEntry, PlanEntryRequest } from '../../core/models/week-plan';
-import { ScheduleTemplate } from '../../core/models/schedule-template';
+import { Routine } from '../../core/models/routine';
 import { DayTypeResponse } from '../../core/models/day-type';
 import { MealHabitResponse } from '../../core/models/meal-habit';
 
@@ -95,7 +95,7 @@ describe('OnboardingStateService', () => {
     expect(service.placedTasks()).toEqual([]);
     expect(service.dayTypes()).toEqual([]);
     expect(service.mealHabits()).toEqual([]);
-    expect(service.scheduleTemplates()).toEqual([]);
+    expect(service.routines()).toEqual([]);
   });
 
   // ── Setter methods ──────────────────────────────────────────────────────
@@ -149,10 +149,10 @@ describe('OnboardingStateService', () => {
     expect(service.mealHabits()).toEqual(habits);
   });
 
-  it('setScheduleTemplates stores template records', () => {
-    const templates: ScheduleTemplate[] = [
+  it('setRoutines stores routine records', () => {
+    const routines: Routine[] = [
       {
-        template_id: 'tmpl-1', user_id: 'u1', task_type: 'general',
+        routine_id: 'tmpl-1', user_id: 'u1', task_type: 'general',
         title: 'Morning run', recurrence: 'weekdays',
         recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
         time_window_start: '07:00', time_window_end: '08:00',
@@ -161,24 +161,24 @@ describe('OnboardingStateService', () => {
         created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
       },
     ];
-    service.setScheduleTemplates(templates);
-    expect(service.scheduleTemplates()).toEqual(templates);
+    service.setRoutines(routines);
+    expect(service.routines()).toEqual(routines);
   });
 
   // ── Computed signals ────────────────────────────────────────────────────
 
-  it('totalRoutines reflects scheduleTemplates length', () => {
+  it('totalRoutines reflects routines length', () => {
     expect(service.totalRoutines()).toBe(0);
-    service.setScheduleTemplates([
+    service.setRoutines([
       {
-        template_id: 'a', user_id: 'u1', task_type: 'general', title: 'A',
+        routine_id: 'a', user_id: 'u1', task_type: 'general', title: 'A',
         recurrence: 'daily', recurrence_rule: 'FREQ=DAILY',
         time_window_start: null, time_window_end: null, duration_minutes: null,
         energy_required: 'low', is_anchor: false, task_ref_id: null, task_ref_type: null,
         created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
       },
       {
-        template_id: 'b', user_id: 'u1', task_type: 'general', title: 'B',
+        routine_id: 'b', user_id: 'u1', task_type: 'general', title: 'B',
         recurrence: 'daily', recurrence_rule: 'FREQ=DAILY',
         time_window_start: null, time_window_end: null, duration_minutes: null,
         energy_required: 'low', is_anchor: false, task_ref_id: null, task_ref_type: null,

@@ -12,8 +12,9 @@ pub mod meal_suggestion;
 pub mod memory;
 pub(crate) mod pg;
 pub mod preferences;
+pub mod routine;
 pub mod schedule;
-pub mod schedule_template;
+pub mod schedule_type;
 pub mod session;
 pub mod task;
 pub mod user;
@@ -31,8 +32,9 @@ pub use meal_search::MealSearchRepository;
 pub use meal_suggestion::MealSuggestionRepository;
 pub use memory::MemoryRepository;
 pub use preferences::PreferencesRepository;
+pub use routine::RoutineRepository;
 pub use schedule::ScheduleRepository;
-pub use schedule_template::ScheduleTemplateRepository;
+pub use schedule_type::ScheduleTypeRepository;
 pub use session::SessionRepository;
 pub use task::TaskRepository;
 pub use user::UserRepository;
@@ -55,7 +57,8 @@ pub struct Repositories {
     pub memory: Arc<dyn MemoryRepository>,
     pub preferences: Arc<dyn PreferencesRepository>,
     pub schedule: Arc<dyn ScheduleRepository>,
-    pub schedule_template: Arc<dyn ScheduleTemplateRepository>,
+    pub routine: Arc<dyn RoutineRepository>,
+    pub schedule_type: Arc<dyn ScheduleTypeRepository>,
     pub session: Arc<dyn SessionRepository>,
     pub task: Arc<dyn TaskRepository>,
     pub user: Arc<dyn UserRepository>,
@@ -90,7 +93,8 @@ impl Repositories {
             memory: Arc::new(pg::memory::PgMemoryRepository::new(pool.clone())),
             preferences: Arc::new(pg::preferences::PgPreferencesRepository::new(pool.clone())),
             schedule: Arc::new(pg::schedule::PgScheduleRepository::new(pool.clone())),
-            schedule_template: Arc::new(pg::schedule_template::PgScheduleTemplateRepository::new(
+            routine: Arc::new(pg::routine::PgRoutineRepository::new(pool.clone())),
+            schedule_type: Arc::new(pg::schedule_type::PgScheduleTypeRepository::new(
                 pool.clone(),
             )),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),

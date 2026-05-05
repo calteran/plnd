@@ -1,4 +1,4 @@
-import { rruleFromRecurrence } from './schedule-template';
+import { rruleFromRecurrence } from './routine';
 
 describe('rruleFromRecurrence', () => {
   it('daily → FREQ=DAILY', () => {

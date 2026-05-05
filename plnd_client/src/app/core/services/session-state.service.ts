@@ -6,7 +6,7 @@ import { UserDishesService } from './user-dishes.service';
 import { UserMealsService } from './user-meals.service';
 import { UserIngredientPrefsService } from './user-ingredient-prefs.service';
 import { WeekPlanService } from './week-plan.service';
-import { ScheduleTemplatesService } from './schedule-templates.service';
+import { RoutinesService } from './routines.service';
 
 @Injectable({ providedIn: 'root' })
 export class SessionStateService {
@@ -17,7 +17,7 @@ export class SessionStateService {
   private readonly userMealsService = inject(UserMealsService);
   private readonly userIngredientPrefsService = inject(UserIngredientPrefsService);
   private readonly weekPlanService = inject(WeekPlanService);
-  private readonly scheduleTemplatesService = inject(ScheduleTemplatesService);
+  private readonly routinesService = inject(RoutinesService);
 
   clearAll(): void {
     this.userService.clearUser();
@@ -27,6 +27,6 @@ export class SessionStateService {
     this.userMealsService.clear();
     this.userIngredientPrefsService.clear();
     this.weekPlanService.clear();
-    this.scheduleTemplatesService.clear();
+    this.routinesService.clear();
   }
 }

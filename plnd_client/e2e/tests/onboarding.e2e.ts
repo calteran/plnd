@@ -31,7 +31,7 @@ async function completeTasksSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/day-types`, route =>
     route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
   );
-  await page.route(`${API_BASE}/schedule/templates`, route => {
+  await page.route(`${API_BASE}/routines`, route => {
     if (route.request().method() === 'POST') {
       route.fulfill({ status: 201, json: MOCK_TEMPLATE_MORNING_WALK });
     } else {
@@ -75,7 +75,7 @@ async function landAtScheduleTypes(page: Page): Promise<void> {
 }
 
 // Drives from hub to the Routines & Tasks substep.
-// Caller must have already set up the /schedule/templates route.
+// Caller must have already set up the /routines route.
 // This helper registers /day-types itself.
 async function landAtRoutinesTasks(page: Page): Promise<void> {
   await page.route(`${API_BASE}/day-types`, route =>
@@ -90,7 +90,7 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
 // Does NOT mock /agent/place-tasks — each test does this individually.
 async function landAtTaskPlacement(page: Page): Promise<void> {
   // Register the POST-handling mock before any click so the request is intercepted correctly.
-  await page.route(`${API_BASE}/schedule/templates`, route => {
+  await page.route(`${API_BASE}/routines`, route => {
     if (route.request().method() === 'POST') {
       route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning run', task_type: 'general' } });
     } else {
@@ -532,7 +532,7 @@ test.describe('Onboarding', () => {
       await page.route(`${API_BASE}/day-types`, route =>
         route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
       );
-      await page.route(`${API_BASE}/schedule/templates`, route =>
+      await page.route(`${API_BASE}/routines`, route =>
         route.fulfill({ status: 200, json: [] })
       );
 
@@ -611,7 +611,7 @@ test.describe('Onboarding', () => {
   test.describe('Tasks spoke — Routines & Tasks', () => {
     test.beforeEach(async ({ page }) => {
       await seedOnboarding(page);
-      await page.route(`${API_BASE}/schedule/templates`, route => {
+      await page.route(`${API_BASE}/routines`, route => {
         if (route.request().method() === 'POST') {
           route.fulfill({ status: 201, json: MOCK_TEMPLATE_MORNING_WALK });
         } else {
@@ -624,7 +624,7 @@ test.describe('Onboarding', () => {
 
     test('add routine via form: name + recurrence chip appears', async ({ page }) => {
       // Override the POST mock to return a template matching what the form submitted.
-      await page.route(`${API_BASE}/schedule/templates`, route => {
+      await page.route(`${API_BASE}/routines`, route => {
         if (route.request().method() === 'POST') {
           route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning yoga' } });
         } else {
