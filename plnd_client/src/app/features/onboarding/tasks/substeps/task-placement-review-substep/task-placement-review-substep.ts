@@ -26,6 +26,7 @@ import { OnboardingLoadingScreenComponent } from '../../../shared/onboarding-loa
 
 interface MealSlotDivider {
   kind: 'meal';
+  id: string;
   label: string;
 }
 
@@ -143,7 +144,7 @@ function buildDayCards(
       });
       const consumed = new Set<'morning' | 'afternoon' | 'evening'>();
       pattern.forEach((p, i) => {
-        rows.push({ kind: 'meal', label: p.name.toUpperCase() });
+        rows.push({ kind: 'meal', id: p.id, label: p.name.toUpperCase() });
         const bucket = buckets[i];
         if (!consumed.has(bucket)) {
           rows.push(...bySlot(bucket));
@@ -703,7 +704,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   // ── Row tracking ──────────────────────────────────────────────────────────
 
   rowTrack(row: DayRow): string {
-    if (row.kind === 'meal') return `meal-${row.label}`;
+    if (row.kind === 'meal') return `meal-${row.id}`;
     return `task-${row.entryIndex}`;
   }
 

@@ -1,5 +1,6 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, OnInit, computed, inject, input } from '@angular/core';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { MealPatternService } from '../../../../core/services/meal-pattern.service';
 import { PlanDayCardComponent } from './plan-day-card';
 import { daysInRange } from '../../utils/date-format.utils';
 
@@ -30,10 +31,15 @@ import { daysInRange } from '../../utils/date-format.utils';
     }
   `]
 })
-export class PlanDayGridStepComponent {
+export class PlanDayGridStepComponent implements OnInit {
   private readonly weekPlanService = inject(WeekPlanService);
+  private readonly mealPatternService = inject(MealPatternService);
 
   // Onboarding-flow overrides — defaults leave weekly wizard behaviour unchanged
+  ngOnInit(): void {
+    this.mealPatternService.load();
+  }
+
   readonly firstRun  = input(false);
   readonly planStart = input<string | undefined>(undefined);
   readonly planEnd   = input<string | undefined>(undefined);

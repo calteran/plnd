@@ -127,6 +127,7 @@ export class OnboardingFoodComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.mealPatternService.load();
     // Ensure preferences are loaded; the reactive effect above fires when they arrive.
     if (!this.state.planPeriod()) {
       this.preferencesService.loadPreferences();

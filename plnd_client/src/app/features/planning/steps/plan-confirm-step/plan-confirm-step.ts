@@ -1,4 +1,4 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, OnInit, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPatternService } from '../../../../core/services/meal-pattern.service';
@@ -101,12 +101,16 @@ import { formatWeekDate } from '../../utils/date-format.utils';
     .btn-finish:disabled { opacity: 0.4; cursor: not-allowed; }
   `]
 })
-export class PlanConfirmStepComponent {
+export class PlanConfirmStepComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   private readonly mealPatternService = inject(MealPatternService);
   private readonly router = inject(Router);
 
   errorMessage = '';
+
+  ngOnInit(): void {
+    this.mealPatternService.load();
+  }
 
   readonly totalDays = computed(() => this.weekPlanService.horizonDays().length);
   readonly taskCount = computed(() => this.weekPlanService.scheduledTasks().length);
