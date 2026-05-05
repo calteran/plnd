@@ -8,7 +8,7 @@ use plnd_data::query_types::{
 
 #[test]
 fn test_plan_entry_request_serde_meal_anchor() {
-    // Meal anchor entries omit task_type (None), and use after_milepost for slot
+    // Meal anchor entries omit task_type (None), and use after_anchor for slot
     let json = r#"{
         "date": "2026-03-24",
         "task_ref_id": "00000000-0000-0000-0000-000000000001",
