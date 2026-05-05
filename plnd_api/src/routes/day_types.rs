@@ -14,23 +14,13 @@ use uuid::Uuid;
 
 pub const MAX_NAME_LEN: usize = 200;
 
-fn deserialize_hhmm<'de, D>(deserializer: D) -> Result<NaiveTime, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    NaiveTime::parse_from_str(&s, "%H:%M")
-        .or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S"))
-        .map_err(serde::de::Error::custom)
-}
-
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateDayTypeRequest {
     pub name: String,
     pub days_bitmask: i32,
-    #[serde(deserialize_with = "deserialize_hhmm")]
+    #[serde(deserialize_with = "crate::models::deserialize_hhmm")]
     pub wake_time: NaiveTime,
-    #[serde(deserialize_with = "deserialize_hhmm")]
+    #[serde(deserialize_with = "crate::models::deserialize_hhmm")]
     pub sleep_time: NaiveTime,
     pub is_cycle: bool,
     pub cycle_length: Option<i32>,
@@ -42,9 +32,9 @@ pub struct CreateDayTypeRequest {
 pub struct UpdateDayTypeRequest {
     pub name: String,
     pub days_bitmask: i32,
-    #[serde(deserialize_with = "deserialize_hhmm")]
+    #[serde(deserialize_with = "crate::models::deserialize_hhmm")]
     pub wake_time: NaiveTime,
-    #[serde(deserialize_with = "deserialize_hhmm")]
+    #[serde(deserialize_with = "crate::models::deserialize_hhmm")]
     pub sleep_time: NaiveTime,
     pub is_cycle: bool,
     pub cycle_length: Option<i32>,

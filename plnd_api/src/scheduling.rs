@@ -70,7 +70,8 @@ pub(crate) fn byday_matches(date: NaiveDate, rule_uc: &str) -> bool {
 }
 
 /// True if `date` matches `rule` (supports legacy simple rules and RRULE BYDAY patterns).
-pub(crate) fn date_matches_recurrence(date: NaiveDate, rule: &str) -> bool {
+#[cfg(test)]
+fn date_matches_recurrence(date: NaiveDate, rule: &str) -> bool {
     let rule_lc = rule.to_lowercase();
     match rule_lc.as_str() {
         "daily" => true,
@@ -82,7 +83,8 @@ pub(crate) fn date_matches_recurrence(date: NaiveDate, rule: &str) -> bool {
 }
 
 /// True if `rule` is a pattern recognised by `date_matches_recurrence`.
-pub(crate) fn is_recognised_recurrence(rule: &str) -> bool {
+#[cfg(test)]
+fn is_recognised_recurrence(rule: &str) -> bool {
     let rule_lc = rule.to_lowercase();
     matches!(rule_lc.as_str(), "daily" | "weekdays" | "weekends") || rule_lc.contains("byday=")
 }
