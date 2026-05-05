@@ -78,6 +78,7 @@ pub struct CommitPlanInput {
     /// Pre-resolved from the HTTP request's `Option<bool>` with a default of `false`.
     pub replace: bool,
     pub carryover_decisions: HashMap<Uuid, CarryoverDecision>,
+    pub drop_reasons: HashMap<Uuid, String>,
 }
 
 /// One schedule entry to be committed, decoded from HTTP in plnd_api.

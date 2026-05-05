@@ -262,12 +262,19 @@ pub async fn commit_plan(
                 .map_err(DatabaseError::from)?;
             }
             CarryoverDecision::Drop => {
+                let reason = req
+                    .drop_reasons
+                    .get(entry_id)
+                    .map(String::as_str)
+                    .unwrap_or("");
                 sqlx::query(
-                    "UPDATE schedule_entries SET status = 'skipped', updated_at = NOW()
+                    "UPDATE schedule_entries
+                     SET status = 'skipped', deviation_note = NULLIF($3, ''), updated_at = NOW()
                      WHERE entry_id = $1 AND user_id = $2",
                 )
                 .bind(entry_id)
                 .bind(user_id)
+                .bind(reason)
                 .execute(&mut *tx)
                 .await
                 .map_err(DatabaseError::from)?;
@@ -378,6 +385,7 @@ mod tests {
             entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
         commit_plan(&pool, uid, &req).await.unwrap();
 
@@ -408,6 +416,7 @@ mod tests {
             ],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         let resp = commit_plan(&pool, uid, &req).await.unwrap();
@@ -475,6 +484,7 @@ mod tests {
             entries: vec![],
             replace: false,
             carryover_decisions: decisions,
+            drop_reasons: HashMap::new(),
         };
         commit_plan(&pool, uid, &req).await.unwrap();
 
@@ -526,6 +536,7 @@ mod tests {
             entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
         commit_plan(&pool, uid, &initial_req).await.unwrap();
 
@@ -550,6 +561,7 @@ mod tests {
             entries: vec![bad_entry],
             replace: true,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         let result = commit_plan(&pool, uid, &bad_req).await;
@@ -601,6 +613,7 @@ mod tests {
             entries: vec![bucket_entry],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         commit_plan(&pool, uid, &req).await.unwrap();
@@ -644,6 +657,7 @@ mod tests {
             entries: vec![entry],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         commit_plan(&pool, uid, &req).await.unwrap();
@@ -689,6 +703,7 @@ mod tests {
             entries: vec![meal_entry],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
 
         commit_plan(&pool, uid, &req).await.unwrap();

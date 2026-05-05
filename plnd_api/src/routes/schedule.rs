@@ -321,6 +321,7 @@ pub async fn post_plan(
         entries,
         replace: body.replace.unwrap_or(false),
         carryover_decisions,
+        drop_reasons: body.carryover_drop_reasons,
     };
 
     state

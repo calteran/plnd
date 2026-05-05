@@ -28,6 +28,7 @@ export class WeekPlanService {
   private readonly scheduledTasksSignal       = signal<PlannedTask[]>([]);
   private readonly scheduledMealsSignal       = signal<Record<string, Partial<Record<MealSlot, PlannedMeal>>>>({});
   private readonly carryoverDecisionsSignal   = signal<Record<string, CarryoverDecision>>({});
+  private readonly dropReasonsSignal          = signal<Record<string, string>>({});
   private readonly hasUnplannedHorizonSignal  = signal<boolean>(false);
   private readonly isSubmittingSignal         = signal<boolean>(false);
   private readonly planningTaskIdSignal       = signal<string>('');
@@ -41,6 +42,7 @@ export class WeekPlanService {
   readonly scheduledTasks       = this.scheduledTasksSignal.asReadonly();
   readonly scheduledMeals       = this.scheduledMealsSignal.asReadonly();
   readonly carryoverDecisions   = this.carryoverDecisionsSignal.asReadonly();
+  readonly dropReasons          = this.dropReasonsSignal.asReadonly();
   readonly hasUnplannedHorizon  = this.hasUnplannedHorizonSignal.asReadonly();
   readonly isSubmitting         = this.isSubmittingSignal.asReadonly();
   readonly planningTaskId       = this.planningTaskIdSignal.asReadonly();
@@ -57,6 +59,7 @@ export class WeekPlanService {
       this.scheduledMealsSignal.set(draft.scheduledMeals);
       this.scheduledTasksSignal.set(draft.scheduledTasks);
       this.floatingTasksSignal.set(draft.floatingTasks ?? []);
+      if (draft.dropReasons) this.dropReasonsSignal.set(draft.dropReasons);
     } else {
       this.currentStepSignal.set(1);
       this.carryoverDecisionsSignal.set({});
@@ -81,6 +84,7 @@ export class WeekPlanService {
       scheduledMeals: this.scheduledMealsSignal(),
       scheduledTasks: this.scheduledTasksSignal(),
       floatingTasks: this.floatingTasksSignal(),
+      dropReasons: this.dropReasonsSignal(),
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(this.DRAFT_KEY, JSON.stringify(draft));
@@ -190,6 +194,16 @@ export class WeekPlanService {
 
   setCarryoverDecision(entryId: string, decision: CarryoverDecision): void {
     this.carryoverDecisionsSignal.update(d => ({ ...d, [entryId]: decision }));
+  }
+
+  setDropReason(entryId: string, reason: string): void {
+    this.dropReasonsSignal.update(d => {
+      // Toggle: if already selected, deselect
+      if (d[entryId] === reason) {
+        return Object.fromEntries(Object.entries(d).filter(([k]) => k !== entryId));
+      }
+      return { ...d, [entryId]: reason };
+    });
   }
 
   setMeal(date: string, slot: MealSlot, meal: PlannedMeal): void {
@@ -343,6 +357,7 @@ export class WeekPlanService {
     this.scheduledTasksSignal.set([]);
     this.scheduledMealsSignal.set({});
     this.carryoverDecisionsSignal.set({});
+    this.dropReasonsSignal.set({});
     this.hasUnplannedHorizonSignal.set(false);
     this.isSubmittingSignal.set(false);
     this.planningTaskIdSignal.set('');
@@ -410,6 +425,7 @@ export class WeekPlanService {
       entries,
       replace: replace || undefined,
       carryover_decisions: this.carryoverDecisionsSignal(),
+      carryover_drop_reasons: this.dropReasonsSignal(),
     };
   }
 }

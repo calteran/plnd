@@ -135,6 +135,7 @@ mod tests {
             ],
             replace: false,
             carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
         };
         schedule::commit_plan(&pool, uid, &req).await.unwrap();
 
