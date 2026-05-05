@@ -38,7 +38,7 @@ function makeStateMock() {
     mealPlan: signal(null).asReadonly(),
     placedTasks: signal([]).asReadonly(),
     mealHabits: signal([]).asReadonly(),
-    scheduleTemplates: signal([]).asReadonly(),
+    routines: signal([]).asReadonly(),
   };
 }
 
@@ -435,8 +435,8 @@ describe('OnboardingHubComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (stateMock as any).placedTasks = signal([placedTask]).asReadonly();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (stateMock as any).scheduleTemplates = signal([
-      { template_id: 'tmpl-abc', title: 'Morning Run' },
+    (stateMock as any).routines = signal([
+      { routine_id: 'tmpl-abc', title: 'Morning Run' },
     ]).asReadonly();
     stateMock.planPeriodSignal.set({ start: '2026-05-05', end: '2026-05-11' });
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));

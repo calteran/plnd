@@ -8,17 +8,17 @@ use uuid::Uuid;
 pub const CARRYOVER_LOOKBACK_DAYS: i64 = 90;
 
 // ---------------------------------------------------------------------------
-// Schedule templates (recurring patterns)
+// Routines (recurring patterns)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct ScheduleTemplate {
-    pub template_id: Uuid,
+pub struct Routine {
+    pub routine_id: Uuid,
     pub user_id: Uuid,
     pub task_type: String,
     pub title: String,
-    pub recurrence: String, // 'daily' | 'weekdays' | 'weekly' | 'custom'
-    pub recurrence_rule: Option<String>, // RRULE string for custom recurrence
+    pub recurrence_tag: Option<String>, // 'daily' | 'weekdays' | 'weekly' | 'monthly' | 'yearly' — nullable derived enum
+    pub recurrence_rule: String,        // RRULE canonical string (e.g. 'FREQ=DAILY')
     pub time_window_start: Option<NaiveTime>,
     pub time_window_end: Option<NaiveTime>,
     pub duration_minutes: Option<i32>,
@@ -38,7 +38,7 @@ pub struct ScheduleTemplate {
 pub struct ScheduleEntry {
     pub entry_id: Uuid,
     pub user_id: Uuid,
-    pub template_id: Option<Uuid>, // null for ad-hoc entries
+    pub routine_id: Option<Uuid>, // null for ad-hoc entries
     pub task_type: String,
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,

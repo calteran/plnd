@@ -25,7 +25,7 @@ pub const VALID_FOCUS_LEVELS: &[&str] = &["low", "medium", "deep"];
 
 pub const VALID_PRIORITY_LEVELS: &[&str] = &["low", "normal", "high"];
 
-pub const VALID_RECURRENCE_TYPES: &[&str] = &["daily", "weekdays", "weekly", "custom"];
+pub const VALID_RECURRENCE_TYPES: &[&str] = &["daily", "weekdays", "weekly", "monthly", "yearly"];
 
 pub const VALID_AFTER_ANCHORS: &[&str] = &["breakfast", "lunch", "dinner"];
 

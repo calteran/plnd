@@ -1,4 +1,4 @@
-use crate::api_response::ScheduleTemplateResponse;
+use crate::api_response::RoutineResponse;
 use crate::auth::jwt::Claims;
 use crate::routes::domain_constants::{
     VALID_ENERGY_LEVELS, VALID_RECURRENCE_TYPES, VALID_TASK_TYPES,
@@ -14,22 +14,22 @@ use plnd_data::Error;
 use std::sync::Arc;
 use uuid::Uuid;
 
-/// Returns 422 if `rule` is `Some` but does not begin with `FREQ=`.
+/// Returns 422 if `rule` does not begin with `FREQ=`.
 /// Uppercase-only: RFC 5545 canonical form; the frontend always generates uppercase.
-fn validate_recurrence_rule(rule: Option<&str>) -> Result<(), StatusCode> {
-    if let Some(r) = rule
-        && !r.starts_with("FREQ=")
-    {
+fn validate_recurrence_rule(rule: &str) -> Result<(), StatusCode> {
+    if !rule.starts_with("FREQ=") {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     Ok(())
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
-pub struct UpdateScheduleTemplateRequest {
+pub struct UpdateRoutineRequest {
     pub title: String,
-    pub recurrence: String,
-    pub recurrence_rule: Option<String>,
+    /// RRULE canonical string, required (e.g. "FREQ=DAILY").
+    pub recurrence_rule: String,
+    /// Curated recurrence enum — optional derived presentation hint.
+    pub recurrence_tag: Option<String>,
     pub time_window_start: Option<NaiveTime>,
     pub time_window_end: Option<NaiveTime>,
     pub duration_minutes: Option<i32>,
@@ -42,11 +42,13 @@ pub struct UpdateScheduleTemplateRequest {
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
-pub struct CreateScheduleTemplateRequest {
+pub struct CreateRoutineRequest {
     pub task_type: String,
     pub title: String,
-    pub recurrence: String,
-    pub recurrence_rule: Option<String>,
+    /// RRULE canonical string, required (e.g. "FREQ=DAILY").
+    pub recurrence_rule: String,
+    /// Curated recurrence enum — optional derived presentation hint.
+    pub recurrence_tag: Option<String>,
     pub time_window_start: Option<NaiveTime>,
     pub time_window_end: Option<NaiveTime>,
     pub duration_minutes: Option<i32>,
@@ -60,75 +62,79 @@ pub struct CreateScheduleTemplateRequest {
 
 #[utoipa::path(
     get,
-    path = "/schedule/templates",
-    tag = "Schedule Templates",
+    path = "/routines",
+    tag = "Routines",
     security(("bearer_auth" = [])),
     responses(
-        (status = 200, description = "List of schedule templates for current user", body = Vec<ScheduleTemplateResponse>),
+        (status = 200, description = "List of routines for current user", body = Vec<RoutineResponse>),
         (status = 401, description = "Unauthorized"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
-pub async fn list_templates(
+pub async fn list_routines(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-) -> Result<Json<Vec<ScheduleTemplateResponse>>, StatusCode> {
+) -> Result<Json<Vec<RoutineResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
-        .schedule_template
-        .list_templates_for_user(user_id)
+        .routine
+        .list_routines_for_user(user_id)
         .await
-        .map(|v| Json(v.into_iter().map(ScheduleTemplateResponse::from).collect()))
+        .map(|v| Json(v.into_iter().map(RoutineResponse::from).collect()))
         .map_err(|e| {
-            tracing::error!(error = %e, "list_templates DB error");
+            tracing::error!(error = %e, "list_routines DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
 }
 
 #[utoipa::path(
     post,
-    path = "/schedule/templates",
-    tag = "Schedule Templates",
+    path = "/routines",
+    tag = "Routines",
     security(("bearer_auth" = [])),
-    request_body = CreateScheduleTemplateRequest,
+    request_body = CreateRoutineRequest,
     responses(
-        (status = 201, description = "Template created", body = ScheduleTemplateResponse),
+        (status = 201, description = "Routine created", body = RoutineResponse),
         (status = 401, description = "Unauthorized"),
         (status = 422, description = "Invalid task_type, recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
-pub async fn create_template(
+pub async fn create_routine(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Json(body): Json<CreateScheduleTemplateRequest>,
-) -> Result<(StatusCode, Json<ScheduleTemplateResponse>), StatusCode> {
+    Json(body): Json<CreateRoutineRequest>,
+) -> Result<(StatusCode, Json<RoutineResponse>), StatusCode> {
     if body.title.trim().is_empty() {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     if !VALID_TASK_TYPES.contains(&body.task_type.as_str()) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if !VALID_RECURRENCE_TYPES.contains(&body.recurrence.as_str()) {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
     let energy = body.energy_required.as_deref().unwrap_or("medium");
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    validate_recurrence_rule(body.recurrence_rule.as_deref())?;
+    validate_recurrence_rule(&body.recurrence_rule)?;
+    if body
+        .recurrence_tag
+        .as_deref()
+        .is_some_and(|tag| !VALID_RECURRENCE_TYPES.contains(&tag))
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
-        .schedule_template
-        .create_template(
+        .routine
+        .create_routine(
             user_id,
             &body.task_type,
             &body.title,
-            &body.recurrence,
-            body.recurrence_rule.as_deref(),
+            body.recurrence_tag.as_deref(),
+            &body.recurrence_rule,
             body.time_window_start,
             body.time_window_end,
             body.duration_minutes,
@@ -138,12 +144,12 @@ pub async fn create_template(
             body.task_ref_type.as_deref(),
         )
         .await
-        .map(|t| (StatusCode::CREATED, Json(ScheduleTemplateResponse::from(t))))
+        .map(|t| (StatusCode::CREATED, Json(RoutineResponse::from(t))))
         .map_err(|e| match e {
             Error::Conflict => StatusCode::CONFLICT,
             Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             e => {
-                tracing::error!(error = %e, "create_template DB error");
+                tracing::error!(error = %e, "create_routine DB error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })
@@ -151,30 +157,30 @@ pub async fn create_template(
 
 #[utoipa::path(
     delete,
-    path = "/schedule/templates/{id}",
-    tag = "Schedule Templates",
+    path = "/routines/{id}",
+    tag = "Routines",
     security(("bearer_auth" = [])),
-    params(("id" = Uuid, Path, description = "Template ID")),
+    params(("id" = Uuid, Path, description = "Routine ID")),
     responses(
-        (status = 204, description = "Template deleted"),
+        (status = 204, description = "Routine deleted"),
         (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Template not found or not owned by current user"),
+        (status = 404, description = "Routine not found or not owned by current user"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
-pub async fn delete_template(
+pub async fn delete_routine(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Path(template_id): Path<Uuid>,
+    Path(routine_id): Path<Uuid>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
-        .schedule_template
-        .delete_template(user_id, template_id)
+        .routine
+        .delete_routine(user_id, routine_id)
         .await
         .map_err(|e| {
-            tracing::error!(error = %e, "delete_template DB error");
+            tracing::error!(error = %e, "delete_routine DB error");
             StatusCode::INTERNAL_SERVER_ERROR
         })
         .and_then(|deleted| {
@@ -188,47 +194,51 @@ pub async fn delete_template(
 
 #[utoipa::path(
     put,
-    path = "/schedule/templates/{id}",
-    tag = "Schedule Templates",
+    path = "/routines/{id}",
+    tag = "Routines",
     security(("bearer_auth" = [])),
-    params(("id" = Uuid, Path, description = "Template ID")),
-    request_body = UpdateScheduleTemplateRequest,
+    params(("id" = Uuid, Path, description = "Routine ID")),
+    request_body = UpdateRoutineRequest,
     responses(
-        (status = 200, description = "Template updated", body = ScheduleTemplateResponse),
+        (status = 200, description = "Routine updated", body = RoutineResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Template not found or not owned by current user"),
+        (status = 404, description = "Routine not found or not owned by current user"),
         (status = 422, description = "Invalid recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
-pub async fn update_template(
+pub async fn update_routine(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Path(template_id): Path<Uuid>,
-    Json(body): Json<UpdateScheduleTemplateRequest>,
-) -> Result<Json<ScheduleTemplateResponse>, StatusCode> {
+    Path(routine_id): Path<Uuid>,
+    Json(body): Json<UpdateRoutineRequest>,
+) -> Result<Json<RoutineResponse>, StatusCode> {
     if body.title.trim().is_empty() {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
-    if !VALID_RECURRENCE_TYPES.contains(&body.recurrence.as_str()) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     let energy = body.energy_required.as_deref().unwrap_or("medium");
     if !VALID_ENERGY_LEVELS.contains(&energy) {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    validate_recurrence_rule(body.recurrence_rule.as_deref())?;
+    validate_recurrence_rule(&body.recurrence_rule)?;
+    if body
+        .recurrence_tag
+        .as_deref()
+        .is_some_and(|tag| !VALID_RECURRENCE_TYPES.contains(&tag))
+    {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     state
         .repos
-        .schedule_template
-        .update_template(
-            template_id,
+        .routine
+        .update_routine(
+            routine_id,
             user_id,
             &body.title,
-            &body.recurrence,
-            body.recurrence_rule.as_deref(),
+            body.recurrence_tag.as_deref(),
+            &body.recurrence_rule,
             body.time_window_start,
             body.time_window_end,
             body.duration_minutes,
@@ -241,11 +251,11 @@ pub async fn update_template(
         .map_err(|e| match e {
             Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
             e => {
-                tracing::error!(error = %e, "update_template DB error");
+                tracing::error!(error = %e, "update_routine DB error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })?
-        .map(|t| Json(ScheduleTemplateResponse::from(t)))
+        .map(|t| Json(RoutineResponse::from(t)))
         .ok_or(StatusCode::NOT_FOUND)
 }
 
@@ -271,12 +281,13 @@ mod tests {
 
     #[test]
     fn valid_recurrences_matches_db_check_constraint() {
-        for r in &["daily", "weekdays", "weekly", "custom"] {
+        for r in &["daily", "weekdays", "weekly", "monthly", "yearly"] {
             assert!(
                 VALID_RECURRENCE_TYPES.contains(r),
                 "missing recurrence: {r}"
             );
         }
+        assert!(!VALID_RECURRENCE_TYPES.contains(&"custom"));
         assert!(!VALID_RECURRENCE_TYPES.contains(&"biweekly"));
     }
 
@@ -296,7 +307,7 @@ mod tests {
             "FREQ=MONTHLY;BYMONTHDAY=1",
         ] {
             assert!(
-                validate_recurrence_rule(Some(rule)).is_ok(),
+                validate_recurrence_rule(rule).is_ok(),
                 "should accept: {rule}"
             );
         }
@@ -306,14 +317,9 @@ mod tests {
     fn recurrence_rule_invalid_format_rejected() {
         for rule in &["garbage", "", "BYDAY=MO", "freq=weekly"] {
             assert!(
-                validate_recurrence_rule(Some(rule)).is_err(),
+                validate_recurrence_rule(rule).is_err(),
                 "should reject: {rule}"
             );
         }
-    }
-
-    #[test]
-    fn recurrence_rule_none_is_always_valid() {
-        assert!(validate_recurrence_rule(None).is_ok());
     }
 }

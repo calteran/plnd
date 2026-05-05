@@ -609,9 +609,9 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   ngOnInit(): void {
     const taskNames = this.stateService.upcomingTaskNames();
     const period = this.stateService.planPeriod();
-    const scheduleTemplates = this.stateService.scheduleTemplates();
+    const routines = this.stateService.routines();
 
-    if ((taskNames.length === 0 && scheduleTemplates.length === 0) || period === null) {
+    if ((taskNames.length === 0 && routines.length === 0) || period === null) {
       this.isEmpty.set(true);
       return;
     }
@@ -630,7 +630,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     const period = this.stateService.planPeriod();
     if (!period) return;
 
-    const routineTemplates: RoutineTemplateInput[] = this.stateService.scheduleTemplates()
+    const routineTemplates: RoutineTemplateInput[] = this.stateService.routines()
       .filter(t => t.recurrence_rule !== null)
       .map(t => ({
         title: t.title,

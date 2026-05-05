@@ -8,7 +8,7 @@ use plnd_api::routes::domain_constants::{
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
     CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, MealTask,
-    ScheduleEntry, ScheduleTemplate, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,
+    Routine, ScheduleEntry, Task, UserDish, UserDishIngredient, UserExercise, UserMeal,
     UserMealDish, WorkTask,
 };
 
@@ -79,12 +79,14 @@ fn test_valid_priority_levels_has_three_values() {
 }
 
 #[test]
-fn test_valid_recurrence_types_has_four_values() {
-    assert_eq!(VALID_RECURRENCE_TYPES.len(), 4);
+fn test_valid_recurrence_types_has_five_values() {
+    assert_eq!(VALID_RECURRENCE_TYPES.len(), 5);
     assert!(VALID_RECURRENCE_TYPES.contains(&"daily"));
     assert!(VALID_RECURRENCE_TYPES.contains(&"weekdays"));
     assert!(VALID_RECURRENCE_TYPES.contains(&"weekly"));
-    assert!(VALID_RECURRENCE_TYPES.contains(&"custom"));
+    assert!(VALID_RECURRENCE_TYPES.contains(&"monthly"));
+    assert!(VALID_RECURRENCE_TYPES.contains(&"yearly"));
+    assert!(!VALID_RECURRENCE_TYPES.contains(&"custom"));
 }
 
 #[test]
@@ -506,14 +508,14 @@ fn test_generic_task_serde_round_trip() {
 }
 
 #[test]
-fn test_schedule_template_serde_with_task_ref_type() {
+fn test_routine_serde_with_task_ref_type() {
     let json = r#"{
-        "template_id": "00000000-0000-0000-0000-000000000017",
+        "routine_id": "00000000-0000-0000-0000-000000000017",
         "user_id": "00000000-0000-0000-0000-000000000099",
         "task_type": "meal",
         "title": "Daily Breakfast",
-        "recurrence": "daily",
-        "recurrence_rule": null,
+        "recurrence_tag": "daily",
+        "recurrence_rule": "FREQ=DAILY",
         "time_window_start": "07:00:00",
         "time_window_end": "08:30:00",
         "duration_minutes": 20,
@@ -524,10 +526,10 @@ fn test_schedule_template_serde_with_task_ref_type() {
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
-    let tmpl: ScheduleTemplate = serde_json::from_str(json).expect("deserialize failed");
-    assert!(tmpl.is_anchor);
-    assert_eq!(tmpl.task_ref_type.as_deref(), Some("user_meal"));
-    assert_eq!(tmpl.recurrence, "daily");
+    let routine: Routine = serde_json::from_str(json).expect("deserialize failed");
+    assert!(routine.is_anchor);
+    assert_eq!(routine.task_ref_type.as_deref(), Some("user_meal"));
+    assert_eq!(routine.recurrence_tag.as_deref(), Some("daily"));
 }
 
 #[test]
@@ -535,7 +537,7 @@ fn test_schedule_entry_serde_with_after_anchor() {
     let json = r#"{
         "entry_id": "00000000-0000-0000-0000-000000000018",
         "user_id": "00000000-0000-0000-0000-000000000099",
-        "template_id": null,
+        "routine_id": null,
         "task_type": "work",
         "task_ref_id": null,
         "task_ref_type": null,
@@ -554,6 +556,6 @@ fn test_schedule_entry_serde_with_after_anchor() {
     }"#;
     let entry: ScheduleEntry = serde_json::from_str(json).expect("deserialize failed");
     assert_eq!(entry.after_anchor.as_deref(), Some("breakfast"));
-    assert!(entry.template_id.is_none());
+    assert!(entry.routine_id.is_none());
     assert!(entry.actual_start.is_none());
 }

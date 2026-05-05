@@ -5,19 +5,19 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { RoutinesTasksSubstepComponent } from './routines-tasks-substep';
-import { ScheduleTemplatesService } from '../../../../../core/services/schedule-templates.service';
+import { RoutinesService } from '../../../../../core/services/routines.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
-import { ScheduleTemplate } from '../../../../../core/models/schedule-template';
+import { Routine } from '../../../../../core/models/routine';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function makeTemplate(overrides: Partial<ScheduleTemplate> = {}): ScheduleTemplate {
+function makeTemplate(overrides: Partial<Routine> = {}): Routine {
   return {
-    template_id: 'tmpl-1',
+    routine_id: 'tmpl-1',
     user_id: 'user-1',
     task_type: 'general',
     title: 'Morning walk',
-    recurrence: 'daily',
+    recurrence_tag: 'daily',
     recurrence_rule: 'FREQ=DAILY',
     time_window_start: null,
     time_window_end: null,
@@ -32,24 +32,24 @@ function makeTemplate(overrides: Partial<ScheduleTemplate> = {}): ScheduleTempla
   };
 }
 
-function makeTemplatesSvcMock(initialTemplates: ScheduleTemplate[] = []) {
-  const templatesSignal: WritableSignal<ScheduleTemplate[] | null> = signal(initialTemplates);
-  const mock = jasmine.createSpyObj<ScheduleTemplatesService>(
-    'ScheduleTemplatesService',
+function makeTemplatesSvcMock(initialTemplates: Routine[] = []) {
+  const templatesSignal: WritableSignal<Routine[] | null> = signal(initialTemplates);
+  const mock = jasmine.createSpyObj<RoutinesService>(
+    'RoutinesService',
     ['load', 'create', 'delete', 'update', 'clear'],
-    { templates: templatesSignal.asReadonly() }
+    { routines: templatesSignal.asReadonly() }
   );
   return { mock, templatesSignal };
 }
 
 function makeStateMock() {
   return {
-    setScheduleTemplates: jasmine.createSpy('setScheduleTemplates'),
+    setRoutines: jasmine.createSpy('setRoutines'),
     setUpcomingTaskNames: jasmine.createSpy('setUpcomingTaskNames'),
   };
 }
 
-async function setup(initialTemplates: ScheduleTemplate[] = []) {
+async function setup(initialTemplates: Routine[] = []) {
   const { mock: templatesSvcMock, templatesSignal } = makeTemplatesSvcMock(initialTemplates);
   const stateMock = makeStateMock();
 
@@ -63,7 +63,7 @@ async function setup(initialTemplates: ScheduleTemplate[] = []) {
       provideHttpClient(),
       provideHttpClientTesting(),
       provideRouter([]),
-      { provide: ScheduleTemplatesService, useValue: templatesSvcMock },
+      { provide: RoutinesService, useValue: templatesSvcMock },
       { provide: OnboardingStateService, useValue: stateMock },
     ],
   }).compileComponents();
@@ -116,7 +116,7 @@ describe('RoutinesTasksSubstepComponent', () => {
 
   // ── 3. Adding a routine via form calls create() and shows a chip ────────────
 
-  it('adding a routine via form calls ScheduleTemplatesService.create() and shows a chip', async () => {
+  it('adding a routine via form calls RoutinesService.create() and shows a chip', async () => {
     const { fixture, component, templatesSvcMock } = await setup();
     fixture.detectChanges();
 
@@ -129,7 +129,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     fixture.detectChanges();
 
     expect(templatesSvcMock.create).toHaveBeenCalledOnceWith(
-      jasmine.objectContaining({ title: 'Yoga', recurrence: 'daily' })
+      jasmine.objectContaining({ title: 'Yoga', recurrence_rule: 'FREQ=DAILY' })
     );
 
     const chips = fixture.nativeElement.querySelectorAll('.routine-chip');
@@ -160,8 +160,8 @@ describe('RoutinesTasksSubstepComponent', () => {
 
   // ── 5. Removing a routine chip calls delete() and removes the chip ──────────
 
-  it('removing a routine chip calls ScheduleTemplatesService.delete() and removes the chip', async () => {
-    const existingTemplate = makeTemplate({ template_id: 'tmpl-99', title: 'Yoga' });
+  it('removing a routine chip calls RoutinesService.delete() and removes the chip', async () => {
+    const existingTemplate = makeTemplate({ routine_id: 'tmpl-99', title: 'Yoga' });
     const { fixture, templatesSvcMock } = await setup([existingTemplate]);
     fixture.detectChanges();
 
@@ -222,7 +222,7 @@ describe('RoutinesTasksSubstepComponent', () => {
 
   // ── 8. "Save & Continue →" calls both state setters and emits complete ───────
 
-  it('"Save & Continue →" calls setScheduleTemplates + setUpcomingTaskNames + emits complete', async () => {
+  it('"Save & Continue →" calls setRoutines + setUpcomingTaskNames + emits complete', async () => {
     const { fixture, component, stateMock } = await setup();
     fixture.detectChanges();
 
@@ -236,7 +236,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     saveBtn.click();
     fixture.detectChanges();
 
-    expect(stateMock.setScheduleTemplates).toHaveBeenCalledTimes(1);
+    expect(stateMock.setRoutines).toHaveBeenCalledTimes(1);
     expect(stateMock.setUpcomingTaskNames).toHaveBeenCalledWith(jasmine.arrayContaining(['Walk the cat']));
     expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
   });
@@ -253,7 +253,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     component.save();
     fixture.detectChanges();
 
-    expect(stateMock.setScheduleTemplates).toHaveBeenCalledTimes(1);
+    expect(stateMock.setRoutines).toHaveBeenCalledTimes(1);
     expect(stateMock.setUpcomingTaskNames).toHaveBeenCalledWith([]);
     expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
   });
@@ -279,7 +279,7 @@ describe('RoutinesTasksSubstepComponent', () => {
   // ── 11. Tapping a routine chip body opens the inline edit card ───────────────
 
   it('clicking a routine chip body opens the inline edit card', async () => {
-    const existing = makeTemplate({ template_id: 'tmpl-1', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' });
+    const existing = makeTemplate({ routine_id: 'tmpl-1', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' });
     const { fixture } = await setup([existing]);
     fixture.detectChanges();
 
@@ -318,8 +318,8 @@ describe('RoutinesTasksSubstepComponent', () => {
   // ── 13. Successful save calls update(), updates chip, closes edit card ────────
 
   it('a successful save calls update() with correct args, updates chip text, closes edit card', async () => {
-    const existing = makeTemplate({ template_id: 'tmpl-1', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' });
-    const updated = makeTemplate({ template_id: 'tmpl-1', title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' });
+    const existing = makeTemplate({ routine_id: 'tmpl-1', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' });
+    const updated = makeTemplate({ routine_id: 'tmpl-1', title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' });
     const { fixture, component, templatesSvcMock } = await setup([existing]);
     templatesSvcMock.update.and.returnValue(of(updated));
     fixture.detectChanges();
@@ -338,7 +338,7 @@ describe('RoutinesTasksSubstepComponent', () => {
 
     expect(templatesSvcMock.update).toHaveBeenCalledOnceWith(
       'tmpl-1',
-      jasmine.objectContaining({ title: 'Evening walk', recurrence: 'daily' })
+      jasmine.objectContaining({ title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' })
     );
     expect(fixture.nativeElement.querySelector('.routine-edit-card')).toBeNull();
     const chipBodyEl: HTMLButtonElement = fixture.nativeElement.querySelector('.chip-body--clickable');

@@ -9,7 +9,7 @@ import { TaskPlacementReviewSubstepComponent } from './task-placement-review-sub
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { ConfigService } from '../../../../../core/services/config.service';
 import { PlaceTasksEntry, PlanEntryRequest } from '../../../../../core/models/week-plan';
-import { ScheduleTemplate } from '../../../../../core/models/schedule-template';
+import { Routine } from '../../../../../core/models/routine';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -44,13 +44,13 @@ const MOCK_ENTRIES: PlaceTasksEntry[] = [
   },
 ];
 
-function makeTemplate(overrides: Partial<ScheduleTemplate> = {}): ScheduleTemplate {
+function makeTemplate(overrides: Partial<Routine> = {}): Routine {
   return {
-    template_id: 'tpl-1',
+    routine_id: 'tpl-1',
     user_id: 'user-1',
     task_type: 'general',
     title: 'Daily Routine',
-    recurrence: 'daily',
+    recurrence_tag: 'daily',
     recurrence_rule: 'FREQ=DAILY',
     time_window_start: '08:00',
     time_window_end: null,
@@ -70,17 +70,17 @@ function makeTemplate(overrides: Partial<ScheduleTemplate> = {}): ScheduleTempla
 function makeStateMock(
   taskNames: string[] = ['Morning Walk', 'Read Book', 'Evening Run'],
   period: { start: string; end: string } | null = PLAN_PERIOD,
-  scheduleTemplates: ScheduleTemplate[] = [],
+  routines: Routine[] = [],
 ) {
   const taskNamesSignal: WritableSignal<string[]> = signal(taskNames);
   const periodSignal: WritableSignal<{ start: string; end: string } | null> = signal(period);
-  const templatesSignal: WritableSignal<ScheduleTemplate[]> = signal(scheduleTemplates);
+  const routinesSignal: WritableSignal<Routine[]> = signal(routines);
   const routineCountSignal: WritableSignal<number> = signal(0);
 
   return {
     upcomingTaskNames: taskNamesSignal.asReadonly(),
     planPeriod: periodSignal.asReadonly(),
-    scheduleTemplates: templatesSignal.asReadonly(),
+    routines: routinesSignal.asReadonly(),
     totalRoutines: routineCountSignal.asReadonly(),
     setPlacedTasks: jasmine.createSpy('setPlacedTasks'),
     markComplete: jasmine.createSpy('markComplete'),
@@ -96,9 +96,9 @@ const CONFIG_MOCK = {
 async function setup(
   taskNames: string[] = ['Morning Walk', 'Read Book', 'Evening Run'],
   period: { start: string; end: string } | null = PLAN_PERIOD,
-  scheduleTemplates: ScheduleTemplate[] = [],
+  routines: Routine[] = [],
 ) {
-  const stateMock = makeStateMock(taskNames, period, scheduleTemplates);
+  const stateMock = makeStateMock(taskNames, period, routines);
 
   await TestBed.configureTestingModule({
     imports: [TaskPlacementReviewSubstepComponent],
@@ -130,7 +130,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
   // ── 1. Empty state when upcomingTaskNames is empty ───────────────────────────
 
-  it('shows empty state when both upcomingTaskNames and scheduleTemplates are empty', async () => {
+  it('shows empty state when both upcomingTaskNames and routines are empty', async () => {
     const { fixture } = await setup([], PLAN_PERIOD, []);
     fixture.detectChanges();
     const emptyMsg: HTMLElement | null = fixture.nativeElement.querySelector('.empty-msg');

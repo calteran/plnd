@@ -7,7 +7,7 @@ use crate::models::{CARRYOVER_LOOKBACK_DAYS, CarryoverDecision, CommitPlanInput,
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 const ENTRY_COLS: &str =
-    "entry_id, user_id, template_id, task_type, task_ref_id, task_ref_type, title,
+    "entry_id, user_id, routine_id, task_type, task_ref_id, task_ref_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
      family_meal_id, after_anchor, after_entry_id, deviation_note,
      duration_minutes, energy_required, created_at, updated_at";

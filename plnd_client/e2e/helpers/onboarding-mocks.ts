@@ -27,13 +27,13 @@ export const MOCK_DAY_TYPE_WEEKENDS = {
   anchor_date: null,
 };
 
-// ── Schedule Templates (Routines) ─────────────────────────────────────────────
+// ── Routines ──────────────────────────────────────────────────────────────────
 
 export const MOCK_TEMPLATE_MORNING_WALK = {
-  template_id: 'tmpl-morning-walk-uuid',
+  routine_id: 'tmpl-morning-walk-uuid',
   task_type: 'general',
   title: 'Morning walk',
-  recurrence: 'daily',
+  recurrence_tag: 'daily',
   recurrence_rule: 'FREQ=DAILY',
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
