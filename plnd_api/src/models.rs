@@ -74,7 +74,7 @@ pub struct PlanEntryRequest {
     pub task_ref_id: Option<Uuid>,
     pub task_ref_type: Option<String>,
     pub title: Option<String>,
-    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"; omit for bucket tasks (after_anchor)
+    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"; omit for slot tasks (after_anchor)
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub scheduled_start: Option<NaiveTime>,
     pub after_anchor: Option<String>,
@@ -304,7 +304,8 @@ pub struct PlaceTasksEntry {
     pub task_type: String,
     pub duration_minutes: u32,
     pub energy_required: String,
-    /// Meal anchor for floating tasks — mutually exclusive with `time_window_start`.
+    /// Slot anchor label for floating tasks — free-form string, e.g. a meal occasion.
+    /// Mutually exclusive with `time_window_start`.
     pub after_anchor: Option<String>,
     /// Wall-clock start time "HH:MM" for fixed tasks — mutually exclusive with `after_anchor`.
     pub time_window_start: Option<String>,

@@ -20,7 +20,7 @@ const PLACE_TASKS_PROMPT: &str = include_str!("../prompts/place_tasks.md");
 /// - When `actions_taken[i].type == "task_created"`, both `task_id` and
 ///   `date` must be present and non-null (the `if/then` conditional).
 /// - `scheduled_at` is optional for all action types (used for timed tasks).
-/// - `after_anchor` is optional (used for bucket-scheduled tasks).
+/// - `after_anchor` is optional (used for slot-scheduled tasks).
 const TASK_ENTRY_RESPONSE_SCHEMA: &str = r##"{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "TaskEntryResponse",
@@ -269,7 +269,7 @@ const PLACE_TASKS_RESPONSE_SCHEMA: &str = r##"{
         "task_type":         { "type": "string", "enum": ["work", "exercise", "leisure", "appointment", "medication", "general"] },
         "duration_minutes":  { "type": "integer", "minimum": 1, "maximum": 480 },
         "energy_required":   { "type": "string", "enum": ["low", "medium", "high"] },
-        "after_anchor":      { "type": "string", "enum": ["breakfast", "lunch", "dinner"] },
+        "after_anchor":      { "type": "string" },
         "time_window_start": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
       }
     }
@@ -884,19 +884,25 @@ mod tests {
     }
 
     #[test]
-    fn place_tasks_validator_rejects_invalid_after_anchor() {
-        let v = UseCase::PlaceTasks.response_validator().unwrap();
-        let bad = serde_json::json!({
-            "entries": [{
-                "title": "Task",
-                "scheduled_date": "2026-04-23",
-                "after_anchor": "brunch",
-                "duration_minutes": 30,
-                "energy_required": "low",
-                "task_type": "work"
-            }]
-        });
-        assert!(!v.is_valid(&bad));
+    fn place_tasks_validator_accepts_any_slot_label() {
+        let v = &PLACE_TASKS_VALIDATOR;
+        for label in &["brunch", "morning snack", "post-workout", "start_of_day"] {
+            let payload = serde_json::json!({
+                "entries": [{
+                    "title": "Task",
+                    "scheduled_date": "2026-04-23",
+                    "after_anchor": label,
+                    "duration_minutes": 30,
+                    "energy_required": "low",
+                    "task_type": "work"
+                }]
+            });
+            assert!(
+                v.is_valid(&payload),
+                "slot label '{}' must be accepted",
+                label
+            );
+        }
     }
 
     #[test]

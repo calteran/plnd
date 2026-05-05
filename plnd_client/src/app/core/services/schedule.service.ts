@@ -116,6 +116,7 @@ function flip(status: 'pending' | 'done'): 'pending' | 'done' {
 
 // ── API → model mapping ───────────────────────────────────────────────────────
 
+// Well-known anchor labels → display name + emoji. Unknown labels fall back gracefully.
 const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
   breakfast: { name: 'Breakfast', emoji: '🥣' },
   lunch:     { name: 'Lunch',     emoji: '🥗' },

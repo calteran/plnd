@@ -26,8 +26,6 @@ pub const VALID_PRIORITY_LEVELS: &[&str] = &["low", "normal", "high"];
 
 pub const VALID_RECURRENCE_TYPES: &[&str] = &["daily", "weekdays", "weekly", "monthly", "yearly"];
 
-pub const VALID_AFTER_ANCHORS: &[&str] = &["breakfast", "lunch", "dinner"];
-
 /// Soft occasion hints for dishes and meals — not DB-validated; used for UI autocomplete.
 pub const SUGGESTED_OCCASION_TAGS: &[&str] = &[
     "breakfast-friendly",
