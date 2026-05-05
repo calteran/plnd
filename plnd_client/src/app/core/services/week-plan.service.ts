@@ -194,6 +194,11 @@ export class WeekPlanService {
 
   setCarryoverDecision(entryId: string, decision: CarryoverDecision): void {
     this.carryoverDecisionsSignal.update(d => ({ ...d, [entryId]: decision }));
+    if (decision !== 'drop') {
+      this.dropReasonsSignal.update(d =>
+        Object.fromEntries(Object.entries(d).filter(([k]) => k !== entryId))
+      );
+    }
   }
 
   setDropReason(entryId: string, reason: string): void {

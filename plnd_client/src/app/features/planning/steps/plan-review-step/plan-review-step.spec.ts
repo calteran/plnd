@@ -111,4 +111,32 @@ describe('PlanReviewStepComponent', () => {
     badge.click();
     expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'carry');
   });
+
+  // ── Drop reason chips ────────────────────────────────────────────────────
+
+  it('reason row is hidden when decision is not drop', () => {
+    flush([MOCK_ITEM]);
+    // Default decision is 'carry'
+    expect(fixture.nativeElement.querySelector('.reason-row')).toBeNull();
+  });
+
+  it('reason row is shown when decision is drop', () => {
+    flush([MOCK_ITEM]);
+    service.setCarryoverDecision('e1', 'drop');
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.reason-row')).not.toBeNull();
+    const chips = fixture.nativeElement.querySelectorAll('.reason-chip') as NodeListOf<HTMLElement>;
+    expect(chips.length).toBeGreaterThan(0);
+  });
+
+  it('clicking a chip calls setDropReason with correct entryId and reason', () => {
+    flush([MOCK_ITEM]);
+    service.setCarryoverDecision('e1', 'drop');
+    fixture.detectChanges();
+    spyOn(service, 'setDropReason');
+    const chip: HTMLButtonElement = fixture.nativeElement.querySelector('.reason-chip');
+    const expectedReason = chip.textContent?.trim() ?? '';
+    chip.click();
+    expect(service.setDropReason).toHaveBeenCalledWith('e1', expectedReason as Parameters<typeof service.setDropReason>[1]);
+  });
 });

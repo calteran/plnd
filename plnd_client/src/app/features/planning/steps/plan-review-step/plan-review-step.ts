@@ -48,6 +48,7 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
                     <button type="button"
                             class="reason-chip"
                             [class.selected]="displayReason(item.entry_id) === reason"
+                            [attr.aria-pressed]="displayReason(item.entry_id) === reason"
                             (click)="selectReason(item.entry_id, reason)">
                       {{ reason }}
                     </button>
