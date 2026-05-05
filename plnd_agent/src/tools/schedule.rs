@@ -518,9 +518,6 @@ impl Tool for PlaceTasksTool {
                                 "enum": ["work", "exercise", "leisure",
                                          "appointment", "medication", "general"],
                                 "description": "Domain category for this task. \
-                                                NEVER use meal anchor names here — \
-                                                \"breakfast\", \"lunch\", and \"dinner\" \
-                                                belong only in after_anchor. \
                                                 For personal errands or activities with \
                                                 no specific category, use \"general\"."
                             }
