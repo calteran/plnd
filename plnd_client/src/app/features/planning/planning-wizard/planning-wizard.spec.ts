@@ -42,10 +42,30 @@ describe('PlanningWizardComponent', () => {
     expect(back).toBeFalsy();
   });
 
-  it('should render all 5 step labels', () => {
+  it('should render all 6 step labels', () => {
     const labels = fixture.nativeElement.querySelectorAll('.pill-label');
     const texts = Array.from(labels as HTMLElement[]).map((el) => el.textContent?.trim());
-    expect(texts).toEqual(['Carryover', 'Tasks', 'Meals', 'Review', 'Confirm']);
+    expect(texts).toEqual(['Carryover', 'Tasks', 'Meals', 'Exercise', 'Review', 'Confirm']);
+  });
+
+  it('should mark the Exercise step pill as disabled', () => {
+    const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
+    // Exercise is step 4, zero-indexed as pills[3]
+    expect(pills[3].classList).toContain('disabled');
+  });
+
+  it('next() from step 3 skips disabled step 4 and lands on step 5', () => {
+    fixture.componentInstance.weekPlanService.goToStep(3);
+    fixture.detectChanges();
+    fixture.componentInstance.next();
+    expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(5);
+  });
+
+  it('back() from step 5 skips disabled step 4 and lands on step 3', () => {
+    fixture.componentInstance.weekPlanService.goToStep(5);
+    fixture.detectChanges();
+    fixture.componentInstance.back();
+    expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(3);
   });
 
   it('should mark step 1 as active on init', () => {

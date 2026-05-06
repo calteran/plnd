@@ -98,6 +98,13 @@ test.describe('Planning Wizard', () => {
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
       await expect(page.locator('.progress-pill.done')).toHaveCount(2);
     });
+
+    test('Exercise pill is visible and has the disabled class', async ({ page }) => {
+      const pills = page.locator('.progress-pill');
+      // Exercise is the 4th pill (index 3)
+      await expect(pills.nth(3)).toHaveClass(/disabled/);
+      await expect(pills.nth(3).locator('.pill-label')).toHaveText('Exercise');
+    });
   });
 
   // ── Navigation buttons ─────────────────────────────────────────────────────
@@ -127,12 +134,13 @@ test.describe('Planning Wizard', () => {
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('1');
     });
 
-    test('Step 5 has no Next button', async ({ page }) => {
-      // Navigate to step 5 by clicking Next four times
+    test('Step 6 has no Next button', async ({ page }) => {
+      // Navigate to step 6 (Confirm) by clicking Next four times.
+      // Click 1: 1→2, Click 2: 2→3, Click 3: 3→5 (skips disabled Exercise), Click 4: 5→6
       for (let i = 0; i < 4; i++) {
         await page.getByLabel('Next step').click();
       }
-      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('5');
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('6');
       await expect(page.getByLabel('Next step')).not.toBeVisible();
     });
   });
