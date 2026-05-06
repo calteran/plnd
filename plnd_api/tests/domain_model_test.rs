@@ -1,9 +1,9 @@
 // Offline tests for domain model structs and constants.
 // No live database required — follows the dietary_restrictions_test.rs pattern.
 use plnd_api::routes::domain_constants::{
-    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_ENERGY_LEVELS, VALID_FAMILY_ROLES,
-    VALID_FOCUS_LEVELS, VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS, VALID_RECURRENCE_TYPES,
-    VALID_TASK_STATUSES, VALID_TASK_TYPES,
+    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_ENERGY_LEVELS, VALID_FOCUS_LEVELS,
+    VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS, VALID_RECURRENCE_TYPES, VALID_TASK_STATUSES,
+    VALID_TASK_TYPES,
 };
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
@@ -55,14 +55,6 @@ fn test_valid_intensity_levels_has_three_values() {
     assert!(VALID_INTENSITY_LEVELS.contains(&"low"));
     assert!(VALID_INTENSITY_LEVELS.contains(&"moderate"));
     assert!(VALID_INTENSITY_LEVELS.contains(&"high"));
-}
-
-#[test]
-fn test_valid_family_roles_has_three_values() {
-    assert_eq!(VALID_FAMILY_ROLES.len(), 3);
-    assert!(VALID_FAMILY_ROLES.contains(&"owner"));
-    assert!(VALID_FAMILY_ROLES.contains(&"member"));
-    assert!(VALID_FAMILY_ROLES.contains(&"caregiver"));
 }
 
 #[test]
