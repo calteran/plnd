@@ -46,6 +46,7 @@ pub async fn get_carryover(
         "SELECT {ENTRY_COLS} FROM schedule_entries
          WHERE user_id = $1 AND date < $2
            AND status IN ('planned', 'deferred')
+           AND one_shot = FALSE
          ORDER BY date, scheduled_start"
     ))
     .bind(user_id)
@@ -120,6 +121,22 @@ pub async fn commit_plan(
 
     let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
 
+    // Window-close drop pass (§4.10): one-shot tasks left incomplete before the
+    // new plan window are silently marked skipped and never surface in carryover.
+    sqlx::query(
+        "UPDATE schedule_entries
+         SET status = 'skipped', updated_at = NOW()
+         WHERE user_id = $1
+           AND date < $2
+           AND one_shot = TRUE
+           AND status IN ('planned', 'deferred')",
+    )
+    .bind(user_id)
+    .bind(req.plan_start)
+    .execute(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+
     // If replace=true, delete planned entries for unstarted days only (spec §303).
     // An unstarted day has no in_progress or completed entries; started days are
     // left completely untouched even if replace=true.
@@ -164,6 +181,7 @@ pub async fn commit_plan(
     let mut after_anchors: Vec<Option<String>> = Vec::new();
     let mut duration_minutes_vals: Vec<Option<i32>> = Vec::new();
     let mut energy_required_vals: Vec<Option<String>> = Vec::new();
+    let mut one_shot_vals: Vec<bool> = Vec::new();
 
     for entry in &req.entries {
         let scheduled_start = entry
@@ -178,6 +196,7 @@ pub async fn commit_plan(
         after_anchors.push(entry.after_anchor.clone());
         duration_minutes_vals.push(entry.duration_minutes);
         energy_required_vals.push(entry.energy_required.clone());
+        one_shot_vals.push(entry.one_shot.unwrap_or(false));
     }
 
     let committed = task_types.len() as i64;
@@ -187,11 +206,11 @@ pub async fn commit_plan(
             "INSERT INTO schedule_entries
                (user_id, task_type, task_ref_id, task_ref_type, title,
                 date, scheduled_start, status, after_anchor,
-                duration_minutes, energy_required)
+                duration_minutes, energy_required, one_shot)
              SELECT $1, unnest($2::text[]), unnest($3::uuid[]), unnest($4::text[]),
                     unnest($5::text[]), unnest($6::date[]), unnest($7::timestamptz[]),
                     'planned', unnest($8::text[]),
-                    unnest($9::int4[]), unnest($10::text[])",
+                    unnest($9::int4[]), unnest($10::text[]), unnest($11::bool[])",
         )
         .bind(user_id)
         .bind(&task_types)
@@ -203,6 +222,7 @@ pub async fn commit_plan(
         .bind(&after_anchors)
         .bind(&duration_minutes_vals)
         .bind(&energy_required_vals)
+        .bind(&one_shot_vals)
         .execute(&mut *tx)
         .await
         .map_err(DatabaseError::from)?;
@@ -755,6 +775,130 @@ mod tests {
         assert_eq!(
             period.carryover[0].title.as_deref(),
             Some("ancient-planned"),
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // H.5 — get_carryover excludes one-shot entries
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_carryover_excludes_one_shot_entries(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let plan_start = tomorrow();
+
+        let old_date = plan_start - Duration::days(1);
+        let sched = old_date.and_hms_opt(9, 0, 0).unwrap().and_utc();
+
+        // Regular entry — should appear in carryover
+        sqlx::query(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, scheduled_start, status, one_shot)
+             VALUES ($1, 'work', 'carry-me', $2, $3, 'planned', FALSE)",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(sched)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // One-shot entry — must be excluded from carryover
+        sqlx::query(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, scheduled_start, status, one_shot)
+             VALUES ($1, 'general', 'drop-me', $2, $3, 'planned', TRUE)",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(sched)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let carryover = get_carryover(&pool, uid, plan_start).await.unwrap();
+
+        assert_eq!(
+            carryover.len(),
+            1,
+            "one-shot entry must be excluded from carryover"
+        );
+        assert_eq!(carryover[0].title.as_deref(), Some("carry-me"));
+    }
+
+    // -----------------------------------------------------------------------
+    // H.6 — commit_plan silently drops one-shot entries from prior window
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_silently_drops_one_shot_entries_from_prior_window(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let plan_start = tomorrow();
+        let plan_end = plan_start + Duration::days(6);
+
+        let old_date = plan_start - Duration::days(1);
+        let sched = old_date.and_hms_opt(10, 0, 0).unwrap().and_utc();
+
+        // One-shot entry in prior window, not completed
+        let one_shot_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, scheduled_start, status, one_shot)
+             VALUES ($1, 'general', 'teeth-brushing', $2, $3, 'planned', TRUE)
+             RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(sched)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Regular entry in prior window — must NOT be dropped
+        let regular_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, scheduled_start, status, one_shot)
+             VALUES ($1, 'work', 'call-dentist', $2, $3, 'planned', FALSE)
+             RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(sched)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let task_id = make_planning_task(&pool, uid, plan_start).await;
+        let req = CommitPlanInput {
+            plan_start,
+            plan_end,
+            planning_task_id: task_id,
+            entries: vec![],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let one_shot_status: String =
+            sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
+                .bind(one_shot_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            one_shot_status, "skipped",
+            "one-shot entry must be silently dropped"
+        );
+
+        let regular_status: String =
+            sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
+                .bind(regular_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            regular_status, "planned",
+            "non-one-shot entry must not be dropped"
         );
     }
 }

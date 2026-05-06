@@ -379,15 +379,17 @@ mod tests {
         assert!(task.one_shot, "one_shot must be persisted and returned");
 
         // Verify one_shot=true was written to schedule_entries as well
-        let se_one_shot: bool = sqlx::query_scalar(
-            "SELECT one_shot FROM schedule_entries WHERE task_ref_id = $1",
-        )
-        .bind(task.task_id)
-        .fetch_one(&pool)
-        .await
-        .expect("schedule_entries row not found");
+        let se_one_shot: bool =
+            sqlx::query_scalar("SELECT one_shot FROM schedule_entries WHERE task_ref_id = $1")
+                .bind(task.task_id)
+                .fetch_one(&pool)
+                .await
+                .expect("schedule_entries row not found");
 
-        assert!(se_one_shot, "one_shot=true must be propagated to schedule_entries");
+        assert!(
+            se_one_shot,
+            "one_shot=true must be propagated to schedule_entries"
+        );
 
         let not_one_shot = create_user_task(
             &pool,
@@ -406,14 +408,16 @@ mod tests {
         assert!(!not_one_shot.one_shot, "one_shot=false must roundtrip too");
 
         // Verify one_shot=false was written to schedule_entries
-        let se_not_one_shot: bool = sqlx::query_scalar(
-            "SELECT one_shot FROM schedule_entries WHERE task_ref_id = $1",
-        )
-        .bind(not_one_shot.task_id)
-        .fetch_one(&pool)
-        .await
-        .expect("schedule_entries row for false task not found");
+        let se_not_one_shot: bool =
+            sqlx::query_scalar("SELECT one_shot FROM schedule_entries WHERE task_ref_id = $1")
+                .bind(not_one_shot.task_id)
+                .fetch_one(&pool)
+                .await
+                .expect("schedule_entries row for false task not found");
 
-        assert!(!se_not_one_shot, "one_shot=false must be propagated to schedule_entries");
+        assert!(
+            !se_not_one_shot,
+            "one_shot=false must be propagated to schedule_entries"
+        );
     }
 }
