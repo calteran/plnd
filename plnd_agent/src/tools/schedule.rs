@@ -236,6 +236,13 @@ impl Tool for CreateTaskTool {
             .and_then(|v| v.as_str())
             .map(str::to_string);
 
+        // null / absent both mean "not one-shot"; non-boolean values are schema
+        // violations and are intentionally treated as false (safe default).
+        let one_shot = input
+            .get("one_shot")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
         if scheduled_start.is_none() && after_anchor.is_none() {
             return Err(ToolError::InvalidInput {
                 tool: self.name().to_string(),
@@ -277,6 +284,7 @@ impl Tool for CreateTaskTool {
                 scheduled_start,
                 duration_minutes,
                 after_anchor.as_deref(),
+                one_shot,
             )
             .await
             .map_err(|e| db_err(self.name(), e))?;
@@ -407,6 +415,13 @@ fn create_task_schema() -> serde_json::Value {
                                 from an anchor entry (is_anchor = true) returned by get_day_schedule, \
                                 or a free-form occasion label. Omit when scheduled_start is set."
             },
+            "one_shot": {
+                "type": "boolean",
+                "description": "Whether this task is meaningful only within today's window. \
+                                One-shot tasks are silently dropped at window close and never \
+                                surface in carryover review (e.g. 'brush teeth'). \
+                                Infer from context; default false."
+            },
             "duration_minutes": {
                 "type": "integer",
                 "minimum": DURATION_MIN,
@@ -520,6 +535,13 @@ impl Tool for PlaceTasksTool {
                                 "description": "Domain category for this task. \
                                                 For personal errands or activities with \
                                                 no specific category, use \"general\"."
+                            },
+                            "one_shot": {
+                                "type": "boolean",
+                                "description": "Whether this task is meaningful only within today's window. \
+                                                One-shot tasks are silently dropped at window close and never \
+                                                surface in carryover review (e.g. 'brush teeth'). \
+                                                Infer from context; default false."
                             }
                         }
                     }
@@ -780,5 +802,47 @@ mod tests {
         });
         let result = tool.execute(&ctx, input.clone()).await.unwrap();
         assert_eq!(result, input);
+    }
+
+    #[test]
+    fn create_task_schema_has_one_shot_property() {
+        let schema = create_task_schema();
+        assert!(
+            schema["properties"].get("one_shot").is_some(),
+            "create_task schema must have one_shot property"
+        );
+        assert_eq!(
+            schema["properties"]["one_shot"]["type"].as_str(),
+            Some("boolean")
+        );
+        assert!(
+            schema["properties"]["one_shot"]["description"]
+                .as_str()
+                .unwrap_or("")
+                .contains("carryover"),
+            "one_shot description must mention carryover"
+        );
+    }
+
+    #[test]
+    fn place_tasks_schema_has_one_shot_in_items() {
+        let tool = PlaceTasksTool;
+        let schema = tool.schema();
+        let items = &schema["properties"]["entries"]["items"];
+        assert!(
+            items["properties"].get("one_shot").is_some(),
+            "place_tasks items must have one_shot property"
+        );
+        assert_eq!(
+            items["properties"]["one_shot"]["type"].as_str(),
+            Some("boolean")
+        );
+        assert!(
+            items["properties"]["one_shot"]["description"]
+                .as_str()
+                .unwrap_or("")
+                .contains("carryover"),
+            "one_shot description must mention carryover"
+        );
     }
 }

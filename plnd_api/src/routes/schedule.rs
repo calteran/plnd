@@ -61,6 +61,7 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
             .transpose()?,
         energy_required: e.energy_required,
+        one_shot: e.one_shot,
     })
 }
 
@@ -334,6 +335,7 @@ mod tests {
             after_anchor: None,
             duration_minutes: None,
             energy_required: None,
+            one_shot: None,
         }
     }
 
@@ -379,5 +381,22 @@ mod tests {
             ..base_entry()
         };
         assert!(map_entry(e).is_ok());
+    }
+
+    #[test]
+    fn map_entry_passes_one_shot_true_through() {
+        let e = PlanEntryRequest {
+            one_shot: Some(true),
+            ..base_entry()
+        };
+        let result = map_entry(e).unwrap();
+        assert_eq!(result.one_shot, Some(true));
+    }
+
+    #[test]
+    fn map_entry_one_shot_defaults_to_none_when_absent() {
+        let e = base_entry();
+        let result = map_entry(e).unwrap();
+        assert_eq!(result.one_shot, None);
     }
 }

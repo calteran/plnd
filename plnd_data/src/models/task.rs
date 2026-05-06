@@ -17,6 +17,7 @@ pub struct Task {
     pub energy_required: String, // 'low' | 'medium' | 'high'
     pub status: String,          // 'planned' | 'in_progress' | 'completed' | 'skipped' | 'deferred'
     pub is_anchor: bool,
+    pub one_shot: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

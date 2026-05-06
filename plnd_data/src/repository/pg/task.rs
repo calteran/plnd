@@ -29,6 +29,7 @@ impl TaskRepository for PgTaskRepository {
         scheduled_at: Option<DateTime<Utc>>,
         duration_minutes: i32,
         after_anchor: Option<&str>,
+        one_shot: bool,
     ) -> Result<Task, crate::Error> {
         create_user_task(
             &self.pool,
@@ -39,6 +40,7 @@ impl TaskRepository for PgTaskRepository {
             scheduled_at,
             duration_minutes,
             after_anchor,
+            one_shot,
         )
         .await
         .map_err(Into::into)

@@ -50,6 +50,7 @@ pub struct ScheduleEntry {
     pub deviation_note: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
+    pub one_shot: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -93,4 +94,5 @@ pub struct PlanEntryInput {
     pub after_anchor: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
+    pub one_shot: Option<bool>,
 }

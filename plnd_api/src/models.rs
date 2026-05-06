@@ -87,6 +87,8 @@ pub struct PlanEntryRequest {
     pub after_anchor: Option<String>,
     pub duration_minutes: Option<u32>,
     pub energy_required: Option<String>,
+    #[serde(default)]
+    pub one_shot: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -313,6 +315,9 @@ pub struct PlaceTasksEntry {
     pub after_anchor: Option<String>,
     /// Wall-clock start time "HH:MM" for fixed tasks — mutually exclusive with `after_anchor`.
     pub time_window_start: Option<String>,
+    /// When true, this task is not carried over if unfinished — it simply drops.
+    #[serde(default)]
+    pub one_shot: Option<bool>,
 }
 
 #[cfg(test)]
@@ -340,6 +345,7 @@ mod place_tasks_tests {
         assert!(req.task_type.is_none());
         assert!(req.duration_minutes.is_none());
         assert!(req.energy_required.is_none());
+        assert!(req.one_shot.is_none());
     }
 
     #[test]
@@ -404,6 +410,7 @@ mod place_tasks_tests {
             energy_required: "low".to_string(),
             after_anchor: Some("lunch".to_string()),
             time_window_start: None,
+            one_shot: None,
         };
         let json = serde_json::to_string(&entry).unwrap();
         assert!(json.contains("\"scheduled_date\":\"2026-04-23\""));
@@ -459,6 +466,23 @@ mod place_tasks_tests {
         }"#;
         let req: PlaceTasksRequest = serde_json::from_str(json).unwrap();
         assert!(req.routine_templates.is_empty());
+    }
+
+    #[test]
+    fn place_tasks_entry_one_shot_defaults_to_none() {
+        let json = r#"{
+            "title": "Call dentist",
+            "scheduled_date": "2026-04-23",
+            "after_anchor": "lunch",
+            "duration_minutes": 30,
+            "energy_required": "low",
+            "task_type": "appointment"
+        }"#;
+        let entry: PlaceTasksEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            entry.one_shot, None,
+            "one_shot must default to None when absent"
+        );
     }
 }
 

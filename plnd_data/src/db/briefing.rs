@@ -109,6 +109,7 @@ mod tests {
                     after_anchor: None,
                     duration_minutes: None,
                     energy_required: None,
+                    one_shot: None,
                 },
                 PlanEntryInput {
                     date: yesterday,
@@ -120,6 +121,7 @@ mod tests {
                     after_anchor: None,
                     duration_minutes: None,
                     energy_required: None,
+                    one_shot: None,
                 },
                 PlanEntryInput {
                     date: yesterday,
@@ -131,6 +133,7 @@ mod tests {
                     after_anchor: None,
                     duration_minutes: None,
                     energy_required: None,
+                    one_shot: None,
                 },
             ],
             replace: false,

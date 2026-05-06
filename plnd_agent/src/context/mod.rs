@@ -270,7 +270,8 @@ const PLACE_TASKS_RESPONSE_SCHEMA: &str = r##"{
         "duration_minutes":  { "type": "integer", "minimum": 1, "maximum": 480 },
         "energy_required":   { "type": "string", "enum": ["low", "medium", "high"] },
         "after_anchor":      { "type": "string" },
-        "time_window_start": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        "time_window_start": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
+        "one_shot":          { "type": "boolean" }
       }
     }
   }
