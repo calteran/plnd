@@ -82,6 +82,7 @@ export interface PlannedTask {
   task_ref_id?: string;
   task_ref_type?: string;
   scheduled_start?: string; // "HH:MM"
+  one_shot?: boolean;
 }
 
 export type FloatingTask = Omit<PlannedTask, 'date'>;
@@ -110,6 +111,7 @@ export interface ScheduleEntryDto {
   status: string;
   after_anchor?: string;      // free-form slot label
   slot_anchor_id?: string;    // UUID of the preceding anchor entry
+  one_shot?: boolean;
 }
 
 export interface SchedulePeriodResponse {
@@ -136,6 +138,7 @@ export interface PlanEntryRequest {
   after_anchor?: string;
   duration_minutes?: number;
   energy_required?: EnergyLevel;
+  one_shot?: boolean;
 }
 
 // -- Task Placement ----------------------------------------------------------
@@ -167,6 +170,7 @@ export interface PlaceTasksEntry {
   after_anchor?: string;
   /** Exact start time "HH:MM" for fixed tasks — mutually exclusive with after_anchor. */
   time_window_start?: string;
+  one_shot?: boolean;
 }
 
 export interface PostSchedulePlanRequest {
