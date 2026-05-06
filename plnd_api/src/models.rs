@@ -87,6 +87,7 @@ pub struct PlanEntryRequest {
     pub after_anchor: Option<String>,
     pub duration_minutes: Option<u32>,
     pub energy_required: Option<String>,
+    #[serde(default)]
     pub one_shot: Option<bool>,
 }
 
