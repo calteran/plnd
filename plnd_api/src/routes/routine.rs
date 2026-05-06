@@ -11,16 +11,14 @@ use axum::{
 };
 use chrono::NaiveTime;
 use plnd_data::Error;
+use rrule::{RRule, Unvalidated};
 use std::sync::Arc;
 use uuid::Uuid;
 
-/// Returns 422 if `rule` does not begin with `FREQ=`.
-/// Uppercase-only: RFC 5545 canonical form; the frontend always generates uppercase.
 fn validate_recurrence_rule(rule: &str) -> Result<(), StatusCode> {
-    if !rule.starts_with("FREQ=") {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
-    Ok(())
+    rule.parse::<RRule<Unvalidated>>()
+        .map(|_| ())
+        .map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
@@ -308,6 +306,10 @@ mod tests {
             "FREQ=WEEKLY;BYDAY=MO,WE,FR",
             "FREQ=DAILY",
             "FREQ=MONTHLY;BYMONTHDAY=1",
+            "FREQ=MONTHLY;BYDAY=-1FR",
+            "FREQ=WEEKLY;COUNT=10",
+            // The rrule crate normalises keys to uppercase internally, so lowercase is accepted.
+            "freq=weekly",
         ] {
             assert!(
                 validate_recurrence_rule(rule).is_ok(),
@@ -318,7 +320,7 @@ mod tests {
 
     #[test]
     fn recurrence_rule_invalid_format_rejected() {
-        for rule in &["garbage", "", "BYDAY=MO", "freq=weekly"] {
+        for rule in &["garbage", "", "BYDAY=MO", "FREQ=NOTAFREQ;BYDAY=ZZ"] {
             assert!(
                 validate_recurrence_rule(rule).is_err(),
                 "should reject: {rule}"
