@@ -110,7 +110,7 @@ export class PlanningWizardComponent implements OnInit {
   private readonly preferencesService = inject(PreferencesService);
   private readonly mealPatternService = inject(MealPatternService);
 
-  private readonly carryoverLoading = signal(true);
+  protected readonly carryoverLoading = signal(true);
 
   readonly steps = computed<WizardStep[]>(() => [
     { n: 1, label: 'Carryover', disabled: !this.carryoverLoading() && this.weekPlanService.carryoverItems().length === 0 },
