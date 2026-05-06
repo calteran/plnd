@@ -95,12 +95,14 @@ pub async fn create_user_task(
     scheduled_at: Option<DateTime<Utc>>,
     duration_minutes: i32,
     after_anchor: Option<&str>,
+    one_shot: bool,
 ) -> Result<Task, DatabaseError> {
     let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
 
     let task: Task = sqlx::query_as::<_, Task>(
-        "INSERT INTO tasks (user_id, title, task_type, scheduled_start, duration_minutes, energy_required, status)
-         VALUES ($1, $2, 'general', $3, $4, $5, 'planned')
+        "INSERT INTO tasks (user_id, title, task_type, scheduled_start, duration_minutes,
+                            energy_required, status, one_shot)
+         VALUES ($1, $2, 'general', $3, $4, $5, 'planned', $6)
          RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
                    energy_required, status, is_anchor, one_shot, created_at, updated_at",
     )
@@ -109,6 +111,7 @@ pub async fn create_user_task(
     .bind(scheduled_at)
     .bind(duration_minutes)
     .bind(energy_level)
+    .bind(one_shot)
     .fetch_one(&mut *tx)
     .await
     .map_err(DatabaseError::from)?;
@@ -126,8 +129,9 @@ pub async fn create_user_task(
         scheduled_at.map(|t| t + Duration::minutes(duration_minutes as i64));
     sqlx::query(
         "INSERT INTO schedule_entries
-           (user_id, task_type, task_ref_id, title, date, scheduled_start, scheduled_end, after_anchor, status)
-         VALUES ($1, 'general', $2, $3, $4, $5, $6, $7, 'planned')",
+           (user_id, task_type, task_ref_id, title, date, scheduled_start, scheduled_end,
+            after_anchor, status, one_shot)
+         VALUES ($1, 'general', $2, $3, $4, $5, $6, $7, 'planned', $8)",
     )
     .bind(user_id)
     .bind(task.task_id)
@@ -136,6 +140,7 @@ pub async fn create_user_task(
     .bind(scheduled_at)
     .bind(scheduled_end)
     .bind(after_anchor)
+    .bind(one_shot)
     .execute(&mut *tx)
     .await
     .map_err(DatabaseError::from)?;
@@ -258,6 +263,7 @@ mod tests {
             Some(scheduled_at),
             30,
             None,
+            false,
         )
         .await
         .expect("create_user_task failed");
@@ -295,6 +301,7 @@ mod tests {
             Some(scheduled_at),
             60,
             None,
+            false,
         )
         .await
         .unwrap();
@@ -307,6 +314,7 @@ mod tests {
             Some(scheduled_at),
             60,
             None,
+            false,
         )
         .await
         .unwrap();
@@ -333,6 +341,7 @@ mod tests {
             None,
             30,
             Some("lunch"),
+            false,
         )
         .await
         .expect("create_user_task failed");
@@ -356,5 +365,33 @@ mod tests {
             Some("lunch".to_string()),
             "after_anchor must be stored"
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_user_task_roundtrips_one_shot(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let date = NaiveDate::from_ymd_opt(2026, 5, 10).unwrap();
+
+        let task = create_user_task(&pool, uid, "Brush teeth", "low", date, None, 5, None, true)
+            .await
+            .expect("create_user_task failed");
+
+        assert!(task.one_shot, "one_shot must be persisted and returned");
+
+        let not_one_shot = create_user_task(
+            &pool,
+            uid,
+            "Call dentist",
+            "low",
+            date,
+            None,
+            15,
+            None,
+            false,
+        )
+        .await
+        .expect("create_user_task failed");
+
+        assert!(!not_one_shot.one_shot, "one_shot=false must roundtrip too");
     }
 }

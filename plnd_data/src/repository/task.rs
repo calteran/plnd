@@ -16,6 +16,7 @@ pub trait TaskRepository: Send + Sync {
         scheduled_at: Option<DateTime<Utc>>,
         duration_minutes: i32,
         after_anchor: Option<&str>,
+        one_shot: bool,
     ) -> Result<Task, crate::Error>;
 
     async fn create_weekly_plan_task(

@@ -440,6 +440,7 @@ fn test_task_serde_round_trip() {
         "energy_required": "medium",
         "status": "planned",
         "is_anchor": false,
+        "one_shot": false,
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
@@ -529,6 +530,7 @@ fn test_schedule_entry_serde_with_after_anchor() {
         "after_anchor": "breakfast",
         "slot_anchor_id": null,
         "deviation_note": null,
+        "one_shot": false,
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;

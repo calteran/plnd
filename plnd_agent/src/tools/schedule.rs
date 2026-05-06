@@ -277,6 +277,7 @@ impl Tool for CreateTaskTool {
                 scheduled_start,
                 duration_minutes,
                 after_anchor.as_deref(),
+                false, // one_shot: wired in Task 5 (agent tool schema update)
             )
             .await
             .map_err(|e| db_err(self.name(), e))?;
