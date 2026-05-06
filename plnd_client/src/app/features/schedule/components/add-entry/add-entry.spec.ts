@@ -280,7 +280,7 @@ describe('AddEntryComponent', () => {
     expect(emitted?.type).toBe('appointment');
   });
 
-  it('emits type "task" as fallback for an unrecognised action type', async () => {
+  it('emits type "general" as fallback for an unrecognised action type', async () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(
       of(makeResponse({ actions_taken: [{ type: 'future_thing', task_id: 'id-1' }], confirmation: 'Done!' })),
@@ -315,7 +315,7 @@ describe('AddEntryComponent', () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(
       of(makeResponse({
-        actions_taken: [{ type: 'task', task_id: 'server-id-123' }],
+        actions_taken: [{ type: 'work', task_id: 'server-id-123' }],
         confirmation: 'Task added!',
       })),
     );

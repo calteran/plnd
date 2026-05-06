@@ -123,6 +123,15 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
   dinner:    { name: 'Dinner',    emoji: '🍽' },
 };
 
+const TYPE_MAP: Record<string, ItemType> = {
+  work:        'work',
+  exercise:    'exercise',
+  leisure:     'leisure',
+  medication:  'medication',
+  appointment: 'appointment',
+  general:     'general',
+};
+
 function mapEntry(e: ScheduleEntryDto): ScheduleItem {
   // Meal anchor entries have task_type === null
   if (e.task_type == null) {
@@ -140,14 +149,6 @@ function mapEntry(e: ScheduleEntryDto): ScheduleItem {
     } satisfies MealAnchor;
   }
 
-  const TYPE_MAP: Record<string, ItemType> = {
-    work:        'work',
-    exercise:    'exercise',
-    leisure:     'leisure',
-    medication:  'medication',
-    appointment: 'appointment',
-    general:     'general',
-  };
   return {
     id:     e.entry_id,
     type:   TYPE_MAP[e.task_type] ?? 'general',
