@@ -61,6 +61,7 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             .map(|d| i32::try_from(d).map_err(|_| StatusCode::BAD_REQUEST))
             .transpose()?,
         energy_required: e.energy_required,
+        one_shot: e.one_shot,
     })
 }
 
