@@ -51,7 +51,7 @@ describe('MealPatternService', () => {
   it('create() POSTs and appends to signal sorted by sort_order', () => {
     service['entriesSignal'].set([{ id: '2', name: 'Dinner', preferred_time: '18:00:00',
                                     tolerance_minutes: 60, sort_order: 3, user_id: '', created_at: '' }]);
-    service['loaded'] = true;
+    service['requested'] = true;
     service.create({ name: 'Lunch', preferred_time: '12:00', sort_order: 2 }).subscribe();
     const req = http.expectOne(`${BASE}/meal-pattern`);
     req.flush({ id: '3', name: 'Lunch', preferred_time: '12:00:00',
@@ -63,7 +63,7 @@ describe('MealPatternService', () => {
   it('update() PATCHes and replaces entry in signal', () => {
     service['entriesSignal'].set([{ id: '1', name: 'Breakfast', preferred_time: '07:00:00',
                                     tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' }]);
-    service['loaded'] = true;
+    service['requested'] = true;
     service.update('1', { preferred_time: '08:00' }).subscribe();
     const req = http.expectOne(`${BASE}/meal-pattern/1`);
     expect(req.request.method).toBe('PATCH');
@@ -76,14 +76,14 @@ describe('MealPatternService', () => {
   it('delete() DELETEs and removes from signal', () => {
     service['entriesSignal'].set([{ id: '1', name: 'Breakfast', preferred_time: '08:00:00',
                                     tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' }]);
-    service['loaded'] = true;
+    service['requested'] = true;
     service.delete('1').subscribe();
     http.expectOne(`${BASE}/meal-pattern/1`).flush(null, { status: 204, statusText: 'No Content' });
     expect(service.entries().length).toBe(0);
   });
 
   it('clear() resets signal and allows re-fetch', () => {
-    service['loaded'] = true;
+    service['requested'] = true;
     service.clear();
     expect(service.entries().length).toBe(0);
     service.load();
@@ -96,5 +96,25 @@ describe('MealPatternService', () => {
     service.load();
     http.expectOne(`${BASE}/meal-pattern`).flush([]);
     expect(service.entries().length).toBe(0);
+  });
+
+  it('loaded() is false before HTTP resolves', () => {
+    service.load();
+    expect(service.loaded()).toBeFalse();
+    http.expectOne(`${BASE}/meal-pattern`).flush([]);
+  });
+
+  it('loaded() becomes true after HTTP resolves', () => {
+    service.load();
+    http.expectOne(`${BASE}/meal-pattern`).flush([]);
+    expect(service.loaded()).toBeTrue();
+  });
+
+  it('loaded() resets to false after clear()', () => {
+    service.load();
+    http.expectOne(`${BASE}/meal-pattern`).flush([]);
+    expect(service.loaded()).toBeTrue();
+    service.clear();
+    expect(service.loaded()).toBeFalse();
   });
 });

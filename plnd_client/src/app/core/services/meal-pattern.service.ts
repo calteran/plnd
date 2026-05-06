@@ -14,20 +14,25 @@ export class MealPatternService {
   private readonly config = inject(ConfigService);
 
   private readonly entriesSignal = signal<MealPatternEntry[]>([]);
-  private loaded = false;
+  private readonly loadedSignal = signal(false);
+  private requested = false;
 
   readonly entries = this.entriesSignal.asReadonly();
+  readonly loaded = this.loadedSignal.asReadonly();
 
   private get apiBase(): string {
     return this.config.getConfig().api.baseUrl;
   }
 
   load(): void {
-    if (this.loaded) return;
-    this.loaded = true;
+    if (this.requested) return;
+    this.requested = true;
     this.http.get<MealPatternEntry[]>(`${this.apiBase}/meal-pattern`).subscribe({
-      next: entries => this.entriesSignal.set(entries),
-      error: (err) => { this.loaded = false; console.error('Failed to load meal pattern', err); },
+      next: entries => {
+        this.entriesSignal.set(entries);
+        this.loadedSignal.set(true);
+      },
+      error: (err) => { this.requested = false; console.error('Failed to load meal pattern', err); },
     });
   }
 
@@ -62,6 +67,7 @@ export class MealPatternService {
 
   clear(): void {
     this.entriesSignal.set([]);
-    this.loaded = false;
+    this.loadedSignal.set(false);
+    this.requested = false;
   }
 }
