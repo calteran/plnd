@@ -144,6 +144,10 @@ describe('PlanningWizardComponent', () => {
   // ── Carryover auto-skip ──────────────────────────────────────────────────
 
   describe('carryover auto-skip', () => {
+    afterEach(() => {
+      TestBed.inject(HttpTestingController).verify();
+    });
+
     function initSession(httpMock: HttpTestingController) {
       // Flush preferences → triggers session-init effect
       httpMock.expectOne(r => r.url.includes('/preferences/me')).flush({
