@@ -1,5 +1,13 @@
-import { Component, input, output } from '@angular/core';
-import { ScheduleTask } from '../../../../core/models/schedule';
+import { Component, computed, input, output } from '@angular/core';
+import { ItemType, ScheduleTask } from '../../../../core/models/schedule';
+
+const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
+  work:        'Work',
+  exercise:    'Exercise',
+  leisure:     'Leisure',
+  medication:  'Rx',
+  appointment: 'Appt',
+};
 
 @Component({
   selector: 'app-task-row',
@@ -28,11 +36,16 @@ import { ScheduleTask } from '../../../../core/models/schedule';
         }
       </button>
       <span class="label" [class.struck]="item().status === 'done'">{{ item().label }}</span>
+      @if (typeBadge()) {
+        <span class="type-badge type-badge--{{ item().type }}">{{ typeBadge() }}</span>
+      }
     </div>
   `,
   styleUrl: './task-row.scss'
 })
 export class TaskRowComponent {
-  readonly item   = input.required<ScheduleTask>();
+  readonly item    = input.required<ScheduleTask>();
   readonly toggled = output<string>();
+
+  protected readonly typeBadge = computed(() => TYPE_BADGE_LABELS[this.item().type] ?? null);
 }
