@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Subject, of, switchMap, map, catchError } from 'rxjs';
 import { ConfigService } from './config.service';
-import { ScheduleItem, ItemType, MealAnchor, ScheduleTask, isMealAnchor } from '../models/schedule';
+import { ScheduleItem, MealAnchor, ScheduleTask, isMealAnchor, parseItemType } from '../models/schedule';
 import { ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 
 @Injectable({ providedIn: 'root' })
@@ -123,15 +123,6 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
   dinner:    { name: 'Dinner',    emoji: '🍽' },
 };
 
-const TYPE_MAP: Record<string, ItemType> = {
-  work:        'work',
-  exercise:    'exercise',
-  leisure:     'leisure',
-  medication:  'medication',
-  appointment: 'appointment',
-  general:     'general',
-};
-
 function mapEntry(e: ScheduleEntryDto): ScheduleItem {
   // Meal anchor entries have task_type === null
   if (e.task_type == null) {
@@ -151,7 +142,7 @@ function mapEntry(e: ScheduleEntryDto): ScheduleItem {
 
   return {
     id:     e.entry_id,
-    type:   TYPE_MAP[e.task_type] ?? 'general',
+    type:   parseItemType(e.task_type),
     label:  e.title ?? e.task_type,
     status: e.status === 'completed' ? 'done' : 'pending',
   } satisfies ScheduleTask;
