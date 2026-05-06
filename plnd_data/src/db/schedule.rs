@@ -867,6 +867,34 @@ mod tests {
         .await
         .unwrap();
 
+        // Deferred one-shot entry — must also be dropped
+        let deferred_one_shot_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, scheduled_start, status, one_shot)
+             VALUES ($1, 'general', 'evening-stretches', $2, $3, 'deferred', TRUE)
+             RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(sched)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        // Completed one-shot entry — must NOT be affected
+        let completed_one_shot_id: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, scheduled_start, status, one_shot)
+             VALUES ($1, 'general', 'morning-vitamins', $2, $3, 'completed', TRUE)
+             RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(old_date)
+        .bind(sched)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
         let task_id = make_planning_task(&pool, uid, plan_start).await;
         let req = CommitPlanInput {
             plan_start,
@@ -899,6 +927,28 @@ mod tests {
         assert_eq!(
             regular_status, "planned",
             "non-one-shot entry must not be dropped"
+        );
+
+        let deferred_status: String =
+            sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
+                .bind(deferred_one_shot_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            deferred_status, "skipped",
+            "deferred one-shot entry must also be silently dropped"
+        );
+
+        let completed_status: String =
+            sqlx::query_scalar("SELECT status FROM schedule_entries WHERE entry_id = $1")
+                .bind(completed_one_shot_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            completed_status, "completed",
+            "completed one-shot entry must not be affected by drop pass"
         );
     }
 }
