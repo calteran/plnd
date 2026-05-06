@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { WritableSignal, signal } from '@angular/core';
 import { PlanningWizardComponent } from './planning-wizard';
@@ -139,5 +139,73 @@ describe('PlanningWizardComponent', () => {
     const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
     expect(pills[0].classList).toContain('done');
     expect(pills[1].classList).toContain('active');
+  });
+
+  // ── Carryover auto-skip ──────────────────────────────────────────────────
+
+  describe('carryover auto-skip', () => {
+    function initSession(httpMock: HttpTestingController) {
+      // Flush preferences → triggers session-init effect
+      httpMock.expectOne(r => r.url.includes('/preferences/me')).flush({
+        user_id: 'u1', week_start_day: 1, planning_trigger_offset: 0,
+        default_plan_length_days: 7, email_notifications_enabled: false,
+        sms_notifications_enabled: false, push_notifications_enabled: false,
+        phone_number: null, created_at: '', updated_at: '',
+      });
+      // Flush weekly-plan task POST
+      httpMock.expectOne(r => r.url.includes('/tasks/weekly-plan')).flush({ task_id: 'tid' });
+    }
+
+    it('advances to step 2 and marks step 1 disabled when carryover is empty', () => {
+      const httpMock = TestBed.inject(HttpTestingController);
+      initSession(httpMock);
+      fixture.detectChanges();
+      httpMock.expectOne(r => r.url.includes('/schedule/plan/carryover')).flush({ carryover: [] });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(2);
+      const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
+      expect(pills[0].classList).toContain('disabled');
+    });
+
+    it('stays on step 1 and keeps it enabled when carryover has items', () => {
+      const httpMock = TestBed.inject(HttpTestingController);
+      initSession(httpMock);
+      fixture.detectChanges();
+      httpMock.expectOne(r => r.url.includes('/schedule/plan/carryover')).flush({
+        carryover: [{ entry_id: 'e1', title: 'Walk', task_type: 'general',
+                      date: '2026-03-20', status: 'planned', scheduled_start: null }],
+      });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(1);
+      const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
+      expect(pills[0].classList).not.toContain('disabled');
+    });
+
+    it('does not show Back button on step 2 when step 1 is disabled', () => {
+      const httpMock = TestBed.inject(HttpTestingController);
+      initSession(httpMock);
+      fixture.detectChanges();
+      httpMock.expectOne(r => r.url.includes('/schedule/plan/carryover')).flush({ carryover: [] });
+      fixture.detectChanges();
+
+      // step 2 is now current; step 1 is the only "previous" step but is disabled
+      const back = fixture.nativeElement.querySelector('.nav-btn--back');
+      expect(back).toBeFalsy();
+    });
+
+    it('shows Back button on step 3 when step 2 is a valid previous step', () => {
+      const httpMock = TestBed.inject(HttpTestingController);
+      initSession(httpMock);
+      fixture.detectChanges();
+      httpMock.expectOne(r => r.url.includes('/schedule/plan/carryover')).flush({ carryover: [] });
+      fixture.detectChanges();
+      fixture.componentInstance.weekPlanService.goToStep(3);
+      fixture.detectChanges();
+
+      const back = fixture.nativeElement.querySelector('.nav-btn--back');
+      expect(back).toBeTruthy();
+    });
   });
 });
