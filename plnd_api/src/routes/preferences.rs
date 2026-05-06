@@ -45,76 +45,14 @@ pub async fn patch_preferences(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    // Cross-field: when both window bounds are provided, start must precede end
-    let window_pairs = [
-        (body.breakfast_window_start, body.breakfast_window_end),
-        (body.lunch_window_start, body.lunch_window_end),
-        (body.dinner_window_start, body.dinner_window_end),
-    ];
-    for (start, end) in window_pairs {
-        if let (Some(s), Some(e)) = (start, end)
-            && s >= e
-        {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
-    }
-
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let any_scheduling = body.week_start_day.is_some()
         || body.planning_trigger_offset.is_some()
         || body.default_plan_length_days.is_some()
-        || body.wake_time.is_some()
         || body.planning_time.is_some();
 
-    let any_window = body.breakfast_window_start.is_some()
-        || body.breakfast_window_end.is_some()
-        || body.lunch_window_start.is_some()
-        || body.lunch_window_end.is_some()
-        || body.dinner_window_start.is_some()
-        || body.dinner_window_end.is_some();
-
-    let prefs = if any_window {
-        if any_scheduling {
-            // Result intentionally discarded: update_meal_windows below returns the
-            // full row (including planning_time) via its own RETURNING clause, so
-            // the final response is correct. The patch_preferences call only needs
-            // to persist the scheduling fields before the window update runs.
-            state
-                .repos
-                .preferences
-                .patch_preferences(
-                    user_id,
-                    body.week_start_day,
-                    body.planning_trigger_offset,
-                    body.default_plan_length_days,
-                    body.wake_time,
-                    body.planning_time,
-                )
-                .await
-                .map_err(|e| {
-                    tracing::error!(error = %e, "patch_preferences error");
-                    StatusCode::INTERNAL_SERVER_ERROR
-                })?;
-        }
-        state
-            .repos
-            .preferences
-            .update_meal_windows(
-                user_id,
-                body.breakfast_window_start,
-                body.breakfast_window_end,
-                body.lunch_window_start,
-                body.lunch_window_end,
-                body.dinner_window_start,
-                body.dinner_window_end,
-            )
-            .await
-            .map_err(|e| {
-                tracing::error!(error = %e, "update_meal_windows error");
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?
-    } else if any_scheduling {
+    let prefs = if any_scheduling {
         state
             .repos
             .preferences
@@ -123,7 +61,6 @@ pub async fn patch_preferences(
                 body.week_start_day,
                 body.planning_trigger_offset,
                 body.default_plan_length_days,
-                body.wake_time,
                 body.planning_time,
             )
             .await
