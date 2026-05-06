@@ -8,6 +8,8 @@ import { PlanMealsStepComponent } from '../steps/plan-meals-step/plan-meals-step
 import { PlanDayGridStepComponent } from '../steps/plan-day-grid-step/plan-day-grid-step';
 import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confirm-step';
 
+interface WizardStep { n: number; label: string; disabled?: boolean; }
+
 @Component({
   selector: 'app-planning-wizard',
   standalone: true,
@@ -96,8 +98,6 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
     .nav-btn--back { margin-right: auto; }
   `]
 })
-interface WizardStep { n: number; label: string; disabled?: boolean; }
-
 export class PlanningWizardComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   private readonly preferencesService = inject(PreferencesService);
