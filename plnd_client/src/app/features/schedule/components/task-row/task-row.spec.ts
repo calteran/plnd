@@ -3,8 +3,8 @@ import { By } from '@angular/platform-browser';
 import { TaskRowComponent } from './task-row';
 import { ScheduleTask } from '../../../../core/models/schedule';
 
-const pending: ScheduleTask = { id: '1', type: 'task', label: '✉️ Email dentist', status: 'pending' };
-const done:    ScheduleTask = { id: '2', type: 'task', label: '💊 Vitamins',      status: 'done'    };
+const pending: ScheduleTask = { id: '1', type: 'general', label: '✉️ Email dentist', status: 'pending' };
+const done:    ScheduleTask = { id: '2', type: 'general', label: '💊 Vitamins',      status: 'done'    };
 const timed:   ScheduleTask = { id: '3', type: 'appointment', label: '📅 Standup', status: 'pending', scheduledTime: '11 AM' };
 
 describe('TaskRowComponent', () => {

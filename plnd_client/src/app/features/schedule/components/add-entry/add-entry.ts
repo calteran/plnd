@@ -13,8 +13,12 @@ export interface AddedEntry {
 
 // Keep in sync with ItemType in core/models/schedule.ts
 function toItemType(actionType: string | undefined): ItemType {
-  if (actionType === 'exercise' || actionType === 'appointment') return actionType;
-  return 'task';
+  if (actionType === 'work')        return 'work';
+  if (actionType === 'exercise')    return 'exercise';
+  if (actionType === 'leisure')     return 'leisure';
+  if (actionType === 'medication')  return 'medication';
+  if (actionType === 'appointment') return 'appointment';
+  return 'general';
 }
 
 @Component({

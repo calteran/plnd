@@ -141,12 +141,16 @@ function mapEntry(e: ScheduleEntryDto): ScheduleItem {
   }
 
   const TYPE_MAP: Record<string, ItemType> = {
+    work:        'work',
     exercise:    'exercise',
+    leisure:     'leisure',
+    medication:  'medication',
     appointment: 'appointment',
+    general:     'general',
   };
   return {
     id:     e.entry_id,
-    type:   TYPE_MAP[e.task_type] ?? 'task',
+    type:   TYPE_MAP[e.task_type] ?? 'general',
     label:  e.title ?? e.task_type,
     status: e.status === 'completed' ? 'done' : 'pending',
   } satisfies ScheduleTask;

@@ -1,7 +1,7 @@
 import { MealNutrition } from './week-plan';
 
 export type ItemStatus = 'pending' | 'done';
-export type ItemType   = 'task' | 'exercise' | 'appointment';
+export type ItemType   = 'work' | 'exercise' | 'leisure' | 'medication' | 'appointment' | 'general';
 
 export interface ScheduleTask {
   id: string;

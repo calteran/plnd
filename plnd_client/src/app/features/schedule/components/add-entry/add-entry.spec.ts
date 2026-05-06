@@ -292,7 +292,7 @@ describe('AddEntryComponent', () => {
     f.componentInstance.added.subscribe((e: AddedEntry) => (emitted = e));
     clickSubmit(f);
 
-    expect(emitted?.type).toBe('task');
+    expect(emitted?.type).toBe('general');
   });
 
   it('does not emit added when actions_taken is empty and ui_signals is empty', async () => {
