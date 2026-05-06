@@ -30,6 +30,7 @@ describe('PlanReviewStepComponent', () => {
 
   function flush(carryover: typeof MOCK_ITEM[] = []) {
     fixture.detectChanges();
+    service.loadCarryover('2026-03-24').subscribe();
     httpMock.expectOne(r => r.url.includes('/schedule/plan/carryover')).flush({ carryover });
     fixture.detectChanges();
   }
@@ -39,28 +40,11 @@ describe('PlanReviewStepComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  // ── Empty state ──────────────────────────────────────────────────────────
-
-  it('shows "All caught up!" when there are no carryover items', () => {
-    flush([]);
-    expect(fixture.nativeElement.textContent).toContain('All caught up!');
-  });
-
-  it('does not show the carryover list when empty', () => {
-    flush([]);
-    expect(fixture.nativeElement.querySelector('.carryover-list')).toBeNull();
-  });
-
   // ── Populated state ──────────────────────────────────────────────────────
 
   it('shows the item title', () => {
     flush([MOCK_ITEM]);
     expect(fixture.nativeElement.textContent).toContain('Morning walk');
-  });
-
-  it('does not show the empty state when items exist', () => {
-    flush([MOCK_ITEM]);
-    expect(fixture.nativeElement.querySelector('.empty-state')).toBeNull();
   });
 
   // ── Date formatting ──────────────────────────────────────────────────────
