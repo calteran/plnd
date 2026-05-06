@@ -90,7 +90,7 @@ describe('PlanningWizardComponent', () => {
     expect(bar.getAttribute('aria-valuenow')).toBe('4');
   });
 
-  it('should show Back button when step > 1', () => {
+  it('should show Back button when a prior enabled step exists', () => {
     fixture.componentInstance.weekPlanService.goToStep(2);
     fixture.detectChanges();
     const back = fixture.nativeElement.querySelector('.nav-btn--back');
