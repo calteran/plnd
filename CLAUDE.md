@@ -32,6 +32,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 ### Branch Discipline
 - **NEVER commit directly to `main`** — always work on a feature or fix branch and open a PR
 - **ALWAYS branch from `main`** — never base a branch on another feature branch; this avoids merge conflicts and spurious commits when the parent branch merges
+- **ALWAYS rebase onto `origin/main` before every push** — both the initial push that opens a PR and any subsequent push (e.g. after applying reviewer fixes): `git fetch origin && git rebase origin/main`, then `git push --force-with-lease`. This keeps PR history linear and avoids merge commits.
 
 ### PR Lifecycle
 - **After opening a PR**: invoke the `monitor-pr` skill to watch CI and address any review comments
