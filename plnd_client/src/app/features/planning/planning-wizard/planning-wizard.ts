@@ -1,6 +1,7 @@
-import { Component, OnInit, effect, inject } from '@angular/core';
+import { Component, OnInit, computed, effect, inject } from '@angular/core';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
+import { MealPatternService } from '../../../core/services/meal-pattern.service';
 import { localIsoDate } from '../../../core/services/schedule.service';
 import { PlanReviewStepComponent } from '../steps/plan-review-step/plan-review-step';
 import { PlanTasksStepComponent } from '../steps/plan-tasks-step/plan-tasks-step';
@@ -28,8 +29,8 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
 
       <div class="wizard-progress" role="progressbar"
            [attr.aria-valuenow]="weekPlanService.currentStep()"
-           aria-valuemin="1" [attr.aria-valuemax]="steps.length">
-        @for (s of steps; track s.n) {
+           aria-valuemin="1" [attr.aria-valuemax]="steps().length">
+        @for (s of steps(); track s.n) {
           @if (!$first) {
             <span class="progress-sep">›</span>
           }
@@ -101,19 +102,28 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
 export class PlanningWizardComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   private readonly preferencesService = inject(PreferencesService);
+  private readonly mealPatternService = inject(MealPatternService);
 
-  readonly steps: WizardStep[] = [
+  readonly steps = computed<WizardStep[]>(() => [
     { n: 1, label: 'Carryover' },
     { n: 2, label: 'Tasks' },
-    { n: 3, label: 'Meals' },
+    { n: 3, label: 'Meals', disabled: this.mealPatternService.entries().length === 0 },
     { n: 4, label: 'Exercise', disabled: true },
     { n: 5, label: 'Review' },
     { n: 6, label: 'Confirm' },
-  ];
+  ]);
 
   private sessionInitialized = false;
 
   constructor() {
+    // If the current step becomes disabled (e.g. a saved draft at the meals step
+    // when meal entries are now empty), skip forward to the next enabled step.
+    effect(() => {
+      const step = this.weekPlanService.currentStep();
+      const stepEntry = this.steps().find(s => s.n === step);
+      if (stepEntry?.disabled) this.next();
+    });
+
     // React when preferences load (may arrive after ngOnInit due to async HTTP).
     effect(() => {
       const prefs = this.preferencesService.preferences();
@@ -144,17 +154,18 @@ export class PlanningWizardComponent implements OnInit {
 
   ngOnInit(): void {
     this.preferencesService.loadPreferences();
+    this.mealPatternService.load();
   }
 
   next(): void {
     const step = this.weekPlanService.currentStep();
-    const nextStep = this.steps.find(s => s.n > step && !s.disabled);
+    const nextStep = this.steps().find(s => s.n > step && !s.disabled);
     if (nextStep) this.weekPlanService.goToStep(nextStep.n);
   }
 
   back(): void {
     const step = this.weekPlanService.currentStep();
-    const prevStep = this.steps.filter(s => s.n < step && !s.disabled).at(-1);
+    const prevStep = this.steps().filter(s => s.n < step && !s.disabled).at(-1);
     if (prevStep) this.weekPlanService.goToStep(prevStep.n);
   }
 
