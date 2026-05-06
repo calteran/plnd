@@ -333,6 +333,8 @@ Each slot can hold **zero or more tasks**. Floating tasks (tasks without a start
 
 Slot boundaries are **positional** — defined by anchor order, not by exact times. A slot between "breakfast" and "lunch" exists even if neither has a fixed clock time.
 
+The upper boundary of a slot is **derived, not stored**. Given a slot's lower anchor, the upper boundary is the next anchor in the day's sequence — determined by `meal_pattern_entries.sort_order` for meal anchors, or by `scheduled_start` for task anchors in a committed schedule. The implicit start-of-day and end-of-day anchors (§4.7) bound the sequence on both ends, so every slot has a well-defined upper boundary. There is no `slot_end_anchor_id` column; persisting one would be redundant because the value is fully determined by the existing anchor ordering.
+
 ### 4.9 Planning windows
 
 A **planning window** is the temporal span the user plans at one time. The default window is one week (7 days); shorter or longer windows are user-configurable.
