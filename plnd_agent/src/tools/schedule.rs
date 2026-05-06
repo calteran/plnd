@@ -236,6 +236,8 @@ impl Tool for CreateTaskTool {
             .and_then(|v| v.as_str())
             .map(str::to_string);
 
+        // null / absent both mean "not one-shot"; non-boolean values are schema
+        // violations and are intentionally treated as false (safe default).
         let one_shot = input
             .get("one_shot")
             .and_then(|v| v.as_bool())
@@ -536,7 +538,10 @@ impl Tool for PlaceTasksTool {
                             },
                             "one_shot": {
                                 "type": "boolean",
-                                "description": "Whether this task is one-shot (dropped at window close). Default false."
+                                "description": "Whether this task is meaningful only within today's window. \
+                                                One-shot tasks are silently dropped at window close and never \
+                                                surface in carryover review (e.g. 'brush teeth'). \
+                                                Infer from context; default false."
                             }
                         }
                     }
@@ -810,6 +815,13 @@ mod tests {
             schema["properties"]["one_shot"]["type"].as_str(),
             Some("boolean")
         );
+        assert!(
+            schema["properties"]["one_shot"]["description"]
+                .as_str()
+                .unwrap_or("")
+                .contains("carryover"),
+            "one_shot description must mention carryover"
+        );
     }
 
     #[test]
@@ -824,6 +836,13 @@ mod tests {
         assert_eq!(
             items["properties"]["one_shot"]["type"].as_str(),
             Some("boolean")
+        );
+        assert!(
+            items["properties"]["one_shot"]["description"]
+                .as_str()
+                .unwrap_or("")
+                .contains("carryover"),
+            "one_shot description must mention carryover"
         );
     }
 }
