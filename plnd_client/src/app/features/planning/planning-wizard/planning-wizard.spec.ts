@@ -156,6 +156,8 @@ describe('PlanningWizardComponent', () => {
         sms_notifications_enabled: false, push_notifications_enabled: false,
         phone_number: null, created_at: '', updated_at: '',
       });
+      // Run change detection so the session-init effect executes and fires HTTP requests
+      fixture.detectChanges();
       // Flush weekly-plan task POST
       httpMock.expectOne(r => r.url.includes('/tasks/weekly-plan')).flush({ task_id: 'tid' });
     }
@@ -185,6 +187,8 @@ describe('PlanningWizardComponent', () => {
       expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(1);
       const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
       expect(pills[0].classList).not.toContain('disabled');
+      // PlanReviewStepComponent also calls loadCarryover on init; flush it to keep the test clean
+      httpMock.match(r => r.url.includes('/schedule/plan/carryover'));
     });
 
     it('does not show Back button on step 2 when step 1 is disabled', () => {
@@ -210,6 +214,8 @@ describe('PlanningWizardComponent', () => {
 
       const back = fixture.nativeElement.querySelector('.nav-btn--back');
       expect(back).toBeTruthy();
+      // PlanMealsStepComponent fires meal-pattern and agent/meal-plan requests on render; discard them
+      httpMock.match(() => true);
     });
   });
 });
