@@ -1,7 +1,7 @@
 import { Component, ElementRef, ViewChild, inject, input, output, signal } from '@angular/core';
 import { AgentService } from '../../../../core/services/agent.service';
 import { ConversationTurn, UiSignal } from '../../../../core/models/agent';
-import { ItemType } from '../../../../core/models/schedule';
+import { ItemType, parseItemType } from '../../../../core/models/schedule';
 
 /** Emitted after agent confirmation so parent components can respond (e.g. schedule reload). */
 export interface AddedEntry {
@@ -9,12 +9,6 @@ export interface AddedEntry {
   type: ItemType;
   id?: string;
   duration?: number;
-}
-
-// Keep in sync with ItemType in core/models/schedule.ts
-function toItemType(actionType: string | undefined): ItemType {
-  if (actionType === 'exercise' || actionType === 'appointment') return actionType;
-  return 'task';
 }
 
 @Component({
@@ -191,7 +185,7 @@ export class AddEntryComponent {
           if (res.actions_taken.length > 0) {
             // Task was created — complete the flow regardless of any informational ui_signals.
             const action = res.actions_taken[0];
-            this.added.emit({ label: input, type: toItemType(action?.type), id: action?.task_id });
+            this.added.emit({ label: input, type: parseItemType(action?.type), id: action?.task_id });
             this.confirmed.emit(res.confirmation);
             this.conversationHistory.set([]);
             this.pendingSignals.set([]);

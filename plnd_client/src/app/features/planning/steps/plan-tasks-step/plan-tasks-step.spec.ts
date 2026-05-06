@@ -74,7 +74,7 @@ describe('PlanTasksStepComponent', () => {
 
   it('onFloatingTaskAdded should call weekPlanService.addFloatingTask', () => {
     spyOn(service, 'addFloatingTask');
-    const entry: AddedEntry = { label: 'Buy groceries', type: 'task' };
+    const entry: AddedEntry = { label: 'Buy groceries', type: 'general' };
     fixture.componentInstance.onFloatingTaskAdded(entry);
     expect(service.addFloatingTask).toHaveBeenCalledWith(jasmine.objectContaining({
       title: 'Buy groceries',

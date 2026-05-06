@@ -96,7 +96,7 @@ describe('DayViewComponent (schedule view)', () => {
   it('renders meal and task rows when items are present', async () => {
     const items: ScheduleItem[] = [
       { id: 'm1', name: 'Breakfast', emoji: '🥑', status: 'done', duringMealTasks: [] },
-      { id: 't1', type: 'task', label: '💊 Vitamins', status: 'pending' }
+      { id: 't1', type: 'general', label: '💊 Vitamins', status: 'pending' }
     ];
     const svc = makeScheduleServiceMock({ scheduleItems: items });
     await TestBed.configureTestingModule({
@@ -191,7 +191,7 @@ describe('DayViewComponent (onItemAdded)', () => {
     f.detectChanges();
     svc.loadDay.calls.reset(); // clear the init call
 
-    f.componentInstance.onItemAdded({ label: 'call mum', type: 'task', id: 'srv-1' });
+    f.componentInstance.onItemAdded({ label: 'call mum', type: 'general', id: 'srv-1' });
 
     expect(svc.loadDay).toHaveBeenCalledOnceWith('2026-03-20');
     expect(svc.addItem).not.toHaveBeenCalled();

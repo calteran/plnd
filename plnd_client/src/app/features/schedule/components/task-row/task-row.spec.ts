@@ -3,9 +3,16 @@ import { By } from '@angular/platform-browser';
 import { TaskRowComponent } from './task-row';
 import { ScheduleTask } from '../../../../core/models/schedule';
 
-const pending: ScheduleTask = { id: '1', type: 'task', label: '✉️ Email dentist', status: 'pending' };
-const done:    ScheduleTask = { id: '2', type: 'task', label: '💊 Vitamins',      status: 'done'    };
+const pending: ScheduleTask = { id: '1', type: 'general', label: '✉️ Email dentist', status: 'pending' };
+const done:    ScheduleTask = { id: '2', type: 'general', label: '💊 Vitamins',      status: 'done'    };
 const timed:   ScheduleTask = { id: '3', type: 'appointment', label: '📅 Standup', status: 'pending', scheduledTime: '11 AM' };
+
+const workTask:  ScheduleTask = { id: '10', type: 'work',        label: 'Write report',  status: 'pending' };
+const leiTask:   ScheduleTask = { id: '11', type: 'leisure',     label: 'Read novel',    status: 'pending' };
+const medTask:   ScheduleTask = { id: '12', type: 'medication',  label: 'Vitamins',      status: 'pending' };
+const genTask:   ScheduleTask = { id: '13', type: 'general',     label: 'Tidy desk',     status: 'pending' };
+const exTask:    ScheduleTask = { id: '14', type: 'exercise',    label: 'Morning run',   status: 'pending' };
+const apptTask:  ScheduleTask = { id: '15', type: 'appointment', label: 'Dentist',       status: 'pending' };
 
 describe('TaskRowComponent', () => {
   async function setup(item: ScheduleTask) {
@@ -49,5 +56,50 @@ describe('TaskRowComponent', () => {
     const f = await setup(pending);
     const cb = f.debugElement.query(By.css('.checkbox'));
     expect(cb.nativeElement.getAttribute('aria-label')).toContain('Email dentist');
+  });
+
+  it('shows Work badge for work type', async () => {
+    const f = await setup(workTask);
+    const badge = f.debugElement.query(By.css('.type-badge'));
+    expect(badge).toBeTruthy();
+    expect(badge.nativeElement.classList).toContain('type-badge--work');
+    expect(badge.nativeElement.textContent.trim()).toBe('work');
+  });
+
+  it('shows Leisure badge for leisure type', async () => {
+    const f = await setup(leiTask);
+    const badge = f.debugElement.query(By.css('.type-badge'));
+    expect(badge).toBeTruthy();
+    expect(badge.nativeElement.classList).toContain('type-badge--leisure');
+    expect(badge.nativeElement.textContent.trim()).toBe('leisure');
+  });
+
+  it('shows Rx badge for medication type', async () => {
+    const f = await setup(medTask);
+    const badge = f.debugElement.query(By.css('.type-badge'));
+    expect(badge).toBeTruthy();
+    expect(badge.nativeElement.classList).toContain('type-badge--medication');
+    expect(badge.nativeElement.textContent.trim()).toBe('rx');
+  });
+
+  it('shows no badge for general type', async () => {
+    const f = await setup(genTask);
+    expect(f.debugElement.query(By.css('.type-badge'))).toBeNull();
+  });
+
+  it('shows Exercise badge for exercise type', async () => {
+    const f = await setup(exTask);
+    const badge = f.debugElement.query(By.css('.type-badge'));
+    expect(badge).toBeTruthy();
+    expect(badge.nativeElement.classList).toContain('type-badge--exercise');
+    expect(badge.nativeElement.textContent.trim()).toBe('exercise');
+  });
+
+  it('shows Appt badge for appointment type', async () => {
+    const f = await setup(apptTask);
+    const badge = f.debugElement.query(By.css('.type-badge'));
+    expect(badge).toBeTruthy();
+    expect(badge.nativeElement.classList).toContain('type-badge--appointment');
+    expect(badge.nativeElement.textContent.trim()).toBe('appt');
   });
 });

@@ -280,7 +280,35 @@ describe('AddEntryComponent', () => {
     expect(emitted?.type).toBe('appointment');
   });
 
-  it('emits type "task" as fallback for an unrecognised action type', async () => {
+  it('emits "work" when agent returns work action type', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(of(makeResponse({
+      actions_taken: [{ type: 'work', task_id: 'w1' }],
+      confirmation: 'Work task added!',
+    })));
+    openPanel(f);
+    typeText(f, 'Write report');
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => emitted = e);
+    clickSubmit(f);
+    expect(emitted?.type).toBe('work');
+  });
+
+  it('emits "leisure" when agent returns leisure action type', async () => {
+    const f = await setup();
+    agentSpy.createTask.and.returnValue(of(makeResponse({
+      actions_taken: [{ type: 'leisure', task_id: 'l1' }],
+      confirmation: 'Leisure task added!',
+    })));
+    openPanel(f);
+    typeText(f, 'Read novel');
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => emitted = e);
+    clickSubmit(f);
+    expect(emitted?.type).toBe('leisure');
+  });
+
+  it('emits type "general" as fallback for an unrecognised action type', async () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(
       of(makeResponse({ actions_taken: [{ type: 'future_thing', task_id: 'id-1' }], confirmation: 'Done!' })),
@@ -292,7 +320,7 @@ describe('AddEntryComponent', () => {
     f.componentInstance.added.subscribe((e: AddedEntry) => (emitted = e));
     clickSubmit(f);
 
-    expect(emitted?.type).toBe('task');
+    expect(emitted?.type).toBe('general');
   });
 
   it('does not emit added when actions_taken is empty and ui_signals is empty', async () => {
@@ -315,7 +343,7 @@ describe('AddEntryComponent', () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(
       of(makeResponse({
-        actions_taken: [{ type: 'task', task_id: 'server-id-123' }],
+        actions_taken: [{ type: 'work', task_id: 'server-id-123' }],
         confirmation: 'Task added!',
       })),
     );

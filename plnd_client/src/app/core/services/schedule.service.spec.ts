@@ -80,6 +80,54 @@ describe('ScheduleService', () => {
     expect(task.status).toBe('done');
   });
 
+  it('maps task_type work to ItemType work', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'e-work', task_type: 'work', title: 'Write report',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+      }],
+      carryover: [],
+    });
+    expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('work');
+  });
+
+  it('maps task_type leisure to ItemType leisure', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'e-lei', task_type: 'leisure', title: 'Read novel',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+      }],
+      carryover: [],
+    });
+    expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('leisure');
+  });
+
+  it('maps task_type medication to ItemType medication', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'e-med', task_type: 'medication', title: 'Take vitamins',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+      }],
+      carryover: [],
+    });
+    expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('medication');
+  });
+
+  it('maps unknown task_type to ItemType general', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'e-unk', task_type: 'unknown_future_type', title: 'Something new',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+      }],
+      carryover: [],
+    });
+    expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('general');
+  });
+
   it('maps a meal entry to MealAnchor', () => {
     svc.loadDay('2026-04-02');
     httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
@@ -166,7 +214,7 @@ describe('ScheduleService', () => {
     (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'm1', name: 'Breakfast', emoji: '🥣',
       status: 'planned', duringMealTasks: [
-        { id: 't-dm2', type: 'task', label: 'Read 10 pages', status: 'pending' }
+        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending' }
       ]
     }]);
     svc.toggleItem('t-dm2');
@@ -175,7 +223,7 @@ describe('ScheduleService', () => {
   });
 
   it('addItem appends a ScheduleTask to scheduleItems', () => {
-    const task: ScheduleTask = { id: 'new-1', type: 'task', label: 'call mum', status: 'pending' };
+    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending' };
     svc.addItem(task);
     expect(svc.scheduleItems()).toContain(task);
     expect(svc.scheduleItems().length).toBe(1);
