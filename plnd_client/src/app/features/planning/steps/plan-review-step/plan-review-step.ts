@@ -1,11 +1,10 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { CarryoverDecision, DROP_REASONS, DropReason } from '../../../../core/models/week-plan';
 import { formatDate, formatWeekDate } from '../../utils/date-format.utils';
 
 const DECISION_CYCLE: CarryoverDecision[] = ['carry', 'defer', 'drop'];
-const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
 
 @Component({
   selector: 'app-plan-review-step',
@@ -21,44 +20,34 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
         </span>
       </p>
 
-      @if (loading) {
-        <p class="loading-text">Loading…</p>
-      } @else if (weekPlanService.carryoverItems().length === 0) {
-        <div class="empty-state">
-          <span class="empty-emoji" aria-hidden="true">{{ emptyStateEmoji }}</span>
-          <p class="empty-heading">All caught up!</p>
-          <p class="empty-sub">No incomplete tasks to carry over.</p>
-        </div>
-      } @else {
-        <ul class="carryover-list">
-          @for (item of weekPlanService.carryoverItems(); track item.entry_id) {
-            <li class="carryover-item">
-              <span class="item-title">{{ item.title ?? item.task_type }}</span>
-              <span class="item-date">{{ formatDate(item.date) }}</span>
-              <button type="button"
-                      class="decision-badge"
-                      [attr.data-decision]="displayDecision(item.entry_id)"
-                      (click)="decide(item.entry_id)">
-                {{ displayDecision(item.entry_id) | titlecase }}
-                <span class="caret">▾</span>
-              </button>
-              @if (displayDecision(item.entry_id) === 'drop') {
-                <div class="reason-row">
-                  @for (reason of DROP_REASONS; track reason) {
-                    <button type="button"
-                            class="reason-chip"
-                            [class.selected]="displayReason(item.entry_id) === reason"
-                            [attr.aria-pressed]="displayReason(item.entry_id) === reason"
-                            (click)="selectReason(item.entry_id, reason)">
-                      {{ reason }}
-                    </button>
-                  }
-                </div>
-              }
-            </li>
-          }
-        </ul>
-      }
+      <ul class="carryover-list">
+        @for (item of weekPlanService.carryoverItems(); track item.entry_id) {
+          <li class="carryover-item">
+            <span class="item-title">{{ item.title ?? item.task_type }}</span>
+            <span class="item-date">{{ formatDate(item.date) }}</span>
+            <button type="button"
+                    class="decision-badge"
+                    [attr.data-decision]="displayDecision(item.entry_id)"
+                    (click)="decide(item.entry_id)">
+              {{ displayDecision(item.entry_id) | titlecase }}
+              <span class="caret">▾</span>
+            </button>
+            @if (displayDecision(item.entry_id) === 'drop') {
+              <div class="reason-row">
+                @for (reason of DROP_REASONS; track reason) {
+                  <button type="button"
+                          class="reason-chip"
+                          [class.selected]="displayReason(item.entry_id) === reason"
+                          [attr.aria-pressed]="displayReason(item.entry_id) === reason"
+                          (click)="selectReason(item.entry_id, reason)">
+                    {{ reason }}
+                  </button>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ul>
     </div>
   `,
   styles: [`
@@ -113,37 +102,11 @@ const EMPTY_STATE_EMOJIS = ['🎉', '✨', '🙌', '🌟', '💪', '🥳'];
     .reason-chip.selected { background: var(--color-destructive-light);
                             border-color: var(--color-destructive-border);
                             color: var(--color-destructive); }
-
-    /* ── Loading ─────────────────────────────────── */
-    .loading-text { font-size: 12px; color: var(--color-text-muted); }
-
-    /* ── Empty state ─────────────────────────────── */
-    .empty-state { display: flex; flex-direction: column; align-items: center;
-                   gap: 8px; padding: 32px 20px;
-                   border: 1.5px solid var(--color-border-row); border-radius: 10px;
-                   background: var(--color-surface-white); text-align: center; }
-    .empty-emoji { font-size: 36px; line-height: 1; }
-    .empty-heading { font-size: 13px; font-weight: 700;
-                     color: var(--color-text-primary); margin: 0; }
-    .empty-sub { font-size: 12px; color: var(--color-text-muted); margin: 0;
-                 max-width: 220px; }
   `]
 })
-export class PlanReviewStepComponent implements OnInit {
+export class PlanReviewStepComponent {
   readonly weekPlanService = inject(WeekPlanService);
-  loading = true;
-  readonly emptyStateEmoji = EMPTY_STATE_EMOJIS[Math.floor(Math.random() * EMPTY_STATE_EMOJIS.length)];
   readonly DROP_REASONS = DROP_REASONS;
-
-  ngOnInit(): void {
-    if (!this.weekPlanService.planStart() || !this.weekPlanService.planEnd()) {
-      this.loading = false;
-      return;
-    }
-    this.weekPlanService
-      .loadCarryover(this.weekPlanService.planStart())
-      .subscribe({ next: () => (this.loading = false), error: () => (this.loading = false) });
-  }
 
   displayDecision(entryId: string): CarryoverDecision {
     return this.weekPlanService.carryoverDecisions()[entryId] ?? 'carry';
