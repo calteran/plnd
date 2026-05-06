@@ -135,6 +135,7 @@ export class PlanningWizardComponent implements OnInit {
     // If the current step becomes disabled (e.g. a saved draft at the meals step
     // when meal entries are now empty), skip forward to the next enabled step.
     effect(() => {
+      if (!this.mealPatternService.loaded()) return;
       const step = this.weekPlanService.currentStep();
       const stepEntry = this.steps().find(s => s.n === step);
       if (stepEntry?.disabled) this.next();

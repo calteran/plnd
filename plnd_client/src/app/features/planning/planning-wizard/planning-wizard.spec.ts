@@ -16,13 +16,16 @@ const PATTERN_FIXTURE: MealPatternEntry[] = [
 describe('PlanningWizardComponent', () => {
   let fixture: ComponentFixture<PlanningWizardComponent>;
   let mealEntries: WritableSignal<MealPatternEntry[]>;
+  let mealLoaded: WritableSignal<boolean>;
 
   beforeEach(async () => {
     localStorage.clear();
     mealEntries = signal<MealPatternEntry[]>([]);
+    mealLoaded  = signal(false);
     const mealPatternMock = {
       load: jasmine.createSpy('load'),
       entries: mealEntries.asReadonly(),
+      loaded: mealLoaded.asReadonly(),
     };
 
     await TestBed.configureTestingModule({
@@ -253,5 +256,24 @@ describe('PlanningWizardComponent', () => {
       // PlanMealsStepComponent fires meal-pattern and agent/meal-plan requests on render; discard them
       httpMock.match(() => true);
     });
+  });
+
+  it('guard effect does not auto-advance when meal-pattern is not yet loaded', () => {
+    mealEntries.set([]);
+    mealLoaded.set(false);
+    fixture.componentInstance.weekPlanService.goToStep(3);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(3);
+  });
+
+  it('guard effect auto-advances past disabled step once meal-pattern loads', () => {
+    mealLoaded.set(false);
+    fixture.componentInstance.weekPlanService.goToStep(3);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(3);
+
+    mealLoaded.set(true);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(5);
   });
 });
