@@ -82,6 +82,7 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
         (status = 200, description = "Schedule entries for the period", body = SchedulePeriodApiResponse),
         (status = 400, description = "end must be >= start"),
         (status = 401, description = "Unauthorized"),
+        (status = 503, description = "Database unavailable"),
         (status = 500, description = "Internal server error"),
     )
 )]
@@ -103,9 +104,12 @@ pub async fn get_period(
         .await
         .map(SchedulePeriodApiResponse::from)
         .map(Json)
-        .map_err(|e| {
-            tracing::error!(error = %e, "get_period error");
-            StatusCode::INTERNAL_SERVER_ERROR
+        .map_err(|e| match e {
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            e => {
+                tracing::error!(error = %e, "get_period error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         })
 }
 
@@ -161,6 +165,7 @@ pub async fn get_plan_carryover(
         (status = 200, description = "Planning status for the period", body = PlanStatusApiResponse),
         (status = 400, description = "end must be >= start"),
         (status = 401, description = "Unauthorized"),
+        (status = 503, description = "Database unavailable"),
         (status = 500, description = "Internal server error"),
     )
 )]
@@ -182,9 +187,12 @@ pub async fn get_plan_status(
         .await
         .map(PlanStatusApiResponse::from)
         .map(Json)
-        .map_err(|e| {
-            tracing::error!(error = %e, "get_plan_status error");
-            StatusCode::INTERNAL_SERVER_ERROR
+        .map_err(|e| match e {
+            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+            e => {
+                tracing::error!(error = %e, "get_plan_status error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
         })
 }
 
