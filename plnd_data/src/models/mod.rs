@@ -1,6 +1,5 @@
 mod catalog;
 mod day_type;
-mod family;
 mod library;
 mod meal_pattern;
 mod preferences;
@@ -12,7 +11,6 @@ mod user;
 
 pub use catalog::*;
 pub use day_type::*;
-pub use family::*;
 pub use library::*;
 pub use meal_pattern::*;
 pub use preferences::*;

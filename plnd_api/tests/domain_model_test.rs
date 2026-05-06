@@ -1,15 +1,14 @@
 // Offline tests for domain model structs and constants.
 // No live database required — follows the dietary_restrictions_test.rs pattern.
 use plnd_api::routes::domain_constants::{
-    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_ENERGY_LEVELS, VALID_FAMILY_ROLES,
-    VALID_FOCUS_LEVELS, VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS, VALID_RECURRENCE_TYPES,
-    VALID_TASK_STATUSES, VALID_TASK_TYPES,
+    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_ENERGY_LEVELS, VALID_FOCUS_LEVELS,
+    VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS, VALID_RECURRENCE_TYPES, VALID_TASK_STATUSES,
+    VALID_TASK_TYPES,
 };
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogExercise, CatalogIngredient, CatalogMeal,
-    CatalogMealDish, ExerciseTask, Family, FamilyMeal, FamilyMember, GenericTask, Routine,
-    ScheduleEntry, Task, UserDish, UserDishIngredient, UserExercise, UserMeal, UserMealDish,
-    WorkTask,
+    CatalogMealDish, ExerciseTask, GenericTask, Routine, ScheduleEntry, Task, UserDish,
+    UserDishIngredient, UserExercise, UserMeal, UserMealDish, WorkTask,
 };
 
 // ---------------------------------------------------------------------------
@@ -55,14 +54,6 @@ fn test_valid_intensity_levels_has_three_values() {
     assert!(VALID_INTENSITY_LEVELS.contains(&"low"));
     assert!(VALID_INTENSITY_LEVELS.contains(&"moderate"));
     assert!(VALID_INTENSITY_LEVELS.contains(&"high"));
-}
-
-#[test]
-fn test_valid_family_roles_has_three_values() {
-    assert_eq!(VALID_FAMILY_ROLES.len(), 3);
-    assert!(VALID_FAMILY_ROLES.contains(&"owner"));
-    assert!(VALID_FAMILY_ROLES.contains(&"member"));
-    assert!(VALID_FAMILY_ROLES.contains(&"caregiver"));
 }
 
 #[test]
@@ -374,58 +365,6 @@ fn test_user_exercise_serde_round_trip() {
     let ex: UserExercise = serde_json::from_str(json).expect("deserialize failed");
     assert_eq!(ex.rating, Some(4));
     assert!(ex.equipment_required.is_empty());
-}
-
-#[test]
-fn test_family_serde_round_trip() {
-    let json = r#"{
-        "family_id": "00000000-0000-0000-0000-000000000008",
-        "name": "Smith Family",
-        "created_at": "2026-01-01T00:00:00Z",
-        "updated_at": "2026-01-01T00:00:00Z"
-    }"#;
-    let family: Family = serde_json::from_str(json).expect("deserialize failed");
-    assert_eq!(family.name, "Smith Family");
-}
-
-#[test]
-fn test_family_member_serde_with_uuid_array() {
-    let json = r#"{
-        "family_member_id": "00000000-0000-0000-0000-000000000009",
-        "family_id": "00000000-0000-0000-0000-000000000008",
-        "user_id": "00000000-0000-0000-0000-000000000099",
-        "role": "owner",
-        "can_plan_for": ["00000000-0000-0000-0000-000000000098"],
-        "created_at": "2026-01-01T00:00:00Z"
-    }"#;
-    let member: FamilyMember = serde_json::from_str(json).expect("deserialize failed");
-    assert_eq!(member.role, "owner");
-    assert_eq!(member.can_plan_for.len(), 1);
-}
-
-#[test]
-fn test_family_meal_serde_with_naive_date_and_participants() {
-    let json = r#"{
-        "family_meal_id": "00000000-0000-0000-0000-000000000011",
-        "family_id": "00000000-0000-0000-0000-000000000008",
-        "planned_by_user_id": "00000000-0000-0000-0000-000000000099",
-        "date": "2026-03-15",
-        "time_window_start": "18:00:00",
-        "time_window_end": "19:30:00",
-        "user_meal_id": null,
-        "title": "Saturday Dinner",
-        "notes": "Everyone bring a dish",
-        "participants": [
-            "00000000-0000-0000-0000-000000000099",
-            "00000000-0000-0000-0000-000000000098"
-        ],
-        "created_at": "2026-01-01T00:00:00Z",
-        "updated_at": "2026-01-01T00:00:00Z"
-    }"#;
-    let fm: FamilyMeal = serde_json::from_str(json).expect("deserialize failed");
-    assert_eq!(fm.participants.len(), 2);
-    assert!(fm.time_window_start.is_some());
-    assert!(fm.user_meal_id.is_none());
 }
 
 #[test]
