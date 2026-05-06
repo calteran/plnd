@@ -326,6 +326,7 @@ mod tests {
             after_anchor: None,
             duration_minutes: None,
             energy_required: None,
+            one_shot: None,
         }
     }
 
@@ -543,6 +544,7 @@ mod tests {
             after_anchor: None,
             duration_minutes: None,
             energy_required: None,
+            one_shot: None,
         };
         let bad_req = CommitPlanInput {
             plan_start: start,
@@ -594,6 +596,7 @@ mod tests {
             after_anchor: Some("lunch".to_string()),
             duration_minutes: None,
             energy_required: None,
+            one_shot: None,
         };
 
         let req = CommitPlanInput {
@@ -638,6 +641,7 @@ mod tests {
             after_anchor: None,
             duration_minutes: Some(45),
             energy_required: Some("medium".to_string()),
+            one_shot: None,
         };
 
         let req = CommitPlanInput {
@@ -684,6 +688,7 @@ mod tests {
             after_anchor: Some("breakfast".to_string()),
             duration_minutes: None,
             energy_required: None,
+            one_shot: None,
         };
 
         let req = CommitPlanInput {

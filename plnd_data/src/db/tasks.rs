@@ -29,7 +29,7 @@ pub async fn create_weekly_plan_task(
     // when trigger_offset < 0 the task is scheduled before plan_start.
     let existing: Option<Task> = sqlx::query_as::<_, Task>(
         "SELECT t.task_id, t.user_id, t.title, t.task_type, t.scheduled_start,
-                t.duration_minutes, t.energy_required, t.status, t.is_anchor,
+                t.duration_minutes, t.energy_required, t.status, t.is_anchor, t.one_shot,
                 t.created_at, t.updated_at
          FROM tasks t
          JOIN generic_tasks gt USING (task_id)
@@ -55,7 +55,7 @@ pub async fn create_weekly_plan_task(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, energy_required, status)
          VALUES ($1, 'Plan your week', 'general', $2, 'low', 'planned')
          RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
-                   energy_required, status, is_anchor, created_at, updated_at",
+                   energy_required, status, is_anchor, one_shot, created_at, updated_at",
     )
     .bind(user_id)
     .bind(scheduled_start)
@@ -102,7 +102,7 @@ pub async fn create_user_task(
         "INSERT INTO tasks (user_id, title, task_type, scheduled_start, duration_minutes, energy_required, status)
          VALUES ($1, $2, 'general', $3, $4, $5, 'planned')
          RETURNING task_id, user_id, title, task_type, scheduled_start, duration_minutes,
-                   energy_required, status, is_anchor, created_at, updated_at",
+                   energy_required, status, is_anchor, one_shot, created_at, updated_at",
     )
     .bind(user_id)
     .bind(title)
