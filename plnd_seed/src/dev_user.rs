@@ -71,8 +71,8 @@ async fn insert_oauth_provider(tx: &mut PgConnection, user_id: Uuid) -> Result<(
 async fn insert_preferences(tx: &mut PgConnection, user_id: Uuid) -> Result<(), SeedError> {
     sqlx::query(
         "INSERT INTO user_preferences
-             (user_id, week_start_day, planning_trigger_offset, default_plan_length_days, wake_time)
-         VALUES ($1, 1, -3, 7, '07:00')",
+             (user_id, week_start_day, planning_trigger_offset, default_plan_length_days)
+         VALUES ($1, 1, -3, 7)",
     )
     .bind(user_id)
     .execute(tx)

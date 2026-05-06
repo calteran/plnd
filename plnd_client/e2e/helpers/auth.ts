@@ -33,7 +33,6 @@ export const MOCK_PREFS = {
   week_start_day: 1,
   planning_trigger_offset: 0,
   default_plan_length_days: 7,
-  wake_time: '07:00:00',
   email_notifications_enabled: false,
   sms_notifications_enabled: false,
   push_notifications_enabled: false,

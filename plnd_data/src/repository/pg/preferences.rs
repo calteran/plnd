@@ -31,7 +31,6 @@ impl PreferencesRepository for PgPreferencesRepository {
         week_start_day: Option<i16>,
         planning_trigger_offset: Option<i16>,
         default_plan_length_days: Option<i16>,
-        wake_time: Option<NaiveTime>,
         planning_time: Option<NaiveTime>,
     ) -> Result<UserPreferences, crate::Error> {
         preferences::patch_preferences(
@@ -40,32 +39,7 @@ impl PreferencesRepository for PgPreferencesRepository {
             week_start_day,
             planning_trigger_offset,
             default_plan_length_days,
-            wake_time,
             planning_time,
-        )
-        .await
-        .map_err(Into::into)
-    }
-
-    async fn update_meal_windows(
-        &self,
-        user_id: Uuid,
-        breakfast_window_start: Option<NaiveTime>,
-        breakfast_window_end: Option<NaiveTime>,
-        lunch_window_start: Option<NaiveTime>,
-        lunch_window_end: Option<NaiveTime>,
-        dinner_window_start: Option<NaiveTime>,
-        dinner_window_end: Option<NaiveTime>,
-    ) -> Result<UserPreferences, crate::Error> {
-        preferences::update_meal_windows(
-            &self.pool,
-            user_id,
-            breakfast_window_start,
-            breakfast_window_end,
-            lunch_window_start,
-            lunch_window_end,
-            dinner_window_start,
-            dinner_window_end,
         )
         .await
         .map_err(Into::into)
