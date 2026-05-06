@@ -106,7 +106,7 @@ pub async fn get_period(
         .map(Json)
         .map_err(|e| match e {
             Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
-            _ => {
+            e => {
                 tracing::error!(error = %e, "get_period error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
@@ -189,7 +189,7 @@ pub async fn get_plan_status(
         .map(Json)
         .map_err(|e| match e {
             Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
-            _ => {
+            e => {
                 tracing::error!(error = %e, "get_plan_status error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
