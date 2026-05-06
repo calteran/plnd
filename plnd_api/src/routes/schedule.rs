@@ -382,4 +382,21 @@ mod tests {
         };
         assert!(map_entry(e).is_ok());
     }
+
+    #[test]
+    fn map_entry_passes_one_shot_true_through() {
+        let e = PlanEntryRequest {
+            one_shot: Some(true),
+            ..base_entry()
+        };
+        let result = map_entry(e).unwrap();
+        assert_eq!(result.one_shot, Some(true));
+    }
+
+    #[test]
+    fn map_entry_one_shot_defaults_to_none_when_absent() {
+        let e = base_entry();
+        let result = map_entry(e).unwrap();
+        assert_eq!(result.one_shot, None);
+    }
 }
