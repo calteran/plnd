@@ -28,7 +28,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
       </header>
 
       <div class="wizard-progress" role="progressbar"
-           [attr.aria-valuenow]="enabledSteps().findIndex(s => s.n === weekPlanService.currentStep()) + 1"
+           [attr.aria-valuenow]="Math.max(1, enabledSteps().findIndex(s => s.n === weekPlanService.currentStep()) + 1)"
            aria-valuemin="1" [attr.aria-valuemax]="enabledSteps().length">
         @for (s of steps(); track s.n) {
           @if (!$first) {
@@ -111,6 +111,7 @@ export class PlanningWizardComponent implements OnInit {
   private readonly mealPatternService = inject(MealPatternService);
 
   protected readonly carryoverLoading = signal(true);
+  protected readonly Math = Math;
 
   readonly steps = computed<WizardStep[]>(() => [
     { n: 1, label: 'Carryover', disabled: !this.carryoverLoading() && this.weekPlanService.carryoverItems().length === 0 },
@@ -132,8 +133,11 @@ export class PlanningWizardComponent implements OnInit {
   private sessionInitialized = false;
 
   constructor() {
-    // If the current step becomes disabled (e.g. a saved draft at the meals step
-    // when meal entries are now empty), skip forward to the next enabled step.
+    // If a saved draft lands on a now-disabled step, skip forward to the next
+    // enabled step. Gated on mealPatternService.loaded() so an empty entries()
+    // signal (default before HTTP resolves) never triggers a premature advance.
+    // Covers the meals pillar only; carryover auto-advance is handled in the
+    // loadCarryover subscribe callback below.
     effect(() => {
       if (!this.mealPatternService.loaded()) return;
       const step = this.weekPlanService.currentStep();
