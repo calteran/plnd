@@ -2,11 +2,11 @@ import { Component, computed, input, output } from '@angular/core';
 import { ItemType, ScheduleTask } from '../../../../core/models/schedule';
 
 const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
-  work:        'Work',
-  exercise:    'Exercise',
-  leisure:     'Leisure',
-  medication:  'Rx',
-  appointment: 'Appt',
+  work:        'work',
+  exercise:    'exercise',
+  leisure:     'leisure',
+  medication:  'rx',
+  appointment: 'appt',
 };
 
 @Component({

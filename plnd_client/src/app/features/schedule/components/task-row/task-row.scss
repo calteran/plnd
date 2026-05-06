@@ -79,8 +79,8 @@
   letter-spacing: 0.3px;
 
   &--work        { background: #e3f0ff; color: #2563eb; }
-  &--exercise    { background: #dcfce7; color: #16a34a; }
-  &--leisure     { background: #f3e8ff; color: #7c3aed; }
+  &--exercise    { background: var(--color-success-light); color: var(--color-success); }
+  &--leisure     { background: var(--color-purple-light);  color: var(--color-purple); }
   &--medication  { background: #fff7ed; color: #c2410c; }
   &--appointment { background: #e0f2fe; color: #0369a1; }
 }

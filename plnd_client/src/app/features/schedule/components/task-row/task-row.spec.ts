@@ -62,21 +62,24 @@ describe('TaskRowComponent', () => {
     const f = await setup(workTask);
     const badge = f.debugElement.query(By.css('.type-badge'));
     expect(badge).toBeTruthy();
-    expect(badge.nativeElement.textContent.trim()).toBe('Work');
+    expect(badge.nativeElement.classList).toContain('type-badge--work');
+    expect(badge.nativeElement.textContent.trim()).toBe('work');
   });
 
   it('shows Leisure badge for leisure type', async () => {
     const f = await setup(leiTask);
     const badge = f.debugElement.query(By.css('.type-badge'));
     expect(badge).toBeTruthy();
-    expect(badge.nativeElement.textContent.trim()).toBe('Leisure');
+    expect(badge.nativeElement.classList).toContain('type-badge--leisure');
+    expect(badge.nativeElement.textContent.trim()).toBe('leisure');
   });
 
   it('shows Rx badge for medication type', async () => {
     const f = await setup(medTask);
     const badge = f.debugElement.query(By.css('.type-badge'));
     expect(badge).toBeTruthy();
-    expect(badge.nativeElement.textContent.trim()).toBe('Rx');
+    expect(badge.nativeElement.classList).toContain('type-badge--medication');
+    expect(badge.nativeElement.textContent.trim()).toBe('rx');
   });
 
   it('shows no badge for general type', async () => {
@@ -88,13 +91,15 @@ describe('TaskRowComponent', () => {
     const f = await setup(exTask);
     const badge = f.debugElement.query(By.css('.type-badge'));
     expect(badge).toBeTruthy();
-    expect(badge.nativeElement.textContent.trim()).toBe('Exercise');
+    expect(badge.nativeElement.classList).toContain('type-badge--exercise');
+    expect(badge.nativeElement.textContent.trim()).toBe('exercise');
   });
 
   it('shows Appt badge for appointment type', async () => {
     const f = await setup(apptTask);
     const badge = f.debugElement.query(By.css('.type-badge'));
     expect(badge).toBeTruthy();
-    expect(badge.nativeElement.textContent.trim()).toBe('Appt');
+    expect(badge.nativeElement.classList).toContain('type-badge--appointment');
+    expect(badge.nativeElement.textContent.trim()).toBe('appt');
   });
 });
