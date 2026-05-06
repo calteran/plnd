@@ -280,46 +280,32 @@ describe('AddEntryComponent', () => {
     expect(emitted?.type).toBe('appointment');
   });
 
-  it('emits type "work" when agent returns work action type', async () => {
+  it('emits "work" when agent returns work action type', async () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(of(makeResponse({
       actions_taken: [{ type: 'work', task_id: 'w1' }],
       confirmation: 'Work task added!',
     })));
-    let emitted: AddedEntry | undefined;
-    f.componentInstance.added.subscribe((e: AddedEntry) => emitted = e);
     openPanel(f);
     typeText(f, 'Write report');
+    let emitted: AddedEntry | undefined;
+    f.componentInstance.added.subscribe((e: AddedEntry) => emitted = e);
     clickSubmit(f);
     expect(emitted?.type).toBe('work');
   });
 
-  it('emits type "leisure" when agent returns leisure action type', async () => {
+  it('emits "leisure" when agent returns leisure action type', async () => {
     const f = await setup();
     agentSpy.createTask.and.returnValue(of(makeResponse({
       actions_taken: [{ type: 'leisure', task_id: 'l1' }],
       confirmation: 'Leisure task added!',
     })));
-    let emitted: AddedEntry | undefined;
-    f.componentInstance.added.subscribe((e: AddedEntry) => emitted = e);
     openPanel(f);
     typeText(f, 'Read novel');
-    clickSubmit(f);
-    expect(emitted?.type).toBe('leisure');
-  });
-
-  it('emits type "general" for an unknown action type', async () => {
-    const f = await setup();
-    agentSpy.createTask.and.returnValue(of(makeResponse({
-      actions_taken: [{ type: 'unknown_future_type', task_id: 'u1' }],
-      confirmation: 'Task added!',
-    })));
     let emitted: AddedEntry | undefined;
     f.componentInstance.added.subscribe((e: AddedEntry) => emitted = e);
-    openPanel(f);
-    typeText(f, 'Something');
     clickSubmit(f);
-    expect(emitted?.type).toBe('general');
+    expect(emitted?.type).toBe('leisure');
   });
 
   it('emits type "general" as fallback for an unrecognised action type', async () => {
