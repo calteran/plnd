@@ -21,16 +21,6 @@ pub struct UserPreferences {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
-pub struct MealHabit {
-    pub id: Uuid,
-    pub user_id: Uuid,
-    pub meal_name: String,
-    pub slot: String,
-    pub recurrence_rule: String,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DietaryRestriction {
     pub restriction_id: Uuid,
     pub user_id: Uuid,

@@ -18,6 +18,16 @@ pub struct ReadyStatus {
 // Preferences
 // ---------------------------------------------------------------------------
 
+pub fn deserialize_hhmm<'de, D>(d: D) -> Result<NaiveTime, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s = String::deserialize(d)?;
+    NaiveTime::parse_from_str(&s, "%H:%M")
+        .or_else(|_| NaiveTime::parse_from_str(&s, "%H:%M:%S"))
+        .map_err(serde::de::Error::custom)
+}
+
 fn deserialize_opt_hhmm<'de, D>(deserializer: D) -> Result<Option<NaiveTime>, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -56,10 +66,21 @@ pub struct PatchPreferencesRequest {
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
-pub struct CreateMealHabitRequest {
-    pub meal_name: String,
-    pub slot: String,
-    pub recurrence_rule: String,
+pub struct CreateMealPatternEntryRequest {
+    pub name: String,
+    #[serde(deserialize_with = "deserialize_hhmm")]
+    pub preferred_time: NaiveTime,
+    pub tolerance_minutes: Option<i32>,
+    pub sort_order: i32,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct UpdateMealPatternEntryRequest {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub preferred_time: Option<NaiveTime>,
+    pub tolerance_minutes: Option<i32>,
+    pub sort_order: Option<i32>,
 }
 
 // ---------------------------------------------------------------------------
@@ -109,9 +130,6 @@ pub struct PostSchedulePlanRequest {
     /// AI-placed one-off tasks from the Task Placement Review step.
     #[serde(default)]
     pub placed_tasks: Vec<PlanEntryRequest>,
-    /// Meal habit IDs to expand into recurring meal entries across plan_start–plan_end.
-    #[serde(default)]
-    pub meal_habit_ids: Vec<Uuid>,
 }
 
 // ---------------------------------------------------------------------------

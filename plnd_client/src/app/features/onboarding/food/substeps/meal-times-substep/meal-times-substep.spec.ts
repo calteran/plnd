@@ -1,72 +1,89 @@
-import { TestBed, fakeAsync, tick, ComponentFixture } from '@angular/core/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Signal, signal } from '@angular/core';
+import { of } from 'rxjs';
 import { MealTimesSubstepComponent } from './meal-times-substep';
-import { ConfigService } from '../../../../../core/services/config.service';
+import { MealPatternService } from '../../../../../core/services/meal-pattern.service';
+import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 
-const mockConfig = { getConfig: () => ({ api: { baseUrl: 'http://api' } }) };
+const makeEntry = (id: string, name: string, sort_order: number): MealPatternEntry => ({
+  id, name, preferred_time: '08:00:00', tolerance_minutes: 60,
+  sort_order, user_id: 'u1', created_at: '',
+});
+
+interface MockMealPatternService {
+  load: jasmine.Spy;
+  entries: Signal<MealPatternEntry[]>;
+  update: jasmine.Spy;
+  create: jasmine.Spy;
+  delete: jasmine.Spy;
+}
 
 describe('MealTimesSubstepComponent', () => {
-  let component: MealTimesSubstepComponent;
   let fixture: ComponentFixture<MealTimesSubstepComponent>;
-  let http: HttpTestingController;
+  let component: MealTimesSubstepComponent;
+  let mockService: MockMealPatternService;
 
   beforeEach(async () => {
+    const entriesSignal = signal<MealPatternEntry[]>([
+      makeEntry('1', 'Breakfast', 1),
+      makeEntry('2', 'Lunch', 2),
+    ]);
+    mockService = {
+      load: jasmine.createSpy('load'),
+      entries: entriesSignal.asReadonly(),
+      update: jasmine.createSpy('update').and.returnValue(of(makeEntry('1', 'Breakfast', 1))),
+      create: jasmine.createSpy('create').and.returnValue(of(makeEntry('3', 'Snack', 3))),
+      delete: jasmine.createSpy('delete').and.returnValue(of(void 0)),
+    };
+
     await TestBed.configureTestingModule({
       imports: [MealTimesSubstepComponent],
-      providers: [
-        provideHttpClient(),
-        provideHttpClientTesting(),
-        { provide: ConfigService, useValue: mockConfig },
-      ],
+      providers: [{ provide: MealPatternService, useValue: mockService }],
     }).compileComponents();
+
     fixture = TestBed.createComponent(MealTimesSubstepComponent);
     component = fixture.componentInstance;
-    http = TestBed.inject(HttpTestingController);
     fixture.detectChanges();
   });
 
-  afterEach(() => http.verify());
-
-  it('renders three meal slot cards', () => {
-    const cards = fixture.nativeElement.querySelectorAll('.meal-slot-card');
-    expect(cards.length).toBe(3);
-    expect(cards[0].textContent).toContain('Breakfast');
-    expect(cards[1].textContent).toContain('Lunch');
-    expect(cards[2].textContent).toContain('Dinner');
+  it('calls mealPatternService.load() on init', () => {
+    expect(mockService.load).toHaveBeenCalled();
   });
 
-  it('save() PATCHes /preferences/me with all six window fields and emits complete', fakeAsync(() => {
-    let completed = false;
-    component.complete.subscribe(() => completed = true);
+  it('renders one card per pattern entry', () => {
+    const cards = fixture.nativeElement.querySelectorAll('.meal-slot-card');
+    expect(cards.length).toBe(2);
+  });
 
-    component.breakfast.from.set('07:00');
-    component.breakfast.to.set('09:00');
-    component.lunch.from.set('12:00');
-    component.lunch.to.set('13:30');
-    component.dinner.from.set('18:00');
-    component.dinner.to.set('20:00');
+  it('updateTime() calls update() with new preferred_time', () => {
+    const entry = makeEntry('1', 'Breakfast', 1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).updateTime(entry, '09:00');
+    expect(mockService.update).toHaveBeenCalledWith('1', { preferred_time: '09:00' });
+  });
 
+  it('addEntry() calls create() and resets form', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).newName.set('Snack');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).newTime.set('15:00');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).addEntry();
+    expect(mockService.create).toHaveBeenCalledWith(
+      jasmine.objectContaining({ name: 'Snack', preferred_time: '15:00' })
+    );
+  });
+
+  it('removeEntry() calls delete()', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (component as any).removeEntry('2');
+    expect(mockService.delete).toHaveBeenCalledWith('2');
+  });
+
+  it('save() emits complete', () => {
+    const spy = jasmine.createSpy('complete');
+    component.complete.subscribe(spy);
     component.save();
-    const req = http.expectOne('http://api/preferences/me');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({
-      breakfast_window_start: '07:00:00',
-      breakfast_window_end: '09:00:00',
-      lunch_window_start: '12:00:00',
-      lunch_window_end: '13:30:00',
-      dinner_window_start: '18:00:00',
-      dinner_window_end: '20:00:00',
-    });
-    req.flush({});
-    tick();
-    expect(completed).toBe(true);
-  }));
-
-  it('save() sets saveError on HTTP failure', fakeAsync(() => {
-    component.save();
-    http.expectOne('http://api/preferences/me').error(new ProgressEvent('error'));
-    tick();
-    expect(component.saveError()).toBe(true);
-  }));
+    expect(spy).toHaveBeenCalled();
+  });
 });

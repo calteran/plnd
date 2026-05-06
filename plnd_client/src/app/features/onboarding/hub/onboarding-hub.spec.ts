@@ -8,8 +8,21 @@ import { OnboardingHubComponent } from './onboarding-hub';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfigService } from '../../../core/services/config.service';
+import { MealPatternService } from '../../../core/services/meal-pattern.service';
 import { MealEntry, PlanEntryRequest, PostSchedulePlanRequest } from '../../../core/models/week-plan';
-import { MealHabitResponse } from '../../../core/models/meal-habit';
+
+function makeMealPatternMock() {
+  const entriesSignal = signal([
+    { id: 'mp-1', user_id: 'u1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 0, created_at: '' },
+    { id: 'mp-2', user_id: 'u1', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 30, sort_order: 1, created_at: '' },
+    { id: 'mp-3', user_id: 'u1', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 30, sort_order: 2, created_at: '' },
+    { id: 'mp-4', user_id: 'u1', name: 'snack',     preferred_time: '15:00:00', tolerance_minutes: 30, sort_order: 3, created_at: '' },
+  ]);
+  return {
+    load: jasmine.createSpy('load'),
+    entries: entriesSignal.asReadonly(),
+  };
+}
 
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
@@ -37,7 +50,6 @@ function makeStateMock() {
     planPeriodSignal,
     mealPlan: signal(null).asReadonly(),
     placedTasks: signal([]).asReadonly(),
-    mealHabits: signal([]).asReadonly(),
     routines: signal([]).asReadonly(),
   };
 }
@@ -45,11 +57,13 @@ function makeStateMock() {
 describe('OnboardingHubComponent', () => {
   let fixture: ComponentFixture<OnboardingHubComponent>;
   let stateMock: ReturnType<typeof makeStateMock>;
+  let mealPatternMock: ReturnType<typeof makeMealPatternMock>;
   let router: Router;
   let userServiceStub: { completeOnboarding: jasmine.Spy };
 
   beforeEach(async () => {
     stateMock = makeStateMock();
+    mealPatternMock = makeMealPatternMock();
     userServiceStub = { completeOnboarding: jasmine.createSpy('completeOnboarding').and.returnValue(of(undefined)) };
     await TestBed.configureTestingModule({
       imports: [OnboardingHubComponent],
@@ -57,6 +71,7 @@ describe('OnboardingHubComponent', () => {
         { provide: OnboardingStateService, useValue: stateMock },
         { provide: UserService, useValue: userServiceStub },
         { provide: ConfigService, useValue: { getConfig: () => ({ api: { baseUrl: 'http://localhost:3000' } }) } },
+        { provide: MealPatternService, useValue: mealPatternMock },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
@@ -475,21 +490,10 @@ describe('OnboardingHubComponent', () => {
       duration_minutes: 20,
       energy_required: 'low',
     };
-    const habit: MealHabitResponse = {
-      id: 'habit-1',
-      user_id: 'user-1',
-      meal_name: 'Oatmeal',
-      slot: 'breakfast',
-      recurrence_rule: 'RRULE:FREQ=DAILY',
-      created_at: '2026-01-01T00:00:00Z',
-    };
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (stateMock as any).mealPlan = signal({ plan_start: '2026-05-01', meals: [mealWithRef, mealNoRef] }).asReadonly();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (stateMock as any).placedTasks = signal([placedTask]).asReadonly();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (stateMock as any).mealHabits = signal([habit]).asReadonly();
     stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
     fixture.detectChanges();
@@ -503,7 +507,6 @@ describe('OnboardingHubComponent', () => {
     expect(body.plan_end).toBe('2026-05-14');
     expect(body.planning_task_id).toBe('00000000-0000-0000-0000-000000000000');
     expect(body.placed_tasks).toEqual([placedTask]);
-    expect(body.meal_habit_ids).toEqual(['habit-1']);
     expect(body.entries).toEqual([
       {
         date: '2026-05-01',

@@ -1,7 +1,8 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { EnergyLevel, MealSlot, STANDARD_MEAL_SLOTS } from '../../../../core/models/week-plan';
+import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { EnergyLevel } from '../../../../core/models/week-plan';
 
 @Component({
   selector: 'app-plan-day-card',
@@ -38,10 +39,10 @@ import { EnergyLevel, MealSlot, STANDARD_MEAL_SLOTS } from '../../../../core/mod
         <div class="card-body-inner">
           <div>
             <div class="body-section-label">Meals</div>
-            @for (slot of slots; track slot) {
+            @for (entry of slots(); track entry.id) {
               <div class="body-row">
-                <span class="slot">{{ slot | titlecase }}</span>
-                @if (getMeal(slot); as meal) {
+                <span class="slot">{{ entry.name | titlecase }}</span>
+                @if (getMeal(entry.name); as meal) {
                   <span class="val">{{ meal.title }}</span>
                 } @else {
                   <span class="empty-val">—</span>
@@ -69,8 +70,9 @@ export class PlanDayCardComponent {
   readonly date = input.required<string>();
 
   private readonly weekPlanService = inject(WeekPlanService);
+  private readonly mealPatternService = inject(MealPatternService);
   protected expanded = false;
-  protected readonly slots = STANDARD_MEAL_SLOTS;
+  protected readonly slots = computed(() => this.mealPatternService.entries());
 
   protected toggle(): void { this.expanded = !this.expanded; }
 
@@ -79,11 +81,11 @@ export class PlanDayCardComponent {
   );
   protected readonly taskCount = computed(() => this.tasks().length);
 
-  protected getMeal(slot: MealSlot) {
+  protected getMeal(slot: string) {
     return this.weekPlanService.scheduledMeals()[this.date()]?.[slot];
   }
 
-  protected readonly mealCount = computed(() => this.slots.filter(s => this.getMeal(s)).length);
+  protected readonly mealCount = computed(() => this.slots().filter(s => this.getMeal(s.name)).length);
 
   // Public — called directly in spec tests via componentInstance
   energyClass(energy: EnergyLevel): string {

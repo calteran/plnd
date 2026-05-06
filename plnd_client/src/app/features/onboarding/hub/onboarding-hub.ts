@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -6,6 +6,8 @@ import { switchMap } from 'rxjs/operators';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { ConfigService } from '../../../core/services/config.service';
 import { UserService } from '../../../core/services/user.service';
+import { MealPatternService } from '../../../core/services/meal-pattern.service';
+import { preferredTimeHHMM } from '../../../core/models/meal-pattern';
 import {
   PostSchedulePlanRequest,
   PostSchedulePlanResponse,
@@ -23,12 +25,6 @@ interface HubSection {
 
 // No planning task exists in the onboarding flow — the DB UPDATE silently no-ops on a nil UUID.
 const NIL_UUID = '00000000-0000-0000-0000-000000000000';
-const SLOT_DEFAULT_TIME: Record<string, string> = {
-  breakfast: '08:00',
-  lunch: '12:00',
-  dinner: '18:00',
-  snack: '15:00',
-};
 
 const HUB_SECTIONS: HubSection[] = [
   {
@@ -529,12 +525,13 @@ const HUB_SECTIONS: HubSection[] = [
     }
   `],
 })
-export class OnboardingHubComponent {
+export class OnboardingHubComponent implements OnInit {
   protected readonly onboardingState = inject(OnboardingStateService);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly config = inject(ConfigService);
   private readonly userService = inject(UserService);
+  private readonly mealPatternService = inject(MealPatternService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly isSubmitting = signal(false);
@@ -543,6 +540,10 @@ export class OnboardingHubComponent {
 
   protected readonly sections = HUB_SECTIONS;
   protected readonly allDone = this.onboardingState.allSectionsComplete;
+
+  ngOnInit(): void {
+    this.mealPatternService.load();
+  }
 
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
@@ -575,7 +576,9 @@ export class OnboardingHubComponent {
       task_ref_id: m.meal_ref?.id,
       task_ref_type: m.meal_ref?.type,
       title: m.meal_ref ? undefined : m.title,
-      scheduled_start: SLOT_DEFAULT_TIME[m.occasion] ?? '12:00',
+      scheduled_start: preferredTimeHHMM(
+        this.mealPatternService.entries().find(e => e.name === m.occasion)?.preferred_time ?? '12:00:00'
+      ),
       after_anchor: m.occasion,
     }));
 
@@ -585,7 +588,6 @@ export class OnboardingHubComponent {
       planning_task_id: NIL_UUID,
       entries,
       placed_tasks: this.onboardingState.placedTasks(),
-      meal_habit_ids: this.onboardingState.mealHabits().map(h => h.id),
     };
 
     const apiBase = this.config.getConfig().api.baseUrl;

@@ -1,8 +1,24 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { signal } from '@angular/core';
 import { PlanDayCardComponent } from './plan-day-card';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { MealPatternEntry } from '../../../../core/models/meal-pattern';
+
+const PATTERN_FIXTURE: MealPatternEntry[] = [
+  { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' },
+  { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', created_at: '' },
+  { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', created_at: '' },
+];
+
+function makeMealPatternMock() {
+  return {
+    load: jasmine.createSpy('load'),
+    entries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+  };
+}
 
 describe('PlanDayCardComponent', () => {
   let fixture: ComponentFixture<PlanDayCardComponent>;
@@ -18,7 +34,11 @@ describe('PlanDayCardComponent', () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [PlanDayCardComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()]
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: MealPatternService, useValue: makeMealPatternMock() },
+      ],
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
     service.initSession('2026-03-31', '2026-04-06');

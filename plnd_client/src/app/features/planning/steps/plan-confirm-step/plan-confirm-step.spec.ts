@@ -2,9 +2,18 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
+import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { PlanConfirmStepComponent } from './plan-confirm-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
+import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { MealPatternEntry } from '../../../../core/models/meal-pattern';
+
+const PATTERN_FIXTURE: MealPatternEntry[] = [
+  { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' },
+  { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', created_at: '' },
+  { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', created_at: '' },
+];
 
 describe('PlanConfirmStepComponent', () => {
   let fixture: ComponentFixture<PlanConfirmStepComponent>;
@@ -14,7 +23,18 @@ describe('PlanConfirmStepComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [PlanConfirmStepComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])]
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideRouter([]),
+        {
+          provide: MealPatternService,
+          useValue: {
+            load: jasmine.createSpy('load'),
+            entries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+          },
+        },
+      ],
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
     service.initSession('2026-03-24', '2026-03-30');

@@ -7,7 +7,6 @@ import { UserPreferences } from '../../core/models/preferences';
 import { MealEntry, PlanEntryRequest } from '../../core/models/week-plan';
 import { Routine } from '../../core/models/routine';
 import { DayTypeResponse } from '../../core/models/day-type';
-import { MealHabitResponse } from '../../core/models/meal-habit';
 
 describe('OnboardingStateService', () => {
   let service: OnboardingStateService;
@@ -94,7 +93,6 @@ describe('OnboardingStateService', () => {
     expect(service.upcomingTaskNames()).toEqual([]);
     expect(service.placedTasks()).toEqual([]);
     expect(service.dayTypes()).toEqual([]);
-    expect(service.mealHabits()).toEqual([]);
     expect(service.routines()).toEqual([]);
   });
 
@@ -135,18 +133,6 @@ describe('OnboardingStateService', () => {
     ];
     service.setDayTypes(types);
     expect(service.dayTypes()).toEqual(types);
-  });
-
-  it('setMealHabits stores meal habit records', () => {
-    const habits: MealHabitResponse[] = [
-      {
-        id: 'mh-1', user_id: 'u1', meal_name: 'Oatmeal',
-        slot: 'breakfast', recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
-        created_at: '2026-04-22T00:00:00Z',
-      },
-    ];
-    service.setMealHabits(habits);
-    expect(service.mealHabits()).toEqual(habits);
   });
 
   it('setRoutines stores routine records', () => {

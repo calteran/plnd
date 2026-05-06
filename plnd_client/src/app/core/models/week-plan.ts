@@ -2,7 +2,7 @@ export type CarryoverDecision = 'carry' | 'defer' | 'drop';
 
 export const DROP_REASONS = ['Changed priority', 'No longer needed', 'Too difficult', 'Not ready'] as const;
 export type DropReason = typeof DROP_REASONS[number];
-export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type MealSlot = string;
 export type EnergyLevel = 'low' | 'medium' | 'high';
 export type ApprovalState = 'proposed' | 'approved' | 'skipped';
 
@@ -33,9 +33,6 @@ export interface PlannedMeal {
   nutrition?: MealNutrition;
   estimated?: boolean;
 }
-
-/** The three standard meal slots that are auto-filled. Snack is excluded — it is only included when explicitly set via setMeal. */
-export const STANDARD_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
 
 // ── Agent API types ─────────────────────────────────────────────────────────
 
@@ -183,7 +180,6 @@ export interface PostSchedulePlanRequest {
   /** Optional reasons for 'drop' decisions. entry_id → reason string */
   carryover_drop_reasons?: Record<string, DropReason>;
   placed_tasks?: PlanEntryRequest[];
-  meal_habit_ids?: string[];
 }
 
 export interface PostSchedulePlanResponse {

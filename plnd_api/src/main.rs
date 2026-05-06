@@ -30,7 +30,7 @@ use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::{
     agent, auth, briefing, catalog_details, catalog_ingest, day_types, dietary_restrictions,
-    meal_habits, meal_suggestions, preferences, routine, schedule, search, system, tasks,
+    meal_pattern, meal_suggestions, preferences, routine, schedule, search, system, tasks,
     user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
@@ -278,9 +278,15 @@ async fn main() {
             "/dietary-restrictions/{id}",
             delete(dietary_restrictions::delete_restriction),
         )
-        .route("/meal-habits", get(meal_habits::list_meal_habits))
-        .route("/meal-habits", post(meal_habits::create_meal_habit))
-        .route("/meal-habits/{id}", delete(meal_habits::delete_meal_habit))
+        .route(
+            "/meal-pattern",
+            get(meal_pattern::list_meal_pattern).post(meal_pattern::create_meal_pattern_entry),
+        )
+        .route(
+            "/meal-pattern/{id}",
+            patch(meal_pattern::update_meal_pattern_entry)
+                .delete(meal_pattern::delete_meal_pattern_entry),
+        )
         .route(
             "/search/ingredients",
             get(search::search_ingredients_handler),

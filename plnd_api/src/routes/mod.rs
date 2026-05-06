@@ -6,7 +6,7 @@ pub mod catalog_ingest;
 pub mod day_types;
 pub mod dietary_restrictions;
 pub mod domain_constants;
-pub mod meal_habits;
+pub mod meal_pattern;
 pub mod meal_suggestions;
 pub mod preferences;
 pub mod routine;

@@ -514,7 +514,10 @@ impl Tool for ProposeMealPlanTool {
                         "additionalProperties": false,
                         "properties": {
                             "date":     { "type": "string", "format": "date" },
-                            "occasion": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+                            "occasion": {
+                                "type": "string",
+                                "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
+                            },
                             "meal_ref": {
                                 "type": "object",
                                 "required": ["type", "id"],
@@ -607,7 +610,10 @@ impl Tool for RebalanceMealPlanTool {
                         "additionalProperties": false,
                         "properties": {
                             "date":     { "type": "string", "format": "date" },
-                            "occasion": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+                            "occasion": {
+                                "type": "string",
+                                "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
+                            },
                             "meal_ref": {
                                 "type": "object",
                                 "required": ["type", "id"],
@@ -690,7 +696,7 @@ impl Tool for SuggestSlotMealTool {
                 },
                 "occasion": {
                     "type": "string",
-                    "enum": ["breakfast", "lunch", "dinner", "snack"]
+                    "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                 },
                 "meal_ref": {
                     "type": "object",
@@ -780,7 +786,7 @@ impl Tool for ResolveMealDescriptionTool {
                 },
                 "occasion_tags": {
                     "type": "array",
-                    "items": { "type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"] },
+                    "items": { "type": "string", "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)" },
                     "description": "Required when kind='new'. Occasions this meal fits."
                 },
                 "estimated_nutrition": {
@@ -974,8 +980,7 @@ fn search_meal_catalog_schema() -> serde_json::Value {
             },
             "occasion": {
                 "type": "string",
-                "enum": ["breakfast", "lunch", "dinner", "snack"],
-                "description": "Filter results to meals tagged for this eating occasion."
+                "description": "Filter results to meals tagged for this eating occasion. Use a slot name from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot)."
             },
             "limit": {
                 "type": "integer",
@@ -1194,11 +1199,19 @@ mod tests {
     }
 
     #[test]
-    fn search_meal_catalog_schema_has_occasion_enum() {
+    fn search_meal_catalog_occasion_is_open_string() {
         let schema = search_meal_catalog_schema();
-        let enums = schema["properties"]["occasion"]["enum"].as_array().unwrap();
-        assert!(enums.iter().any(|v| v.as_str() == Some("breakfast")));
-        assert!(enums.iter().any(|v| v.as_str() == Some("dinner")));
+        let occasion = &schema["properties"]["occasion"];
+        assert_eq!(occasion["type"], "string");
+        assert!(
+            occasion.get("enum").is_none(),
+            "occasion must not be a closed enum"
+        );
+        assert!(
+            occasion["description"]
+                .as_str()
+                .is_some_and(|s| s.contains("slot"))
+        );
     }
 
     #[test]

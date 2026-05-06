@@ -6,7 +6,7 @@ import {
 import {
   MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS,
   MOCK_TEMPLATE_MORNING_WALK, MOCK_PLACED_TASKS, MOCK_MEAL_PLAN,
-  MOCK_MEAL_HABIT, MOCK_DIETARY_RESTRICTION_ALLERGY,
+  MOCK_DIETARY_RESTRICTION_ALLERGY,
   MOCK_PLAN_COMMITTED,
   seedOnboarding,
 } from '../helpers/onboarding-mocks';
@@ -128,10 +128,9 @@ async function landAtDietaryPreferences(page: Page): Promise<void> {
   await expect(page.locator('.prefs-substep')).toBeVisible();
 }
 
-async function landAtMealHabits(page: Page): Promise<void> {
+async function landAtMealPlanReview(page: Page): Promise<void> {
   await landAtDietaryPreferences(page);
   await page.locator('.btn-continue').click();
-  await expect(page.locator('.meal-habits')).toBeVisible();
 }
 
 async function mockDayView(page: Page): Promise<void> {
@@ -159,9 +158,6 @@ async function completeFoodSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/my/ingredient-prefs`, route =>
     route.fulfill({ status: 200, json: [] })
   );
-  await page.route(`${API_BASE}/meal-habits`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
   await page.route(`${API_BASE}/agent/meal-plan`, route =>
     route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
   );
@@ -182,11 +178,7 @@ async function completeFoodSpoke(page: Page): Promise<void> {
   await expect(page.locator('.prefs-substep')).toBeVisible();
   await page.locator('.btn-continue').click();
 
-  // Step 4: Meal Habits
-  await expect(page.locator('.meal-habits')).toBeVisible();
-  await page.locator('.btn-continue').click();
-
-  // Step 5: Meal Plan Review — wait for generation then save
+  // Step 4: Meal Plan Review — wait for generation then save
   await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
   await page.locator('.btn-continue').click();
 
@@ -514,9 +506,6 @@ test.describe('Onboarding', () => {
 
     test('skipped on Food after Tasks spoke completed planning prefs', async ({ page }) => {
       await seedOnboarding(page);
-      await page.route(`${API_BASE}/meal-habits`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
 
       await page.goto('/onboarding');
       await completeTasksSpoke(page);
@@ -825,61 +814,9 @@ test.describe('Onboarding', () => {
     });
   });
 
-  test.describe('Food spoke — Meal Habits', () => {
-    test.beforeEach(async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/meal-habits`, route => {
-        if (route.request().method() === 'POST') {
-          route.fulfill({ status: 201, json: MOCK_MEAL_HABIT });
-        } else {
-          route.fulfill({ status: 200, json: [] });
-        }
-      });
-      await page.goto('/onboarding');
-      await landAtMealHabits(page);
-    });
-
-    test('add Oatmeal for Breakfast → appears as habit chip', async ({ page }) => {
-      await page.locator('.meal-habits .name-input').fill('Oatmeal');
-      await expect(page.locator('.pills-row .pill').filter({ hasText: 'Breakfast' })).toHaveClass(/pill--active/);
-      await page.locator('.btn-add').click();
-
-      await expect(page.locator('.habit-chip')).toHaveCount(1);
-      await expect(page.locator('.habit-chip').first()).toContainText('Oatmeal');
-    });
-
-    test('conflict warning when adding second Breakfast/Every day entry', async ({ page }) => {
-      // Override the GET mock (LIFO — this wins over the beforeEach handler) and reload
-      // so habitsService picks up the existing Oatmeal habit before we navigate.
-      await page.route(`${API_BASE}/meal-habits`, route => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({ status: 200, json: [MOCK_MEAL_HABIT] });
-        } else {
-          route.fulfill({ status: 201, json: { ...MOCK_MEAL_HABIT, id: 'habit-2', meal_name: 'Granola' } });
-        }
-      });
-
-      // Navigate fresh so habitsService.load() fires against the new GET mock.
-      await page.goto('/onboarding');
-      await landAtMealHabits(page);
-
-      // Default slot = Breakfast, default recurrence = Every day → conflict fires on load.
-      await expect(page.locator('.conflict-warning')).toBeVisible();
-      await expect(page.locator('.conflict-warning')).toContainText('Oatmeal');
-      await expect(page.locator('.btn-add')).toContainText('Add anyway');
-
-      await page.locator('.meal-habits .name-input').fill('Granola');
-      await page.locator('.btn-add').click();
-      await expect(page.locator('.habit-chip')).toHaveCount(2);
-    });
-  });
-
   test.describe('Food spoke — Meal Plan Review', () => {
     test.beforeEach(async ({ page }) => {
       await seedOnboarding(page);
-      await page.route(`${API_BASE}/meal-habits`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
     });
 
     test('Save & Continue disabled during generation; enabled after plan loads', async ({ page }) => {
@@ -889,8 +826,7 @@ test.describe('Onboarding', () => {
       });
 
       await page.goto('/onboarding');
-      await landAtMealHabits(page);
-      await page.locator('.btn-continue').click();
+      await landAtMealPlanReview(page);
 
       // Button should be disabled while generation is in flight
       await expect(page.locator('.btn-continue')).toBeDisabled({ timeout: 500 });
@@ -904,8 +840,7 @@ test.describe('Onboarding', () => {
       );
 
       await page.goto('/onboarding');
-      await landAtMealHabits(page);
-      await page.locator('.btn-continue').click();
+      await landAtMealPlanReview(page);
 
       // Wait for generation to finish, then click Save & Continue
       await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });

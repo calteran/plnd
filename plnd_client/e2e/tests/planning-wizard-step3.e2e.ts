@@ -15,8 +15,17 @@ const STEP3_AGENT_MEALS = STEP3_MEAL_DAYS.flatMap(date =>
   }))
 );
 
+const MOCK_MEAL_PATTERN = [
+  { id: 'mp1', user_id: 'test', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp2', user_id: 'test', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, created_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp3', user_id: 'test', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, created_at: '2026-01-01T00:00:00Z' },
+];
+
 async function seedWizard(page: Page): Promise<void> {
   await seedAuth(page);
+  await page.route(`${API_BASE}/meal-pattern`, route =>
+    route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
+  );
   await page.route(`${API_BASE}/preferences/me`, route =>
     route.fulfill({ status: 200, json: MOCK_PREFS_3DAY })
   );
@@ -296,9 +305,12 @@ test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
   });
 
   test('Refresh modal shows the correct unapproved count', async ({ page }) => {
+    test.setTimeout(15_000);
+    // Wait for auto-generate to complete before clicking
+    await expect(page.locator('.gc').first().locator('.gc-approve')).toBeVisible();
     // Approve one meal first
     await page.locator('.gc').first().locator('.gc-approve').click();
-    await expect(page.locator('.btn-refresh-all')).toBeVisible();
+    await expect(page.locator('.btn-refresh-all')).toBeVisible({ timeout: 8_000 });
     const badge = page.locator('.badge');
     // 9 total − 1 approved = 8 unapproved
     await expect(badge).toHaveText('8');
@@ -308,6 +320,9 @@ test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
   });
 
   test('confirm Refresh — approved meal is unchanged, proposed cells are refreshed', async ({ page }) => {
+    test.setTimeout(15_000);
+    // Wait for auto-generate to complete before clicking
+    await expect(page.locator('.gc').first().locator('.gc-approve')).toBeVisible();
     // Approve first cell
     await page.locator('.gc').first().locator('.gc-approve').click();
     const approvedText = await page.locator('.gc').first().locator('.gc-text.approved-t').textContent();

@@ -1,7 +1,7 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish, DayType,
-    DietaryRestriction, MealHabit, MealSuggestion, Routine, ScheduleEntry, Task, User,
+    DietaryRestriction, MealPatternEntry, MealSuggestion, Routine, ScheduleEntry, Task, User,
     UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
 };
 use plnd_data::query_types::{
@@ -82,26 +82,28 @@ impl From<UserPreferences> for UserPreferencesResponse {
     }
 }
 
-/// API response wrapper for `plnd_data::models::MealHabit`.
+/// API response wrapper for `plnd_data::models::MealPatternEntry`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
-pub struct MealHabitResponse {
+pub struct MealPatternEntryResponse {
     pub id: Uuid,
     pub user_id: Uuid,
-    pub meal_name: String,
-    pub slot: String,
-    pub recurrence_rule: String,
+    pub name: String,
+    pub preferred_time: NaiveTime,
+    pub tolerance_minutes: i32,
+    pub sort_order: i32,
     pub created_at: DateTime<Utc>,
 }
 
-impl From<MealHabit> for MealHabitResponse {
-    fn from(h: MealHabit) -> Self {
+impl From<MealPatternEntry> for MealPatternEntryResponse {
+    fn from(e: MealPatternEntry) -> Self {
         Self {
-            id: h.id,
-            user_id: h.user_id,
-            meal_name: h.meal_name,
-            slot: h.slot,
-            recurrence_rule: h.recurrence_rule,
-            created_at: h.created_at,
+            id: e.id,
+            user_id: e.user_id,
+            name: e.name,
+            preferred_time: e.preferred_time,
+            tolerance_minutes: e.tolerance_minutes,
+            sort_order: e.sort_order,
+            created_at: e.created_at,
         }
     }
 }

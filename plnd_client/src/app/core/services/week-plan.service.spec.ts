@@ -1,8 +1,11 @@
 import { TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
 import { PostSchedulePlanRequest } from '../models/week-plan';
+import { MealPatternService } from './meal-pattern.service';
+import { MealPatternEntry } from '../models/meal-pattern';
 
 describe('WeekPlanService', () => {
   let service: WeekPlanService;
@@ -10,7 +13,21 @@ describe('WeekPlanService', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        {
+          provide: MealPatternService,
+          useValue: {
+            load: jasmine.createSpy('load'),
+            entries: signal<MealPatternEntry[]>([
+              { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' },
+              { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', created_at: '' },
+              { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', created_at: '' },
+            ]).asReadonly(),
+          },
+        },
+      ],
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
     httpMock = TestBed.inject(HttpTestingController);
@@ -260,17 +277,32 @@ describe('WeekPlanService', () => {
       req.flush({ committed: 3, planning_task_status: 'completed' });
     });
 
-    it('buildCommitRequest includes an explicit snack entry', () => {
+    it('buildCommitRequest includes one entry per meal pattern slot', () => {
       service.initSession('2026-03-24', '2026-03-24');
-      service.setMeal('2026-03-24', 'snack', { approvalState: 'approved', mealRef: null, title: 'Apple' });
       service.commitPlan('task-1').subscribe();
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const snack = body.entries.find(e => e.after_anchor === 'snack');
-      expect(snack).toBeTruthy();
-      expect(snack!.title).toBe('Apple');
-      req.flush({ committed: 4, planning_task_status: 'completed' });
+      // Three pattern entries × one day = three meal anchor entries
+      const anchors = body.entries.filter(e => e.after_anchor);
+      expect(anchors.length).toBe(3);
+      expect(anchors.map(a => a.after_anchor).sort()).toEqual(['breakfast', 'dinner', 'lunch']);
+      req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest uses scheduled_start from the meal pattern preferred_time', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const breakfast = body.entries.find(e => e.after_anchor === 'breakfast');
+      const lunch = body.entries.find(e => e.after_anchor === 'lunch');
+      const dinner = body.entries.find(e => e.after_anchor === 'dinner');
+      expect(breakfast!.scheduled_start).toBe('08:00');
+      expect(lunch!.scheduled_start).toBe('12:00');
+      expect(dinner!.scheduled_start).toBe('18:00');
+      req.flush({ committed: 3, planning_task_status: 'completed' });
     });
 
     it('buildCommitRequest excludes skipped meals', () => {
@@ -401,7 +433,7 @@ describe('WeekPlanService', () => {
   });
 
   describe('currentState()', () => {
-    it('returns a MealPlanState with all horizon days × standard slots', () => {
+    it('returns a MealPlanState with all horizon days × meal pattern slots', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const state = service.currentState();
       expect(state.week_start).toBe('2026-03-24');
