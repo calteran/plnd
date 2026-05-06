@@ -67,13 +67,13 @@ test.describe('Planning Wizard', () => {
 
   // ── Access ─────────────────────────────────────────────────────────────────
 
-  test('authenticated onboarded user can access /plan/week and sees Step 1', async ({ page }) => {
+  test('authenticated onboarded user can access /plan/week and auto-skips to Step 2 when no carryover', async ({ page }) => {
     await page.clock.setFixedTime('2026-03-28T00:00:00');
     await seedWizard(page);
     await page.goto('/plan/week');
     await expect(page.locator('.planning-wizard')).toBeVisible();
-    // The Carryover pill is the Step 1 label
-    await expect(page.locator('.progress-pill.active .pill-label')).toHaveText('Carryover');
+    // No carryover items → wizard auto-skips step 1 and lands on Tasks (step 2)
+    await expect(page.locator('.progress-pill.active .pill-label')).toHaveText('Tasks');
   });
 
   // ── Progress indicator ─────────────────────────────────────────────────────
@@ -86,16 +86,21 @@ test.describe('Planning Wizard', () => {
       await expect(page.locator('.planning-wizard')).toBeVisible();
     });
 
-    test('Step 1 pill is active on first load', async ({ page }) => {
-      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('1');
+    test('Step 2 pill is active on first load (step 1 auto-skipped when no carryover)', async ({ page }) => {
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
+      // Step 1 pill should be disabled (faded) since carryover is empty
+      await expect(page.locator('.progress-pill').nth(0)).toHaveClass(/disabled/);
     });
 
     test('active pill advances and done pills accumulate as user steps forward', async ({ page }) => {
-      // Advance to step 3 via two Next clicks
+      // Wizard starts on step 2 (step 1 auto-skipped).
+      // Advance to step 3 via one Next click, then step 5 via a second click.
       await page.getByLabel('Next step').click();
-      await page.getByLabel('Next step').click();
-
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
+      await expect(page.locator('.progress-pill.done')).toHaveCount(1);
+
+      await page.getByLabel('Next step').click();
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('5');
       await expect(page.locator('.progress-pill.done')).toHaveCount(2);
     });
 
@@ -117,27 +122,31 @@ test.describe('Planning Wizard', () => {
       await expect(page.locator('.planning-wizard')).toBeVisible();
     });
 
-    test('Step 1 has no Previous button', async ({ page }) => {
+    test('Step 2 has no Previous button (step 1 is disabled)', async ({ page }) => {
+      // Wizard starts on step 2; step 1 is disabled, so there is no previous enabled step
       await expect(page.getByLabel('Previous step')).not.toBeVisible();
     });
 
     test('Next button advances to the next step', async ({ page }) => {
+      // Wizard starts on step 2; Next advances to step 3
       await page.getByLabel('Next step').click();
-      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
     });
 
     test('Previous button returns to the prior step', async ({ page }) => {
+      // Wizard starts on step 2 (step 1 disabled/skipped). Advance to step 3 first.
       await page.getByLabel('Next step').click();
-      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
 
+      // Back from step 3 returns to step 2 (not step 1, which is disabled)
       await page.getByLabel('Previous step').click();
-      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('1');
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
     });
 
     test('Step 6 has no Next button', async ({ page }) => {
-      // Navigate to step 6 (Confirm) by clicking Next four times.
-      // Click 1: 1→2, Click 2: 2→3, Click 3: 3→5 (skips disabled Exercise), Click 4: 5→6
-      for (let i = 0; i < 4; i++) {
+      // Wizard starts on step 2 (step 1 auto-skipped). Navigate to step 6 (Confirm).
+      // Click 1: 2→3, Click 2: 3→5 (skips disabled Exercise), Click 3: 5→6
+      for (let i = 0; i < 3; i++) {
         await page.getByLabel('Next step').click();
       }
       await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('6');
@@ -187,14 +196,14 @@ test.describe('Planning Wizard', () => {
       );
     }
 
-    test('empty state shows celebration emoji and message when no carryover', async ({ page }) => {
+    test('wizard auto-skips to step 2 when no carryover items', async ({ page }) => {
       await page.clock.setFixedTime('2026-03-28T00:00:00');
       await seedWizard(page); // returns carryover: []
       await page.goto('/plan/week');
       await expect(page.locator('.planning-wizard')).toBeVisible();
-      await expect(page.locator('.empty-state')).toBeVisible();
-      await expect(page.locator('.empty-emoji')).toContainText(/[🎉✨🙌🌟💪🥳]/u);
-      await expect(page.locator('.carryover-list')).not.toBeVisible();
+      // Step 1 is skipped entirely — wizard opens on step 2 (Tasks)
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
+      await expect(page.locator('.progress-pill').nth(0)).toHaveClass(/disabled/);
     });
 
     test.describe('with carryover items', () => {

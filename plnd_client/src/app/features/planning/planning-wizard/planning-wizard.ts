@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
 import { MealPatternService } from '../../../core/services/meal-pattern.service';
@@ -47,7 +47,13 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
       <div class="wizard-content">
         @if (weekPlanService.planStart()) {
           @switch (weekPlanService.currentStep()) {
-            @case (1) { <app-plan-review-step /> }
+            @case (1) {
+              @if (carryoverLoading()) {
+                <p>Loading…</p>
+              } @else {
+                <app-plan-review-step />
+              }
+            }
             @case (2) { <app-plan-tasks-step /> }
             @case (3) { <app-plan-meals-step /> }
             @case (5) { <app-plan-day-grid-step /> }
@@ -59,7 +65,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
       </div>
 
       <footer class="wizard-footer">
-        @if (weekPlanService.currentStep() > 1) {
+        @if (hasPrevStep()) {
           <button class="nav-btn nav-btn--back" (click)="back()" type="button" aria-label="Previous step">‹</button>
         }
         @if (weekPlanService.currentStep() < 6) {
@@ -104,14 +110,20 @@ export class PlanningWizardComponent implements OnInit {
   private readonly preferencesService = inject(PreferencesService);
   private readonly mealPatternService = inject(MealPatternService);
 
+  protected readonly carryoverLoading = signal(true);
+
   readonly steps = computed<WizardStep[]>(() => [
-    { n: 1, label: 'Carryover' },
+    { n: 1, label: 'Carryover', disabled: !this.carryoverLoading() && this.weekPlanService.carryoverItems().length === 0 },
     { n: 2, label: 'Tasks' },
     { n: 3, label: 'Meals', disabled: this.mealPatternService.entries().length === 0 },
     { n: 4, label: 'Exercise', disabled: true },
     { n: 5, label: 'Review' },
     { n: 6, label: 'Confirm' },
   ]);
+
+  readonly hasPrevStep = computed(() =>
+    this.steps().some(s => s.n < this.weekPlanService.currentStep() && !s.disabled)
+  );
 
   private sessionInitialized = false;
 
@@ -148,6 +160,15 @@ export class PlanningWizardComponent implements OnInit {
       this.weekPlanService.initSession(planStartIso, localIsoDate(planEnd));
       this.weekPlanService.createOrFetchPlanTask(planStartIso).subscribe({
         error: err => console.error('Failed to create planning task', err),
+      });
+      this.weekPlanService.loadCarryover(planStartIso).subscribe({
+        next: items => {
+          this.carryoverLoading.set(false);
+          if (items.length === 0 && this.weekPlanService.currentStep() === 1) {
+            this.weekPlanService.goToStep(2);
+          }
+        },
+        error: () => this.carryoverLoading.set(false),
       });
     });
   }
