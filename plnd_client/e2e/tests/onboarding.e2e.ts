@@ -8,6 +8,7 @@ import {
   MOCK_TEMPLATE_MORNING_WALK, MOCK_PLACED_TASKS, MOCK_MEAL_PLAN,
   MOCK_DIETARY_RESTRICTION_ALLERGY,
   MOCK_PLAN_COMMITTED,
+  MOCK_MEAL_PATTERN,
   seedOnboarding,
 } from '../helpers/onboarding-mocks';
 
@@ -197,6 +198,9 @@ test.describe('Onboarding', () => {
     );
     await page.route(`${API_BASE}/dietary-restrictions`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
+    );
+    await page.route(`${API_BASE}/meal-pattern**`, route =>
+      route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
     );
 
     await page.addInitScript(() => {
