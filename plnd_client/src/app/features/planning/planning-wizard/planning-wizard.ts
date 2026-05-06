@@ -148,18 +148,14 @@ export class PlanningWizardComponent implements OnInit {
 
   next(): void {
     const step = this.weekPlanService.currentStep();
-    if (step >= 6) return;
-    // Skip disabled Exercise step 4 when going forward from step 3
-    const target = step === 3 ? 5 : step + 1;
-    this.weekPlanService.goToStep(target);
+    const nextStep = this.steps.find(s => s.n > step && !s.disabled);
+    if (nextStep) this.weekPlanService.goToStep(nextStep.n);
   }
 
   back(): void {
     const step = this.weekPlanService.currentStep();
-    if (step <= 1) return;
-    // Skip disabled Exercise step 4 when going backward from step 5
-    const target = step === 5 ? 3 : step - 1;
-    this.weekPlanService.goToStep(target);
+    const prevStep = this.steps.filter(s => s.n < step && !s.disabled).at(-1);
+    if (prevStep) this.weekPlanService.goToStep(prevStep.n);
   }
 
 }
