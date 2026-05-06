@@ -40,7 +40,7 @@ pub async fn patch_preferences(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     if let Some(lpd) = body.default_plan_length_days
-        && !(1..=90).contains(&lpd)
+        && !(1..=14).contains(&lpd)
     {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }

@@ -195,7 +195,7 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
 
   // ── Persistence ───────────────────────────────────────────────────────────────
 
-  test('meals state survives navigating to Step 4 and back to Step 3', async ({ page }) => {
+  test('meals state survives navigating to Step 5 and back to Step 3', async ({ page }) => {
     const cell = page.locator('.gc').first();
     // Fill Mon/Breakfast
     await cell.locator('.gc-pick').click();
@@ -203,9 +203,9 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     await cell.locator('.mock-input').press('Enter');
     await expect(cell).toHaveClass(/approved-g/);
 
-    // Navigate to Step 4
+    // Navigate to Step 5
     await page.getByLabel('Next step').click();
-    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('4');
+    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('5');
 
     // Navigate back to Step 3
     await page.getByLabel('Previous step').click();

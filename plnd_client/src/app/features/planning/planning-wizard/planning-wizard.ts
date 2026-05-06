@@ -8,6 +8,8 @@ import { PlanMealsStepComponent } from '../steps/plan-meals-step/plan-meals-step
 import { PlanDayGridStepComponent } from '../steps/plan-day-grid-step/plan-day-grid-step';
 import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confirm-step';
 
+interface WizardStep { n: number; label: string; disabled?: boolean; }
+
 @Component({
   selector: 'app-planning-wizard',
   standalone: true,
@@ -33,7 +35,8 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
           }
           <div class="progress-pill"
                [class.active]="weekPlanService.currentStep() === s.n"
-               [class.done]="weekPlanService.currentStep() > s.n">
+               [class.done]="weekPlanService.currentStep() > s.n && !s.disabled"
+               [class.disabled]="s.disabled">
             <span class="pill-num">{{ s.n }}</span>
             <span class="pill-label">{{ s.label }}</span>
           </div>
@@ -46,8 +49,8 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
             @case (1) { <app-plan-review-step /> }
             @case (2) { <app-plan-tasks-step /> }
             @case (3) { <app-plan-meals-step /> }
-            @case (4) { <app-plan-day-grid-step /> }
-            @case (5) { <app-plan-confirm-step /> }
+            @case (5) { <app-plan-day-grid-step /> }
+            @case (6) { <app-plan-confirm-step /> }
           }
         } @else {
           <p>Initializing session…</p>
@@ -58,7 +61,7 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
         @if (weekPlanService.currentStep() > 1) {
           <button class="nav-btn nav-btn--back" (click)="back()" type="button" aria-label="Previous step">‹</button>
         }
-        @if (weekPlanService.currentStep() < 5) {
+        @if (weekPlanService.currentStep() < 6) {
           <button class="nav-btn" (click)="next()" type="button" aria-label="Next step">›</button>
         }
       </footer>
@@ -79,6 +82,7 @@ import { PlanConfirmStepComponent } from '../steps/plan-confirm-step/plan-confir
     .progress-pill.active .pill-label { font-weight: 700; }
     .progress-pill.done .pill-num,
     .progress-pill.active .pill-num { background: var(--color-accent); color: #fff; }
+    .progress-pill.disabled { opacity: 0.4; cursor: default; }
     .pill-num { width: 16px; height: 16px; border-radius: 50%; background: var(--color-border-row);
                 display: flex; align-items: center; justify-content: center;
                 font-size: 10px; font-weight: 700; flex-shrink: 0; }
@@ -98,12 +102,13 @@ export class PlanningWizardComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   private readonly preferencesService = inject(PreferencesService);
 
-  readonly steps = [
+  readonly steps: WizardStep[] = [
     { n: 1, label: 'Carryover' },
     { n: 2, label: 'Tasks' },
     { n: 3, label: 'Meals' },
-    { n: 4, label: 'Review' },
-    { n: 5, label: 'Confirm' },
+    { n: 4, label: 'Exercise', disabled: true },
+    { n: 5, label: 'Review' },
+    { n: 6, label: 'Confirm' },
   ];
 
   private sessionInitialized = false;
@@ -143,12 +148,14 @@ export class PlanningWizardComponent implements OnInit {
 
   next(): void {
     const step = this.weekPlanService.currentStep();
-    if (step < 5) this.weekPlanService.goToStep(step + 1);
+    const nextStep = this.steps.find(s => s.n > step && !s.disabled);
+    if (nextStep) this.weekPlanService.goToStep(nextStep.n);
   }
 
   back(): void {
     const step = this.weekPlanService.currentStep();
-    if (step > 1) this.weekPlanService.goToStep(step - 1);
+    const prevStep = this.steps.filter(s => s.n < step && !s.disabled).at(-1);
+    if (prevStep) this.weekPlanService.goToStep(prevStep.n);
   }
 
 }

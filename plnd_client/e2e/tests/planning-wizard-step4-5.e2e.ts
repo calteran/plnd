@@ -3,7 +3,7 @@ import { seedAuth, API_BASE } from '../helpers/auth';
 
 // Fixed seed: 7-day horizon Mon 2026-03-30 → Sun 2026-04-05
 // MOCK_PREFS (from seedAuth): week_start_day=1, default_plan_length_days=7
-// currentStep: 4 or 5 → wizard opens directly on Day Review or Confirmation
+// currentStep: 5 or 6 → wizard opens directly on Day Review or Confirmation
 
 const MOCK_TASKS = [
   { title: 'Morning run', energy: 'high', date: '2026-03-30', task_type: 'general' },
@@ -34,24 +34,7 @@ async function seedWizard(page: Page): Promise<void> {
   );
 }
 
-async function seedStep4(page: Page): Promise<void> {
-  await page.addInitScript((tasks) => {
-    localStorage.setItem('plnd:plan-draft', JSON.stringify({
-      schemaVersion: 2,
-      planStart: '2026-03-30',
-      planEnd: '2026-04-05',
-      currentStep: 4,
-      carryoverDecisions: {},
-      scheduledMeals: {},
-      scheduledTasks: tasks,
-      floatingTasks: [],
-      savedAt: '2026-03-29T00:00:00.000Z',
-    }));
-  }, MOCK_TASKS);
-  await seedWizard(page);
-}
-
-async function seedStep5(page: Page): Promise<void> {
+async function seedStep5DayReview(page: Page): Promise<void> {
   await page.addInitScript((tasks) => {
     localStorage.setItem('plnd:plan-draft', JSON.stringify({
       schemaVersion: 2,
@@ -68,15 +51,32 @@ async function seedStep5(page: Page): Promise<void> {
   await seedWizard(page);
 }
 
-// ── Step 4 — Day Review ───────────────────────────────────────────────────────
+async function seedStep6Confirm(page: Page): Promise<void> {
+  await page.addInitScript((tasks) => {
+    localStorage.setItem('plnd:plan-draft', JSON.stringify({
+      schemaVersion: 2,
+      planStart: '2026-03-30',
+      planEnd: '2026-04-05',
+      currentStep: 6,
+      carryoverDecisions: {},
+      scheduledMeals: {},
+      scheduledTasks: tasks,
+      floatingTasks: [],
+      savedAt: '2026-03-29T00:00:00.000Z',
+    }));
+  }, MOCK_TASKS);
+  await seedWizard(page);
+}
 
-test.describe('Planning Wizard — Step 4: Day Review', () => {
+// ── Step 5 — Day Review ───────────────────────────────────────────────────────
+
+test.describe('Planning Wizard — Step 5: Day Review', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime('2026-03-28T00:00:00');
-    await seedStep4(page);
+    await seedStep5DayReview(page);
     await page.goto('/plan/week');
     await expect(page.locator('.planning-wizard')).toBeVisible();
-    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('4');
+    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('5');
   });
 
   // ── Card grid ───────────────────────────────────────────────────────────────
@@ -128,15 +128,15 @@ test.describe('Planning Wizard — Step 4: Day Review', () => {
   });
 });
 
-// ── Step 5 — Confirmation ─────────────────────────────────────────────────────
+// ── Step 6 — Confirmation ─────────────────────────────────────────────────────
 
-test.describe('Planning Wizard — Step 5: Confirmation', () => {
+test.describe('Planning Wizard — Step 6: Confirmation', () => {
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime('2026-03-28T00:00:00');
-    await seedStep5(page);
+    await seedStep6Confirm(page);
     await page.goto('/plan/week');
     await expect(page.locator('.planning-wizard')).toBeVisible();
-    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('5');
+    await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('6');
   });
 
   // ── Completion banner ──────────────────────────────────────────────────────

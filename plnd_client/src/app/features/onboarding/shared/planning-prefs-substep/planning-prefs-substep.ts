@@ -200,17 +200,16 @@ export class PlanningPrefsSubstepComponent implements OnInit {
   private readonly preferencesService = inject(PreferencesService);
 
   // Form state — public for test access
-  readonly planLength = signal<7 | 14 | 28>(7);
+  readonly planLength = signal<7 | 14>(7);
   readonly weekStart = signal<number>(1); // Monday default
   readonly planningDay = signal<number>(0); // Sunday default
   readonly planningTime = signal<string>('15:00');
   readonly saveError = signal(false);
   readonly isSaving = signal(false);
 
-  readonly planLengthOptions: { value: 7 | 14 | 28; label: string }[] = [
+  readonly planLengthOptions: { value: 7 | 14; label: string }[] = [
     { value: 7, label: '1 week' },
     { value: 14, label: '2 weeks' },
-    { value: 28, label: '4 weeks' },
   ];
 
   readonly dayOptions = DAY_LABELS.map((label, i) => ({

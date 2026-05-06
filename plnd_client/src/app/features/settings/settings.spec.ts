@@ -120,4 +120,18 @@ describe('SettingsComponent', () => {
     expect(fixture.nativeElement.querySelector('.load-error')).toBeNull();
     expect(fixture.nativeElement.querySelector('form')).toBeTruthy();
   });
+
+  it('planLengthDays form control rejects values above 14', () => {
+    const fixture = TestBed.createComponent(SettingsComponent);
+    fixture.detectChanges();
+    httpMock.expectOne(r => r.url.includes('/preferences/me') && r.method === 'GET')
+      .flush(MOCK_PREFS);
+    fixture.detectChanges();
+
+    const control = fixture.componentInstance.form.controls.planLengthDays;
+    control.setValue(15);
+    expect(control.valid).toBeFalse();
+    control.setValue(14);
+    expect(control.valid).toBeTrue();
+  });
 });

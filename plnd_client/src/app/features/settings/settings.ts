@@ -36,7 +36,7 @@ import { PreferencesService } from '../../core/services/preferences.service';
             </select>
 
             <label for="planLengthDays">Plan horizon length (days)</label>
-            <input id="planLengthDays" type="number" min="1" max="90"
+            <input id="planLengthDays" type="number" min="1" max="14"
                    formControlName="planLengthDays" class="settings-input" />
 
             <label for="planningTriggerOffset">Planning reminder (days before/after horizon start)</label>
@@ -121,7 +121,7 @@ export class SettingsComponent implements OnInit {
 
   readonly form = new FormGroup({
     weekStartDay: new FormControl<number>(1, { nonNullable: true, validators: [Validators.min(0), Validators.max(6)] }),
-    planLengthDays: new FormControl<number>(7, { nonNullable: true, validators: [Validators.min(1), Validators.max(90)] }),
+    planLengthDays: new FormControl<number>(7, { nonNullable: true, validators: [Validators.min(1), Validators.max(14)] }),
     planningTriggerOffset: new FormControl<number>(0, { nonNullable: true, validators: [Validators.min(-14), Validators.max(14)] }),
   });
 

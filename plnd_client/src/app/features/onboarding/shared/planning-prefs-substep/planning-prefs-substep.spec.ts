@@ -112,13 +112,15 @@ describe('PlanningPrefsSubstepComponent', () => {
     expect(component.planningDay()).toBe(0);
   });
 
-  it('selecting 4-week plan length updates signal', async () => {
-    const { fixture, component } = await setup(false);
+  it('offers only 1-week and 2-week plan length options (no 28-day)', async () => {
+    const { fixture } = await setup(false);
     fixture.detectChanges();
     const btns: NodeListOf<HTMLButtonElement> =
       fixture.nativeElement.querySelectorAll('.seg-btn');
-    btns[2].click(); // "4 weeks" (index 2, value 28)
-    expect(component.planLength()).toBe(28);
+    expect(btns.length).toBe(2);
+    const labels = Array.from(btns).map((b) => b.textContent?.trim());
+    expect(labels).toEqual(['1 week', '2 weeks']);
+    expect(labels).not.toContain('4 weeks');
   });
 
   it('selecting week-start Sunday updates signal', async () => {
@@ -151,12 +153,12 @@ describe('PlanningPrefsSubstepComponent', () => {
   it('save() calls patchPreferences with correct fields', async () => {
     const { fixture, component, prefsMock } = await setup(false);
     fixture.detectChanges();
-    component.planLength.set(28);
+    component.planLength.set(14);
     component.weekStart.set(1);
-    component.planningDay.set(0); // Sunday = 1 day before Monday
+    component.planningDay.set(0);
     component.save();
     expect(prefsMock.patchPreferences).toHaveBeenCalledWith({
-      default_plan_length_days: 28,
+      default_plan_length_days: 14,
       week_start_day: 1,
       planning_trigger_offset: -1,
       planning_time: '15:00:00',
