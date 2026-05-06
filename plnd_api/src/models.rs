@@ -345,6 +345,7 @@ mod place_tasks_tests {
         assert!(req.task_type.is_none());
         assert!(req.duration_minutes.is_none());
         assert!(req.energy_required.is_none());
+        assert!(req.one_shot.is_none());
     }
 
     #[test]
