@@ -28,8 +28,8 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
       </header>
 
       <div class="wizard-progress" role="progressbar"
-           [attr.aria-valuenow]="weekPlanService.currentStep()"
-           aria-valuemin="1" [attr.aria-valuemax]="steps().length">
+           [attr.aria-valuenow]="enabledSteps().findIndex(s => s.n === weekPlanService.currentStep()) + 1"
+           aria-valuemin="1" [attr.aria-valuemax]="enabledSteps().length">
         @for (s of steps(); track s.n) {
           @if (!$first) {
             <span class="progress-sep">›</span>
@@ -123,6 +123,10 @@ export class PlanningWizardComponent implements OnInit {
 
   readonly hasPrevStep = computed(() =>
     this.steps().some(s => s.n < this.weekPlanService.currentStep() && !s.disabled)
+  );
+
+  protected readonly enabledSteps = computed(() =>
+    this.steps().filter(s => !s.disabled)
   );
 
   private sessionInitialized = false;

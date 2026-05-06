@@ -51,6 +51,42 @@ describe('PlanningWizardComponent', () => {
     expect(bar).toBeTruthy();
   });
 
+  it('aria-valuemax equals the number of enabled steps', () => {
+    // Default: Meals (step 3) and Exercise (step 4) are both disabled → 4 enabled
+    const bar: HTMLElement = fixture.nativeElement.querySelector('.wizard-progress');
+    expect(bar.getAttribute('aria-valuemax')).toBe('4');
+  });
+
+  it('aria-valuemax reflects enabled steps when Meals step becomes enabled', () => {
+    mealEntries.set(PATTERN_FIXTURE);
+    fixture.detectChanges();
+    const bar: HTMLElement = fixture.nativeElement.querySelector('.wizard-progress');
+    // Exercise (step 4) still disabled → 5 enabled
+    expect(bar.getAttribute('aria-valuemax')).toBe('5');
+  });
+
+  it('aria-valuenow is 1-indexed position among enabled steps on step 1', () => {
+    const bar: HTMLElement = fixture.nativeElement.querySelector('.wizard-progress');
+    expect(bar.getAttribute('aria-valuenow')).toBe('1');
+  });
+
+  it('aria-valuenow advances correctly when navigating to step 5 with both 3 and 4 disabled', () => {
+    // Enabled steps: [1,2,5,6]. Step 5 is position 3.
+    fixture.componentInstance.weekPlanService.goToStep(5);
+    fixture.detectChanges();
+    const bar: HTMLElement = fixture.nativeElement.querySelector('.wizard-progress');
+    expect(bar.getAttribute('aria-valuenow')).toBe('3');
+  });
+
+  it('aria-valuenow is 4 on step 5 when only Exercise (step 4) is disabled', () => {
+    // Enabled steps: [1,2,3,5,6]. Step 5 is position 4.
+    mealEntries.set(PATTERN_FIXTURE);
+    fixture.componentInstance.weekPlanService.goToStep(5);
+    fixture.detectChanges();
+    const bar: HTMLElement = fixture.nativeElement.querySelector('.wizard-progress');
+    expect(bar.getAttribute('aria-valuenow')).toBe('4');
+  });
+
   it('should show Back button when step > 1', () => {
     fixture.componentInstance.weekPlanService.goToStep(2);
     fixture.detectChanges();
