@@ -18,8 +18,6 @@ pub const VALID_TASK_STATUSES: &[&str] =
 
 pub const VALID_INTENSITY_LEVELS: &[&str] = &["low", "moderate", "high"];
 
-pub const VALID_FAMILY_ROLES: &[&str] = &["owner", "member", "caregiver"];
-
 pub const VALID_FOCUS_LEVELS: &[&str] = &["low", "medium", "deep"];
 
 pub const VALID_PRIORITY_LEVELS: &[&str] = &["low", "normal", "high"];
