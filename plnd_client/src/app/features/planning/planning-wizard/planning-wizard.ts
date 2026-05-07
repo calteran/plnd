@@ -186,6 +186,10 @@ export class PlanningWizardComponent implements OnInit {
         error: () => this.carryoverLoading.set(false),
       });
     });
+
+    effect(() => {
+      if (this.preferencesService.loadError()) this.carryoverLoading.set(false);
+    });
   }
 
   ngOnInit(): void {
