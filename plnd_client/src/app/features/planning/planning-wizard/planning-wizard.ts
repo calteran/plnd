@@ -142,7 +142,13 @@ export class PlanningWizardComponent implements OnInit {
       if (!this.mealPatternService.loaded()) return;
       const step = this.weekPlanService.currentStep();
       const stepEntry = this.steps().find(s => s.n === step);
-      if (stepEntry?.disabled) this.next();
+      if (!stepEntry?.disabled) return;
+      const nextEnabled = this.steps().find(s => s.n > step && !s.disabled);
+      if (nextEnabled) {
+        this.weekPlanService.goToStep(nextEnabled.n);
+      } else {
+        console.warn(`[PlanningWizard] Guard: no enabled step after step ${step}; user may be stranded.`);
+      }
     });
 
     // React when preferences load (may arrive after ngOnInit due to async HTTP).

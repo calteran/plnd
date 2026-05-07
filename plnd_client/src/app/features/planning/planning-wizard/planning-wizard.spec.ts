@@ -276,4 +276,46 @@ describe('PlanningWizardComponent', () => {
     fixture.detectChanges();
     expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(5);
   });
+
+  it('guard effect calls goToStep directly without delegating to next()', () => {
+    // Spy on next() without callThrough — if the guard still delegates, the spy
+    // blocks navigation and currentStep stays at 3. After the fix the guard calls
+    // goToStep(5) directly, so next() is never touched.
+    const nextSpy = spyOn(fixture.componentInstance, 'next');
+
+    mealLoaded.set(false);
+    fixture.componentInstance.weekPlanService.goToStep(3);
+    fixture.detectChanges();
+
+    mealLoaded.set(true);
+    fixture.detectChanges();
+
+    expect(nextSpy).not.toHaveBeenCalled();
+    expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(5);
+  });
+
+  it('guard effect logs console.warn when no enabled step follows the disabled step', () => {
+    const warnSpy = spyOn(console, 'warn');
+
+    // Replace the computed steps with a writable signal to simulate a future
+    // state where every step after the current one is also disabled.
+    Object.assign(fixture.componentInstance, {
+      steps: signal([
+        { n: 3, label: 'Meals',    disabled: true },
+        { n: 4, label: 'Exercise', disabled: true },
+        // Steps 5 and 6 intentionally omitted — no enabled step follows step 3.
+      ]),
+    });
+
+    mealLoaded.set(false);
+    fixture.componentInstance.weekPlanService.goToStep(3);
+    fixture.detectChanges();
+
+    mealLoaded.set(true);
+    fixture.detectChanges();
+
+    expect(warnSpy).toHaveBeenCalled();
+    // User is stranded; currentStep should still be 3.
+    expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(3);
+  });
 });
