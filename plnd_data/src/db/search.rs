@@ -147,7 +147,7 @@ pub async fn search_catalog_meals(
     pool: &PgPool,
     q: &str,
     limit: i64,
-    occasion: Option<&str>,
+    meal_name: Option<&str>,
     exclude_allergens: &[String],
     user_id: Option<uuid::Uuid>,
 ) -> Result<Vec<crate::models::CatalogMeal>, DatabaseError> {
@@ -174,7 +174,7 @@ pub async fn search_catalog_meals(
     )
     .bind(q)
     .bind(limit)
-    .bind(occasion)
+    .bind(meal_name)
     .bind(exclude_allergens)
     .bind(user_id)
     .fetch_all(pool)

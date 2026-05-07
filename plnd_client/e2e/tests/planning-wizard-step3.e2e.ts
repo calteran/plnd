@@ -10,8 +10,8 @@ const MOCK_PREFS_3DAY = { ...MOCK_PREFS, default_plan_length_days: 3 };
 // Agent meal fixtures for the 3-day horizon
 const STEP3_MEAL_DAYS = ['2026-03-30', '2026-03-31', '2026-04-01'];
 const STEP3_AGENT_MEALS = STEP3_MEAL_DAYS.flatMap(date =>
-  (['breakfast', 'lunch', 'dinner'] as const).map(occasion => ({
-    date, occasion, meal_ref: null, title: `${occasion} on ${date}`,
+  (['breakfast', 'lunch', 'dinner'] as const).map(name => ({
+    date, meal_name: name, meal_ref: null, title: `${name} on ${date}`,
   }))
 );
 
@@ -44,7 +44,7 @@ async function seedWizard(page: Page): Promise<void> {
     route.fulfill({ status: 200, json: { meal_ref: null, confirmation: 'Added' } })
   );
   await page.route(`${API_BASE}/agent/meal-plan/suggest`, route =>
-    route.fulfill({ status: 200, json: { date: '2026-03-30', occasion: 'breakfast', meal_ref: null, title: 'Suggested meal' } })
+    route.fulfill({ status: 200, json: { date: '2026-03-30', meal_name: 'breakfast', meal_ref: null, title: 'Suggested meal' } })
   );
 }
 
@@ -246,11 +246,11 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
 // seedStep3AgentMock provides an empty scheduledMeals draft so ngOnInit auto-generates.
 
 const AGENT_MEALS = ['2026-03-30', '2026-03-31', '2026-04-01'].flatMap(date =>
-  (['breakfast', 'lunch', 'dinner'] as const).map(occasion => ({
+  (['breakfast', 'lunch', 'dinner'] as const).map(name => ({
     date,
-    occasion,
+    meal_name: name,
     meal_ref: null,
-    title: `${occasion} on ${date}`,
+    title: `${name} on ${date}`,
     estimated: true,
   }))
 );

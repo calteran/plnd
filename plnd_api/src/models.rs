@@ -154,30 +154,6 @@ pub struct TaskEntryResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Agent — Occasion
-// ---------------------------------------------------------------------------
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
-#[serde(rename_all = "lowercase")]
-pub enum Occasion {
-    Breakfast,
-    Lunch,
-    Dinner,
-    Snack,
-}
-
-impl std::fmt::Display for Occasion {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self {
-            Occasion::Breakfast => "breakfast",
-            Occasion::Lunch => "lunch",
-            Occasion::Dinner => "dinner",
-            Occasion::Snack => "snack",
-        })
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Agent — Meal Planning
 // ---------------------------------------------------------------------------
 
@@ -199,7 +175,7 @@ pub struct Nutrition {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MealEntry {
     pub date: NaiveDate,
-    pub occasion: Occasion,
+    pub meal_name: String,
     pub meal_ref: MealRef,
     pub estimated_nutrition: Option<Nutrition>,
 }
@@ -207,7 +183,7 @@ pub struct MealEntry {
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct SlotRef {
     pub date: NaiveDate,
-    pub occasion: Occasion,
+    pub meal_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
@@ -255,14 +231,14 @@ pub struct MealPlanResponse {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MealSuggestRequest {
     pub date: NaiveDate,
-    pub occasion: Occasion,
+    pub meal_name: String,
     pub avoid_meal_refs: Option<Vec<MealRef>>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct MealAdhocResolveRequest {
     pub text: String,
-    pub occasion: Occasion,
+    pub meal_name: String,
     pub date: Option<NaiveDate>,
 }
 
@@ -310,7 +286,7 @@ pub struct PlaceTasksEntry {
     pub task_type: String,
     pub duration_minutes: u32,
     pub energy_required: String,
-    /// Slot anchor label for floating tasks — free-form string, e.g. a meal occasion.
+    /// Slot anchor label for floating tasks — free-form string, e.g. a meal name.
     /// Mutually exclusive with `time_window_start`.
     pub after_anchor: Option<String>,
     /// Wall-clock start time "HH:MM" for fixed tasks — mutually exclusive with `after_anchor`.
@@ -525,21 +501,21 @@ mod meal_plan_tests {
             "week_start": "2026-04-21",
             "current_state": {
                 "approved": [],
-                "skipped": [{"date": "2026-04-21", "occasion": "breakfast"}],
+                "skipped": [{"date": "2026-04-21", "meal_name": "breakfast"}],
                 "custom": []
             }
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.current_state.skipped.len(), 1);
-        assert_eq!(req.current_state.skipped[0].occasion, Occasion::Breakfast);
+        assert_eq!(req.current_state.skipped[0].meal_name, "breakfast");
     }
 
     #[test]
     fn meal_suggest_request_deserializes_minimal() {
-        let json = r#"{"date": "2026-04-21", "occasion": "lunch"}"#;
+        let json = r#"{"date": "2026-04-21", "meal_name": "lunch"}"#;
         let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.date.to_string(), "2026-04-21");
-        assert_eq!(req.occasion, Occasion::Lunch);
+        assert_eq!(req.meal_name, "lunch");
         assert!(req.avoid_meal_refs.is_none());
     }
 
@@ -547,13 +523,13 @@ mod meal_plan_tests {
     fn meal_suggest_request_deserializes_with_avoid_refs() {
         let json = r#"{
             "date": "2026-04-21",
-            "occasion": "dinner",
+            "meal_name": "dinner",
             "avoid_meal_refs": [
                 {"type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
             ]
         }"#;
         let req: MealSuggestRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.occasion, Occasion::Dinner);
+        assert_eq!(req.meal_name, "dinner");
         let refs = req.avoid_meal_refs.unwrap();
         assert_eq!(refs.len(), 1);
         assert_eq!(refs[0].meal_type, "catalog");
@@ -561,23 +537,23 @@ mod meal_plan_tests {
 
     #[test]
     fn meal_suggest_request_rejects_missing_date() {
-        let json = r#"{"occasion": "lunch"}"#;
+        let json = r#"{"meal_name": "lunch"}"#;
         let result: Result<MealSuggestRequest, _> = serde_json::from_str(json);
         assert!(result.is_err());
     }
 
     #[test]
     fn meal_adhoc_resolve_request_deserializes() {
-        let json = r#"{"text": "grilled cheese sandwich", "occasion": "lunch"}"#;
+        let json = r#"{"text": "grilled cheese sandwich", "meal_name": "lunch"}"#;
         let req: MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.text, "grilled cheese sandwich");
-        assert_eq!(req.occasion, Occasion::Lunch);
+        assert_eq!(req.meal_name, "lunch");
         assert!(req.date.is_none());
     }
 
     #[test]
     fn meal_adhoc_resolve_request_with_date_deserializes() {
-        let json = r#"{"text": "oatmeal", "occasion": "breakfast", "date": "2026-04-21"}"#;
+        let json = r#"{"text": "oatmeal", "meal_name": "breakfast", "date": "2026-04-21"}"#;
         let req: MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
         assert_eq!(
             req.date,
@@ -587,7 +563,7 @@ mod meal_plan_tests {
 
     #[test]
     fn meal_adhoc_resolve_request_rejects_missing_text() {
-        let json = r#"{"occasion": "lunch"}"#;
+        let json = r#"{"meal_name": "lunch"}"#;
         let result: Result<MealAdhocResolveRequest, _> = serde_json::from_str(json);
         assert!(result.is_err());
     }
@@ -608,43 +584,20 @@ mod meal_plan_tests {
     }
 
     #[test]
-    fn occasion_rejects_invalid_value() {
-        let result: Result<MealSuggestRequest, _> =
-            serde_json::from_str(r#"{"date": "2026-04-21", "occasion": "brunch"}"#);
-        assert!(
-            result.is_err(),
-            "brunch must be rejected at deserialization"
-        );
-    }
-
-    #[test]
-    fn occasion_accepts_all_valid_values() {
-        for (json, expected) in [
-            ("breakfast", Occasion::Breakfast),
-            ("lunch", Occasion::Lunch),
-            ("dinner", Occasion::Dinner),
-            ("snack", Occasion::Snack),
+    fn meal_name_accepts_arbitrary_strings() {
+        for value in [
+            "breakfast",
+            "lunch",
+            "dinner",
+            "snack",
+            "brunch",
+            "second_breakfast",
         ] {
             let req: MealSuggestRequest = serde_json::from_str(&format!(
-                r#"{{"date": "2026-04-21", "occasion": "{}"}}"#,
-                json
+                r#"{{"date": "2026-04-21", "meal_name": "{value}"}}"#
             ))
-            .unwrap_or_else(|_| panic!("{json} should deserialize"));
-            assert_eq!(req.occasion, expected);
-        }
-    }
-
-    #[test]
-    fn occasion_serializes_to_lowercase() {
-        for (variant, expected) in [
-            (Occasion::Breakfast, "breakfast"),
-            (Occasion::Lunch, "lunch"),
-            (Occasion::Dinner, "dinner"),
-            (Occasion::Snack, "snack"),
-        ] {
-            assert_eq!(variant.to_string(), expected);
-            let json = serde_json::to_string(&variant).unwrap();
-            assert_eq!(json, format!("\"{}\"", expected));
+            .unwrap_or_else(|_| panic!("{value} should deserialize"));
+            assert_eq!(req.meal_name, value);
         }
     }
 }

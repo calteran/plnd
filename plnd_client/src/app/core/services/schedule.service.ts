@@ -124,12 +124,14 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
 };
 
 function mapEntry(e: ScheduleEntryDto): ScheduleItem {
-  // Meal anchor entries have task_type === null
+  // Meal anchor entries have task_type === null. The meal name lives on
+  // `after_anchor`; `title` is the dish description, not the slot identity,
+  // so user-defined meal names (e.g. "Brunch") must come from after_anchor.
   if (e.task_type == null) {
-    const slot = e.after_anchor ? MEAL_SLOTS[e.after_anchor] : undefined;
+    const slot = e.after_anchor ? MEAL_SLOTS[e.after_anchor.toLowerCase()] : undefined;
     return {
       id:    e.entry_id,
-      name:  slot?.name ?? e.title ?? 'Meal',
+      name:  slot?.name ?? e.after_anchor ?? e.title ?? 'Meal',
       emoji: slot?.emoji ?? '🍴',
       description: e.title ?? undefined,
       status: e.status === 'completed' ? 'done'

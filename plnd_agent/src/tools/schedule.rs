@@ -413,7 +413,7 @@ fn create_task_schema() -> serde_json::Value {
                 "type": "string",
                 "description": "Slot anchor label to position this task after. Use the 'slot' value \
                                 from an anchor entry (is_anchor = true) returned by get_day_schedule, \
-                                or a free-form occasion label. Omit when scheduled_start is set."
+                                or a free-form anchor label. Omit when scheduled_start is set."
             },
             "one_shot": {
                 "type": "boolean",

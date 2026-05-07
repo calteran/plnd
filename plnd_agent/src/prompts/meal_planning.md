@@ -55,5 +55,6 @@ Score 0 (neutral) is the default and is not included in any list.
   already has one in their library that fits. Never invent a `user` meal ID.
 - **Security**: `user_id` is managed by the system — never include it in any
   tool argument.
-- **Occasion fit**: match meals to their occasion (breakfasts for breakfast
-  slots, etc.) unless the user's memory indicates otherwise.
+- **Pattern fit**: match meals to their meal_name (breakfast dishes for
+  the "breakfast" entry, etc.) unless the user's memory indicates otherwise.
+  The meal_name is matched against each candidate dish's `occasion_tags`.

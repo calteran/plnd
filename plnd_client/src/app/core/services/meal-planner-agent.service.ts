@@ -25,18 +25,18 @@ export class MealPlannerAgentService {
     });
   }
 
-  suggestSlot(date: string, occasion: MealSlot, avoid: MealRef[] = []): Observable<MealEntry> {
+  suggestSlot(date: string, mealName: MealSlot, avoid: MealRef[] = []): Observable<MealEntry> {
     return this.http.post<MealEntry>(`${this.apiBase}/agent/meal-plan/suggest`, {
       date,
-      occasion,
+      meal_name: mealName,
       ...(avoid.length ? { context: { avoid_meal_refs: avoid } } : {}),
     });
   }
 
-  resolveText(text: string, occasion: MealSlot, date?: string): Observable<ResolveResponse> {
+  resolveText(text: string, mealName: MealSlot, date?: string): Observable<ResolveResponse> {
     return this.http.post<ResolveResponse>(`${this.apiBase}/agent/meal-plan/resolve`, {
       text,
-      occasion,
+      meal_name: mealName,
       ...(date ? { date } : {}),
     });
   }

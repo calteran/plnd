@@ -76,11 +76,11 @@ impl MealRepository for PgMealRepository {
         &self,
         q: &str,
         limit: i64,
-        occasion: Option<&str>,
+        meal_name: Option<&str>,
         exclude_allergens: &[String],
         user_id: Option<Uuid>,
     ) -> Result<Vec<CatalogMeal>, crate::Error> {
-        db_search_catalog_meals(&self.pool, q, limit, occasion, exclude_allergens, user_id)
+        db_search_catalog_meals(&self.pool, q, limit, meal_name, exclude_allergens, user_id)
             .await
             .map_err(Into::into)
     }

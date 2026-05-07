@@ -287,7 +287,7 @@ export class WeekPlanService {
         const meal = meals[date]?.[slot];
         return {
           date,
-          occasion: slot,
+          meal_name: slot,
           meal_ref: meal?.mealRef ?? null,
           title: meal?.title,
           approved: meal?.approvalState === 'approved',
@@ -304,7 +304,7 @@ export class WeekPlanService {
     this.scheduledMealsSignal.update(current => {
       const next = { ...current };
       for (const entry of agentMeals) {
-        const slot     = entry.occasion as MealSlot;
+        const slot     = entry.meal_name as MealSlot;
         const existing = current[entry.date]?.[slot];
         if (!existing || existing.approvalState === 'proposed') {
           next[entry.date] = { ...(next[entry.date] ?? {}), [slot]: {

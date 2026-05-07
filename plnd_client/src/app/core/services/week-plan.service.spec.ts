@@ -354,8 +354,8 @@ describe('WeekPlanService', () => {
 
   describe('applyAgentMeals()', () => {
     const AGENT_MEALS = [
-      { date: '2026-03-24', occasion: 'breakfast' as const, meal_ref: null },
-      { date: '2026-03-24', occasion: 'lunch'     as const, meal_ref: null },
+      { date: '2026-03-24', meal_name: 'breakfast' as const, meal_ref: null },
+      { date: '2026-03-24', meal_name: 'lunch'     as const, meal_ref: null },
     ];
 
     it('should overwrite a proposed cell with the agent result', () => {
@@ -388,7 +388,7 @@ describe('WeekPlanService', () => {
 
     it('should default title to empty string when entry has no title', () => {
       service.initSession('2026-03-24', '2026-03-24');
-      service.applyAgentMeals([{ date: '2026-03-24', occasion: 'breakfast' as const, meal_ref: null }]);
+      service.applyAgentMeals([{ date: '2026-03-24', meal_name: 'breakfast' as const, meal_ref: null }]);
       expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.title).toBe('');
     });
   });
@@ -447,7 +447,7 @@ describe('WeekPlanService', () => {
       service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Oatmeal' });
       service.approveMeal('2026-03-24', 'breakfast');
       const state = service.currentState();
-      const entry = state.meals.find(m => m.occasion === 'breakfast');
+      const entry = state.meals.find(m => m.meal_name === 'breakfast');
       expect(entry?.approved).toBeTrue();
       expect(entry?.skipped).toBeFalse();
     });
@@ -457,7 +457,7 @@ describe('WeekPlanService', () => {
       service.setMeal('2026-03-24', 'dinner', { approvalState: 'proposed', mealRef: null, title: 'Pasta' });
       service.skipMeal('2026-03-24', 'dinner');
       const state = service.currentState();
-      const entry = state.meals.find(m => m.occasion === 'dinner');
+      const entry = state.meals.find(m => m.meal_name === 'dinner');
       expect(entry?.skipped).toBeTrue();
       expect(entry?.approved).toBeFalse();
     });

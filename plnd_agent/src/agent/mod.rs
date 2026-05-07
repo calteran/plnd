@@ -1126,7 +1126,7 @@ mod tests {
         // so validation does not retry. This test verifies memory injection, not validation.
         let valid_content = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         })
         .to_string();
@@ -1185,7 +1185,7 @@ mod tests {
         // so validation does not retry. This test verifies memory omission, not validation.
         let valid_content = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         })
         .to_string();
@@ -1312,7 +1312,7 @@ mod tests {
         // so validation does not retry. This test verifies memory category filtering.
         let valid_content = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         })
         .to_string();
@@ -1360,7 +1360,7 @@ mod tests {
         // so validation does not retry. This test verifies message construction.
         let valid_content = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         })
         .to_string();
@@ -1408,7 +1408,7 @@ mod tests {
         // This test is verifying message construction, not schema validation.
         let valid_content = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         })
         .to_string();
@@ -1949,7 +1949,7 @@ mod tests {
         // so validation does not retry. This test verifies input XML-escaping.
         let valid_content = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         })
         .to_string();

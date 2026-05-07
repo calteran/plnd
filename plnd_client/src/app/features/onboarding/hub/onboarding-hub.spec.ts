@@ -473,12 +473,12 @@ describe('OnboardingHubComponent', () => {
 
     const mealWithRef: MealEntry = {
       date: '2026-05-01',
-      occasion: 'breakfast',
+      meal_name: 'breakfast',
       meal_ref: { type: 'catalog', id: 'meal-abc' },
     };
     const mealNoRef: MealEntry = {
       date: '2026-05-02',
-      occasion: 'lunch',
+      meal_name: 'lunch',
       meal_ref: null,
       title: 'Salad',
     };

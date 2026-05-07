@@ -76,14 +76,14 @@ export const MOCK_MEAL_PLAN = {
   meals: [
     {
       date: '2026-03-28',
-      occasion: 'breakfast',
+      meal_name: 'breakfast',
       meal_ref: { id: 'meal-oatmeal-uuid', type: 'catalog' },
       title: 'Oatmeal',
       estimated: true,
     },
     {
       date: '2026-03-28',
-      occasion: 'lunch',
+      meal_name: 'lunch',
       meal_ref: { id: 'meal-salad-uuid', type: 'catalog' },
       title: 'Salad',
       estimated: true,

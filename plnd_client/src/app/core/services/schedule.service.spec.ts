@@ -151,6 +151,27 @@ describe('ScheduleService', () => {
     expect(meal.status).toBe('planned');
   });
 
+  it('maps a user-defined meal entry by after_anchor, not title', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'm9',
+        task_type: null,
+        title: 'Pancakes and eggs',
+        after_anchor: 'Brunch',
+        status: 'planned',
+        date: '2026-04-02',
+        scheduled_start: '2026-04-02T10:30:00Z',
+      }],
+      carryover: [],
+    });
+
+    const items = svc.scheduleItems();
+    const meal = items[0] as MealAnchor;
+    expect(meal.name).toBe('Brunch');
+    expect(meal.description).toBe('Pancakes and eggs');
+  });
+
   it('sets items to [] and clears loading on HTTP error', () => {
     svc.loadDay('2026-04-02');
     httpMock.expectOne(r => r.url.includes('/schedule/period'))

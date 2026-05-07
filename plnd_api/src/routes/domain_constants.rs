@@ -40,8 +40,8 @@ pub const SUGGESTED_OCCASION_TAGS: &[&str] = &[
     "meal-prep",
 ];
 
-/// Soft eating occasion labels for meal anchor entries — not DB-validated; used for UI autocomplete.
-pub const SUGGESTED_OCCASION_LABELS: &[&str] = &[
+/// Suggested meal names for the user's meal pattern — not DB-validated; used for UI autocomplete.
+pub const SUGGESTED_MEAL_NAMES: &[&str] = &[
     "breakfast",
     "morning snack",
     "lunch",
