@@ -59,6 +59,8 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
             @case (5) { <app-plan-day-grid-step /> }
             @case (6) { <app-plan-confirm-step /> }
           }
+        } @else if (prefLoadError()) {
+          <p class="error-msg">Unable to load preferences. Please refresh to try again.</p>
         } @else {
           <p>Initializing session…</p>
         }
@@ -103,6 +105,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
                font-size: 16px; font-weight: 400; line-height: 1; min-width: 44px; min-height: 44px;
                display: flex; align-items: center; justify-content: center; }
     .nav-btn--back { margin-right: auto; }
+    .error-msg { color: var(--color-error, #c0392b); padding: 1rem 0; }
   `]
 })
 export class PlanningWizardComponent implements OnInit {
@@ -111,6 +114,7 @@ export class PlanningWizardComponent implements OnInit {
   private readonly mealPatternService = inject(MealPatternService);
 
   protected readonly carryoverLoading = signal(true);
+  protected readonly prefLoadError = this.preferencesService.loadError;
   protected readonly Math = Math;
 
   readonly steps = computed<WizardStep[]>(() => [
@@ -185,6 +189,10 @@ export class PlanningWizardComponent implements OnInit {
         },
         error: () => this.carryoverLoading.set(false),
       });
+    });
+
+    effect(() => {
+      if (this.preferencesService.loadError()) this.carryoverLoading.set(false);
     });
   }
 

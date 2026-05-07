@@ -201,6 +201,33 @@ describe('PlanningWizardComponent', () => {
       httpMock.expectOne(r => r.url.includes('/tasks/weekly-plan')).flush({ task_id: 'tid' });
     }
 
+    it('clears carryoverLoading when preferences HTTP request fails', () => {
+      const httpMock = TestBed.inject(HttpTestingController);
+      const comp = fixture.componentInstance as unknown as { carryoverLoading: () => boolean };
+      expect(comp.carryoverLoading()).toBe(true);
+
+      httpMock.expectOne(r => r.url.includes('/preferences/me')).flush(
+        { message: 'Server error' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+      fixture.detectChanges();
+
+      expect(comp.carryoverLoading()).toBe(false);
+    });
+
+    it('shows error message when preferences HTTP request fails', () => {
+      const httpMock = TestBed.inject(HttpTestingController);
+      httpMock.expectOne(r => r.url.includes('/preferences/me')).flush(
+        { message: 'Server error' },
+        { status: 500, statusText: 'Internal Server Error' }
+      );
+      fixture.detectChanges();
+
+      const errorEl: HTMLElement | null = fixture.nativeElement.querySelector('.error-msg');
+      expect(errorEl).toBeTruthy();
+      expect(errorEl?.textContent).toContain('Unable to load preferences');
+    });
+
     it('advances to step 2 and marks step 1 disabled when carryover is empty', () => {
       const httpMock = TestBed.inject(HttpTestingController);
       initSession(httpMock);
