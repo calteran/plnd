@@ -104,12 +104,8 @@ export class MealReviewPaneComponent {
 
   readonly isFilled = computed(() => this.meal().status !== 'unplanned');
 
-  private static readonly OCCASION_MAP: Readonly<Record<string, MealSlot>> = {
-    breakfast: 'breakfast', lunch: 'lunch', dinner: 'dinner', snack: 'snack',
-  };
-
   private occasionFor(meal: MealAnchor): MealSlot {
-    return MealReviewPaneComponent.OCCASION_MAP[meal.name.toLowerCase()] ?? 'lunch';
+    return meal.name.toLowerCase();
   }
 
   activate(action: ActiveAction): void {

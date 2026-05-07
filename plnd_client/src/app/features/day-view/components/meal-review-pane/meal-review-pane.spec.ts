@@ -104,6 +104,28 @@ describe('MealReviewPaneComponent', () => {
     req.flush({ meal_ref: null, confirmation: 'Scheduled Greek yogurt bowl' });
   });
 
+  it('passes user-defined meal name through as occasion (no enum coercion)', async () => {
+    const brunchMeal: MealAnchor = {
+      id: 'm4', name: 'Brunch', emoji: '🥞', description: 'Pancakes',
+      status: 'planned', duringMealTasks: [],
+    };
+    const { f, http } = await setup(brunchMeal);
+    f.debugElement.query(By.css('[data-action="swap"]')).nativeElement.click();
+    f.detectChanges();
+    const input: HTMLInputElement = f.debugElement.query(By.css('.resolve-input')).nativeElement;
+    input.value = 'Eggs benedict';
+    input.dispatchEvent(new Event('input'));
+    f.detectChanges();
+    f.debugElement.query(By.css('.resolve-submit')).nativeElement.click();
+    f.detectChanges();
+
+    const req = http.expectOne('http://test/agent/meal-plan/resolve');
+    expect(req.request.body).toEqual(jasmine.objectContaining({
+      occasion: 'brunch',
+    }));
+    req.flush({ meal_ref: null, confirmation: 'ok' });
+  });
+
   it('emits closed after successful swap', async () => {
     const { f, http } = await setup(filledMeal);
     let closed = false;
