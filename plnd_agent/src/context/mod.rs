@@ -88,11 +88,11 @@ const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
   "definitions": {
     "MealEntry": {
       "type": "object",
-      "required": ["date", "occasion", "meal_ref"],
+      "required": ["date", "meal_name", "meal_ref"],
       "additionalProperties": false,
       "properties": {
         "date":                 { "type": "string", "format": "date" },
-        "occasion":             { "type": "string", "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot)" },
+        "meal_name":            { "type": "string", "description": "Name of the meal in the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined name)" },
         "meal_ref":             { "$ref": "#/definitions/MealRef" },
         "estimated_nutrition":  { "$ref": "#/definitions/Nutrition" }
       }
@@ -145,11 +145,11 @@ const SUGGEST_SLOT_RESPONSE_SCHEMA: &str = r##"{
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "MealSuggestSlotResponse",
   "type": "object",
-  "required": ["date", "occasion", "meal_ref"],
+  "required": ["date", "meal_name", "meal_ref"],
   "additionalProperties": false,
   "properties": {
     "date":                { "type": "string", "format": "date" },
-    "occasion":            { "type": "string", "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot)" },
+    "meal_name":           { "type": "string", "description": "Name of the meal in the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined name)" },
     "meal_ref":            { "$ref": "#/definitions/MealRef" },
     "estimated_nutrition": { "$ref": "#/definitions/Nutrition" }
   },
@@ -544,7 +544,7 @@ mod tests {
         let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
         let ok = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         });
         assert!(validator.is_valid(&ok), "minimal valid envelope must pass");
@@ -555,7 +555,7 @@ mod tests {
         let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
         let ok = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "dinner",
+            "meal_name": "dinner",
             "meal_ref": { "type": "user", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
             "estimated_nutrition": { "kcal": 520.0, "protein_g": 28.0, "carbs_g": 45.0, "fat_g": 18.0 }
         });
@@ -565,22 +565,22 @@ mod tests {
     #[test]
     fn suggest_slot_validator_rejects_missing_meal_ref() {
         let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
-        let bad = serde_json::json!({ "date": "2026-04-21", "occasion": "lunch" });
+        let bad = serde_json::json!({ "date": "2026-04-21", "meal_name": "lunch" });
         assert!(!validator.is_valid(&bad));
     }
 
     #[test]
-    fn suggest_slot_validator_accepts_user_defined_occasion() {
-        // occasion is now an open string — any slot name from the user's meal pattern is valid
+    fn suggest_slot_validator_accepts_user_defined_meal_name() {
+        // meal_name is an open string — any name from the user's meal pattern is valid
         let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
         let ok = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "brunch",
+            "meal_name": "brunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         });
         assert!(
             validator.is_valid(&ok),
-            "user-defined occasion name must be accepted"
+            "user-defined meal name must be accepted"
         );
     }
 
@@ -597,7 +597,7 @@ mod tests {
             "meals": [
                 {
                     "date": "2026-04-21",
-                    "occasion": "breakfast",
+                    "meal_name": "breakfast",
                     "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
                 }
             ]
@@ -613,7 +613,7 @@ mod tests {
             "meals": [
                 {
                     "date": "2026-04-21",
-                    "occasion": "lunch",
+                    "meal_name": "lunch",
                     "meal_ref": { "type": "user", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" },
                     "estimated_nutrition": { "kcal": 420.0, "protein_g": 18.0, "carbs_g": 55.0, "fat_g": 12.0 }
                 }
@@ -634,22 +634,22 @@ mod tests {
     }
 
     #[test]
-    fn meal_plan_validator_accepts_user_defined_occasion() {
-        // occasion is now an open string — any slot name from the user's meal pattern is valid
+    fn meal_plan_validator_accepts_user_defined_meal_name() {
+        // meal_name is an open string — any name from the user's meal pattern is valid
         let validator = UseCase::MealPlanning.response_validator().unwrap();
         let ok = serde_json::json!({
             "plan_start": "2026-04-21",
             "meals": [
                 {
                     "date": "2026-04-21",
-                    "occasion": "brunch",
+                    "meal_name": "brunch",
                     "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
                 }
             ]
         });
         assert!(
             validator.is_valid(&ok),
-            "user-defined occasion name must be accepted"
+            "user-defined meal name must be accepted"
         );
     }
 

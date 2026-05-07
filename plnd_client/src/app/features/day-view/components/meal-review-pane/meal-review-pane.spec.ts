@@ -99,12 +99,12 @@ describe('MealReviewPaneComponent', () => {
     const req = http.expectOne('http://test/agent/meal-plan/resolve');
     expect(req.request.body).toEqual(jasmine.objectContaining({
       text: 'Greek yogurt bowl',
-      occasion: 'breakfast',
+      meal_name: 'breakfast',
     }));
     req.flush({ meal_ref: null, confirmation: 'Scheduled Greek yogurt bowl' });
   });
 
-  it('passes user-defined meal name through as occasion (no enum coercion)', async () => {
+  it('passes user-defined meal name through as meal_name (no enum coercion)', async () => {
     const brunchMeal: MealAnchor = {
       id: 'm4', name: 'Brunch', emoji: '🥞', description: 'Pancakes',
       status: 'planned', duringMealTasks: [],
@@ -121,7 +121,7 @@ describe('MealReviewPaneComponent', () => {
 
     const req = http.expectOne('http://test/agent/meal-plan/resolve');
     expect(req.request.body).toEqual(jasmine.objectContaining({
-      occasion: 'brunch',
+      meal_name: 'brunch',
     }));
     req.flush({ meal_ref: null, confirmation: 'ok' });
   });

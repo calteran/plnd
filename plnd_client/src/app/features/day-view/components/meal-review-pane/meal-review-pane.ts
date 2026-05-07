@@ -104,8 +104,8 @@ export class MealReviewPaneComponent {
 
   readonly isFilled = computed(() => this.meal().status !== 'unplanned');
 
-  private occasionFor(meal: MealAnchor): MealSlot {
-    return meal.name.toLowerCase();
+  private mealNameFor(meal: MealAnchor): MealSlot {
+    return meal.name.trim().toLowerCase();
   }
 
   activate(action: ActiveAction): void {
@@ -118,7 +118,7 @@ export class MealReviewPaneComponent {
     if (!text) return;
     this.resolving.set(true);
     this.agentService
-      .resolveText(text, this.occasionFor(this.meal()), this.date())
+      .resolveText(text, this.mealNameFor(this.meal()), this.date())
       .subscribe({
         next: () => {
           this.resolving.set(false);
@@ -132,7 +132,7 @@ export class MealReviewPaneComponent {
   onSuggest(): void {
     this.resolving.set(true);
     this.agentService
-      .suggestSlot(this.date(), this.occasionFor(this.meal()))
+      .suggestSlot(this.date(), this.mealNameFor(this.meal()))
       .subscribe({
         next: () => {
           this.resolving.set(false);

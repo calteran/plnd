@@ -278,7 +278,7 @@ pub async fn post_meal_plan_suggest(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let date = body.date.format("%Y-%m-%d").to_string();
-    let occasion = body.occasion;
+    let meal_name = body.meal_name;
 
     let avoid_str = body
         .avoid_meal_refs
@@ -294,10 +294,8 @@ pub async fn post_meal_plan_suggest(
     let ctx = AgentContext {
         user_id,
         use_case: UseCase::MealSuggestSlot,
-        input: format!("Suggest a {occasion} meal for {date}."),
-        prior_context: Some(format!(
-            "{avoid_str}[Date: {date}]\n[Occasion: {occasion}]\n"
-        )),
+        input: format!("Suggest a {meal_name} meal for {date}."),
+        prior_context: Some(format!("{avoid_str}[Date: {date}]\n[Meal: {meal_name}]\n")),
         extra: None,
     };
 
@@ -353,7 +351,7 @@ pub async fn post_meal_plan_resolve(
 
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    let occasion = body.occasion;
+    let meal_name = body.meal_name;
     let date_str = body.date.map(|d| d.format("%Y-%m-%d").to_string());
     let date_context = date_str
         .as_deref()
@@ -364,7 +362,7 @@ pub async fn post_meal_plan_resolve(
         user_id,
         use_case: UseCase::MealAdhocResolve,
         input: body.text.clone(),
-        prior_context: Some(format!("{date_context}[Occasion: {occasion}]\n")),
+        prior_context: Some(format!("{date_context}[Meal: {meal_name}]\n")),
         extra: None,
     };
 
@@ -529,7 +527,7 @@ pub async fn post_place_tasks(
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{ActionTaken, Occasion, TaskEntryRequest, TaskEntryResponse};
+    use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
 
     #[test]
     fn meal_plan_request_state_deserializes_with_skipped() {
@@ -538,13 +536,13 @@ mod tests {
             "week_start": "2026-04-21",
             "current_state": {
                 "approved": [],
-                "skipped": [{"date": "2026-04-21", "occasion": "breakfast"}],
+                "skipped": [{"date": "2026-04-21", "meal_name": "breakfast"}],
                 "custom": []
             }
         }"#;
         let req: MealPlanRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.current_state.skipped.len(), 1);
-        assert_eq!(req.current_state.skipped[0].occasion, Occasion::Breakfast);
+        assert_eq!(req.current_state.skipped[0].meal_name, "breakfast");
     }
 
     #[test]
@@ -556,7 +554,7 @@ mod tests {
                 "approved": [
                     {
                         "date": "2026-04-21",
-                        "occasion": "breakfast",
+                        "meal_name": "breakfast",
                         "meal_ref": { "type": "catalog", "id": "00000000-0000-0000-0000-000000000001" },
                         "estimated_nutrition": null
                     }
@@ -568,7 +566,7 @@ mod tests {
 
         let req: MealPlanRequest = serde_json::from_str(json).expect("should deserialize");
         assert_eq!(req.current_state.approved.len(), 1);
-        assert_eq!(req.current_state.approved[0].occasion, Occasion::Breakfast);
+        assert_eq!(req.current_state.approved[0].meal_name, "breakfast");
     }
 
     #[test]
@@ -828,17 +826,17 @@ mod tests {
 
     #[test]
     fn meal_adhoc_resolve_request_text_is_required() {
-        let json = r#"{"occasion": "lunch"}"#;
+        let json = r#"{"meal_name": "lunch"}"#;
         let result: Result<crate::models::MealAdhocResolveRequest, _> = serde_json::from_str(json);
         assert!(result.is_err(), "text field must be required");
     }
 
     #[test]
     fn meal_adhoc_resolve_request_with_all_fields() {
-        let json = r#"{"text": "homemade pizza", "occasion": "dinner", "date": "2026-04-21"}"#;
+        let json = r#"{"text": "homemade pizza", "meal_name": "dinner", "date": "2026-04-21"}"#;
         let req: crate::models::MealAdhocResolveRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.text, "homemade pizza");
-        assert_eq!(req.occasion, Occasion::Dinner);
+        assert_eq!(req.meal_name, "dinner");
         assert!(req.date.is_some());
     }
 

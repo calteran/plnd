@@ -190,10 +190,10 @@ describe('OnboardingStateService', () => {
     // title is a client-side field not in the agent JSON schema (MealEntry has no skipped field
     // either; MEAL_PLAN_RESPONSE_SCHEMA uses additionalProperties:false for server responses).
     const fakeMeals: MealEntry[] = [
-      { date: '2026-04-22', occasion: 'breakfast', meal_ref: null, title: '' },
-      { date: '2026-04-22', occasion: 'lunch',     meal_ref: null, title: '' },
-      { date: '2026-04-22', occasion: 'dinner',    meal_ref: null, title: '' },
-      { date: '2026-04-23', occasion: 'breakfast', meal_ref: null, title: '' },
+      { date: '2026-04-22', meal_name: 'breakfast', meal_ref: null, title: '' },
+      { date: '2026-04-22', meal_name: 'lunch',     meal_ref: null, title: '' },
+      { date: '2026-04-22', meal_name: 'dinner',    meal_ref: null, title: '' },
+      { date: '2026-04-23', meal_name: 'breakfast', meal_ref: null, title: '' },
     ];
     service.setMealPlan({ plan_start: '2026-04-22', meals: fakeMeals });
     expect(service.totalMeals()).toBe(4);
@@ -204,8 +204,8 @@ describe('OnboardingStateService', () => {
     // The food spoke's Meal Plan Review substep is responsible for filtering out client-side
     // skipped slots. This test documents that totalMeals counts whatever was passed to setMealPlan.
     const committed: MealEntry[] = [
-      { date: '2026-04-22', occasion: 'breakfast', meal_ref: null, title: '' },
-      { date: '2026-04-22', occasion: 'lunch',     meal_ref: null, title: '' },
+      { date: '2026-04-22', meal_name: 'breakfast', meal_ref: null, title: '' },
+      { date: '2026-04-22', meal_name: 'lunch',     meal_ref: null, title: '' },
       // dinner was skipped by the user — food spoke excludes it before calling setMealPlan
     ];
     service.setMealPlan({ plan_start: '2026-04-22', meals: committed });

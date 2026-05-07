@@ -1,7 +1,7 @@
 // Offline tests for domain model structs and constants.
 // No live database required — follows the dietary_restrictions_test.rs pattern.
 use plnd_api::routes::domain_constants::{
-    SUGGESTED_OCCASION_LABELS, SUGGESTED_OCCASION_TAGS, VALID_ENERGY_LEVELS, VALID_FOCUS_LEVELS,
+    SUGGESTED_MEAL_NAMES, SUGGESTED_OCCASION_TAGS, VALID_ENERGY_LEVELS, VALID_FOCUS_LEVELS,
     VALID_INTENSITY_LEVELS, VALID_PRIORITY_LEVELS, VALID_RECURRENCE_TYPES, VALID_TASK_STATUSES,
     VALID_TASK_TYPES,
 };
@@ -101,15 +101,15 @@ fn test_suggested_occasion_tags_has_twelve_values() {
 }
 
 #[test]
-fn test_suggested_occasion_labels_has_seven_values() {
-    assert_eq!(SUGGESTED_OCCASION_LABELS.len(), 7);
-    assert!(SUGGESTED_OCCASION_LABELS.contains(&"breakfast"));
-    assert!(SUGGESTED_OCCASION_LABELS.contains(&"morning snack"));
-    assert!(SUGGESTED_OCCASION_LABELS.contains(&"lunch"));
-    assert!(SUGGESTED_OCCASION_LABELS.contains(&"afternoon snack"));
-    assert!(SUGGESTED_OCCASION_LABELS.contains(&"dinner"));
-    assert!(SUGGESTED_OCCASION_LABELS.contains(&"late snack"));
-    assert!(SUGGESTED_OCCASION_LABELS.contains(&"post-workout"));
+fn test_suggested_meal_names_has_seven_values() {
+    assert_eq!(SUGGESTED_MEAL_NAMES.len(), 7);
+    assert!(SUGGESTED_MEAL_NAMES.contains(&"breakfast"));
+    assert!(SUGGESTED_MEAL_NAMES.contains(&"morning snack"));
+    assert!(SUGGESTED_MEAL_NAMES.contains(&"lunch"));
+    assert!(SUGGESTED_MEAL_NAMES.contains(&"afternoon snack"));
+    assert!(SUGGESTED_MEAL_NAMES.contains(&"dinner"));
+    assert!(SUGGESTED_MEAL_NAMES.contains(&"late snack"));
+    assert!(SUGGESTED_MEAL_NAMES.contains(&"post-workout"));
 }
 
 // ---------------------------------------------------------------------------

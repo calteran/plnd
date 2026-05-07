@@ -38,7 +38,7 @@ export interface PlannedMeal {
 
 export interface MealPlanStateEntry {
   date: string;
-  occasion: MealSlot;
+  meal_name: MealSlot;
   meal_ref?: MealRef | null;
   title?: string;
   approved: boolean;
@@ -52,7 +52,7 @@ export interface MealPlanState {
 
 export interface MealEntry {
   date: string;
-  occasion: MealSlot;
+  meal_name: MealSlot;
   meal_ref: MealRef | null;
   title?: string;          // client-side only; never in API response
   estimated_nutrition?: MealNutrition;

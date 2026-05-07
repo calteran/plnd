@@ -12,9 +12,9 @@ use crate::api_response::{
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealPatternEntryRequest, MealAdhocResolveRequest,
     MealAdhocResolveResponse, MealEntry, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
-    MealSuggestRequest, Nutrition, NutritionSummary, Occasion, PatchEntryStatusRequest,
-    PlaceTasksEntry, PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus,
-    SlotRef, TaskEntryRequest, TaskEntryResponse, UpdateMealPatternEntryRequest,
+    MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryStatusRequest, PlaceTasksEntry,
+    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef,
+    TaskEntryRequest, TaskEntryResponse, UpdateMealPatternEntryRequest,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
@@ -203,7 +203,6 @@ impl Modify for BearerSecurityAddon {
         TaskEntryRequest,
         TaskEntryResponse,
         // Meal Planning
-        Occasion,
         MealRef,
         Nutrition,
         MealEntry,

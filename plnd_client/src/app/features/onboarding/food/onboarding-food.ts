@@ -174,7 +174,7 @@ export class OnboardingFoodComponent implements OnInit {
         if (planned && planned.approvalState !== 'skipped' && planned.mealRef) {
           meals.push({
             date,
-            occasion: slot,
+            meal_name: slot,
             meal_ref: planned.mealRef,
             title: planned.title || undefined,
             estimated: planned.estimated,

@@ -54,7 +54,7 @@ Map natural-language timing cues to the matching anchor's `slot` label:
 | "evening", "tonight", "after dinner", "end of day" | the evening anchor's label (often `"dinner"`) |
 
 If no timing cue is present, call `get_day_schedule` and pick the slot with the fewest tasks.
-If the schedule has no anchors yet, use a free-form occasion label that matches the timing.
+If the schedule has no anchors yet, use a free-form anchor label that matches the timing.
 
 ## Energy level guidance
 

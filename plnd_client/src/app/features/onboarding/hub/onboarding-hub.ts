@@ -577,9 +577,9 @@ export class OnboardingHubComponent implements OnInit {
       task_ref_type: m.meal_ref?.type,
       title: m.meal_ref ? undefined : m.title,
       scheduled_start: preferredTimeHHMM(
-        this.mealPatternService.entries().find(e => e.name === m.occasion)?.preferred_time ?? '12:00:00'
+        this.mealPatternService.entries().find(e => e.name === m.meal_name)?.preferred_time ?? '12:00:00'
       ),
-      after_anchor: m.occasion,
+      after_anchor: m.meal_name,
     }));
 
     const body: PostSchedulePlanRequest = {

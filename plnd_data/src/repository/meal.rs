@@ -43,7 +43,7 @@ pub trait MealRepository: Send + Sync {
         &self,
         q: &str,
         limit: i64,
-        occasion: Option<&str>,
+        meal_name: Option<&str>,
         exclude_allergens: &[String],
         user_id: Option<Uuid>,
     ) -> Result<Vec<CatalogMeal>, crate::Error>;

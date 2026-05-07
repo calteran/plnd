@@ -26,7 +26,7 @@ impl Tool for SearchMealCatalogTool {
 
     fn description(&self) -> &str {
         "Full-text search over the shared meal catalog. Returns meals matching the query, \
-         filtered by occasion if provided, excluding meals the user has blocked. \
+         filtered by meal name if provided, excluding meals the user has blocked. \
          Call get_user_meal_preferences first to learn the user's dietary restrictions."
     }
 
@@ -54,8 +54,8 @@ impl Tool for SearchMealCatalogTool {
             .unwrap_or(5)
             .clamp(1, 20);
 
-        let occasion = input
-            .get("occasion")
+        let meal_name = input
+            .get("meal_name")
             .and_then(|v| v.as_str())
             .map(str::to_string);
 
@@ -75,7 +75,7 @@ impl Tool for SearchMealCatalogTool {
             .search_catalog_meals(
                 &q,
                 limit,
-                occasion.as_deref(),
+                meal_name.as_deref(),
                 &allergens,
                 Some(ctx.user_id),
             )
@@ -510,11 +510,11 @@ impl Tool for ProposeMealPlanTool {
                     "description": "All meal slots for the week",
                     "items": {
                         "type": "object",
-                        "required": ["date", "occasion", "meal_ref"],
+                        "required": ["date", "meal_name", "meal_ref"],
                         "additionalProperties": false,
                         "properties": {
                             "date":     { "type": "string", "format": "date" },
-                            "occasion": {
+                            "meal_name": {
                                 "type": "string",
                                 "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                             },
@@ -606,11 +606,11 @@ impl Tool for RebalanceMealPlanTool {
                     "description": "All meal slots for the week",
                     "items": {
                         "type": "object",
-                        "required": ["date", "occasion", "meal_ref"],
+                        "required": ["date", "meal_name", "meal_ref"],
                         "additionalProperties": false,
                         "properties": {
                             "date":     { "type": "string", "format": "date" },
-                            "occasion": {
+                            "meal_name": {
                                 "type": "string",
                                 "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                             },
@@ -679,14 +679,14 @@ impl Tool for SuggestSlotMealTool {
 
     fn description(&self) -> &str {
         "Submit your single meal suggestion for the requested slot. Call this as your \
-         final action once you have selected a meal. Pass the date, occasion, and meal_ref; \
+         final action once you have selected a meal. Pass the date, meal_name, and meal_ref; \
          include estimated_nutrition if you have it from a prior get_meal_nutrition call."
     }
 
     fn schema(&self) -> serde_json::Value {
         serde_json::json!({
             "type": "object",
-            "required": ["date", "occasion", "meal_ref"],
+            "required": ["date", "meal_name", "meal_ref"],
             "additionalProperties": false,
             "properties": {
                 "date": {
@@ -694,7 +694,7 @@ impl Tool for SuggestSlotMealTool {
                     "format": "date",
                     "description": "ISO date for this slot"
                 },
-                "occasion": {
+                "meal_name": {
                     "type": "string",
                     "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                 },
@@ -978,9 +978,9 @@ fn search_meal_catalog_schema() -> serde_json::Value {
                 "type": "string",
                 "description": "Full-text search query (meal name or description)."
             },
-            "occasion": {
+            "meal_name": {
                 "type": "string",
-                "description": "Filter results to meals tagged for this eating occasion. Use a slot name from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot)."
+                "description": "Filter results to meals whose occasion_tags match this name. Use a meal name from the user's pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined name)."
             },
             "limit": {
                 "type": "integer",
@@ -1199,18 +1199,18 @@ mod tests {
     }
 
     #[test]
-    fn search_meal_catalog_occasion_is_open_string() {
+    fn search_meal_catalog_meal_name_is_open_string() {
         let schema = search_meal_catalog_schema();
-        let occasion = &schema["properties"]["occasion"];
-        assert_eq!(occasion["type"], "string");
+        let meal_name = &schema["properties"]["meal_name"];
+        assert_eq!(meal_name["type"], "string");
         assert!(
-            occasion.get("enum").is_none(),
-            "occasion must not be a closed enum"
+            meal_name.get("enum").is_none(),
+            "meal_name must not be a closed enum"
         );
         assert!(
-            occasion["description"]
+            meal_name["description"]
                 .as_str()
-                .is_some_and(|s| s.contains("slot"))
+                .is_some_and(|s| s.contains("meal name"))
         );
     }
 
@@ -1306,7 +1306,7 @@ mod tests {
     async fn get_week_schedule_echoes_stored_state() {
         let state = serde_json::json!({
             "approved": [],
-            "skipped": [{ "date": "2026-04-21", "occasion": "breakfast" }],
+            "skipped": [{ "date": "2026-04-21", "meal_name": "breakfast" }],
             "custom": []
         });
         let tool = GetWeekScheduleTool(state.clone());
@@ -1314,7 +1314,7 @@ mod tests {
             user_id: uuid::Uuid::new_v4(),
         };
         let result = tool.execute(&ctx, serde_json::json!({})).await.unwrap();
-        assert_eq!(result["skipped"][0]["occasion"], "breakfast");
+        assert_eq!(result["skipped"][0]["meal_name"], "breakfast");
     }
 
     #[tokio::test]
@@ -1328,12 +1328,12 @@ mod tests {
             "meals": [
                 {
                     "date": "2026-04-21",
-                    "occasion": "breakfast",
+                    "meal_name": "breakfast",
                     "meal_ref": { "type": "catalog", "id": "00000000-0000-0000-0000-000000000001" }
                 },
                 {
                     "date": "2026-04-21",
-                    "occasion": "lunch",
+                    "meal_name": "lunch",
                     "meal_ref": { "type": "user", "id": "00000000-0000-0000-0000-000000000002" }
                 }
             ]
@@ -1445,7 +1445,7 @@ mod tests {
             "meals": [
                 {
                     "date": "2026-04-21",
-                    "occasion": "breakfast",
+                    "meal_name": "breakfast",
                     "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
                 }
             ]
@@ -1558,7 +1558,7 @@ mod tests {
                 &self,
                 _q: &str,
                 _limit: i64,
-                _occasion: Option<&str>,
+                _meal_name: Option<&str>,
                 _exclude_allergens: &[String],
                 _user_id: Option<Uuid>,
             ) -> Result<Vec<CatalogMeal>, plnd_data::Error> {
@@ -2097,7 +2097,7 @@ mod tests {
     async fn suggest_slot_meal_tool_echoes_input() {
         let input = serde_json::json!({
             "date": "2026-04-21",
-            "occasion": "lunch",
+            "meal_name": "lunch",
             "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
         });
         let ctx = crate::tools::ToolContext {

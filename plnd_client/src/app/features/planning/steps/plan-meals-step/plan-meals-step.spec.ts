@@ -25,11 +25,11 @@ function makeMealPatternMock() {
 
 function makeMockPlanResponse(days: string[]): MealPlanResponse {
   const meals: MealEntry[] = days.flatMap(date =>
-    (['breakfast', 'lunch', 'dinner'] as const).map(occasion => ({
+    (['breakfast', 'lunch', 'dinner'] as const).map(name => ({
       date,
-      occasion,
+      meal_name: name,
       meal_ref: null,
-      title: `${occasion} for ${date}`,
+      title: `${name} for ${date}`,
     }))
   );
   return { plan_start: days[0], meals };
@@ -212,7 +212,7 @@ describe('PlanMealsStepComponent', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
 
-    suggestSlot$.next({ date: '2026-03-23', occasion: 'breakfast', meal_ref: null, title: 'Avocado toast' });
+    suggestSlot$.next({ date: '2026-03-23', meal_name: 'breakfast', meal_ref: null, title: 'Avocado toast' });
     expect(service.setMealRef).toHaveBeenCalledWith('2026-03-23', 'breakfast', null, 'Avocado toast', undefined, undefined);
   });
 
