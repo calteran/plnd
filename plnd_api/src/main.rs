@@ -279,11 +279,11 @@ async fn main() {
             delete(dietary_restrictions::delete_restriction),
         )
         .route(
-            "/meal-pattern",
+            "/day-types/{day_type_id}/meals",
             get(meal_pattern::list_meal_pattern).post(meal_pattern::create_meal_pattern_entry),
         )
         .route(
-            "/meal-pattern/{id}",
+            "/day-types/{day_type_id}/meals/{meal_id}",
             patch(meal_pattern::update_meal_pattern_entry)
                 .delete(meal_pattern::delete_meal_pattern_entry),
         )
