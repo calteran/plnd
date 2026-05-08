@@ -4,32 +4,55 @@ use crate::models::{CreateMealPatternEntryRequest, UpdateMealPatternEntryRequest
 use crate::state::AppState;
 use axum::{
     Json,
-    extract::{Extension, Path, State},
+    extract::{Extension, Path, Query, State},
     http::StatusCode,
 };
 use plnd_data::Error;
+use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub const MAX_NAME_LEN: usize = 200;
 const DEFAULT_TOLERANCE_MINUTES: i32 = 60;
 
+#[derive(Debug, Deserialize)]
+pub struct ListMealPatternParams {
+    pub day_type_id: Uuid,
+}
+
 #[utoipa::path(get, path = "/meal-pattern", tag = "Meal Pattern",
     security(("bearer_auth" = [])),
+    params(
+        ("day_type_id" = Uuid, Query, description = "Day type whose meal pattern to fetch"),
+    ),
     responses(
         (status = 200, description = "Meal pattern entries ordered by sort_order", body = Vec<MealPatternEntryResponse>),
         (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Day type not found or not owned by user"),
     ))]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
 pub async fn list_meal_pattern(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
+    Query(params): Query<ListMealPatternParams>,
 ) -> Result<Json<Vec<MealPatternEntryResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    state
+        .repos
+        .day_type
+        .get_by_id(params.day_type_id, user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "list_meal_pattern: day_type ownership check failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
     state
         .repos
         .meal_pattern
-        .list_for_user(user_id)
+        .list_for_day_type(params.day_type_id)
         .await
         .map(|v| Json(v.into_iter().map(MealPatternEntryResponse::from).collect()))
         .map_err(|e| match e {
@@ -47,7 +70,8 @@ pub async fn list_meal_pattern(
     responses(
         (status = 201, description = "Entry created", body = MealPatternEntryResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 409, description = "Duplicate name or sort_order for this user"),
+        (status = 404, description = "Day type not found or not owned by user"),
+        (status = 409, description = "Duplicate name or sort_order for this day type"),
         (status = 422, description = "Validation error"),
     ))]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -69,9 +93,20 @@ pub async fn create_meal_pattern_entry(
 
     state
         .repos
+        .day_type
+        .get_by_id(body.day_type_id, user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "create_meal_pattern_entry: day_type ownership check failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    state
+        .repos
         .meal_pattern
         .create(
-            user_id,
+            body.day_type_id,
             name,
             body.preferred_time,
             tolerance,
@@ -97,7 +132,7 @@ pub async fn create_meal_pattern_entry(
         (status = 200, description = "Entry updated", body = MealPatternEntryResponse),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Not found"),
-        (status = 409, description = "Duplicate name or sort_order for this user"),
+        (status = 409, description = "Duplicate name or sort_order for this day type"),
         (status = 422, description = "No fields provided or validation error"),
     ))]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
