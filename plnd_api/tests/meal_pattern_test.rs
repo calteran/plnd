@@ -24,7 +24,8 @@ fn create_request_accepts_hms_time_format() {
 
 #[test]
 fn create_request_with_optional_tolerance() {
-    let json = r#"{"name":"Dinner","preferred_time":"18:00","tolerance_minutes":30,"sort_order":3}"#;
+    let json =
+        r#"{"name":"Dinner","preferred_time":"18:00","tolerance_minutes":30,"sort_order":3}"#;
     let req: CreateMealPatternEntryRequest =
         serde_json::from_str(json).expect("tolerance_minutes is optional");
     assert_eq!(req.tolerance_minutes, Some(30));
