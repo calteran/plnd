@@ -9,7 +9,7 @@ import {
   PlanStatusResponse, ScheduleEntryDto, SchedulePeriodResponse,
 } from '../models/week-plan';
 import { TaskType } from '../models/routine';
-import { MealPatternService } from './meal-pattern.service';
+import { DayTypesMealsService } from './day-types-meals.service';
 import { preferredTimeHHMM } from '../models/meal-pattern';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
@@ -18,7 +18,7 @@ interface WeeklyPlanTaskResponse { task_id: string; }
 export class WeekPlanService {
   private readonly http    = inject(HttpClient);
   private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
-  private readonly mealPatternService = inject(MealPatternService);
+  private readonly dayTypesMealsService = inject(DayTypesMealsService);
 
   private readonly DRAFT_KEY = 'plnd:plan-draft';
   private readonly SCHEMA_VERSION = 2;
@@ -280,8 +280,9 @@ export class WeekPlanService {
   /** Serialises current scheduledMeals into the shape the agent API expects. */
   currentState(): MealPlanState {
     const meals = this.scheduledMealsSignal();
+    // Precondition: dayTypesMealsService.loaded() must be true before calling this method.
     const entries = this.horizonDays().flatMap(date =>
-      this.mealPatternService.entries().map(patternEntry => {
+      this.dayTypesMealsService.mealsForDate(date).map(patternEntry => {
         const slot = patternEntry.name;
         const meal = meals[date]?.[slot];
         return {
@@ -380,8 +381,9 @@ export class WeekPlanService {
     const tasks   = this.scheduledTasksSignal();
     const entries: PlanEntryRequest[] = [];
 
+    // Precondition: dayTypesMealsService.loaded() must be true before calling this method.
     for (const date of this.horizonDays()) {
-      for (const patternEntry of this.mealPatternService.entries()) {
+      for (const patternEntry of this.dayTypesMealsService.mealsForDate(date)) {
         const slot = patternEntry.name;
         const meal = meals[date]?.[slot];
         if (meal?.approvalState === 'skipped') continue;
