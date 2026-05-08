@@ -6,7 +6,7 @@ import { Subject } from 'rxjs';
 import { PlanMealsStepComponent } from './plan-meals-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
-import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { MealEntry, MealPlanResponse } from '../../../../core/models/week-plan';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
@@ -16,10 +16,13 @@ const PATTERN_FIXTURE: MealPatternEntry[] = [
   { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
 ];
 
-function makeMealPatternMock() {
+function makeDayTypesMealsMock(entries: MealPatternEntry[] = PATTERN_FIXTURE) {
   return {
     load: jasmine.createSpy('load'),
-    entries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+    allEntries: signal<MealPatternEntry[]>(entries).asReadonly(),
+    loaded: signal(true).asReadonly(),
+    mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => entries),
+    clear: jasmine.createSpy('clear'),
   };
 }
 
@@ -59,7 +62,7 @@ describe('PlanMealsStepComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: MealPlannerAgentService, useValue: agentSpy },
-        { provide: MealPatternService, useValue: makeMealPatternMock() },
+        { provide: DayTypesMealsService, useValue: makeDayTypesMealsMock() },
       ],
     }).compileComponents();
 
@@ -304,6 +307,60 @@ describe('PlanMealsStepComponent', () => {
       service.approveMeal('2026-03-23', 'breakfast');
       fixture.detectChanges();
       expect(component.unapprovedCount()).toBe(total - 1);
+    });
+  });
+
+  describe('.gc-na placeholder cells', () => {
+    let narrowService: WeekPlanService;
+    let narrowAgentSpy: jasmine.SpyObj<MealPlannerAgentService>;
+    let narrowGenerateWeek$: Subject<MealPlanResponse>;
+
+    const narrowMock = {
+      load: jasmine.createSpy('load'),
+      allEntries: signal(PATTERN_FIXTURE).asReadonly(), // 3 rows in union
+      loaded: signal(true).asReadonly(),
+      // Only 2026-03-23 gets all 3 slots; remaining days get only dinner
+      mealsForDate: jasmine.createSpy('mealsForDate').and.callFake((date: string) =>
+        date === '2026-03-23' ? PATTERN_FIXTURE : [PATTERN_FIXTURE[2]]
+      ),
+      clear: jasmine.createSpy('clear'),
+    };
+
+    beforeEach(async () => {
+      narrowGenerateWeek$ = new Subject();
+      narrowAgentSpy = jasmine.createSpyObj('MealPlannerAgentService', [
+        'generateWeek', 'rebalance', 'suggestSlot', 'resolveText',
+      ]);
+      narrowAgentSpy.generateWeek.and.returnValue(narrowGenerateWeek$);
+      narrowAgentSpy.rebalance.and.returnValue(narrowGenerateWeek$);
+      narrowAgentSpy.suggestSlot.and.returnValue(new Subject());
+
+      TestBed.resetTestingModule();
+      await TestBed.configureTestingModule({
+        imports: [PlanMealsStepComponent],
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+          { provide: MealPlannerAgentService, useValue: narrowAgentSpy },
+          { provide: DayTypesMealsService, useValue: narrowMock },
+        ],
+      }).compileComponents();
+
+      narrowService = TestBed.inject(WeekPlanService);
+      narrowService.initSession('2026-03-23', '2026-03-27');
+      (['2026-03-23', '2026-03-24', '2026-03-25', '2026-03-26', '2026-03-27'] as const).forEach(date => {
+        ['breakfast', 'lunch', 'dinner'].forEach(slot => {
+          narrowService.setMeal(date, slot, { approvalState: 'proposed', mealRef: null, title: slot });
+        });
+      });
+    });
+
+    it('should render .gc-na placeholder cells for days that lack a slot', () => {
+      const f = TestBed.createComponent(PlanMealsStepComponent);
+      f.detectChanges();
+      // 3 rows × 5 days = 15 total cells; 4 days × 2 missing slots = 8 gc-na; 7 real gc
+      const naCells = f.nativeElement.querySelectorAll('.gc-na');
+      expect(naCells.length).toBe(8);
     });
   });
 

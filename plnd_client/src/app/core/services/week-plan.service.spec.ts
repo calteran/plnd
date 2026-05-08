@@ -4,8 +4,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
 import { PostSchedulePlanRequest } from '../models/week-plan';
-import { MealPatternService } from './meal-pattern.service';
-import { MealPatternEntry } from '../models/meal-pattern';
+import { DayTypesMealsService } from './day-types-meals.service';
 
 describe('WeekPlanService', () => {
   let service: WeekPlanService;
@@ -17,14 +16,15 @@ describe('WeekPlanService', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         {
-          provide: MealPatternService,
+          provide: DayTypesMealsService,
           useValue: {
             load: jasmine.createSpy('load'),
-            entries: signal<MealPatternEntry[]>([
+            loaded: signal(true).asReadonly(),
+            mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => [
               { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
               { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
               { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
-            ]).asReadonly(),
+            ]),
           },
         },
       ],
@@ -330,6 +330,38 @@ describe('WeekPlanService', () => {
       expect(lunch!.task_ref_type).toBe('user');
       expect(lunch!.title).toBeUndefined();
       req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest calls mealsForDate for each horizon day and uses per-date slots', () => {
+      service.initSession('2026-03-24', '2026-03-25'); // two days
+      // Re-configure the spy to return different slots per date
+      const mock = TestBed.inject(DayTypesMealsService) as unknown as {
+        mealsForDate: jasmine.Spy;
+      };
+      mock.mealsForDate.and.callFake((date: string) => {
+        if (date === '2026-03-24') {
+          return [
+            { id: 'a', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
+          ];
+        }
+        // 2026-03-25 gets only dinner
+        return [
+          { id: 'b', name: 'dinner', preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
+        ];
+      });
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const anchors = body.entries.filter(e => e.after_anchor);
+      // Day 1 → breakfast only; Day 2 → dinner only → 2 total entries
+      expect(anchors.length).toBe(2);
+      expect(anchors.find(e => e.date === '2026-03-24')?.after_anchor).toBe('breakfast');
+      expect(anchors.find(e => e.date === '2026-03-25')?.after_anchor).toBe('dinner');
+      // Verify mealsForDate was called once for each date
+      expect(mock.mealsForDate).toHaveBeenCalledWith('2026-03-24');
+      expect(mock.mealsForDate).toHaveBeenCalledWith('2026-03-25');
+      req.flush({ committed: 2, planning_task_status: 'completed' });
     });
   });
 

@@ -1,7 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { EnergyLevel } from '../../../../core/models/week-plan';
 
 @Component({
@@ -70,9 +70,9 @@ export class PlanDayCardComponent {
   readonly date = input.required<string>();
 
   private readonly weekPlanService = inject(WeekPlanService);
-  private readonly mealPatternService = inject(MealPatternService);
+  private readonly dayTypesMealsService = inject(DayTypesMealsService);
   protected expanded = false;
-  protected readonly slots = computed(() => this.mealPatternService.entries());
+  protected readonly slots = computed(() => this.dayTypesMealsService.mealsForDate(this.date()));
 
   protected toggle(): void { this.expanded = !this.expanded; }
 

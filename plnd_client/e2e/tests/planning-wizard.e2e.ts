@@ -5,16 +5,25 @@ import { seedAuth, API_BASE, MOCK_USER_NEW } from '../helpers/auth';
 // MOCK_PREFS: week_start_day=1 (Monday), default_plan_length_days=7
 // → plan_start = 2026-03-30, plan_end = 2026-04-05
 
-const MOCK_MEAL_PATTERN = [
-  { id: 'mp1', user_id: 'test', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp2', user_id: 'test', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp3', user_id: 'test', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, created_at: '2026-01-01T00:00:00Z' },
+const MOCK_DAY_TYPES = [
+  { id: 'dt-default', user_id: 'test', name: 'Default', days_bitmask: 0,
+    wake_time: '07:00:00', sleep_time: '23:00:00',
+    is_default: true, is_cycle: false, cycle_length: null, anchor_date: null, created_at: '2026-01-01T00:00:00Z' },
+];
+
+const MOCK_DAY_TYPE_MEALS = [
+  { id: 'mp1', user_id: 'test', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp2', user_id: 'test', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+  { id: 'mp3', user_id: 'test', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
 ];
 
 async function seedWizard(page: Page): Promise<void> {
   await seedAuth(page);
-  await page.route(`${API_BASE}/meal-pattern`, route =>
-    route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
+  await page.route(url => url.href.includes('/day-types') && !url.href.includes('/meals'), route =>
+    route.fulfill({ status: 200, json: MOCK_DAY_TYPES })
+  );
+  await page.route(url => url.href.includes('/day-types/') && url.href.includes('/meals'), route =>
+    route.fulfill({ status: 200, json: MOCK_DAY_TYPE_MEALS })
   );
   await page.route(`${API_BASE}/tasks/weekly-plan**`, route =>
     route.fulfill({ status: 200, json: { task_id: 'test-planning-task' } })

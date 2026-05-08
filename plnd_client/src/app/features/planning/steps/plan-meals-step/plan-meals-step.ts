@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable } from 'rxjs';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
-import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { formatDayName, formatDayDate, daysInRange } from '../../utils/date-format.utils';
 import { MealPlanResponse, MealSlot, PlannedMeal } from '../../../../core/models/week-plan';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
@@ -60,11 +60,12 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
         }
 
         <!-- One row per meal slot -->
-        @for (entry of slots(); track entry.id) {
+        @for (entry of allSlots(); track entry.id) {
           <div class="cell-slot-label">
             <span class="slot-lbl">{{ entry.name }}</span>
           </div>
           @for (day of horizonDays(); track day) {
+            @if (hasSlotForDate(day, entry.name)) {
             <div class="gc"
                  [class.approved-g]="isApproved(day, entry.name)"
                  [class.skipped-g]="isSkipped(day, entry.name)"
@@ -119,10 +120,13 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
                           data-tip="Suggest a different meal"
                           (click)="refreshSlot(day, entry.name)">🔀</button>
                 </div>
-              }
+              } <!-- end @else proposed -->
 
-            </div>
-          }
+            </div> <!-- end .gc -->
+            } @else {
+              <div class="gc gc-na" aria-hidden="true"></div>
+            }
+          } <!-- end @for day -->
         }
 
       </div>
@@ -234,6 +238,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .gc.skipped-g   { background: var(--color-surface-base); opacity: 0.45; }
     .gc.gc-editing  { border-color: var(--color-accent-border); box-shadow: 0 0 0 2px var(--color-accent-light); }
     .gc.gc-loading  { overflow: hidden; }
+    .gc.gc-na { background: var(--color-surface-base); opacity: 0.2; border-style: dashed; }
 
     /* ── Skeleton shimmer ── */
     .gc-skeleton {
@@ -331,7 +336,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 export class PlanMealsStepComponent implements OnInit {
   private readonly weekPlanService         = inject(WeekPlanService);
   private readonly mealPlannerAgentService = inject(MealPlannerAgentService);
-  private readonly mealPatternService      = inject(MealPatternService);
+  private readonly dayTypesMealsService    = inject(DayTypesMealsService);
   private readonly destroyRef              = inject(DestroyRef);
 
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
@@ -344,14 +349,23 @@ export class PlanMealsStepComponent implements OnInit {
   // Pass (date: string) => MealPatternEntry[] from the onboarding state.
   readonly getMealsForDate = input<((date: string) => MealPatternEntry[]) | undefined>(undefined);
 
-  readonly slots = computed(() => {
+  readonly allSlots = computed(() => {
     const fn = this.getMealsForDate();
-    if (fn) {
-      const firstDay = this.horizonDays()[0];
-      return firstDay ? fn(firstDay) : [];
-    }
-    return this.mealPatternService.entries();
+    const seen = new Set<string>();
+    return this.horizonDays()
+      .flatMap(d => (fn ? fn(d) : this.dayTypesMealsService.mealsForDate(d)))
+      .filter(e => seen.has(e.name) ? false : seen.add(e.name))
+      .sort((a, b) => a.sort_order - b.sort_order);
   });
+
+  slotsForDate(date: string): MealPatternEntry[] {
+    const fn = this.getMealsForDate();
+    return fn ? fn(date) : this.dayTypesMealsService.mealsForDate(date);
+  }
+
+  hasSlotForDate(date: string, slotName: string): boolean {
+    return this.slotsForDate(date).some(e => e.name === slotName);
+  }
 
   readonly horizonDays = computed(() => {
     const start = this.planStart();
@@ -371,17 +385,16 @@ export class PlanMealsStepComponent implements OnInit {
 
   readonly unapprovedCount = computed(() => {
     const meals = this.weekPlanService.scheduledMeals();
-    const slotNames = this.slots().map(s => s.name);
     return this.horizonDays().reduce((n, date) =>
-      n + slotNames.filter(
-        slot => (meals[date]?.[slot]?.approvalState ?? 'proposed') === 'proposed'
+      n + this.slotsForDate(date).filter(
+        s => (meals[date]?.[s.name]?.approvalState ?? 'proposed') === 'proposed'
       ).length,
     0);
   });
 
   ngOnInit(): void {
     if (!this.getMealsForDate()) {
-      this.mealPatternService.load();
+      this.dayTypesMealsService.load();
     }
     const meals  = this.weekPlanService.scheduledMeals();
     const hasAny = this.horizonDays().some(d => Object.keys(meals[d] ?? {}).length > 0);

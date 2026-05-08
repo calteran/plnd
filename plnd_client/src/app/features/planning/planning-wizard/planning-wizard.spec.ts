@@ -4,7 +4,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { provideRouter } from '@angular/router';
 import { WritableSignal, signal } from '@angular/core';
 import { PlanningWizardComponent } from './planning-wizard';
-import { MealPatternService } from '../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../core/services/day-types-meals.service';
 import { MealPatternEntry } from '../../../core/models/meal-pattern';
 
 const PATTERN_FIXTURE: MealPatternEntry[] = [
@@ -22,10 +22,12 @@ describe('PlanningWizardComponent', () => {
     localStorage.clear();
     mealEntries = signal<MealPatternEntry[]>([]);
     mealLoaded  = signal(false);
-    const mealPatternMock = {
+    const dayTypesMealsMock = {
       load: jasmine.createSpy('load'),
-      entries: mealEntries.asReadonly(),
+      allEntries: mealEntries.asReadonly(),
       loaded: mealLoaded.asReadonly(),
+      mealsForDate: (_date: string) => mealEntries(),
+      clear: jasmine.createSpy('clear'),
     };
 
     await TestBed.configureTestingModule({
@@ -34,7 +36,7 @@ describe('PlanningWizardComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
-        { provide: MealPatternService, useValue: mealPatternMock },
+        { provide: DayTypesMealsService, useValue: dayTypesMealsMock },
       ]
     }).compileComponents();
     fixture = TestBed.createComponent(PlanningWizardComponent);

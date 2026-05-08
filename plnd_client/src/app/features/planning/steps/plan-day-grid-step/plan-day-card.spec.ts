@@ -4,7 +4,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
 import { PlanDayCardComponent } from './plan-day-card';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
 const PATTERN_FIXTURE: MealPatternEntry[] = [
@@ -13,10 +13,13 @@ const PATTERN_FIXTURE: MealPatternEntry[] = [
   { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
 ];
 
-function makeMealPatternMock() {
+function makeDayTypesMealsMock() {
   return {
     load: jasmine.createSpy('load'),
-    entries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+    allEntries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+    loaded: signal(true).asReadonly(),
+    mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => PATTERN_FIXTURE),
+    clear: jasmine.createSpy('clear'),
   };
 }
 
@@ -37,7 +40,7 @@ describe('PlanDayCardComponent', () => {
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),
-        { provide: MealPatternService, useValue: makeMealPatternMock() },
+        { provide: DayTypesMealsService, useValue: makeDayTypesMealsMock() },
       ],
     }).compileComponents();
     service = TestBed.inject(WeekPlanService);
@@ -51,6 +54,12 @@ describe('PlanDayCardComponent', () => {
   it('should create', () => {
     createComponent();
     expect(fixture.componentInstance).toBeTruthy();
+  });
+
+  it('should call mealsForDate with the card\'s own date input', () => {
+    const mockService = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: jasmine.Spy };
+    createComponent('2026-03-31');
+    expect(mockService.mealsForDate).toHaveBeenCalledWith('2026-03-31');
   });
 
   describe('collapsed state', () => {
