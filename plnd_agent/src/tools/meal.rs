@@ -516,7 +516,7 @@ impl Tool for ProposeMealPlanTool {
                             "date":     { "type": "string", "format": "date" },
                             "meal_name": {
                                 "type": "string",
-                                "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
+                                "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                             },
                             "meal_ref": {
                                 "type": "object",
@@ -612,7 +612,7 @@ impl Tool for RebalanceMealPlanTool {
                             "date":     { "type": "string", "format": "date" },
                             "meal_name": {
                                 "type": "string",
-                                "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
+                                "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                             },
                             "meal_ref": {
                                 "type": "object",
@@ -696,7 +696,7 @@ impl Tool for SuggestSlotMealTool {
                 },
                 "meal_name": {
                     "type": "string",
-                    "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
+                    "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                 },
                 "meal_ref": {
                     "type": "object",
@@ -786,7 +786,7 @@ impl Tool for ResolveMealDescriptionTool {
                 },
                 "occasion_tags": {
                     "type": "array",
-                    "items": { "type": "string", "description": "Name of the meal slot from the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)" },
+                    "items": { "type": "string", "description": "Dining occasion this meal fits (e.g. 'breakfast', 'lunch', 'dinner')" },
                     "description": "Required when kind='new'. Occasions this meal fits."
                 },
                 "estimated_nutrition": {
