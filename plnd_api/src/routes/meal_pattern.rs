@@ -140,7 +140,7 @@ pub async fn create_meal_pattern_entry(
 pub async fn update_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Path((day_type_id, entry_id)): Path<(Uuid, Uuid)>,
+    Path((day_type_id, meal_id)): Path<(Uuid, Uuid)>,
     Json(body): Json<UpdateMealPatternEntryRequest>,
 ) -> Result<Json<MealPatternEntryResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
@@ -162,7 +162,7 @@ pub async fn update_meal_pattern_entry(
     let existing = state
         .repos
         .meal_pattern
-        .get_by_id(entry_id, user_id)
+        .get_by_id(meal_id, user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "update_meal_pattern_entry: get_by_id failed");
@@ -184,7 +184,7 @@ pub async fn update_meal_pattern_entry(
         .repos
         .meal_pattern
         .update(
-            entry_id,
+            meal_id,
             user_id,
             name,
             body.preferred_time.unwrap_or(existing.preferred_time),
@@ -219,14 +219,14 @@ pub async fn update_meal_pattern_entry(
 pub async fn delete_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Path((day_type_id, entry_id)): Path<(Uuid, Uuid)>,
+    Path((day_type_id, meal_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     let existing = state
         .repos
         .meal_pattern
-        .get_by_id(entry_id, user_id)
+        .get_by_id(meal_id, user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "delete_meal_pattern_entry: get_by_id failed");
@@ -241,7 +241,7 @@ pub async fn delete_meal_pattern_entry(
     state
         .repos
         .meal_pattern
-        .delete(entry_id, user_id)
+        .delete(meal_id, user_id)
         .await
         .map_err(|e| match e {
             Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
