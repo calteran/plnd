@@ -198,7 +198,6 @@ export class WeekPlanService {
   setCarryoverDecision(entryId: string, decision: CarryoverDecision): void {
     this.carryoverDecisionsSignal.update(d => ({ ...d, [entryId]: decision }));
     if (decision !== 'drop') {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       this.dropReasonsSignal.update(({ [entryId]: _, ...rest }) => rest);
     }
   }
@@ -207,9 +206,9 @@ export class WeekPlanService {
     this.dropReasonsSignal.update(d => {
       // Toggle: if already selected, deselect
       if (d[entryId] === reason) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { [entryId]: _, ...rest } = d;
-        return rest;
+        const remaining = { ...d };
+        delete remaining[entryId];
+        return remaining;
       }
       return { ...d, [entryId]: reason };
     });

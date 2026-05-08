@@ -10,8 +10,8 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { AgentService } from '../../../../../core/services/agent.service';
-import { MealPatternService } from '../../../../../core/services/meal-pattern.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
+import { mealsForDate } from '../../../../../core/utils/day-type-utils';
 import {
   PlaceTasksRequest,
   PlaceTasksEntry,
@@ -110,11 +110,12 @@ function buildDayCards(
   entries: PlaceTasksEntry[],
   start: string,
   end: string,
-  pattern: MealPatternEntry[],
+  getMeals: (date: string) => MealPatternEntry[],
 ): DayCard[] {
   const allDates = datesBetween(start, end);
-  const anchorNames = new Set(pattern.map(p => p.name.toLowerCase()));
   return allDates.map(date => {
+    const pattern = getMeals(date);
+    const anchorNames = new Set(pattern.map(p => p.name.toLowerCase()));
     const dayEntries = entries
       .map((entry, idx) => ({ entry, idx }))
       .filter(({ entry }) => entry.scheduled_date === date);
@@ -129,11 +130,8 @@ function buildDayCards(
           entryIndex: idx,
         }));
 
-    // Build interleaved rows: each pattern anchor becomes a meal divider, with tasks
-    // distributed by the bucket their after_anchor or time_window_start falls into.
     const rows: DayRow[] = [];
     if (pattern.length === 0) {
-      // No pattern loaded — just list all tasks sorted by time
       rows.push(...bySlot('morning'), ...bySlot('afternoon'), ...bySlot('evening'));
     } else {
       const buckets: ('morning' | 'afternoon' | 'evening')[] = pattern.map(p => {
@@ -151,7 +149,6 @@ function buildDayCards(
           consumed.add(bucket);
         }
       });
-      // Append any unconsumed buckets so no task is dropped from view
       (['morning', 'afternoon', 'evening'] as const).forEach(b => {
         if (!consumed.has(b)) rows.push(...bySlot(b));
       });
@@ -617,7 +614,6 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   @Output() complete = new EventEmitter<void>();
 
   private readonly agentService = inject(AgentService);
-  private readonly mealPatternService = inject(MealPatternService);
   private readonly stateService = inject(OnboardingStateService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
@@ -636,8 +632,6 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   readonly planDates = signal<{ value: string; label: string }[]>([]);
 
   ngOnInit(): void {
-    this.mealPatternService.load();
-
     const taskNames = this.stateService.upcomingTaskNames();
     const period = this.stateService.planPeriod();
     const routines = this.stateService.routines();
@@ -691,7 +685,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.entries.set(result);
-          this.dayCards.set(buildDayCards(result, period.start, period.end, this.mealPatternService.entries()));
+          this.dayCards.set(buildDayCards(result, period.start, period.end, (date) => mealsForDate(date, this.stateService.dayTypes())));
           this.isLoading.set(false);
         },
         error: () => {
@@ -760,7 +754,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     });
 
     this.editState.set(null);
-    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, this.mealPatternService.entries()));
+    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, (date) => mealsForDate(date, this.stateService.dayTypes())));
   }
 
   removeEntry(entryIndex: number): void {
@@ -771,7 +765,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     this.editState.set(null);
 
     // Re-index: rebuild day cards from the updated (re-indexed) entries
-    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, this.mealPatternService.entries()));
+    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, (date) => mealsForDate(date, this.stateService.dayTypes())));
   }
 
   // ── Save & Return ─────────────────────────────────────────────────────────

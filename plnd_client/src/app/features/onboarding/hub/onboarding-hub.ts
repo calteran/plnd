@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -6,8 +6,8 @@ import { switchMap } from 'rxjs/operators';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { ConfigService } from '../../../core/services/config.service';
 import { UserService } from '../../../core/services/user.service';
-import { MealPatternService } from '../../../core/services/meal-pattern.service';
 import { preferredTimeHHMM } from '../../../core/models/meal-pattern';
+import { mealsForDate } from '../../../core/utils/day-type-utils';
 import {
   PostSchedulePlanRequest,
   PostSchedulePlanResponse,
@@ -525,13 +525,12 @@ const HUB_SECTIONS: HubSection[] = [
     }
   `],
 })
-export class OnboardingHubComponent implements OnInit {
+export class OnboardingHubComponent {
   protected readonly onboardingState = inject(OnboardingStateService);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly config = inject(ConfigService);
   private readonly userService = inject(UserService);
-  private readonly mealPatternService = inject(MealPatternService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly isSubmitting = signal(false);
@@ -540,10 +539,6 @@ export class OnboardingHubComponent implements OnInit {
 
   protected readonly sections = HUB_SECTIONS;
   protected readonly allDone = this.onboardingState.allSectionsComplete;
-
-  ngOnInit(): void {
-    this.mealPatternService.load();
-  }
 
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
@@ -577,7 +572,7 @@ export class OnboardingHubComponent implements OnInit {
       task_ref_type: m.meal_ref?.type,
       title: m.meal_ref ? undefined : m.title,
       scheduled_start: preferredTimeHHMM(
-        this.mealPatternService.entries().find(e => e.name === m.meal_name)?.preferred_time ?? '12:00:00'
+        mealsForDate(m.date, this.onboardingState.dayTypes()).find(e => e.name === m.meal_name)?.preferred_time ?? '12:00:00'
       ),
       after_anchor: m.meal_name,
     }));

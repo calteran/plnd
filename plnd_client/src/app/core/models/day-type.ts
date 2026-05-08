@@ -1,3 +1,5 @@
+import { MealPatternEntry } from './meal-pattern';
+
 export interface DayTypeResponse {
   id: string;
   user_id: string;
@@ -10,6 +12,7 @@ export interface DayTypeResponse {
   cycle_length: number | null;
   anchor_date: string | null;
   created_at: string;
+  meals?: MealPatternEntry[];
 }
 
 export interface CreateDayTypeRequest {

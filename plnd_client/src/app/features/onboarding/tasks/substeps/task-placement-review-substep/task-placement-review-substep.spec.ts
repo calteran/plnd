@@ -8,8 +8,7 @@ import { Router } from '@angular/router';
 import { TaskPlacementReviewSubstepComponent } from './task-placement-review-substep';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { ConfigService } from '../../../../../core/services/config.service';
-import { MealPatternService } from '../../../../../core/services/meal-pattern.service';
-import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
+import { DayTypeResponse } from '../../../../../core/models/day-type';
 import { PlaceTasksEntry, PlanEntryRequest } from '../../../../../core/models/week-plan';
 import { Routine } from '../../../../../core/models/routine';
 
@@ -78,12 +77,26 @@ function makeStateMock(
   const periodSignal: WritableSignal<{ start: string; end: string } | null> = signal(period);
   const routinesSignal: WritableSignal<Routine[]> = signal(routines);
   const routineCountSignal: WritableSignal<number> = signal(0);
+  const dayTypesSignal: WritableSignal<DayTypeResponse[]> = signal([{
+    id: 'default-dt', user_id: 'u1', name: 'Default',
+    days_bitmask: 127,
+    wake_time: '07:00:00', sleep_time: '22:00:00',
+    is_default: true, is_cycle: false,
+    cycle_length: null, anchor_date: null,
+    created_at: '2026-01-01T00:00:00Z',
+    meals: [
+      { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },
+      { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },
+      { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },
+    ],
+  }]);
 
   return {
     upcomingTaskNames: taskNamesSignal.asReadonly(),
     planPeriod: periodSignal.asReadonly(),
     routines: routinesSignal.asReadonly(),
     totalRoutines: routineCountSignal.asReadonly(),
+    dayTypes: dayTypesSignal.asReadonly(),
     setPlacedTasks: jasmine.createSpy('setPlacedTasks'),
     markComplete: jasmine.createSpy('markComplete'),
   };
@@ -102,15 +115,6 @@ async function setup(
 ) {
   const stateMock = makeStateMock(taskNames, period, routines);
 
-  const mealPatternMock = {
-    load: jasmine.createSpy('load'),
-    entries: signal<MealPatternEntry[]>([
-      { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', created_at: '' },
-      { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', created_at: '' },
-      { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', created_at: '' },
-    ]).asReadonly(),
-  };
-
   await TestBed.configureTestingModule({
     imports: [TaskPlacementReviewSubstepComponent],
     providers: [
@@ -119,7 +123,6 @@ async function setup(
       provideRouter([]),
       { provide: OnboardingStateService, useValue: stateMock },
       { provide: ConfigService, useValue: CONFIG_MOCK },
-      { provide: MealPatternService, useValue: mealPatternMock },
     ],
   }).compileComponents();
 

@@ -33,12 +33,23 @@ function makeStateMock(storedTypes: DayTypeResponse[] = []) {
 }
 
 function makeDayTypesSvcMock() {
-  return jasmine.createSpyObj<DayTypesService>('DayTypesService', [
+  const spy = jasmine.createSpyObj<DayTypesService>('DayTypesService', [
     'create',
     'update',
     'list',
     'delete',
+    'listMeals',
+    'createMeal',
+    'deleteMeal',
   ]);
+  spy.listMeals.and.returnValue(of([]));
+  spy.createMeal.and.returnValue(
+    of({ id: 'new-meal', day_type_id: 'dt1', user_id: 'u1', name: 'Breakfast',
+         preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 0,
+         created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' })
+  );
+  spy.deleteMeal.and.returnValue(of(undefined));
+  return spy;
 }
 
 describe('DayTypesSubstepComponent', () => {
@@ -375,5 +386,70 @@ describe('DayTypesSubstepComponent', () => {
     component.onRemoveClick(0);
     expect(svcMock.delete).not.toHaveBeenCalled();
     expect(component.cards().length).toBe(1);
+  });
+
+  // ── 14. addMeal ─────────────────────────────────────────────────────────────
+
+  describe('addMeal', () => {
+    it('adds a new draft meal to the specified card', async () => {
+      const { component } = await setup();
+      component.cards.set([{
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
+        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
+        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        meals: [],
+      }]);
+      component.addMeal(0);
+      expect(component.cards()[0].meals.length).toBe(1);
+      expect(component.cards()[0].meals[0].id).toBeNull();
+    });
+  });
+
+  // ── 15. removeMeal ───────────────────────────────────────────────────────────
+
+  describe('removeMeal', () => {
+    it('removes a meal by localId', async () => {
+      const { component } = await setup();
+      component.cards.set([{
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
+        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
+        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        meals: [
+          { localId: 'ml1', id: null, name: 'Breakfast', preferred_time: '08:00', tolerance_minutes: 30, sort_order: 0 },
+          { localId: 'ml2', id: null, name: 'Lunch', preferred_time: '12:00', tolerance_minutes: 30, sort_order: 1 },
+        ],
+      }]);
+      component.removeMeal(0, 'ml1');
+      expect(component.cards()[0].meals.length).toBe(1);
+      expect(component.cards()[0].meals[0].localId).toBe('ml2');
+    });
+
+    it('does not remove the last meal', async () => {
+      const { component } = await setup();
+      component.cards.set([{
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
+        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
+        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        meals: [{ localId: 'ml1', id: null, name: 'Breakfast', preferred_time: '08:00', tolerance_minutes: 30, sort_order: 0 }],
+      }]);
+      component.removeMeal(0, 'ml1');
+      expect(component.cards()[0].meals.length).toBe(1);
+    });
+  });
+
+  // ── 16. updateMeal ───────────────────────────────────────────────────────────
+
+  describe('updateMeal', () => {
+    it('patches a meal by localId', async () => {
+      const { component } = await setup();
+      component.cards.set([{
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
+        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
+        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        meals: [{ localId: 'ml1', id: null, name: 'Breakfast', preferred_time: '08:00', tolerance_minutes: 30, sort_order: 0 }],
+      }]);
+      component.updateMeal(0, 'ml1', { preferred_time: '09:00' });
+      expect(component.cards()[0].meals[0].preferred_time).toBe('09:00');
+    });
   });
 });
