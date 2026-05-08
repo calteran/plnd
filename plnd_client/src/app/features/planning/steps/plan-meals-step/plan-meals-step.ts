@@ -6,6 +6,7 @@ import { MealPlannerAgentService } from '../../../../core/services/meal-planner-
 import { MealPatternService } from '../../../../core/services/meal-pattern.service';
 import { formatDayName, formatDayDate, daysInRange } from '../../utils/date-format.utils';
 import { MealPlanResponse, MealSlot, PlannedMeal } from '../../../../core/models/week-plan';
+import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
 @Component({
   selector: 'app-plan-meals-step',
@@ -336,11 +337,21 @@ export class PlanMealsStepComponent implements OnInit {
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
 
   // Onboarding-flow overrides — defaults leave weekly wizard behaviour unchanged
-  readonly firstRun  = input(false);
-  readonly planStart = input<string | undefined>(undefined);
-  readonly planEnd   = input<string | undefined>(undefined);
+  readonly firstRun        = input(false);
+  readonly planStart       = input<string | undefined>(undefined);
+  readonly planEnd         = input<string | undefined>(undefined);
+  // When provided, overrides the global MealPatternService for slot resolution.
+  // Pass (date: string) => MealPatternEntry[] from the onboarding state.
+  readonly getMealsForDate = input<((date: string) => MealPatternEntry[]) | undefined>(undefined);
 
-  readonly slots = computed(() => this.mealPatternService.entries());
+  readonly slots = computed(() => {
+    const fn = this.getMealsForDate();
+    if (fn) {
+      const firstDay = this.horizonDays()[0];
+      return firstDay ? fn(firstDay) : [];
+    }
+    return this.mealPatternService.entries();
+  });
 
   readonly horizonDays = computed(() => {
     const start = this.planStart();
@@ -369,7 +380,9 @@ export class PlanMealsStepComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.mealPatternService.load();
+    if (!this.getMealsForDate()) {
+      this.mealPatternService.load();
+    }
     const meals  = this.weekPlanService.scheduledMeals();
     const hasAny = this.horizonDays().some(d => Object.keys(meals[d] ?? {}).length > 0);
     if (!hasAny) {

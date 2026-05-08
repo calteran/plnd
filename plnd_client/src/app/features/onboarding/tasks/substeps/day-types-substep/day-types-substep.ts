@@ -234,6 +234,16 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
                   (change)="updateMeal(cardIdx, meal.localId, { preferred_time: $any($event.target).value })"
                   aria-label="Preferred time for {{ meal.name }}"
                 />
+                <input
+                  type="number"
+                  class="meal-tolerance-input"
+                  min="0"
+                  max="120"
+                  [value]="meal.tolerance_minutes"
+                  (change)="updateMeal(cardIdx, meal.localId, { tolerance_minutes: +$any($event.target).value })"
+                  aria-label="Tolerance (minutes) for {{ meal.name }}"
+                  title="Window (±minutes)"
+                />
                 <button
                   type="button"
                   class="remove-meal-btn"
@@ -549,6 +559,15 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
       font-size: 13px;
     }
 
+    .meal-tolerance-input {
+      width: 56px;
+      border: 1.5px solid var(--color-accent-border);
+      border-radius: 6px;
+      padding: 5px 6px;
+      font-size: 13px;
+      text-align: center;
+    }
+
     .remove-meal-btn {
       background: none;
       border: 1.5px solid var(--color-btn-neutral-border);
@@ -822,15 +841,16 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
       switchMap(dayTypeResults => {
         const mealSaves = dayTypeResults.map((dt, idx) => {
           const card = this.cards()[idx];
-          const existingIds = card.meals.filter(m => m.id !== null).map(m => m.id!);
-          const deleteOps = existingIds.length > 0
-            ? forkJoin(existingIds.map(mid => this.dayTypesService.deleteMeal(dt.id, mid)))
-            : of([] as void[]);
-          const draftMeals = card.meals;
-          return deleteOps.pipe(
+          // Fetch current server meals so we catch removals (not just UI-tracked IDs).
+          return this.dayTypesService.listMeals(dt.id).pipe(
+            switchMap(serverMeals =>
+              serverMeals.length > 0
+                ? forkJoin(serverMeals.map(m => this.dayTypesService.deleteMeal(dt.id, m.id)))
+                : of([] as void[])
+            ),
             switchMap(() =>
-              draftMeals.length > 0
-                ? forkJoin(draftMeals.map((m, sort_order) =>
+              card.meals.length > 0
+                ? forkJoin(card.meals.map((m, sort_order) =>
                     this.dayTypesService.createMeal(dt.id, {
                       name: m.name,
                       preferred_time: m.preferred_time,

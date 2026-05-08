@@ -47,6 +47,7 @@ import { mealsForDate } from '../../../core/utils/day-type-utils';
               [firstRun]="true"
               [planStart]="planStart()"
               [planEnd]="planEnd()"
+              [getMealsForDate]="getMealsForDateFn"
             />
           } @else {
             <div class="meal-plan-loading">Preparing your meal plan…</div>
@@ -77,7 +78,8 @@ export class OnboardingFoodComponent implements OnInit {
     return this.state.planningPrefsComplete() ? step : step + 1;
   });
   readonly planStart = computed(() => this.state.planPeriod()?.start ?? '');
-  readonly planEnd = computed(() => this.state.planPeriod()?.end ?? '');
+  readonly planEnd   = computed(() => this.state.planPeriod()?.end ?? '');
+  readonly getMealsForDateFn = (date: string) => mealsForDate(date, this.state.dayTypes());
   readonly continueDisabledForStep = computed(() => {
     if (this.internalStep() === 0) return this.planningPrefsRef()?.isSaving() ?? false;
     return this.internalStep() === 3 && this.weekPlanService.isGenerating();
