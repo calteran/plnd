@@ -6,8 +6,8 @@ import { switchMap } from 'rxjs/operators';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { ConfigService } from '../../../core/services/config.service';
 import { UserService } from '../../../core/services/user.service';
-import { MealPatternService } from '../../../core/services/meal-pattern.service';
 import { preferredTimeHHMM } from '../../../core/models/meal-pattern';
+import { mealsForDate } from '../../../core/utils/day-type-utils';
 import {
   PostSchedulePlanRequest,
   PostSchedulePlanResponse,
@@ -531,7 +531,6 @@ export class OnboardingHubComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly config = inject(ConfigService);
   private readonly userService = inject(UserService);
-  private readonly mealPatternService = inject(MealPatternService);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly isSubmitting = signal(false);
@@ -542,7 +541,6 @@ export class OnboardingHubComponent implements OnInit {
   protected readonly allDone = this.onboardingState.allSectionsComplete;
 
   ngOnInit(): void {
-    this.mealPatternService.load();
   }
 
   @HostListener('document:keydown.escape')
@@ -577,7 +575,7 @@ export class OnboardingHubComponent implements OnInit {
       task_ref_type: m.meal_ref?.type,
       title: m.meal_ref ? undefined : m.title,
       scheduled_start: preferredTimeHHMM(
-        this.mealPatternService.entries().find(e => e.name === m.meal_name)?.preferred_time ?? '12:00:00'
+        mealsForDate(m.date, this.onboardingState.dayTypes()).find(e => e.name === m.meal_name)?.preferred_time ?? '12:00:00'
       ),
       after_anchor: m.meal_name,
     }));

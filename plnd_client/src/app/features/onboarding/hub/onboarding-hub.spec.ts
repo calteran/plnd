@@ -8,21 +8,8 @@ import { OnboardingHubComponent } from './onboarding-hub';
 import { OnboardingStateService, SectionId } from '../onboarding-state.service';
 import { UserService } from '../../../core/services/user.service';
 import { ConfigService } from '../../../core/services/config.service';
-import { MealPatternService } from '../../../core/services/meal-pattern.service';
+import { DayTypeResponse } from '../../../core/models/day-type';
 import { MealEntry, PlanEntryRequest, PostSchedulePlanRequest } from '../../../core/models/week-plan';
-
-function makeMealPatternMock() {
-  const entriesSignal = signal([
-    { id: 'mp-1', user_id: 'u1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 0, created_at: '' },
-    { id: 'mp-2', user_id: 'u1', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 30, sort_order: 1, created_at: '' },
-    { id: 'mp-3', user_id: 'u1', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 30, sort_order: 2, created_at: '' },
-    { id: 'mp-4', user_id: 'u1', name: 'snack',     preferred_time: '15:00:00', tolerance_minutes: 30, sort_order: 3, created_at: '' },
-  ]);
-  return {
-    load: jasmine.createSpy('load'),
-    entries: entriesSignal.asReadonly(),
-  };
-}
 
 function makeStateMock() {
   const statusSignal = signal<Record<SectionId, 'not-started' | 'complete'>>({
@@ -32,6 +19,20 @@ function makeStateMock() {
   });
   const allCompleteSignal = signal(false);
   const planPeriodSignal = signal<{ start: string; end: string } | null>(null);
+  const dayTypesSignal = signal<DayTypeResponse[]>([{
+    id: 'default-dt', user_id: 'u1', name: 'Default',
+    days_bitmask: 127,
+    wake_time: '07:00:00', sleep_time: '22:00:00',
+    is_default: true, is_cycle: false,
+    cycle_length: null, anchor_date: null,
+    created_at: '2026-01-01T00:00:00Z',
+    meals: [
+      { id: 'mp-1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 0, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },
+      { id: 'mp-2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 30, sort_order: 1, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },
+      { id: 'mp-3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 30, sort_order: 2, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },
+      { id: 'mp-4', name: 'snack',     preferred_time: '15:00:00', tolerance_minutes: 30, sort_order: 3, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },
+    ],
+  }]);
 
   return {
     sectionStatus: statusSignal.asReadonly(),
@@ -51,19 +52,18 @@ function makeStateMock() {
     mealPlan: signal(null).asReadonly(),
     placedTasks: signal([]).asReadonly(),
     routines: signal([]).asReadonly(),
+    dayTypes: dayTypesSignal.asReadonly(),
   };
 }
 
 describe('OnboardingHubComponent', () => {
   let fixture: ComponentFixture<OnboardingHubComponent>;
   let stateMock: ReturnType<typeof makeStateMock>;
-  let mealPatternMock: ReturnType<typeof makeMealPatternMock>;
   let router: Router;
   let userServiceStub: { completeOnboarding: jasmine.Spy };
 
   beforeEach(async () => {
     stateMock = makeStateMock();
-    mealPatternMock = makeMealPatternMock();
     userServiceStub = { completeOnboarding: jasmine.createSpy('completeOnboarding').and.returnValue(of(undefined)) };
     await TestBed.configureTestingModule({
       imports: [OnboardingHubComponent],
@@ -71,7 +71,6 @@ describe('OnboardingHubComponent', () => {
         { provide: OnboardingStateService, useValue: stateMock },
         { provide: UserService, useValue: userServiceStub },
         { provide: ConfigService, useValue: { getConfig: () => ({ api: { baseUrl: 'http://localhost:3000' } }) } },
-        { provide: MealPatternService, useValue: mealPatternMock },
         provideHttpClient(),
         provideHttpClientTesting(),
         provideRouter([]),
