@@ -73,8 +73,16 @@ fn update_request_with_all_fields() {
     let req: UpdateMealPatternEntryRequest =
         serde_json::from_str(json).expect("full update should deserialize");
     assert_eq!(req.name.as_deref(), Some("Second Breakfast"));
+    assert!(req.preferred_time.is_some());
+    assert!(req.preferred_time.unwrap().to_string().starts_with("10:00"));
     assert_eq!(req.tolerance_minutes, Some(15));
     assert_eq!(req.sort_order, Some(2));
+}
+
+#[test]
+fn update_request_invalid_time_format_fails() {
+    let json = r#"{"preferred_time":"not-a-time"}"#;
+    assert!(serde_json::from_str::<UpdateMealPatternEntryRequest>(json).is_err());
 }
 
 // --- Constants ---
