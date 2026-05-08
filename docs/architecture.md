@@ -220,7 +220,7 @@ Each day type carries:
 
 - **Wake time** — the wall-clock time the day's implicit start-of-day anchor sits at on dates of this type.
 - **Sleep time** — the wall-clock time the day's implicit end-of-day anchor sits at.
-- **Meals** — an ordered list of meal entries (name, `preferred_time`, `tolerance_minutes`, `sort_order`). Each entry defines a meal anchor on dates of this type (§4.7) and the time zone within which that meal is undisplaced (§4.6). The meal list may be empty — a day type with zero meals has no meal anchors and matches §4.6's empty-pattern semantics.
+- **Meals** — an ordered list of meal entries (name, `preferred_time`, `tolerance_minutes`, `sort_order`). Each entry defines a meal anchor on dates of this type (§4.7) and the time zone within which that meal is undisplaced (§4.6). The meal list may be empty — a day type with zero meals has no meal anchors and matches §4.6's empty-list semantics.
 
 Meal entries are **independent across day types**. Two day types with same-named meals ("Breakfast" on Weekdays at 08:00, "Breakfast" on Weekends at 10:00) carry no structural relationship — the duplicate name is incidental, not a join. Cross-day-type continuity ("the user's *breakfasts*, regardless of day type") is reasoned about by the agent via fuzzy text matching against meal names, consistent with how §3.5 memory inference works elsewhere. The data model intentionally does not encode this linkage, because requiring users to maintain a shared meal vocabulary across day types is friction the redesign is meant to remove.
 
