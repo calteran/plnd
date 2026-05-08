@@ -3,6 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { DayTypesService, bitmaskToDays, daysToBitmask } from './day-types.service';
 import { DayTypeResponse, CreateDayTypeRequest } from '../models/day-type';
+import { MealPatternEntry, CreateMealPatternEntryRequest, UpdateMealPatternEntryRequest } from '../models/meal-pattern';
 import { ConfigService } from './config.service';
 
 const MOCK_CONFIG = { api: { baseUrl: 'http://localhost:3000' } };
@@ -119,6 +120,62 @@ describe('DayTypesService', () => {
     req.flush(null, { status: 204, statusText: 'No Content' });
 
     expect(completed).toBeTrue();
+  });
+
+  describe('listMeals', () => {
+    it('GET /day-types/{id}/meals', () => {
+      const mockMeals: MealPatternEntry[] = [{
+        id: 'm1', day_type_id: 'dt1', user_id: 'u1',
+        name: 'Breakfast', preferred_time: '08:00:00',
+        tolerance_minutes: 30, sort_order: 0,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      }];
+      let result: MealPatternEntry[] | undefined;
+      service.listMeals('dt1').subscribe(m => (result = m));
+      const req = httpMock.expectOne(r => r.url.endsWith('/day-types/dt1/meals') && r.method === 'GET');
+      req.flush(mockMeals);
+      expect(result).toEqual(mockMeals);
+    });
+  });
+
+  describe('createMeal', () => {
+    it('POST /day-types/{id}/meals', () => {
+      const body: CreateMealPatternEntryRequest = { name: 'Lunch', preferred_time: '12:00', sort_order: 1 };
+      const mockMeal: MealPatternEntry = {
+        id: 'm2', day_type_id: 'dt1', user_id: 'u1',
+        name: 'Lunch', preferred_time: '12:00:00',
+        tolerance_minutes: 30, sort_order: 1,
+        created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      };
+      let result: MealPatternEntry | undefined;
+      service.createMeal('dt1', body).subscribe(m => (result = m));
+      const req = httpMock.expectOne(r => r.url.endsWith('/day-types/dt1/meals') && r.method === 'POST');
+      expect(req.request.body).toEqual(body);
+      req.flush(mockMeal);
+      expect(result).toEqual(mockMeal);
+    });
+  });
+
+  describe('updateMeal', () => {
+    it('PATCH /day-types/{id}/meals/{mealId}', () => {
+      const body: UpdateMealPatternEntryRequest = { preferred_time: '13:00' };
+      let result: MealPatternEntry | undefined;
+      service.updateMeal('dt1', 'm2', body).subscribe(m => (result = m));
+      const req = httpMock.expectOne(r => r.url.endsWith('/day-types/dt1/meals/m2') && r.method === 'PATCH');
+      expect(req.request.body).toEqual(body);
+      req.flush({ id: 'm2', day_type_id: 'dt1', user_id: 'u1', name: 'Lunch', preferred_time: '13:00:00', tolerance_minutes: 30, sort_order: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' });
+      expect(result?.preferred_time).toBe('13:00:00');
+    });
+  });
+
+  describe('deleteMeal', () => {
+    it('DELETE /day-types/{id}/meals/{mealId}', () => {
+      let completed = false;
+      service.deleteMeal('dt1', 'm1').subscribe({ complete: () => (completed = true) });
+      const req = httpMock.expectOne(r => r.url.endsWith('/day-types/dt1/meals/m1') && r.method === 'DELETE');
+      req.flush(null, { status: 204, statusText: 'No Content' });
+      expect(completed).toBeTrue();
+    });
   });
 });
 

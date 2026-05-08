@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ConfigService } from './config.service';
 import { DayTypeResponse, CreateDayTypeRequest } from '../models/day-type';
+import { MealPatternEntry, CreateMealPatternEntryRequest, UpdateMealPatternEntryRequest } from '../models/meal-pattern';
 
 /**
  * Converts a days bitmask to an array of day numbers.
@@ -55,5 +56,25 @@ export class DayTypesService {
   delete(id: string): Observable<void> {
     const apiBase = this.config.getConfig().api.baseUrl;
     return this.http.delete<void>(`${apiBase}/day-types/${id}`);
+  }
+
+  listMeals(dayTypeId: string): Observable<MealPatternEntry[]> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.get<MealPatternEntry[]>(`${apiBase}/day-types/${dayTypeId}/meals`);
+  }
+
+  createMeal(dayTypeId: string, req: CreateMealPatternEntryRequest): Observable<MealPatternEntry> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.post<MealPatternEntry>(`${apiBase}/day-types/${dayTypeId}/meals`, req);
+  }
+
+  updateMeal(dayTypeId: string, mealId: string, req: UpdateMealPatternEntryRequest): Observable<MealPatternEntry> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.patch<MealPatternEntry>(`${apiBase}/day-types/${dayTypeId}/meals/${mealId}`, req);
+  }
+
+  deleteMeal(dayTypeId: string, mealId: string): Observable<void> {
+    const apiBase = this.config.getConfig().api.baseUrl;
+    return this.http.delete<void>(`${apiBase}/day-types/${dayTypeId}/meals/${mealId}`);
   }
 }
