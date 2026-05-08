@@ -19,8 +19,11 @@ impl PgMealPatternRepository {
 
 #[async_trait]
 impl MealPatternRepository for PgMealPatternRepository {
-    async fn list_for_user(&self, user_id: Uuid) -> Result<Vec<MealPatternEntry>, crate::Error> {
-        db::list_for_user(&self.pool, user_id)
+    async fn list_for_day_type(
+        &self,
+        day_type_id: Uuid,
+    ) -> Result<Vec<MealPatternEntry>, crate::Error> {
+        db::list_for_day_type(&self.pool, day_type_id)
             .await
             .map_err(Into::into)
     }
@@ -37,7 +40,7 @@ impl MealPatternRepository for PgMealPatternRepository {
 
     async fn create(
         &self,
-        user_id: Uuid,
+        day_type_id: Uuid,
         name: &str,
         preferred_time: NaiveTime,
         tolerance_minutes: i32,
@@ -45,7 +48,7 @@ impl MealPatternRepository for PgMealPatternRepository {
     ) -> Result<MealPatternEntry, crate::Error> {
         db::create(
             &self.pool,
-            user_id,
+            day_type_id,
             name,
             preferred_time,
             tolerance_minutes,

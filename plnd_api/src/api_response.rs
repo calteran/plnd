@@ -72,7 +72,7 @@ impl From<UserPreferences> for UserPreferencesResponse {
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MealPatternEntryResponse {
     pub id: Uuid,
-    pub user_id: Uuid,
+    pub day_type_id: Uuid,
     pub name: String,
     pub preferred_time: NaiveTime,
     pub tolerance_minutes: i32,
@@ -84,7 +84,7 @@ impl From<MealPatternEntry> for MealPatternEntryResponse {
     fn from(e: MealPatternEntry) -> Self {
         Self {
             id: e.id,
-            user_id: e.user_id,
+            day_type_id: e.day_type_id,
             name: e.name,
             preferred_time: e.preferred_time,
             tolerance_minutes: e.tolerance_minutes,

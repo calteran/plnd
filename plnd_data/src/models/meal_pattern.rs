@@ -5,7 +5,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct MealPatternEntry {
     pub id: Uuid,
-    pub user_id: Uuid,
+    pub day_type_id: Uuid,
     pub name: String,
     pub preferred_time: NaiveTime,
     pub tolerance_minutes: i32,
