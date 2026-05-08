@@ -24,6 +24,9 @@ updates:
           - '@angular-eslint/*'
           - '@typescript-eslint/*'
           - 'eslint'
+      typescript:
+        patterns:
+          - 'typescript'
       npm:
         patterns:
           - '*'
@@ -33,6 +36,7 @@ updates:
           - '@angular-eslint/*'
           - '@typescript-eslint/*'
           - 'eslint'
+          - 'typescript'
 
   - package-ecosystem: docker
     directory: /plnd_api
