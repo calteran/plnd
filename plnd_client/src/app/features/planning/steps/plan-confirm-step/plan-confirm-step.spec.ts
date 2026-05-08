@@ -6,7 +6,7 @@ import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { PlanConfirmStepComponent } from './plan-confirm-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
 const PATTERN_FIXTURE: MealPatternEntry[] = [
@@ -28,10 +28,13 @@ describe('PlanConfirmStepComponent', () => {
         provideHttpClientTesting(),
         provideRouter([]),
         {
-          provide: MealPatternService,
+          provide: DayTypesMealsService,
           useValue: {
             load: jasmine.createSpy('load'),
-            entries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+            allEntries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
+            loaded: signal(true).asReadonly(),
+            mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => PATTERN_FIXTURE),
+            clear: jasmine.createSpy('clear'),
           },
         },
       ],
@@ -115,5 +118,23 @@ describe('PlanConfirmStepComponent', () => {
     const el = fixture.nativeElement.querySelector('.error-banner');
     expect(el).toBeTruthy();
     expect(el.textContent).toContain('Failed to save plan');
+  });
+
+  it('should accumulate totalSlots per day when day types have different slot counts', () => {
+    const dtSvc = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: jasmine.Spy };
+    // Mon–Fri get 3 slots; Sat/Sun get only 1 slot (dinner)
+    dtSvc.mealsForDate.and.callFake((date: string) => {
+      const dow = new Date(`${date}T12:00:00`).getDay();
+      return (dow === 0 || dow === 6) ? [PATTERN_FIXTURE[2]] : PATTERN_FIXTURE;
+    });
+    fixture.detectChanges();
+    // 2026-03-24..30: Mon-Fri = 5 days × 3 slots = 15; Sat+Sun = 2 days × 1 slot = 2 → total 17
+    // None skipped → 100%
+    expect(fixture.componentInstance.mealCoverage()).toBe(100);
+
+    // Now skip one weekday dinner — covered = 16/17
+    service.setMeal('2026-03-24', 'dinner', { approvalState: 'skipped', mealRef: null, title: '' });
+    fixture.detectChanges();
+    expect(fixture.componentInstance.mealCoverage()).toBe(Math.round((16 / 17) * 100));
   });
 });

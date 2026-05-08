@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
-import { MealPatternService } from '../../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { formatWeekDate } from '../../utils/date-format.utils';
 
 @Component({
@@ -103,13 +103,13 @@ import { formatWeekDate } from '../../utils/date-format.utils';
 })
 export class PlanConfirmStepComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
-  private readonly mealPatternService = inject(MealPatternService);
+  private readonly dayTypesMealsService = inject(DayTypesMealsService);
   private readonly router = inject(Router);
 
   errorMessage = '';
 
   ngOnInit(): void {
-    this.mealPatternService.load();
+    this.dayTypesMealsService.load();
   }
 
   readonly totalDays = computed(() => this.weekPlanService.horizonDays().length);
@@ -118,17 +118,20 @@ export class PlanConfirmStepComponent implements OnInit {
   readonly mealCoverage = computed(() => {
     const days = this.weekPlanService.horizonDays();
     if (days.length === 0) return 0;
-    const slotNames = this.mealPatternService.entries().map(e => e.name);
-    if (slotNames.length === 0) return 0;
     const meals = this.weekPlanService.scheduledMeals();
-    const covered = days.reduce((acc, d) => {
+    let totalSlots = 0;
+    let covered   = 0;
+    for (const d of days) {
+      const slotNames = this.dayTypesMealsService.mealsForDate(d).map(e => e.name);
+      totalSlots += slotNames.length;
       const daySlots = meals[d] ?? {};
-      return acc + slotNames.filter(s => {
+      for (const s of slotNames) {
         const entry = daySlots[s];
-        return !entry || entry.approvalState !== 'skipped';
-      }).length;
-    }, 0);
-    return Math.round((covered / (days.length * slotNames.length)) * 100);
+        if (!entry || entry.approvalState !== 'skipped') covered++;
+      }
+    }
+    if (totalSlots === 0) return 0;
+    return Math.round((covered / totalSlots) * 100);
   });
 
   readonly formatWeekDate = formatWeekDate;
