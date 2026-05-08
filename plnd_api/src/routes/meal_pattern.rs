@@ -164,7 +164,10 @@ pub async fn update_meal_pattern_entry(
         .meal_pattern
         .get_by_id(entry_id, user_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|e| {
+            tracing::error!(error = %e, "update_meal_pattern_entry: get_by_id failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     if existing.day_type_id != day_type_id {
@@ -225,7 +228,10 @@ pub async fn delete_meal_pattern_entry(
         .meal_pattern
         .get_by_id(entry_id, user_id)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(|e| {
+            tracing::error!(error = %e, "delete_meal_pattern_entry: get_by_id failed");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     if existing.day_type_id != day_type_id {
