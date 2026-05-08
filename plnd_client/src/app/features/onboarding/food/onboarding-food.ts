@@ -2,16 +2,15 @@ import { Component, OnInit, computed, effect, inject, signal, viewChild } from '
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
-import { MealPatternService } from '../../../core/services/meal-pattern.service';
 import { localIsoDate } from '../../../core/services/schedule.service';
 import { OnboardingStateService } from '../onboarding-state.service';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
-import { MealTimesSubstepComponent } from './substeps/meal-times-substep/meal-times-substep';
 import { DietaryRestrictionsSubstepComponent } from './substeps/dietary-restrictions-substep/dietary-restrictions-substep';
 import { DietaryPreferencesSubstepComponent } from './substeps/dietary-preferences-substep/dietary-preferences-substep';
 import { MealEntry, MealPlanResponse } from '../../../core/models/week-plan';
 import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/plan-meals-step';
+import { mealsForDate } from '../../../core/utils/day-type-utils';
 
 @Component({
   selector: 'app-onboarding-food',
@@ -19,7 +18,6 @@ import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/pla
   imports: [
     SpokeChromeComponent,
     PlanningPrefsSubstepComponent,
-    MealTimesSubstepComponent,
     DietaryRestrictionsSubstepComponent,
     DietaryPreferencesSubstepComponent,
     PlanMealsStepComponent,
@@ -38,15 +36,12 @@ import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/pla
           <app-planning-prefs-substep (complete)="advance()" />
         }
         @case (1) {
-          <app-meal-times-substep (complete)="advance()" />
-        }
-        @case (2) {
           <app-dietary-restrictions-substep (complete)="advance()" />
         }
-        @case (3) {
+        @case (2) {
           <app-dietary-preferences-substep (complete)="advance()" />
         }
-        @case (4) {
+        @case (3) {
           @if (planStart()) {
             <app-plan-meals-step
               [firstRun]="true"
@@ -70,15 +65,13 @@ export class OnboardingFoodComponent implements OnInit {
   private readonly weekPlanService = inject(WeekPlanService);
   private readonly state = inject(OnboardingStateService);
   private readonly preferencesService = inject(PreferencesService);
-  private readonly mealPatternService = inject(MealPatternService);
   private readonly router = inject(Router);
 
   private readonly planningPrefsRef = viewChild(PlanningPrefsSubstepComponent);
-  private readonly mealTimesRef = viewChild(MealTimesSubstepComponent);
   private readonly restrictionsRef = viewChild(DietaryRestrictionsSubstepComponent);
   private readonly preferencesRef = viewChild(DietaryPreferencesSubstepComponent);
 
-  readonly totalSteps = computed(() => this.state.planningPrefsComplete() ? 4 : 5);
+  readonly totalSteps = computed(() => this.state.planningPrefsComplete() ? 3 : 4);
   readonly currentStep = computed(() => {
     const step = this.internalStep();
     return this.state.planningPrefsComplete() ? step : step + 1;
@@ -87,7 +80,7 @@ export class OnboardingFoodComponent implements OnInit {
   readonly planEnd = computed(() => this.state.planPeriod()?.end ?? '');
   readonly continueDisabledForStep = computed(() => {
     if (this.internalStep() === 0) return this.planningPrefsRef()?.isSaving() ?? false;
-    return this.internalStep() === 4 && this.weekPlanService.isGenerating();
+    return this.internalStep() === 3 && this.weekPlanService.isGenerating();
   });
 
   private sessionInitialized = false;
@@ -100,7 +93,7 @@ export class OnboardingFoodComponent implements OnInit {
     // Mirror the PlanningWizardComponent pattern: call initSession() once when
     // planPeriod becomes available and the user reaches the meal plan step.
     effect(() => {
-      if (this.internalStep() !== 4) return;
+      if (this.internalStep() !== 3) return;
       const period = this.state.planPeriod();
       if (!period || this.sessionInitialized) return;
 
@@ -127,7 +120,6 @@ export class OnboardingFoodComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.mealPatternService.load();
     // Ensure preferences are loaded; the reactive effect above fires when they arrive.
     if (!this.state.planPeriod()) {
       this.preferencesService.loadPreferences();
@@ -135,7 +127,7 @@ export class OnboardingFoodComponent implements OnInit {
   }
 
   advance(): void {
-    this.internalStep.update(s => Math.min(s + 1, 4));
+    this.internalStep.update(s => Math.min(s + 1, 3));
   }
 
   onBack(): void {
@@ -148,10 +140,9 @@ export class OnboardingFoodComponent implements OnInit {
   onContinue(): void {
     switch (this.internalStep()) {
       case 0: this.planningPrefsRef()?.save(); break;
-      case 1: this.mealTimesRef()?.save(); break;
-      case 2: this.restrictionsRef()?.save(); break;
-      case 3: this.preferencesRef()?.save(); break;
-      case 4: this.finalSave(); break;
+      case 1: this.restrictionsRef()?.save(); break;
+      case 2: this.preferencesRef()?.save(); break;
+      case 3: this.finalSave(); break;
     }
   }
 
@@ -165,10 +156,11 @@ export class OnboardingFoodComponent implements OnInit {
   private buildMealPlanResponse(): MealPlanResponse {
     const planStart = this.weekPlanService.planStart() ?? '';
     const scheduled = this.weekPlanService.scheduledMeals();
-    const slotNames = this.mealPatternService.entries().map(e => e.name);
+    const dayTypes = this.state.dayTypes();
     const meals: MealEntry[] = [];
     for (const date of this.weekPlanService.horizonDays()) {
       const daySlots = scheduled[date] ?? {};
+      const slotNames = mealsForDate(date, dayTypes).map(e => e.name);
       for (const slot of slotNames) {
         const planned = daySlots[slot];
         if (planned && planned.approvalState !== 'skipped' && planned.mealRef) {
