@@ -3,6 +3,7 @@ import { forkJoin, map, of, switchMap } from 'rxjs';
 import { DayTypesService } from './day-types.service';
 import { DayTypeResponse } from '../models/day-type';
 import { MealPatternEntry } from '../models/meal-pattern';
+import { mealsForDate as mealsForDateUtil } from '../utils/day-type-utils';
 
 @Injectable({ providedIn: 'root' })
 export class DayTypesMealsService {
@@ -48,13 +49,7 @@ export class DayTypesMealsService {
   }
 
   mealsForDate(date: string): MealPatternEntry[] {
-    const dayTypes = this.dayTypesSignal();
-    if (dayTypes.length === 0) return [];
-    const dow = new Date(`${date}T12:00:00`).getDay(); // 0=Sun…6=Sat
-    const bit = 1 << dow;
-    const match = dayTypes.find(dt => !dt.is_cycle && !dt.is_default && (dt.days_bitmask & bit) !== 0);
-    const dayType = match ?? dayTypes.find(dt => dt.is_default);
-    return dayType?.meals ?? [];
+    return mealsForDateUtil(date, this.dayTypesSignal());
   }
 
   clear(): void {

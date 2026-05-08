@@ -345,8 +345,8 @@ export class PlanMealsStepComponent implements OnInit {
   readonly firstRun        = input(false);
   readonly planStart       = input<string | undefined>(undefined);
   readonly planEnd         = input<string | undefined>(undefined);
-  // When provided, overrides the global MealPatternService for slot resolution.
-  // Pass (date: string) => MealPatternEntry[] from the onboarding state.
+  // When provided, overrides DayTypesMealsService for slot resolution.
+  // Pass (date: string) => MealPatternEntry[] from the caller's context (e.g., onboarding state).
   readonly getMealsForDate = input<((date: string) => MealPatternEntry[]) | undefined>(undefined);
 
   readonly allSlots = computed(() => {
