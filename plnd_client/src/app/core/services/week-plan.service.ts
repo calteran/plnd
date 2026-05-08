@@ -206,8 +206,9 @@ export class WeekPlanService {
     this.dropReasonsSignal.update(d => {
       // Toggle: if already selected, deselect
       if (d[entryId] === reason) {
-        const { [entryId]: _, ...rest } = d;
-        return rest;
+        const remaining = { ...d };
+        delete remaining[entryId];
+        return remaining;
       }
       return { ...d, [entryId]: reason };
     });

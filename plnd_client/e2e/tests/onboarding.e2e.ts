@@ -29,9 +29,13 @@ async function completeAccountSpoke(page: Page): Promise<void> {
 }
 
 async function completeTasksSpoke(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/day-types`, route =>
-    route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
-  );
+  await page.route(`${API_BASE}/day-types`, async route => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] });
+    } else {
+      await route.fulfill({ status: 201, json: MOCK_DAY_TYPE_WEEKDAYS });
+    }
+  });
   await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
     const method = route.request().method();
     if (method === 'GET') {
@@ -93,9 +97,13 @@ async function landAtScheduleTypes(page: Page): Promise<void> {
 // Caller must have already set up the /routines route.
 // This helper registers /day-types itself.
 async function landAtRoutinesTasks(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/day-types`, route =>
-    route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
-  );
+  await page.route(`${API_BASE}/day-types`, async route => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] });
+    } else {
+      await route.fulfill({ status: 201, json: MOCK_DAY_TYPE_WEEKDAYS });
+    }
+  });
   await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
     const method = route.request().method();
     if (method === 'GET') {
