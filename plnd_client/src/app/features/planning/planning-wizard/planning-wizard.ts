@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
-import { MealPatternService } from '../../../core/services/meal-pattern.service';
+import { DayTypesMealsService } from '../../../core/services/day-types-meals.service';
 import { localIsoDate } from '../../../core/services/schedule.service';
 import { PlanReviewStepComponent } from '../steps/plan-review-step/plan-review-step';
 import { PlanTasksStepComponent } from '../steps/plan-tasks-step/plan-tasks-step';
@@ -111,7 +111,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
 export class PlanningWizardComponent implements OnInit {
   readonly weekPlanService = inject(WeekPlanService);
   private readonly preferencesService = inject(PreferencesService);
-  private readonly mealPatternService = inject(MealPatternService);
+  private readonly dayTypesMealsService = inject(DayTypesMealsService);
 
   protected readonly carryoverLoading = signal(true);
   protected readonly prefLoadError = this.preferencesService.loadError;
@@ -120,7 +120,7 @@ export class PlanningWizardComponent implements OnInit {
   readonly steps = computed<WizardStep[]>(() => [
     { n: 1, label: 'Carryover', disabled: !this.carryoverLoading() && this.weekPlanService.carryoverItems().length === 0 },
     { n: 2, label: 'Tasks' },
-    { n: 3, label: 'Meals', disabled: this.mealPatternService.entries().length === 0 },
+    { n: 3, label: 'Meals', disabled: this.dayTypesMealsService.allEntries().length === 0 },
     { n: 4, label: 'Exercise', disabled: true },
     { n: 5, label: 'Review' },
     { n: 6, label: 'Confirm' },
@@ -138,12 +138,12 @@ export class PlanningWizardComponent implements OnInit {
 
   constructor() {
     // If a saved draft lands on a now-disabled step, skip forward to the next
-    // enabled step. Gated on mealPatternService.loaded() so an empty entries()
+    // enabled step. Gated on dayTypesMealsService.loaded() so an empty allEntries()
     // signal (default before HTTP resolves) never triggers a premature advance.
     // Covers the meals pillar only; carryover auto-advance is handled in the
     // loadCarryover subscribe callback below.
     effect(() => {
-      if (!this.mealPatternService.loaded()) return;
+      if (!this.dayTypesMealsService.loaded()) return;
       const step = this.weekPlanService.currentStep();
       const stepEntry = this.steps().find(s => s.n === step);
       if (!stepEntry?.disabled) return;
@@ -198,7 +198,7 @@ export class PlanningWizardComponent implements OnInit {
 
   ngOnInit(): void {
     this.preferencesService.loadPreferences();
-    this.mealPatternService.load();
+    this.dayTypesMealsService.load();
   }
 
   next(): void {
