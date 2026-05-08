@@ -352,10 +352,10 @@ export class PlanMealsStepComponent implements OnInit {
   readonly allSlots = computed(() => {
     const fn = this.getMealsForDate();
     const seen = new Set<string>();
-    return this.horizonDays().flatMap(d => {
-      const entries = fn ? fn(d) : this.dayTypesMealsService.mealsForDate(d);
-      return entries.filter(e => seen.has(e.name) ? false : seen.add(e.name));
-    });
+    return this.horizonDays()
+      .flatMap(d => (fn ? fn(d) : this.dayTypesMealsService.mealsForDate(d)))
+      .filter(e => seen.has(e.name) ? false : seen.add(e.name))
+      .sort((a, b) => a.sort_order - b.sort_order);
   });
 
   slotsForDate(date: string): MealPatternEntry[] {

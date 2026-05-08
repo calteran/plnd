@@ -73,7 +73,7 @@ describe('DayTypesMealsService', () => {
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
         .flush('error', { status: 500, statusText: 'Server Error' });
-      expect(service.loaded()).toBeTrue();
+      expect(service.loaded()).toBeFalse();
       // After error, a second load() should fire a new HTTP request
       service.load();
       const req = httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'));

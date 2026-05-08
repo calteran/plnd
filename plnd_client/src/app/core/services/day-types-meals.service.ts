@@ -37,13 +37,13 @@ export class DayTypesMealsService {
           ? of([] as DayTypeResponse[])
           : forkJoin(dayTypes.map(dt =>
               this.dayTypesService.listMeals(dt.id).pipe(
-                map(meals => ({ ...dt, meals }) as DayTypeResponse)
+                map(meals => ({ ...dt, meals: meals.sort((a, b) => a.sort_order - b.sort_order) }) as DayTypeResponse)
               )
             ))
       ),
     ).subscribe({
       next:  dayTypes => { this.dayTypesSignal.set(dayTypes); this.loadedSignal.set(true); },
-      error: ()        => { this.requested = false;            this.loadedSignal.set(true); },
+      error: ()        => { this.requested = false; },
     });
   }
 

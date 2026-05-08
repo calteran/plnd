@@ -26,7 +26,7 @@ describe('PlanningWizardComponent', () => {
       load: jasmine.createSpy('load'),
       allEntries: mealEntries.asReadonly(),
       loaded: mealLoaded.asReadonly(),
-      mealsForDate: (date: string) => mealEntries(),
+      mealsForDate: (_date: string) => mealEntries(),
       clear: jasmine.createSpy('clear'),
     };
 
