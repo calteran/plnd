@@ -32,6 +32,20 @@ async function completeTasksSpoke(page: Page): Promise<void> {
   await page.route(`${API_BASE}/day-types`, route =>
     route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
   );
+  await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
+    const method = route.request().method();
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+    } else if (method === 'POST') {
+      await route.fulfill({ status: 201, json: {
+        id: 'mock-meal-uuid', day_type_id: 'mock-dt-uuid', user_id: 'test',
+        name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 30,
+        sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      }});
+    } else if (method === 'DELETE') {
+      await route.fulfill({ status: 204, body: '' });
+    }
+  });
   await page.route(`${API_BASE}/routines`, route => {
     if (route.request().method() === 'POST') {
       route.fulfill({ status: 201, json: MOCK_TEMPLATE_MORNING_WALK });
@@ -82,6 +96,20 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
   await page.route(`${API_BASE}/day-types`, route =>
     route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
   );
+  await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
+    const method = route.request().method();
+    if (method === 'GET') {
+      await route.fulfill({ status: 200, json: [] });
+    } else if (method === 'POST') {
+      await route.fulfill({ status: 201, json: {
+        id: 'mock-meal-uuid', day_type_id: 'mock-dt-uuid', user_id: 'test',
+        name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 30,
+        sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      }});
+    } else if (method === 'DELETE') {
+      await route.fulfill({ status: 204, body: '' });
+    }
+  });
   await landAtScheduleTypes(page);
   await page.locator('.day-types-substep .save-btn').click();
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
@@ -109,22 +137,21 @@ async function landAtTaskPlacement(page: Page): Promise<void> {
   await expect(page.locator('.placement-review')).toBeVisible();
 }
 
-// Lands on Meal Times substep (planningPrefsComplete=true after Tasks spoke).
-async function landAtMealTimes(page: Page): Promise<void> {
+// Lands on Dietary Restrictions substep (planningPrefsComplete=true after Tasks spoke;
+// meal-times step was removed — food now starts directly at restrictions).
+async function landAtDietaryRestrictions(page: Page): Promise<void> {
   await completeTasksSpoke(page);
 
   await page.locator('.section-card').nth(2).click();
   await expect(page.locator('.spoke-title')).toHaveText('Food & Meals');
-  await expect(page.locator('.meal-times')).toBeVisible();
+  await expect(page.locator('.restrictions-substep')).toBeVisible();
 }
 
 async function landAtDietaryPreferences(page: Page): Promise<void> {
   await page.route(`${API_BASE}/my/ingredient-prefs`, route =>
     route.fulfill({ status: 200, json: [] })
   );
-  await landAtMealTimes(page);
-  await page.locator('.btn-continue').click();
-  await expect(page.locator('.restrictions-substep')).toBeVisible();
+  await landAtDietaryRestrictions(page);
   await page.locator('.btn-continue').click();
   await expect(page.locator('.prefs-substep')).toBeVisible();
 }
@@ -166,16 +193,12 @@ async function completeFoodSpoke(page: Page): Promise<void> {
   await page.locator('.section-card').nth(2).click();
   await expect(page.locator('.spoke-title')).toHaveText('Food & Meals');
 
-  // planningPrefsComplete=true after Tasks, so Food starts at Meal Times (internalStep=1)
-  // Step 1: Meal Times
-  await expect(page.locator('.meal-times')).toBeVisible();
-  await page.locator('.btn-continue').click();
-
-  // Step 2: Dietary Restrictions
+  // planningPrefsComplete=true after Tasks, so Food starts at Dietary Restrictions (step 1)
+  // Step 1: Dietary Restrictions
   await expect(page.locator('.restrictions-substep')).toBeVisible();
   await page.locator('.btn-continue').click();
 
-  // Step 3: Dietary Preferences
+  // Step 2: Dietary Preferences
   await expect(page.locator('.prefs-substep')).toBeVisible();
   await page.locator('.btn-continue').click();
 
@@ -520,7 +543,7 @@ test.describe('Onboarding', () => {
       await page.locator('.section-card').nth(2).click();
       await expect(page.locator('.spoke-title')).toHaveText('Food & Meals');
       await expect(page.locator('.planning-prefs')).not.toBeVisible();
-      await expect(page.locator('.meal-times')).toBeVisible();
+      await expect(page.locator('.restrictions-substep')).toBeVisible();
     });
 
     test('shown on first entry into Food spoke; skipped on Tasks entered after', async ({ page }) => {
@@ -536,7 +559,7 @@ test.describe('Onboarding', () => {
       await expect(page.locator('.planning-prefs')).toBeVisible();
 
       await page.locator('.btn-continue').click();
-      await expect(page.locator('.meal-times')).toBeVisible();
+      await expect(page.locator('.restrictions-substep')).toBeVisible();
 
       await page.locator('.hub-link').click();
       await expect(page).toHaveURL(/\/onboarding$/);
@@ -730,27 +753,6 @@ test.describe('Onboarding', () => {
     });
   });
 
-  test.describe('Food spoke — Meal Times', () => {
-    test.beforeEach(async ({ page }) => {
-      await seedOnboarding(page);
-      await page.goto('/onboarding');
-      await landAtMealTimes(page);
-    });
-
-    test('three meal slot cards visible: Breakfast, Lunch, Dinner', async ({ page }) => {
-      const cards = page.locator('.meal-slot-card');
-      await expect(cards).toHaveCount(3);
-      await expect(cards.nth(0).locator('.card-header')).toContainText('Breakfast');
-      await expect(cards.nth(1).locator('.card-header')).toContainText('Lunch');
-      await expect(cards.nth(2).locator('.card-header')).toContainText('Dinner');
-    });
-
-    test('Save & Continue → advances to Dietary Restrictions', async ({ page }) => {
-      await page.locator('.btn-continue').click();
-      await expect(page.locator('.restrictions-substep')).toBeVisible();
-    });
-  });
-
   test.describe('Food spoke — Dietary Restrictions', () => {
     test.beforeEach(async ({ page }) => {
       await seedOnboarding(page);
@@ -762,8 +764,7 @@ test.describe('Onboarding', () => {
         }
       });
       await page.goto('/onboarding');
-      await landAtMealTimes(page);
-      await page.locator('.btn-continue').click();
+      await landAtDietaryRestrictions(page);
       await expect(page.locator('.restrictions-substep')).toBeVisible();
     });
 

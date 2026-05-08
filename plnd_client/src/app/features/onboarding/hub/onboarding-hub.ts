@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
@@ -525,7 +525,7 @@ const HUB_SECTIONS: HubSection[] = [
     }
   `],
 })
-export class OnboardingHubComponent implements OnInit {
+export class OnboardingHubComponent {
   protected readonly onboardingState = inject(OnboardingStateService);
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
@@ -539,9 +539,6 @@ export class OnboardingHubComponent implements OnInit {
 
   protected readonly sections = HUB_SECTIONS;
   protected readonly allDone = this.onboardingState.allSectionsComplete;
-
-  ngOnInit(): void {
-  }
 
   @HostListener('document:keydown.escape')
   onEscapeKey(): void {
