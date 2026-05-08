@@ -1,5 +1,5 @@
 # Angular Client Dockerfile
-FROM node:24 AS builder
+FROM node:26 AS builder
 
 WORKDIR /app
 COPY plnd_client .
