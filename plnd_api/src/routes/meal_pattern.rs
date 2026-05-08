@@ -4,26 +4,20 @@ use crate::models::{CreateMealPatternEntryRequest, UpdateMealPatternEntryRequest
 use crate::state::AppState;
 use axum::{
     Json,
-    extract::{Extension, Path, Query, State},
+    extract::{Extension, Path, State},
     http::StatusCode,
 };
 use plnd_data::Error;
-use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
 
 pub const MAX_NAME_LEN: usize = 200;
 const DEFAULT_TOLERANCE_MINUTES: i32 = 60;
 
-#[derive(Debug, Deserialize)]
-pub struct ListMealPatternParams {
-    pub day_type_id: Uuid,
-}
-
-#[utoipa::path(get, path = "/meal-pattern", tag = "Meal Pattern",
+#[utoipa::path(get, path = "/day-types/{day_type_id}/meals", tag = "Meal Pattern",
     security(("bearer_auth" = [])),
     params(
-        ("day_type_id" = Uuid, Query, description = "Day type whose meal pattern to fetch"),
+        ("day_type_id" = Uuid, Path, description = "Day type ID"),
     ),
     responses(
         (status = 200, description = "Meal pattern entries ordered by sort_order", body = Vec<MealPatternEntryResponse>),
@@ -34,14 +28,14 @@ pub struct ListMealPatternParams {
 pub async fn list_meal_pattern(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Query(params): Query<ListMealPatternParams>,
+    Path(day_type_id): Path<Uuid>,
 ) -> Result<Json<Vec<MealPatternEntryResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
     state
         .repos
         .day_type
-        .get_by_id(params.day_type_id, user_id)
+        .get_by_id(day_type_id, user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "list_meal_pattern: day_type ownership check failed");
@@ -52,7 +46,7 @@ pub async fn list_meal_pattern(
     state
         .repos
         .meal_pattern
-        .list_for_day_type(params.day_type_id)
+        .list_for_day_type(day_type_id)
         .await
         .map(|v| Json(v.into_iter().map(MealPatternEntryResponse::from).collect()))
         .map_err(|e| match e {
@@ -64,9 +58,11 @@ pub async fn list_meal_pattern(
         })
 }
 
-#[utoipa::path(post, path = "/day-types/{day_type_id}/meal-pattern", tag = "Meal Pattern",
+#[utoipa::path(post, path = "/day-types/{day_type_id}/meals", tag = "Meal Pattern",
     security(("bearer_auth" = [])),
-    params(("day_type_id" = Uuid, Path, description = "Day type ID")),
+    params(
+        ("day_type_id" = Uuid, Path, description = "Day type ID"),
+    ),
     request_body = CreateMealPatternEntryRequest,
     responses(
         (status = 201, description = "Entry created", body = MealPatternEntryResponse),
@@ -126,9 +122,12 @@ pub async fn create_meal_pattern_entry(
         })
 }
 
-#[utoipa::path(patch, path = "/meal-pattern/{id}", tag = "Meal Pattern",
+#[utoipa::path(patch, path = "/day-types/{day_type_id}/meals/{meal_id}", tag = "Meal Pattern",
     security(("bearer_auth" = [])),
-    params(("id" = Uuid, Path, description = "Entry ID")),
+    params(
+        ("day_type_id" = Uuid, Path, description = "Day type ID"),
+        ("meal_id" = Uuid, Path, description = "Meal entry ID"),
+    ),
     request_body = UpdateMealPatternEntryRequest,
     responses(
         (status = 200, description = "Entry updated", body = MealPatternEntryResponse),
@@ -141,7 +140,7 @@ pub async fn create_meal_pattern_entry(
 pub async fn update_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Path(entry_id): Path<Uuid>,
+    Path((day_type_id, entry_id)): Path<(Uuid, Uuid)>,
     Json(body): Json<UpdateMealPatternEntryRequest>,
 ) -> Result<Json<MealPatternEntryResponse>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
@@ -167,6 +166,10 @@ pub async fn update_meal_pattern_entry(
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
         .ok_or(StatusCode::NOT_FOUND)?;
+
+    if existing.day_type_id != day_type_id {
+        return Err(StatusCode::NOT_FOUND);
+    }
 
     let name = body.name.as_deref().unwrap_or(&existing.name);
     let name = name.trim();
@@ -198,9 +201,12 @@ pub async fn update_meal_pattern_entry(
         .ok_or(StatusCode::NOT_FOUND)
 }
 
-#[utoipa::path(delete, path = "/meal-pattern/{id}", tag = "Meal Pattern",
+#[utoipa::path(delete, path = "/day-types/{day_type_id}/meals/{meal_id}", tag = "Meal Pattern",
     security(("bearer_auth" = [])),
-    params(("id" = Uuid, Path, description = "Entry ID")),
+    params(
+        ("day_type_id" = Uuid, Path, description = "Day type ID"),
+        ("meal_id" = Uuid, Path, description = "Meal entry ID"),
+    ),
     responses(
         (status = 204, description = "Deleted"),
         (status = 401, description = "Unauthorized"),
@@ -210,9 +216,22 @@ pub async fn update_meal_pattern_entry(
 pub async fn delete_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
-    Path(entry_id): Path<Uuid>,
+    Path((day_type_id, entry_id)): Path<(Uuid, Uuid)>,
 ) -> Result<StatusCode, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let existing = state
+        .repos
+        .meal_pattern
+        .get_by_id(entry_id, user_id)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    if existing.day_type_id != day_type_id {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
     state
         .repos
         .meal_pattern
