@@ -9,9 +9,10 @@ import {
   signal,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of, switchMap, map } from 'rxjs';
 import { DayTypesService } from '../../../../../core/services/day-types.service';
 import { DayTypeResponse } from '../../../../../core/models/day-type';
+import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 
 // Visual order of day pills: M T W T F S S (Mon–Sun, with Sun last)
@@ -32,6 +33,15 @@ const DAY_PILLS: DayPill[] = [
   { bit: 0, label: 'S' },
 ];
 
+interface DraftMeal {
+  localId: string;           // always set (crypto.randomUUID())
+  id: string | null;         // null until saved to server
+  name: string;
+  preferred_time: string;    // "HH:MM" for <input type="time">
+  tolerance_minutes: number;
+  sort_order: number;
+}
+
 interface ScheduleCard {
   localId: string;
   id: string | null;
@@ -43,6 +53,26 @@ interface ScheduleCard {
   cycle_length: number | null;
   anchor_date: string | null;
   showRemoveHint: boolean;
+  meals: DraftMeal[];
+}
+
+function defaultDraftMeals(): DraftMeal[] {
+  return [
+    { localId: crypto.randomUUID(), id: null, name: 'Breakfast', preferred_time: '08:00', tolerance_minutes: 30, sort_order: 0 },
+    { localId: crypto.randomUUID(), id: null, name: 'Lunch',     preferred_time: '12:00', tolerance_minutes: 30, sort_order: 1 },
+    { localId: crypto.randomUUID(), id: null, name: 'Dinner',    preferred_time: '18:00', tolerance_minutes: 30, sort_order: 2 },
+  ];
+}
+
+function mealToDraft(m: MealPatternEntry): DraftMeal {
+  return {
+    localId: crypto.randomUUID(),
+    id: m.id,
+    name: m.name,
+    preferred_time: m.preferred_time.slice(0, 5), // "HH:MM:SS" → "HH:MM"
+    tolerance_minutes: m.tolerance_minutes,
+    sort_order: m.sort_order,
+  };
 }
 
 function defaultCards(): ScheduleCard[] {
@@ -58,6 +88,7 @@ function defaultCards(): ScheduleCard[] {
       cycle_length: null,
       anchor_date: null,
       showRemoveHint: false,
+      meals: defaultDraftMeals(),
     },
     {
       localId: crypto.randomUUID(),
@@ -70,6 +101,7 @@ function defaultCards(): ScheduleCard[] {
       cycle_length: null,
       anchor_date: null,
       showRemoveHint: false,
+      meals: defaultDraftMeals(),
     },
   ];
 }
@@ -87,6 +119,7 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
     cycle_length: r.cycle_length,
     anchor_date: r.anchor_date,
     showRemoveHint: false,
+    meals: (r.meals ?? []).map(mealToDraft),
   };
 }
 
@@ -179,6 +212,42 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
                 required
               />
             </label>
+          </div>
+
+          <!-- Meals for this day type -->
+          <div class="meal-section">
+            <p class="meal-section-title">Meals</p>
+            @for (meal of card.meals; track meal.localId) {
+              <div class="meal-row">
+                <input
+                  type="text"
+                  class="meal-name-input"
+                  placeholder="Meal name"
+                  [value]="meal.name"
+                  (input)="updateMeal(cardIdx, meal.localId, { name: $any($event.target).value })"
+                  aria-label="Meal name"
+                />
+                <input
+                  type="time"
+                  class="meal-time-input"
+                  [value]="meal.preferred_time"
+                  (change)="updateMeal(cardIdx, meal.localId, { preferred_time: $any($event.target).value })"
+                  aria-label="Preferred time for {{ meal.name }}"
+                />
+                <button
+                  type="button"
+                  class="remove-meal-btn"
+                  [attr.disabled]="card.meals.length <= 1 ? '' : null"
+                  (click)="removeMeal(cardIdx, meal.localId)"
+                  [attr.aria-label]="'Remove ' + meal.name"
+                >✕</button>
+              </div>
+            }
+            <button
+              type="button"
+              class="add-meal-btn"
+              (click)="addMeal(cardIdx)"
+            >+ Add meal</button>
           </div>
 
           <!-- Cycle mode fields (only shown for cycle cards) -->
@@ -437,6 +506,81 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
     .save-btn:hover:not(:disabled) {
       filter: brightness(0.88);
     }
+
+    .meal-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .meal-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--color-text-primary);
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .meal-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .meal-name-input {
+      flex: 1;
+      border: 1.5px solid var(--color-accent-border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 13px;
+      color: var(--color-text-primary);
+      outline: none;
+    }
+
+    .meal-name-input:focus {
+      border-color: var(--color-accent);
+    }
+
+    .meal-time-input {
+      border: 1.5px solid var(--color-accent-border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-size: 13px;
+    }
+
+    .remove-meal-btn {
+      background: none;
+      border: 1.5px solid var(--color-btn-neutral-border);
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--color-btn-neutral-text);
+      transition: color 0.15s, border-color 0.15s;
+    }
+
+    .remove-meal-btn:hover:not(:disabled) {
+      color: var(--color-destructive);
+      border-color: var(--color-destructive);
+    }
+
+    .remove-meal-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.4;
+    }
+
+    .add-meal-btn {
+      background: none;
+      border: none;
+      padding: 2px 0;
+      font-size: 12px;
+      color: var(--color-accent);
+      cursor: pointer;
+      text-decoration: underline;
+      text-align: left;
+      font-weight: 600;
+    }
   `],
 })
 export class DayTypesSubstepComponent implements OnInit, OnDestroy {
@@ -462,6 +606,13 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
     const stored = this.stateService.dayTypes();
     if (stored.length > 0) {
       this.cards.set(stored.map(responseToCard));
+      stored.forEach((dt, idx) => {
+        this.dayTypesService.listMeals(dt.id)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(meals => {
+            this.updateCard(idx, { meals: meals.map(mealToDraft) });
+          });
+      });
     } else {
       this.cards.set(defaultCards());
     }
@@ -473,6 +624,35 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
       const updated = [...list];
       updated[index] = { ...updated[index], ...patch };
       return updated;
+    });
+  }
+
+  addMeal(cardIndex: number): void {
+    const card = this.cards()[cardIndex];
+    const newMeal: DraftMeal = {
+      localId: crypto.randomUUID(),
+      id: null,
+      name: '',
+      preferred_time: '12:00',
+      tolerance_minutes: 30,
+      sort_order: card.meals.length,
+    };
+    this.updateCard(cardIndex, { meals: [...card.meals, newMeal] });
+  }
+
+  updateMeal(cardIndex: number, mealLocalId: string, patch: Partial<DraftMeal>): void {
+    const card = this.cards()[cardIndex];
+    const updatedMeals = card.meals.map(m =>
+      m.localId === mealLocalId ? { ...m, ...patch } : m
+    );
+    this.updateCard(cardIndex, { meals: updatedMeals });
+  }
+
+  removeMeal(cardIndex: number, mealLocalId: string): void {
+    const card = this.cards()[cardIndex];
+    if (card.meals.length <= 1) return;
+    this.updateCard(cardIndex, {
+      meals: card.meals.filter(m => m.localId !== mealLocalId),
     });
   }
 
@@ -564,6 +744,7 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
       cycle_length: null,
       anchor_date: null,
       showRemoveHint: false,
+      meals: defaultDraftMeals(),
     };
     this.cards.update(list => [...list, blank]);
   }
@@ -580,6 +761,7 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
       cycle_length: 1,
       anchor_date: null,
       showRemoveHint: false,
+      meals: defaultDraftMeals(),
     };
     this.cards.update(list => [...list, blank]);
   }
@@ -636,9 +818,36 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
     }
 
     this.isSaving.set(true);
-    forkJoin(requests).subscribe({
-      next: (responses) => {
-        this.stateService.setDayTypes(responses);
+    forkJoin(requests).pipe(
+      switchMap(dayTypeResults => {
+        const mealSaves = dayTypeResults.map((dt, idx) => {
+          const card = this.cards()[idx];
+          const existingIds = card.meals.filter(m => m.id !== null).map(m => m.id!);
+          const deleteOps = existingIds.length > 0
+            ? forkJoin(existingIds.map(mid => this.dayTypesService.deleteMeal(dt.id, mid)))
+            : of([] as void[]);
+          const draftMeals = card.meals;
+          return deleteOps.pipe(
+            switchMap(() =>
+              draftMeals.length > 0
+                ? forkJoin(draftMeals.map((m, sort_order) =>
+                    this.dayTypesService.createMeal(dt.id, {
+                      name: m.name,
+                      preferred_time: m.preferred_time,
+                      tolerance_minutes: m.tolerance_minutes,
+                      sort_order,
+                    })
+                  ))
+                : of([] as MealPatternEntry[])
+            ),
+            map(meals => ({ ...dt, meals }) as DayTypeResponse),
+          );
+        });
+        return mealSaves.length > 0 ? forkJoin(mealSaves) : of([] as DayTypeResponse[]);
+      }),
+    ).subscribe({
+      next: (augmented) => {
+        this.stateService.setDayTypes(augmented);
         this.isSaving.set(false);
         this.complete.emit();
       },
