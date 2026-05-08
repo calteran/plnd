@@ -92,7 +92,7 @@ const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
       "additionalProperties": false,
       "properties": {
         "date":                 { "type": "string", "format": "date" },
-        "meal_name":            { "type": "string", "description": "Name of the meal in the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined name)" },
+        "meal_name":            { "type": "string", "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined name)" },
         "meal_ref":             { "$ref": "#/definitions/MealRef" },
         "estimated_nutrition":  { "$ref": "#/definitions/Nutrition" }
       }
@@ -149,7 +149,7 @@ const SUGGEST_SLOT_RESPONSE_SCHEMA: &str = r##"{
   "additionalProperties": false,
   "properties": {
     "date":                { "type": "string", "format": "date" },
-    "meal_name":           { "type": "string", "description": "Name of the meal in the user's meal pattern (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined name)" },
+    "meal_name":           { "type": "string", "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined name)" },
     "meal_ref":            { "$ref": "#/definitions/MealRef" },
     "estimated_nutrition": { "$ref": "#/definitions/Nutrition" }
   },
@@ -571,7 +571,7 @@ mod tests {
 
     #[test]
     fn suggest_slot_validator_accepts_user_defined_meal_name() {
-        // meal_name is an open string — any name from the user's meal pattern is valid
+        // meal_name is an open string — any name from the active day type's meals is valid
         let validator = UseCase::MealSuggestSlot.response_validator().unwrap();
         let ok = serde_json::json!({
             "date": "2026-04-21",
@@ -635,7 +635,7 @@ mod tests {
 
     #[test]
     fn meal_plan_validator_accepts_user_defined_meal_name() {
-        // meal_name is an open string — any name from the user's meal pattern is valid
+        // meal_name is an open string — any name from the active day type's meals is valid
         let validator = UseCase::MealPlanning.response_validator().unwrap();
         let ok = serde_json::json!({
             "plan_start": "2026-04-21",
