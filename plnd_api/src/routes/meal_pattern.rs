@@ -64,8 +64,9 @@ pub async fn list_meal_pattern(
         })
 }
 
-#[utoipa::path(post, path = "/meal-pattern", tag = "Meal Pattern",
+#[utoipa::path(post, path = "/day-types/{day_type_id}/meal-pattern", tag = "Meal Pattern",
     security(("bearer_auth" = [])),
+    params(("day_type_id" = Uuid, Path, description = "Day type ID")),
     request_body = CreateMealPatternEntryRequest,
     responses(
         (status = 201, description = "Entry created", body = MealPatternEntryResponse),
@@ -78,6 +79,7 @@ pub async fn list_meal_pattern(
 pub async fn create_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
+    Path(day_type_id): Path<Uuid>,
     Json(body): Json<CreateMealPatternEntryRequest>,
 ) -> Result<(StatusCode, Json<MealPatternEntryResponse>), StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
@@ -94,7 +96,7 @@ pub async fn create_meal_pattern_entry(
     state
         .repos
         .day_type
-        .get_by_id(body.day_type_id, user_id)
+        .get_by_id(day_type_id, user_id)
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "create_meal_pattern_entry: day_type ownership check failed");
@@ -106,7 +108,7 @@ pub async fn create_meal_pattern_entry(
         .repos
         .meal_pattern
         .create(
-            body.day_type_id,
+            day_type_id,
             name,
             body.preferred_time,
             tolerance,

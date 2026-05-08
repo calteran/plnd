@@ -53,7 +53,6 @@ pub struct PatchPreferencesRequest {
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct CreateMealPatternEntryRequest {
-    pub day_type_id: Uuid,
     pub name: String,
     #[serde(deserialize_with = "deserialize_hhmm")]
     pub preferred_time: NaiveTime,
