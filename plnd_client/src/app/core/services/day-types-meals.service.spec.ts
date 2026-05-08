@@ -115,6 +115,17 @@ describe('DayTypesMealsService', () => {
     it('returns [] when no day types are loaded', () => {
       expect(service.mealsForDate('2026-03-24')).toEqual([]);
     });
+
+    it('uses UTC day-of-week — is not fooled when getDay() returns the wrong weekday', () => {
+      loadFull();
+      // Simulate a timezone where local noon on a Saturday reads as Tuesday.
+      // If the service calls getDay(), it gets 2 (Tue) → matches Workday (bitmask 62) → wrong meals.
+      // After fix: service delegates to the utility which calls getUTCDay(), unaffected by this spy.
+      const getDay = spyOn(Date.prototype, 'getDay').and.returnValue(2); // fake Tuesday
+      const meals = service.mealsForDate('2026-03-28'); // actual Saturday UTC
+      expect(meals.map(m => m.name)).toEqual(['brunch', 'dinner']); // Saturday = Weekend meals
+      getDay.and.callThrough(); // restore
+    });
   });
 
   describe('allEntries()', () => {
