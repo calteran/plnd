@@ -3,12 +3,14 @@
 
 export interface MealPatternEntry {
   id: string;
+  day_type_id: string;
   user_id: string;
   name: string;
   preferred_time: string;   // "HH:MM:SS" from Postgres; use preferredTimeHHMM() to display
   tolerance_minutes: number;
   sort_order: number;
   created_at: string;
+  updated_at: string;
 }
 
 export interface CreateMealPatternEntryRequest {
