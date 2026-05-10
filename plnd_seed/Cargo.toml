@@ -24,5 +24,8 @@ tokio = { version = "1", features = ["full"] }
 thiserror = "2.0"
 anyhow = "1.0"
 
+[dev-dependencies]
+sqlx = { version = "0.8", features = ["macros"] }
+
 [package.metadata.cargo-machete]
 ignored = ["rust_decimal"]  # used via sqlx rust_decimal feature for Decimal Encode/Type impls
