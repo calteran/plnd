@@ -11,9 +11,11 @@ export class DayTypesMealsService {
 
   private readonly dayTypesSignal = signal<DayTypeResponse[]>([]);
   private readonly loadedSignal = signal(false);
+  private readonly loadErrorSignal = signal(false);
   private requested = false;
 
   readonly loaded = this.loadedSignal.asReadonly();
+  readonly loadError = this.loadErrorSignal.asReadonly();
 
   readonly allEntries = computed<MealPatternEntry[]>(() => {
     const seen   = new Set<string>();
@@ -32,6 +34,7 @@ export class DayTypesMealsService {
   load(): void {
     if (this.requested) return;
     this.requested = true;
+    this.loadErrorSignal.set(false);
     this.dayTypesService.list().pipe(
       switchMap(dayTypes =>
         dayTypes.length === 0
@@ -44,7 +47,7 @@ export class DayTypesMealsService {
       ),
     ).subscribe({
       next:  dayTypes => { this.dayTypesSignal.set(dayTypes); this.loadedSignal.set(true); },
-      error: ()        => { this.requested = false; },
+      error: ()        => { this.requested = false; this.loadErrorSignal.set(true); },
     });
   }
 
@@ -55,6 +58,7 @@ export class DayTypesMealsService {
   clear(): void {
     this.dayTypesSignal.set([]);
     this.loadedSignal.set(false);
+    this.loadErrorSignal.set(false);
     this.requested = false;
   }
 }

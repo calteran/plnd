@@ -17,15 +17,18 @@ describe('PlanningWizardComponent', () => {
   let fixture: ComponentFixture<PlanningWizardComponent>;
   let mealEntries: WritableSignal<MealPatternEntry[]>;
   let mealLoaded: WritableSignal<boolean>;
+  let mealLoadError: WritableSignal<boolean>;
 
   beforeEach(async () => {
     localStorage.clear();
-    mealEntries = signal<MealPatternEntry[]>([]);
-    mealLoaded  = signal(false);
+    mealEntries   = signal<MealPatternEntry[]>([]);
+    mealLoaded    = signal(false);
+    mealLoadError = signal(false);
     const dayTypesMealsMock = {
       load: jasmine.createSpy('load'),
       allEntries: mealEntries.asReadonly(),
       loaded: mealLoaded.asReadonly(),
+      loadError: mealLoadError.asReadonly(),
       mealsForDate: (_date: string) => mealEntries(),
       clear: jasmine.createSpy('clear'),
     };
@@ -346,5 +349,54 @@ describe('PlanningWizardComponent', () => {
     expect(warnSpy).toHaveBeenCalled();
     // User is stranded; currentStep should still be 3.
     expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(3);
+  });
+
+  describe('meals load error', () => {
+    it('step 3 is NOT disabled when loadError is true and allEntries is empty', () => {
+      mealLoadError.set(true);
+      fixture.detectChanges();
+      const pills = fixture.nativeElement.querySelectorAll('.progress-pill');
+      // Step 3 = Meals, index 2
+      expect(pills[2].classList).not.toContain('disabled');
+    });
+
+    it('shows meals error message on step 3 when loadError is true', () => {
+      // planStart must be truthy for wizard-content to render step-specific content
+      fixture.componentInstance.weekPlanService.initSession('2026-05-12', '2026-05-18');
+      mealLoadError.set(true);
+      fixture.componentInstance.weekPlanService.goToStep(3);
+      fixture.detectChanges();
+      const errorEl: HTMLElement | null = fixture.nativeElement.querySelector('.error-msg');
+      expect(errorEl).toBeTruthy();
+      expect(errorEl?.textContent).toContain('Unable to load meal schedule');
+    });
+
+    it('does not render app-plan-meals-step on step 3 when loadError is true', () => {
+      fixture.componentInstance.weekPlanService.initSession('2026-05-12', '2026-05-18');
+      mealLoadError.set(true);
+      fixture.componentInstance.weekPlanService.goToStep(3);
+      fixture.detectChanges();
+      const mealsStep = fixture.nativeElement.querySelector('app-plan-meals-step');
+      expect(mealsStep).toBeFalsy();
+    });
+
+    it('guard effect does not auto-advance on step 3 when loadError is true', () => {
+      // loaded() never becomes true on the error path — this test pins that invariant
+      // so a future refactor cannot accidentally re-enable the guard in the error state
+      mealLoadError.set(true);
+      fixture.componentInstance.weekPlanService.goToStep(3);
+      fixture.detectChanges();
+      expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(3);
+    });
+
+    it('next() from step 3 advances to step 5 when loadError is true', () => {
+      // Step 3 is enabled (not disabled) on error, so next() must skip only
+      // the always-disabled Exercise step (step 4) and land on step 5
+      mealLoadError.set(true);
+      fixture.componentInstance.weekPlanService.goToStep(3);
+      fixture.detectChanges();
+      fixture.componentInstance.next();
+      expect(fixture.componentInstance.weekPlanService.currentStep()).toBe(5);
+    });
   });
 });
