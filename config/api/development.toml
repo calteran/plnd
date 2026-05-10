@@ -11,25 +11,14 @@ level = "debug,h2=warn,hyper_util=warn,tonic=warn,tower=warn,opentelemetry_sdk=w
 pretty_print = true
 
 [llm.fast]
-# LM Studio (native, Apple Silicon / MLX) — Gemma 4 26B MoE for low-latency tasks.
-# MoE activates only ~4B params per forward pass; fast despite large total size.
-# Override model via APP_LLM__FAST__MODEL env var.
-provider = "openai"
-base_url = "http://localhost:1234/v1"
-model = "google/gemma-4-26b-a4b"
-api_key = "lm-studio"
-max_tokens = 1024
-max_iterations = 10
+# Anthropic Claude Haiku — low-latency tasks; key set via Doppler APP_LLM__FAST__API_KEY.
+max_tokens = 4096
 
 [llm.capable]
-# LM Studio (native, Apple Silicon / MLX) — Gemma 4 26B MoE for complex reasoning.
-# Override model via APP_LLM__CAPABLE__MODEL env var.
-provider = "openai"
-base_url = "http://localhost:1234/v1"
-model = "google/gemma-4-26b-a4b"
-api_key = "lm-studio"
-max_tokens = 4096
-max_iterations = 10
+# Anthropic Claude Sonnet — complex reasoning in dev; Opus used in production via default.toml.
+# Key set via Doppler APP_LLM__CAPABLE__API_KEY.
+model = "claude-sonnet-4-6"
+max_tokens = 16384
 
 [otel]
 endpoint = "http://localhost:4317"

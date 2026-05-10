@@ -56,20 +56,14 @@ worktree-new branch:
 # Start infrastructure in Docker, then run API and client natively with split-pane logs.
 # Press q or Ctrl-C to stop API and client — infra containers keep running.
 # Use `just stop` to also bring down the infrastructure.
-# LLM is served by LM Studio natively (localhost:1234). Override model via LM_STUDIO_MODEL env var.
-# Requires: mprocs (brew install mprocs), doppler, LM Studio running locally
+# LLM requests go to the Anthropic API (key injected via Doppler).
+# Requires: mprocs (brew install mprocs), doppler
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ Starting infrastructure (db, mock-oauth-server)..."
     doppler run -- docker compose up -d --wait --wait-timeout 120
     echo "→ Infrastructure healthy."
-    LM_MODEL="${LM_STUDIO_MODEL:-google/gemma-4-26b-a4b}"
-    echo "→ Kicking off LM Studio warm-up for: $LM_MODEL (not waiting for response)"
-    curl -s -o /dev/null -X POST http://localhost:1234/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -d "{\"model\": \"$LM_MODEL\", \"messages\": [{\"role\": \"user\", \"content\": \"hi\"}], \"max_tokens\": 1}" \
-      2>/dev/null & disown 2>/dev/null || true
     echo "→ Starting API and client..."
     mprocs
 
