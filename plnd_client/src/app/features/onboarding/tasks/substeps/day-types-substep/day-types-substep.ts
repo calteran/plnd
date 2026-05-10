@@ -623,18 +623,34 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     const stored = this.stateService.dayTypes();
-    if (stored.length > 0) {
-      this.cards.set(stored.map(responseToCard));
-      stored.forEach((dt, idx) => {
-        this.dayTypesService.listMeals(dt.id)
-          .pipe(takeUntilDestroyed(this.destroyRef))
-          .subscribe(meals => {
-            this.updateCard(idx, { meals: meals.map(mealToDraft) });
-          });
-      });
-    } else {
-      this.cards.set(defaultCards());
-    }
+    // Use in-memory state when available; fall back to server (e.g. after page refresh)
+    // so returning users get records with IDs — save() can then UPDATE rather than CREATE,
+    // avoiding a bitmask-overlap 422 on already-created records.
+    const types$ = stored.length > 0
+      ? of(stored)
+      : this.dayTypesService.list();
+
+    types$.pipe(
+      switchMap(types =>
+        types.length === 0
+          ? of(null)
+          : forkJoin(types.map(dt =>
+              this.dayTypesService.listMeals(dt.id).pipe(
+                map(meals => ({ dt, meals }))
+              )
+            ))
+      ),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(result => {
+      if (result === null) {
+        this.cards.set(defaultCards());
+      } else {
+        this.cards.set(result.map(({ dt, meals }) => ({
+          ...responseToCard(dt),
+          meals: meals.map(mealToDraft),
+        })));
+      }
+    });
   }
 
   /** Update a single card's properties immutably. */
