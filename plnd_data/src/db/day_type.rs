@@ -313,6 +313,27 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn db_rejects_second_default_for_same_user(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        make_type(&pool, uid).await; // first type — auto-set as default
+
+        // Attempt to bypass app logic and insert a second is_default=true row directly
+        let result = sqlx::query(
+            "INSERT INTO user_day_types
+                 (user_id, name, days_bitmask, wake_time, sleep_time, is_default, is_cycle)
+             VALUES ($1, 'Second Default', 65, '08:00'::time, '22:00'::time, true, false)",
+        )
+        .bind(uid)
+        .execute(&pool)
+        .await;
+
+        assert!(
+            result.is_err(),
+            "DB must reject a second is_default=true for the same user"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn create_returns_day_type(pool: PgPool) {
         let uid = new_user(&pool).await;
         let dt = make_type(&pool, uid).await;
