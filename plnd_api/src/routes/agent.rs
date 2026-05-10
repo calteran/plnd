@@ -11,7 +11,9 @@ use crate::models::{
     MealPlanResponse, MealSuggestRequest, PlaceTasksEntry, PlaceTasksRequest, TaskEntryRequest,
     TaskEntryResponse,
 };
-use crate::scheduling::{constrained_dates_for_rule, has_floating_instance_in_window};
+use crate::scheduling::{
+    constrained_dates_for_rule, day_type_applies_to, has_floating_instance_in_window,
+};
 use crate::state::AppState;
 
 #[derive(serde::Deserialize)]
@@ -450,6 +452,195 @@ fn time_hint_str(start: &Option<chrono::NaiveTime>, end: &Option<chrono::NaiveTi
     }
 }
 
+#[derive(Debug, Clone)]
+struct MealAnchor {
+    name: String,
+    preferred_time: chrono::NaiveTime,
+    tolerance_minutes: i32,
+}
+
+#[derive(Debug, Clone)]
+struct DayTypeAnchors {
+    name: String,
+    wake_time: chrono::NaiveTime,
+    sleep_time: chrono::NaiveTime,
+    meals: Vec<MealAnchor>,
+}
+
+#[derive(Debug, Clone)]
+struct DateAssignment {
+    date: chrono::NaiveDate,
+    day_type_idx: usize,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct AnchorContext {
+    day_types: Vec<DayTypeAnchors>,
+    assignments: Vec<DateAssignment>,
+}
+
+impl AnchorContext {
+    pub(crate) fn empty() -> Self {
+        Self::default()
+    }
+}
+
+/// Fetch a user's day types and meal patterns and assemble an `AnchorContext`
+/// for the given plan window. Errors propagate; callers should fall back to an
+/// empty block on failure rather than 500ing the agent path.
+async fn build_anchor_context_for_user(
+    repos: &plnd_data::Repositories,
+    user_id: Uuid,
+    plan_start: chrono::NaiveDate,
+    plan_end: chrono::NaiveDate,
+) -> Result<AnchorContext, plnd_data::Error> {
+    let day_types = repos.day_type.list_for_user(user_id).await?;
+    let mut meals_by_day_type = std::collections::HashMap::new();
+    for dt in &day_types {
+        let meals = repos.meal_pattern.list_for_day_type(dt.id).await?;
+        meals_by_day_type.insert(dt.id, meals);
+    }
+    Ok(build_anchor_context(
+        &day_types,
+        &meals_by_day_type,
+        plan_start,
+        plan_end,
+    ))
+}
+
+/// Build an `AnchorContext` from the user's day types and their meal patterns.
+///
+/// For each date in [plan_start, plan_end] the active day type is resolved via
+/// `day_type_applies_to`. Day types that aren't assigned to any date in the window
+/// are excluded to keep the prompt compact. Tie-breaks favor the most recently
+/// created day type when multiple weekday types claim the same weekday bit.
+fn build_anchor_context(
+    day_types: &[plnd_data::models::DayType],
+    meals_by_day_type: &std::collections::HashMap<Uuid, Vec<plnd_data::models::MealPatternEntry>>,
+    plan_start: chrono::NaiveDate,
+    plan_end: chrono::NaiveDate,
+) -> AnchorContext {
+    if day_types.is_empty() || plan_end < plan_start {
+        return AnchorContext::empty();
+    }
+
+    let mut sorted = day_types.iter().collect::<Vec<_>>();
+    sorted.sort_by_key(|dt| std::cmp::Reverse(dt.created_at));
+
+    let mut included: Vec<&plnd_data::models::DayType> = Vec::new();
+    let mut assignments: Vec<DateAssignment> = Vec::new();
+
+    let mut date = plan_start;
+    while date <= plan_end {
+        if let Some(dt) = sorted.iter().find(|dt| day_type_applies_to(dt, date)) {
+            let idx = match included.iter().position(|x| x.id == dt.id) {
+                Some(i) => i,
+                None => {
+                    included.push(*dt);
+                    included.len() - 1
+                }
+            };
+            assignments.push(DateAssignment {
+                date,
+                day_type_idx: idx,
+            });
+        }
+        let Some(next) = date.succ_opt() else { break };
+        date = next;
+    }
+
+    let day_types_out = included
+        .into_iter()
+        .map(|dt| {
+            // sort_order reflects the waking-period sequence per §4.6 — re-sort as
+            // a safety net in case the caller hands us an unsorted slice.
+            let mut indexed: Vec<(i32, MealAnchor)> = meals_by_day_type
+                .get(&dt.id)
+                .map(|v| v.as_slice())
+                .unwrap_or(&[])
+                .iter()
+                .map(|m| {
+                    (
+                        m.sort_order,
+                        MealAnchor {
+                            name: m.name.clone(),
+                            preferred_time: m.preferred_time,
+                            tolerance_minutes: m.tolerance_minutes,
+                        },
+                    )
+                })
+                .collect();
+            indexed.sort_by_key(|(o, _)| *o);
+            DayTypeAnchors {
+                name: dt.name.clone(),
+                wake_time: dt.wake_time,
+                sleep_time: dt.sleep_time,
+                meals: indexed.into_iter().map(|(_, m)| m).collect(),
+            }
+        })
+        .collect();
+
+    AnchorContext {
+        day_types: day_types_out,
+        assignments,
+    }
+}
+
+/// Format the `[Anchors]` block (and the `[Day-type assignments]` block when more
+/// than one day type covers the window). Returns an empty string when the context
+/// has no day types — callers should treat that as "skip the block entirely."
+fn anchor_context_block(ctx: &AnchorContext) -> String {
+    if ctx.day_types.is_empty() {
+        return String::new();
+    }
+
+    let mut out = String::new();
+    out.push_str("[Anchors]\n");
+    for dt in &ctx.day_types {
+        let crosses_midnight = dt.sleep_time < dt.wake_time;
+        out.push_str(&format!("Day type \"{}\":\n", dt.name));
+        out.push_str(&format!(
+            "  - start of day @ {}\n",
+            dt.wake_time.format("%H:%M")
+        ));
+        for meal in &dt.meals {
+            // A meal whose preferred_time is before wake_time on the 24-hour clock
+            // belongs to the next calendar date when the day crosses midnight.
+            let next_day = crosses_midnight && meal.preferred_time < dt.wake_time;
+            let suffix = if next_day { " (next day)" } else { "" };
+            out.push_str(&format!(
+                "  - {} @ {} (±{} min){}\n",
+                meal.name,
+                meal.preferred_time.format("%H:%M"),
+                meal.tolerance_minutes,
+                suffix
+            ));
+        }
+        let end_suffix = if crosses_midnight { " (next day)" } else { "" };
+        out.push_str(&format!(
+            "  - end of day @ {}{}\n",
+            dt.sleep_time.format("%H:%M"),
+            end_suffix
+        ));
+    }
+
+    let distinct_day_types: std::collections::BTreeSet<usize> =
+        ctx.assignments.iter().map(|a| a.day_type_idx).collect();
+    if distinct_day_types.len() > 1 {
+        out.push_str("\n[Day-type assignments]\n");
+        for a in &ctx.assignments {
+            out.push_str(&format!(
+                "- {} ({}): {}\n",
+                a.date,
+                a.date.format("%a"),
+                ctx.day_types[a.day_type_idx].name
+            ));
+        }
+    }
+
+    out
+}
+
 /// POST /agent/place-tasks — schedule a list of one-off task names across a plan period.
 ///
 /// The client POSTs task names collected during onboarding. The agent assigns each
@@ -496,12 +687,25 @@ pub async fn post_place_tasks(
         return Err(StatusCode::BAD_REQUEST);
     }
 
+    let anchor_block =
+        match build_anchor_context_for_user(&state.repos, user_id, plan_start, plan_end).await {
+            Ok(ctx) => anchor_context_block(&ctx),
+            Err(e) => {
+                tracing::warn!(
+                    user_id = %user_id,
+                    error = %e,
+                    "place-tasks: failed to load anchors; proceeding with empty [Anchors] block",
+                );
+                String::new()
+            }
+        };
+
     let ctx = AgentContext {
         user_id,
         use_case: UseCase::PlaceTasks,
         input: body.task_names.join("\n"),
         prior_context: Some(format!(
-            "[Period: {plan_start} through {plan_end}]\n{routine_ctx}"
+            "[Period: {plan_start} through {plan_end}]\n{anchor_block}{routine_ctx}"
         )),
         extra: None,
     };
@@ -997,5 +1201,243 @@ mod tests {
         let end = chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap();
         let hint = super::time_hint_str(&None, &Some(end));
         assert_eq!(hint, " preferred end 09:00");
+    }
+
+    // --- AnchorContext / anchor_context_block tests ---
+
+    fn day_type(
+        name: &str,
+        days_bitmask: i32,
+        wake: &str,
+        sleep: &str,
+        created_secs: i64,
+    ) -> plnd_data::models::DayType {
+        use chrono::TimeZone;
+        plnd_data::models::DayType {
+            id: uuid::Uuid::new_v4(),
+            user_id: uuid::Uuid::new_v4(),
+            name: name.to_string(),
+            days_bitmask,
+            wake_time: chrono::NaiveTime::parse_from_str(wake, "%H:%M").unwrap(),
+            sleep_time: chrono::NaiveTime::parse_from_str(sleep, "%H:%M").unwrap(),
+            is_cycle: false,
+            cycle_length: None,
+            anchor_date: None,
+            created_at: chrono::Utc.timestamp_opt(created_secs, 0).unwrap(),
+        }
+    }
+
+    fn meal(
+        day_type_id: uuid::Uuid,
+        name: &str,
+        time: &str,
+        tolerance: i32,
+        sort_order: i32,
+    ) -> plnd_data::models::MealPatternEntry {
+        use chrono::TimeZone;
+        plnd_data::models::MealPatternEntry {
+            id: uuid::Uuid::new_v4(),
+            day_type_id,
+            name: name.to_string(),
+            preferred_time: chrono::NaiveTime::parse_from_str(time, "%H:%M").unwrap(),
+            tolerance_minutes: tolerance,
+            sort_order,
+            created_at: chrono::Utc.timestamp_opt(0, 0).unwrap(),
+        }
+    }
+
+    #[test]
+    fn anchor_context_block_empty_returns_empty_string() {
+        let ctx = super::AnchorContext::empty();
+        assert!(super::anchor_context_block(&ctx).is_empty());
+    }
+
+    #[test]
+    fn anchor_context_block_single_day_type_omits_assignments() {
+        // bit 1..5 = Mon..Fri = 0b0111110
+        let dt = day_type("Weekday", 0b0111110, "06:30", "22:30", 1);
+        let mut meals_map = std::collections::HashMap::new();
+        meals_map.insert(
+            dt.id,
+            vec![
+                meal(dt.id, "breakfast", "07:30", 20, 1),
+                meal(dt.id, "lunch", "12:30", 30, 2),
+                meal(dt.id, "dinner", "19:00", 30, 3),
+            ],
+        );
+        let ctx = super::build_anchor_context(&[dt], &meals_map, d(2026, 4, 27), d(2026, 5, 1));
+        let block = super::anchor_context_block(&ctx);
+        assert!(block.contains("[Anchors]"));
+        assert!(block.contains("Day type \"Weekday\":"));
+        assert!(block.contains("- start of day @ 06:30"));
+        assert!(block.contains("- breakfast @ 07:30 (±20 min)"));
+        assert!(block.contains("- lunch @ 12:30 (±30 min)"));
+        assert!(block.contains("- dinner @ 19:00 (±30 min)"));
+        assert!(block.contains("- end of day @ 22:30"));
+        assert!(
+            !block.contains("[Day-type assignments]"),
+            "single day type should omit the assignments block"
+        );
+    }
+
+    #[test]
+    fn anchor_context_block_multi_day_type_emits_assignments() {
+        // Mon..Fri
+        let weekday = day_type("Weekday", 0b0111110, "06:30", "22:30", 1);
+        // Sat + Sun = bits 6 + 0
+        let weekend = day_type("Weekend", 0b1000001, "08:30", "23:30", 2);
+        let mut meals_map = std::collections::HashMap::new();
+        meals_map.insert(
+            weekday.id,
+            vec![meal(weekday.id, "breakfast", "07:30", 20, 1)],
+        );
+        meals_map.insert(weekend.id, vec![meal(weekend.id, "brunch", "10:30", 60, 1)]);
+        let ctx = super::build_anchor_context(
+            &[weekday, weekend],
+            &meals_map,
+            d(2026, 5, 1),
+            d(2026, 5, 3),
+        );
+        let block = super::anchor_context_block(&ctx);
+        assert!(block.contains("Day type \"Weekday\":"));
+        assert!(block.contains("Day type \"Weekend\":"));
+        assert!(block.contains("[Day-type assignments]"));
+        assert!(block.contains("- 2026-05-01 (Fri): Weekday"));
+        assert!(block.contains("- 2026-05-02 (Sat): Weekend"));
+        assert!(block.contains("- 2026-05-03 (Sun): Weekend"));
+    }
+
+    #[test]
+    fn anchor_context_block_empty_meal_list_still_emits_start_and_end_of_day() {
+        // Empty meal list — §4.6 allows it; start/end-of-day are still anchors.
+        let dt = day_type("Bare", 0b1111111, "07:00", "23:00", 1);
+        let meals_map =
+            std::collections::HashMap::<uuid::Uuid, Vec<plnd_data::models::MealPatternEntry>>::new(
+            );
+        let ctx = super::build_anchor_context(&[dt], &meals_map, d(2026, 5, 1), d(2026, 5, 1));
+        let block = super::anchor_context_block(&ctx);
+        assert!(block.contains("- start of day @ 07:00"));
+        assert!(block.contains("- end of day @ 23:00"));
+        // Body has exactly two anchor lines — no meal entries.
+        let anchor_line_count = block
+            .lines()
+            .filter(|l| l.trim_start().starts_with("- "))
+            .count();
+        assert_eq!(anchor_line_count, 2, "only start- and end-of-day lines");
+    }
+
+    #[test]
+    fn anchor_context_block_midnight_crossing_annotates_next_day() {
+        // Night-shift: wake 20:00, sleep 06:00 next day.
+        let dt = day_type("Nights", 0b1111111, "20:00", "06:00", 1);
+        let mut meals_map = std::collections::HashMap::new();
+        // A "breakfast" at 21:00 is on calendar day 0 (after wake on 24-hr clock).
+        // A "lunch" at 02:00 is on calendar day +1 (before wake).
+        meals_map.insert(
+            dt.id,
+            vec![
+                meal(dt.id, "breakfast", "21:00", 20, 1),
+                meal(dt.id, "lunch", "02:00", 30, 2),
+            ],
+        );
+        let ctx = super::build_anchor_context(&[dt], &meals_map, d(2026, 5, 1), d(2026, 5, 1));
+        let block = super::anchor_context_block(&ctx);
+        assert!(block.contains("- start of day @ 20:00"));
+        assert!(block.contains("- breakfast @ 21:00 (±20 min)\n"));
+        assert!(block.contains("- lunch @ 02:00 (±30 min) (next day)"));
+        assert!(block.contains("- end of day @ 06:00 (next day)"));
+    }
+
+    #[test]
+    fn anchor_context_block_unsorted_meals_are_emitted_in_sort_order() {
+        let dt = day_type("Weekday", 0b0111110, "06:30", "22:30", 1);
+        let mut meals_map = std::collections::HashMap::new();
+        // Inserted in reverse order to confirm we sort by sort_order, not insertion order.
+        meals_map.insert(
+            dt.id,
+            vec![
+                meal(dt.id, "dinner", "19:00", 30, 3),
+                meal(dt.id, "breakfast", "07:30", 20, 1),
+                meal(dt.id, "lunch", "12:30", 30, 2),
+            ],
+        );
+        let ctx = super::build_anchor_context(&[dt], &meals_map, d(2026, 4, 27), d(2026, 4, 27));
+        let block = super::anchor_context_block(&ctx);
+        let breakfast = block.find("breakfast").unwrap();
+        let lunch = block.find("lunch").unwrap();
+        let dinner = block.find("dinner").unwrap();
+        assert!(breakfast < lunch && lunch < dinner);
+    }
+
+    #[test]
+    fn place_tasks_prior_context_layout_anchor_block_precedes_routines() {
+        // Locks in the prior_context shape `post_place_tasks` builds when both an
+        // [Anchors] block and routine listings are present:
+        //   [Period: ...]
+        //   [Anchors] ... (followed by) [Routine instances ...]
+        // The agent's existing `test_prior_context_prepended_before_user_input`
+        // proves anything in `prior_context` reaches the LLM request — combined,
+        // those two tests cover the chain of evidence the plan asked for.
+        let dt = day_type("Weekday", 0b0111110, "06:30", "22:30", 1);
+        let mut meals_map = std::collections::HashMap::new();
+        meals_map.insert(dt.id, vec![meal(dt.id, "breakfast", "07:30", 20, 1)]);
+        let anchors =
+            super::build_anchor_context(&[dt], &meals_map, d(2026, 4, 28), d(2026, 4, 30));
+        let anchor_block = super::anchor_context_block(&anchors);
+        let routines = super::routine_prior_context(
+            &[tmpl("Stretch", "FREQ=DAILY", None)],
+            d(2026, 4, 28),
+            d(2026, 4, 30),
+        );
+        let composed = format!(
+            "[Period: {} through {}]\n{}{}",
+            d(2026, 4, 28),
+            d(2026, 4, 30),
+            anchor_block,
+            routines
+        );
+
+        let period_pos = composed.find("[Period:").expect("period header present");
+        let anchors_pos = composed.find("[Anchors]").expect("anchors block present");
+        let routines_pos = composed
+            .find("[Routine instances")
+            .expect("routine block present");
+        assert!(period_pos < anchors_pos, "period header must come first");
+        assert!(
+            anchors_pos < routines_pos,
+            "anchor block must precede routine instances"
+        );
+        assert!(composed.contains("Day type \"Weekday\":"));
+        assert!(composed.contains("breakfast @ 07:30 (±20 min)"));
+    }
+
+    #[test]
+    fn anchor_context_block_excludes_day_types_with_no_assigned_dates() {
+        // Two weekday types but only "Weekday" matches the (Mon-Fri) window.
+        let weekday = day_type("Weekday", 0b0111110, "06:30", "22:30", 1);
+        let weekend = day_type("Weekend", 0b1000001, "08:30", "23:30", 2);
+        let mut meals_map = std::collections::HashMap::new();
+        meals_map.insert(
+            weekday.id,
+            vec![meal(weekday.id, "breakfast", "07:30", 20, 1)],
+        );
+        meals_map.insert(weekend.id, vec![meal(weekend.id, "brunch", "10:30", 60, 1)]);
+        // Window covers Tue–Thu, all weekdays.
+        let ctx = super::build_anchor_context(
+            &[weekday, weekend],
+            &meals_map,
+            d(2026, 4, 28),
+            d(2026, 4, 30),
+        );
+        let block = super::anchor_context_block(&ctx);
+        assert!(block.contains("Day type \"Weekday\":"));
+        assert!(
+            !block.contains("Day type \"Weekend\""),
+            "unused day type should be excluded"
+        );
+        assert!(
+            !block.contains("[Day-type assignments]"),
+            "single in-use day type should omit assignments block"
+        );
     }
 }

@@ -89,10 +89,15 @@ function getDayName(isoDate: string): string {
   return DAY_NAMES[d.getDay()];
 }
 
-function bucketOf(entry: PlaceTasksEntry, anchorNames: Set<string>): 'morning' | 'afternoon' | 'evening' {
-  // If after_anchor matches a known pattern entry name (case-insensitive), bucket by name keyword.
+type Bucket = 'start-of-day' | 'morning' | 'afternoon' | 'evening';
+
+export function bucketOf(entry: PlaceTasksEntry, anchorNames: Set<string>): Bucket {
   if (entry.after_anchor) {
     const lower = entry.after_anchor.toLowerCase();
+    // The implicit start-of-day anchor (§4.7) — a task placed in the slot above
+    // the first meal divider. The LLM emits this label per place_tasks.md.
+    if (lower === 'start of day') return 'start-of-day';
+    // If after_anchor matches a known pattern entry name (case-insensitive), bucket by name keyword.
     if (anchorNames.has(lower)) {
       if (lower.includes('breakfast') || lower.includes('morning')) return 'morning';
       if (lower.includes('dinner') || lower.includes('supper') || lower.includes('evening')) return 'evening';
@@ -106,7 +111,7 @@ function bucketOf(entry: PlaceTasksEntry, anchorNames: Set<string>): 'morning' |
   return 'evening';
 }
 
-function buildDayCards(
+export function buildDayCards(
   entries: PlaceTasksEntry[],
   start: string,
   end: string,
@@ -120,7 +125,7 @@ function buildDayCards(
       .map((entry, idx) => ({ entry, idx }))
       .filter(({ entry }) => entry.scheduled_date === date);
 
-    const bySlot = (slot: 'morning' | 'afternoon' | 'evening'): TaskRow[] =>
+    const bySlot = (slot: Bucket): TaskRow[] =>
       dayEntries
         .filter(({ entry }) => bucketOf(entry, anchorNames) === slot)
         .sort((a, b) => (a.entry.time_window_start ?? '').localeCompare(b.entry.time_window_start ?? ''))
@@ -132,8 +137,15 @@ function buildDayCards(
 
     const rows: DayRow[] = [];
     if (pattern.length === 0) {
-      rows.push(...bySlot('morning'), ...bySlot('afternoon'), ...bySlot('evening'));
+      rows.push(
+        ...bySlot('start-of-day'),
+        ...bySlot('morning'),
+        ...bySlot('afternoon'),
+        ...bySlot('evening'),
+      );
     } else {
+      // Tasks anchored at start-of-day render above the first meal divider.
+      rows.push(...bySlot('start-of-day'));
       const buckets: ('morning' | 'afternoon' | 'evening')[] = pattern.map(p => {
         const lower = p.name.toLowerCase();
         if (lower.includes('breakfast') || lower.includes('morning')) return 'morning';

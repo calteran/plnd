@@ -1,4 +1,17 @@
 use chrono::{Datelike, NaiveDate, Weekday};
+use plnd_data::models::DayType;
+
+/// True if `day_type` covers `date`. Today this resolves only weekday-bitmask types
+/// (bit 0 = Sunday … bit 6 = Saturday); cycle types always return `false`. The
+/// frontend's `activeDayTypeForDate` makes the same simplification — cycle support
+/// is forward work tracked in https://github.com/calteran/plnd/issues/730.
+pub(crate) fn day_type_applies_to(day_type: &DayType, date: NaiveDate) -> bool {
+    if day_type.is_cycle {
+        return false;
+    }
+    let bit = 1_i32 << date.weekday().num_days_from_sunday();
+    (day_type.days_bitmask & bit) != 0
+}
 
 /// Returns all dates in [start, end] where `rule` produces a constrained instance
 /// (date is fixed; the LLM picks time only).
@@ -291,5 +304,73 @@ mod tests {
     fn unknown_recurrence_returns_false() {
         assert!(!date_matches_recurrence(d(2026, 4, 27), "quarterly"));
         assert!(!date_matches_recurrence(d(2026, 4, 27), ""));
+    }
+
+    // ── day_type_applies_to ────────────────────────────────────────────────
+
+    fn weekday_dt(name: &str, days_bitmask: i32) -> DayType {
+        use chrono::{NaiveTime, TimeZone, Utc};
+        DayType {
+            id: uuid::Uuid::new_v4(),
+            user_id: uuid::Uuid::new_v4(),
+            name: name.to_string(),
+            days_bitmask,
+            wake_time: NaiveTime::from_hms_opt(7, 0, 0).unwrap(),
+            sleep_time: NaiveTime::from_hms_opt(22, 0, 0).unwrap(),
+            is_cycle: false,
+            cycle_length: None,
+            anchor_date: None,
+            created_at: Utc.timestamp_opt(0, 0).unwrap(),
+        }
+    }
+
+    fn cycle_dt(name: &str) -> DayType {
+        let mut dt = weekday_dt(name, 0);
+        dt.is_cycle = true;
+        dt.cycle_length = Some(2);
+        dt.anchor_date = Some(NaiveDate::from_ymd_opt(2026, 4, 27).unwrap());
+        dt
+    }
+
+    #[test]
+    fn day_type_applies_to_weekday_match() {
+        // bit 1 = Monday; 2026-04-27 is a Monday.
+        let dt = weekday_dt("Mondays", 0b0000010);
+        assert!(day_type_applies_to(&dt, d(2026, 4, 27)));
+    }
+
+    #[test]
+    fn day_type_applies_to_weekday_non_match() {
+        // bit 1 = Monday; 2026-04-28 is a Tuesday.
+        let dt = weekday_dt("Mondays", 0b0000010);
+        assert!(!day_type_applies_to(&dt, d(2026, 4, 28)));
+    }
+
+    #[test]
+    fn day_type_applies_to_weekday_multi_day_bitmask() {
+        // Mon..Fri = bits 1..5 = 0b0111110.
+        let dt = weekday_dt("Weekdays", 0b0111110);
+        assert!(day_type_applies_to(&dt, d(2026, 4, 27))); // Mon
+        assert!(day_type_applies_to(&dt, d(2026, 5, 1))); // Fri
+        assert!(!day_type_applies_to(&dt, d(2026, 5, 2))); // Sat
+        assert!(!day_type_applies_to(&dt, d(2026, 5, 3))); // Sun
+    }
+
+    #[test]
+    fn day_type_applies_to_weekend_bitmask() {
+        // Sat = bit 6; Sun = bit 0.
+        let dt = weekday_dt("Weekends", 0b1000001);
+        assert!(day_type_applies_to(&dt, d(2026, 5, 2))); // Sat
+        assert!(day_type_applies_to(&dt, d(2026, 5, 3))); // Sun
+        assert!(!day_type_applies_to(&dt, d(2026, 4, 27))); // Mon
+    }
+
+    #[test]
+    fn day_type_applies_to_cycle_returns_false() {
+        // Cycle types are forward work — they always return false today, mirroring
+        // the frontend's `activeDayTypeForDate`.
+        let dt = cycle_dt("Shift");
+        assert!(!day_type_applies_to(&dt, d(2026, 4, 27)));
+        assert!(!day_type_applies_to(&dt, d(2026, 4, 28)));
     }
 }

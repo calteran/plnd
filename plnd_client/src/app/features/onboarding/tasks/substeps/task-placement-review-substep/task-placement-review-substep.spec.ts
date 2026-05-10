@@ -5,7 +5,12 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { Router } from '@angular/router';
-import { TaskPlacementReviewSubstepComponent } from './task-placement-review-substep';
+import {
+  TaskPlacementReviewSubstepComponent,
+  bucketOf,
+  buildDayCards,
+} from './task-placement-review-substep';
+import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { ConfigService } from '../../../../../core/services/config.service';
 import { DayTypeResponse } from '../../../../../core/models/day-type';
@@ -591,5 +596,95 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(component.editState()?.entryIndex).toBe(0);
   });
 
+});
+
+// ── Helper-function tests ─────────────────────────────────────────────────────
+
+describe('bucketOf', () => {
+  function entry(overrides: Partial<PlaceTasksEntry>): PlaceTasksEntry {
+    return {
+      title: 'task',
+      scheduled_date: '2026-04-28',
+      duration_minutes: 30,
+      energy_required: 'low',
+      task_type: 'general',
+      ...overrides,
+    };
+  }
+
+  it('buckets after_anchor "start of day" as start-of-day', () => {
+    expect(bucketOf(entry({ after_anchor: 'start of day' }), new Set())).toBe('start-of-day');
+  });
+
+  it('is case-insensitive for "start of day"', () => {
+    expect(bucketOf(entry({ after_anchor: 'Start Of Day' }), new Set())).toBe('start-of-day');
+    expect(bucketOf(entry({ after_anchor: 'START OF DAY' }), new Set())).toBe('start-of-day');
+  });
+
+  it('still buckets meal anchors as before (regression)', () => {
+    const anchors = new Set(['breakfast', 'lunch', 'dinner']);
+    expect(bucketOf(entry({ after_anchor: 'breakfast' }), anchors)).toBe('morning');
+    expect(bucketOf(entry({ after_anchor: 'lunch' }), anchors)).toBe('afternoon');
+    expect(bucketOf(entry({ after_anchor: 'dinner' }), anchors)).toBe('evening');
+  });
+});
+
+describe('buildDayCards start-of-day rendering', () => {
+  function meal(overrides: Partial<MealPatternEntry>): MealPatternEntry {
+    return {
+      id: 'm-1',
+      day_type_id: 'd-1',
+      user_id: 'u-1' as unknown as MealPatternEntry['user_id'],
+      name: 'breakfast',
+      preferred_time: '08:00:00',
+      tolerance_minutes: 30,
+      sort_order: 1,
+      created_at: '2026-04-01T00:00:00Z',
+      updated_at: '2026-04-01T00:00:00Z',
+      ...overrides,
+    } as MealPatternEntry;
+  }
+
+  function entry(overrides: Partial<PlaceTasksEntry>): PlaceTasksEntry {
+    return {
+      title: 'task',
+      scheduled_date: '2026-04-28',
+      duration_minutes: 30,
+      energy_required: 'low',
+      task_type: 'general',
+      ...overrides,
+    };
+  }
+
+  it('renders a start-of-day task above the first meal divider', () => {
+    const entries: PlaceTasksEntry[] = [
+      entry({ title: 'Walk', after_anchor: 'start of day' }),
+      entry({ title: 'Meds', after_anchor: 'breakfast' }),
+    ];
+    const meals = [meal({ name: 'breakfast', preferred_time: '08:00:00', sort_order: 1 })];
+    const cards = buildDayCards(entries, '2026-04-28', '2026-04-28', () => meals);
+    const rows = cards[0].rows;
+
+    const walkIdx = rows.findIndex(r => r.kind === 'task' && r.entry.title === 'Walk');
+    const breakfastDividerIdx = rows.findIndex(r => r.kind === 'meal' && r.label === 'BREAKFAST');
+    const medsIdx = rows.findIndex(r => r.kind === 'task' && r.entry.title === 'Meds');
+
+    expect(walkIdx).toBeGreaterThanOrEqual(0);
+    expect(breakfastDividerIdx).toBeGreaterThan(walkIdx);
+    expect(medsIdx).toBeGreaterThan(breakfastDividerIdx);
+  });
+
+  it('includes start-of-day tasks in the flat fallback when meal pattern is empty', () => {
+    const entries: PlaceTasksEntry[] = [
+      entry({ title: 'Walk', after_anchor: 'start of day' }),
+      entry({ title: 'Lunch errand', after_anchor: 'lunch' }), // no meal pattern → falls through to time bucket
+    ];
+    const cards = buildDayCards(entries, '2026-04-28', '2026-04-28', () => []);
+    const rows = cards[0].rows;
+    // No meal dividers when pattern is empty.
+    expect(rows.every(r => r.kind === 'task')).toBe(true);
+    // The start-of-day task is included.
+    expect(rows.find(r => r.kind === 'task' && r.entry.title === 'Walk')).toBeDefined();
+  });
 });
 
