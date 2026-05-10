@@ -160,7 +160,12 @@ pub(crate) fn build_tool_registry(
     extra: Option<serde_json::Value>,
 ) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
-    register_memory_tools(&mut registry, Arc::clone(&repos.memory));
+    // PlaceTasks is a stateless batch operation: memories are already server-injected
+    // into the system prompt before the first LLM call, so memory tools add only
+    // token overhead (~400–500 tokens) with no benefit.
+    if *use_case != UseCase::PlaceTasks {
+        register_memory_tools(&mut registry, Arc::clone(&repos.memory));
+    }
     match use_case {
         UseCase::TaskEntry => {
             register_schedule_tools(
