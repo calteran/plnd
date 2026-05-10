@@ -6,9 +6,9 @@ import { seedAuth, API_BASE, MOCK_USER_NEW } from '../helpers/auth';
 // → plan_start = 2026-03-30, plan_end = 2026-04-05
 
 const MOCK_DAY_TYPES = [
-  { id: 'dt-default', user_id: 'test', name: 'Default', days_bitmask: 0,
+  { id: 'dt-default', user_id: 'test', name: 'Default', days_bitmask: 127,
     wake_time: '07:00:00', sleep_time: '23:00:00',
-    is_default: true, is_cycle: false, cycle_length: null, anchor_date: null, created_at: '2026-01-01T00:00:00Z' },
+    is_cycle: false, cycle_length: null, anchor_date: null, created_at: '2026-01-01T00:00:00Z' },
 ];
 
 const MOCK_DAY_TYPE_MEALS = [

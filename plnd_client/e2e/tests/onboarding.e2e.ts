@@ -42,6 +42,8 @@ async function completeTasksSpoke(page: Page): Promise<void> {
     const method = route.request().method();
     if (method === 'DELETE') {
       await route.fulfill({ status: 204, body: '' });
+    } else if (route.request().url().includes('st-weekends-uuid')) {
+      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKENDS });
     } else {
       await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKDAYS });
     }
@@ -118,6 +120,8 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
     const method = route.request().method();
     if (method === 'DELETE') {
       await route.fulfill({ status: 204, body: '' });
+    } else if (route.request().url().includes('st-weekends-uuid')) {
+      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKENDS });
     } else {
       await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKDAYS });
     }

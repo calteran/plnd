@@ -8,8 +8,6 @@ use crate::models::DayType;
 pub enum DeleteDayTypeOutcome {
     Deleted,
     NotFound,
-    /// Cannot delete: this is the user's designated default day type.
-    IsDefault,
     /// Cannot delete: this is the user's only day type.
     LastType,
 }
@@ -46,8 +44,6 @@ pub trait DayTypeRepository: Send + Sync {
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
     ) -> Result<Option<DayType>, crate::Error>;
-
-    async fn set_default(&self, id: Uuid, user_id: Uuid) -> Result<Option<DayType>, crate::Error>;
 
     async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error>;
 

@@ -87,12 +87,6 @@ impl DayTypeRepository for PgDayTypeRepository {
         .map_err(Into::into)
     }
 
-    async fn set_default(&self, id: Uuid, user_id: Uuid) -> Result<Option<DayType>, crate::Error> {
-        db::set_default(&self.pool, id, user_id)
-            .await
-            .map_err(Into::into)
-    }
-
     async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error> {
         db::count_for_user(&self.pool, user_id)
             .await

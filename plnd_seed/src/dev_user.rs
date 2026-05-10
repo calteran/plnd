@@ -85,8 +85,8 @@ async fn insert_default_day_type(tx: &mut PgConnection, user_id: Uuid) -> Result
     let day_type_id = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO user_day_types
-             (id, user_id, name, days_bitmask, wake_time, sleep_time, is_default, is_cycle)
-         VALUES ($1, $2, $3, $4, $5::time, $6::time, true, false)",
+             (id, user_id, name, days_bitmask, wake_time, sleep_time, is_cycle)
+         VALUES ($1, $2, $3, $4, $5::time, $6::time, false)",
     )
     .bind(day_type_id)
     .bind(user_id)

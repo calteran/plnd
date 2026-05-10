@@ -129,7 +129,6 @@ impl Modify for BearerSecurityAddon {
         crate::routes::day_types::list_day_types,
         crate::routes::day_types::create_day_type,
         crate::routes::day_types::update_day_type,
-        crate::routes::day_types::set_default_day_type,
         crate::routes::day_types::delete_day_type,
         // Agent
         crate::routes::agent::post_task,

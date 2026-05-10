@@ -7,7 +7,6 @@ export interface DayTypeResponse {
   days_bitmask: number; // bit 0=Sun, bit 1=Mon, …, bit 6=Sat; 0 for cycle types
   wake_time: string;    // "HH:MM:SS"
   sleep_time: string;   // "HH:MM:SS"
-  is_default: boolean;
   is_cycle: boolean;
   cycle_length: number | null;
   anchor_date: string | null;
