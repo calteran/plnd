@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
-use chrono::{Datelike, Utc};
+use chrono::Utc;
 use plnd_agent::{AgentContext, AgentError, UseCase, xml_escape};
 use uuid::Uuid;
 
@@ -629,18 +629,11 @@ fn anchor_context_block(ctx: &AnchorContext) -> String {
     if distinct_day_types.len() > 1 {
         out.push_str("\n[Day-type assignments]\n");
         for a in &ctx.assignments {
-            let dow = match a.date.weekday() {
-                chrono::Weekday::Mon => "Mon",
-                chrono::Weekday::Tue => "Tue",
-                chrono::Weekday::Wed => "Wed",
-                chrono::Weekday::Thu => "Thu",
-                chrono::Weekday::Fri => "Fri",
-                chrono::Weekday::Sat => "Sat",
-                chrono::Weekday::Sun => "Sun",
-            };
             out.push_str(&format!(
                 "- {} ({}): {}\n",
-                a.date, dow, ctx.day_types[a.day_type_idx].name
+                a.date,
+                a.date.format("%a"),
+                ctx.day_types[a.day_type_idx].name
             ));
         }
     }
