@@ -5,6 +5,6 @@
 -- (e.g. plnd_seed inserts is_default = true directly) has no constraint to catch
 -- a second default. This partial unique index closes that gap.
 
-CREATE UNIQUE INDEX user_day_types_one_default_per_user
+CREATE UNIQUE INDEX idx_user_day_types_one_default
     ON user_day_types (user_id)
     WHERE is_default = true;
