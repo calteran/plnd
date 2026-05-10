@@ -34,6 +34,7 @@ export class DayTypesMealsService {
   load(): void {
     if (this.requested) return;
     this.requested = true;
+    this.loadErrorSignal.set(false);
     this.dayTypesService.list().pipe(
       switchMap(dayTypes =>
         dayTypes.length === 0

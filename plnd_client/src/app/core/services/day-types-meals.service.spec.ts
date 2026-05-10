@@ -93,6 +93,17 @@ describe('DayTypesMealsService', () => {
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
       expect(service.loadError()).toBeFalse();
     });
+
+    it('loadError resets to false when load() is retried after an error', () => {
+      service.load();
+      httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
+        .flush('error', { status: 500, statusText: 'Server Error' });
+      expect(service.loadError()).toBeTrue();
+      // Retry: requested was reset on error, so a second load() fires
+      service.load();
+      expect(service.loadError()).toBeFalse(); // cleared at start of retry
+      httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
+    });
   });
 
   describe('mealsForDate()', () => {
