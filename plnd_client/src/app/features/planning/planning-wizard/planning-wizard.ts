@@ -55,7 +55,13 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
               }
             }
             @case (2) { <app-plan-tasks-step /> }
-            @case (3) { <app-plan-meals-step /> }
+            @case (3) {
+              @if (dayTypesMealsLoadError()) {
+                <p class="error-msg">Unable to load meal schedule. Please refresh to try again.</p>
+              } @else {
+                <app-plan-meals-step />
+              }
+            }
             @case (5) { <app-plan-day-grid-step /> }
             @case (6) { <app-plan-confirm-step /> }
           }
@@ -115,12 +121,13 @@ export class PlanningWizardComponent implements OnInit {
 
   protected readonly carryoverLoading = signal(true);
   protected readonly prefLoadError = this.preferencesService.loadError;
+  protected readonly dayTypesMealsLoadError = this.dayTypesMealsService.loadError;
   protected readonly Math = Math;
 
   readonly steps = computed<WizardStep[]>(() => [
     { n: 1, label: 'Carryover', disabled: !this.carryoverLoading() && this.weekPlanService.carryoverItems().length === 0 },
     { n: 2, label: 'Tasks' },
-    { n: 3, label: 'Meals', disabled: this.dayTypesMealsService.allEntries().length === 0 },
+    { n: 3, label: 'Meals', disabled: this.dayTypesMealsService.allEntries().length === 0 && !this.dayTypesMealsService.loadError() },
     { n: 4, label: 'Exercise', disabled: true },
     { n: 5, label: 'Review' },
     { n: 6, label: 'Confirm' },
