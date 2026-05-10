@@ -9,17 +9,18 @@ function dayOfWeekBit(date: string): number {
 
 /**
  * Returns the active DayTypeResponse for a given calendar date.
- * Checks 7-day types by bitmask first, then falls back to the default.
- * Cycle day types are skipped (forward work).
+ * Checks 7-day types by bitmask first. Cycle day types are skipped (forward work).
+ * Throws if no day type covers the date — this indicates a data integrity error,
+ * since every weekday must belong to exactly one type.
  */
 export function activeDayTypeForDate(
   date: string,
   dayTypes: DayTypeResponse[],
-): DayTypeResponse | undefined {
+): DayTypeResponse {
   const bit = dayOfWeekBit(date);
   const match = dayTypes.find(dt => !dt.is_cycle && (dt.days_bitmask & bit) !== 0);
   if (match) return match;
-  return dayTypes.find(dt => dt.is_default);
+  throw new Error(`No day type covers date ${date} — data integrity error`);
 }
 
 /**
@@ -30,5 +31,6 @@ export function mealsForDate(
   date: string,
   dayTypes: DayTypeResponse[],
 ): MealPatternEntry[] {
-  return activeDayTypeForDate(date, dayTypes)?.meals ?? [];
+  if (dayTypes.length === 0) return [];
+  return activeDayTypeForDate(date, dayTypes).meals ?? [];
 }

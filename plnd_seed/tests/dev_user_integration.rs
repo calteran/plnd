@@ -41,22 +41,18 @@ async fn seed_dev_user_creates_expected_rows(pool: PgPool) {
             .unwrap();
     assert_eq!(prefs_count, 1, "expected exactly 1 user_preferences row");
 
-    let day_type_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM user_day_types WHERE user_id = $1 AND is_default = true",
-    )
-    .bind(uid)
-    .fetch_one(&pool)
-    .await
-    .unwrap();
-    assert_eq!(
-        day_type_count, 1,
-        "expected exactly 1 default user_day_type"
-    );
+    let day_type_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM user_day_types WHERE user_id = $1")
+            .bind(uid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(day_type_count, 1, "expected exactly 1 user_day_type");
 
     let meal_pattern_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM meal_pattern_entries
          WHERE day_type_id = (
-             SELECT id FROM user_day_types WHERE user_id = $1 AND is_default = true
+             SELECT id FROM user_day_types WHERE user_id = $1
          )",
     )
     .bind(uid)
@@ -123,7 +119,7 @@ async fn seed_dev_user_is_idempotent(pool: PgPool) {
     let meal_pattern_count: i64 = sqlx::query_scalar(
         "SELECT COUNT(*) FROM meal_pattern_entries
          WHERE day_type_id = (
-             SELECT id FROM user_day_types WHERE user_id = $1 AND is_default = true
+             SELECT id FROM user_day_types WHERE user_id = $1
          )",
     )
     .bind(uid)

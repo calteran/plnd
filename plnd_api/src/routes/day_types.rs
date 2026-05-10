@@ -248,42 +248,6 @@ pub async fn update_day_type(
 }
 
 #[utoipa::path(
-    patch,
-    path = "/day-types/{id}/default",
-    tag = "Day Types",
-    security(("bearer_auth" = [])),
-    params(("id" = Uuid, Path, description = "Day type ID to promote as default")),
-    responses(
-        (status = 200, description = "Day type promoted to default", body = DayTypeResponse),
-        (status = 401, description = "Unauthorized"),
-        (status = 404, description = "Day type not found"),
-    )
-)]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
-pub async fn set_default_day_type(
-    State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
-    Path(day_type_id): Path<Uuid>,
-) -> Result<Json<DayTypeResponse>, StatusCode> {
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    state
-        .repos
-        .day_type
-        .set_default(day_type_id, user_id)
-        .await
-        .map_err(|e| match e {
-            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
-            e => {
-                tracing::error!(error = %e, "set_default_day_type DB error");
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        })?
-        .map(|dt| Json(DayTypeResponse::from(dt)))
-        .ok_or(StatusCode::NOT_FOUND)
-}
-
-#[utoipa::path(
     delete,
     path = "/day-types/{id}",
     tag = "Day Types",
@@ -293,7 +257,7 @@ pub async fn set_default_day_type(
         (status = 204, description = "Day type deleted"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Day type not found"),
-        (status = 422, description = "Cannot delete the default or the last day type"),
+        (status = 422, description = "Cannot delete the last day type"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -307,7 +271,6 @@ pub async fn delete_day_type(
     match state.repos.day_type.delete(day_type_id, user_id).await {
         Ok(DeleteDayTypeOutcome::Deleted) => Ok(StatusCode::NO_CONTENT),
         Ok(DeleteDayTypeOutcome::NotFound) => Err(StatusCode::NOT_FOUND),
-        Ok(DeleteDayTypeOutcome::IsDefault) => Err(StatusCode::UNPROCESSABLE_ENTITY),
         Ok(DeleteDayTypeOutcome::LastType) => Err(StatusCode::UNPROCESSABLE_ENTITY),
         Err(Error::ConnectionLost) => Err(StatusCode::SERVICE_UNAVAILABLE),
         Err(e) => {

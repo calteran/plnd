@@ -6,7 +6,7 @@ use crate::db::error::DatabaseError;
 use crate::models::DayType;
 use crate::repository::day_type::DeleteDayTypeOutcome;
 
-const COLUMNS: &str = "id, user_id, name, days_bitmask, wake_time, sleep_time, is_default, \
+const COLUMNS: &str = "id, user_id, name, days_bitmask, wake_time, sleep_time, \
      is_cycle, cycle_length, anchor_date, created_at";
 
 /// List all day types for a user, ordered by created_at ascending.
@@ -38,8 +38,7 @@ pub async fn get_by_id(
     .map_err(DatabaseError::from)
 }
 
-/// Insert a new day type. The first day type created for a user is automatically
-/// set as the default (is_default = true via a NOT EXISTS subquery).
+/// Insert a new day type.
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip(pool), fields(table = "user_day_types", op = "create"))]
 pub async fn create(
@@ -55,13 +54,9 @@ pub async fn create(
 ) -> Result<DayType, DatabaseError> {
     sqlx::query_as::<_, DayType>(&format!(
         "INSERT INTO user_day_types
-            (user_id, name, days_bitmask, wake_time, sleep_time, is_default,
+            (user_id, name, days_bitmask, wake_time, sleep_time,
              is_cycle, cycle_length, anchor_date)
-         VALUES (
-            $1, $2, $3, $4, $5,
-            (SELECT NOT EXISTS(SELECT 1 FROM user_day_types WHERE user_id = $1)),
-            $6, $7, $8
-         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING {COLUMNS}"
     ))
     .bind(user_id)
@@ -77,7 +72,7 @@ pub async fn create(
     .map_err(DatabaseError::from)
 }
 
-/// Replace all mutable fields of an existing day type (excluding is_default).
+/// Replace all mutable fields of an existing day type.
 /// Returns `None` if not found.
 #[allow(clippy::too_many_arguments)]
 #[tracing::instrument(skip(pool), fields(table = "user_day_types", op = "update"))]
@@ -114,29 +109,6 @@ pub async fn update(
     .map_err(DatabaseError::from)
 }
 
-/// Atomically promote a day type to default, clearing is_default on all others
-/// for the same user. Returns the newly-promoted record, or None if not found.
-#[tracing::instrument(skip(pool), fields(table = "user_day_types", op = "set_default"))]
-pub async fn set_default(
-    pool: &PgPool,
-    id: Uuid,
-    user_id: Uuid,
-) -> Result<Option<DayType>, DatabaseError> {
-    let rows = sqlx::query_as::<_, DayType>(&format!(
-        "UPDATE user_day_types
-         SET is_default = (id = $1)
-         WHERE user_id = $2
-         RETURNING {COLUMNS}"
-    ))
-    .bind(id)
-    .bind(user_id)
-    .fetch_all(pool)
-    .await
-    .map_err(DatabaseError::from)?;
-
-    Ok(rows.into_iter().find(|r| r.id == id))
-}
-
 /// Count day types owned by a user.
 #[tracing::instrument(skip(pool), fields(table = "user_day_types", op = "count"))]
 pub async fn count_for_user(pool: &PgPool, user_id: Uuid) -> Result<i64, DatabaseError> {
@@ -147,12 +119,10 @@ pub async fn count_for_user(pool: &PgPool, user_id: Uuid) -> Result<i64, Databas
         .map_err(DatabaseError::from)
 }
 
-/// Atomically delete a day type, enforcing two invariants:
-///   1. The user must keep at least one day type (count > 1).
-///   2. The default day type cannot be deleted (is_default = false guard).
+/// Atomically delete a day type, enforcing that the user keeps at least one.
 ///
-/// Returns `IsDefault` if the target is the default, `LastType` if it is the
-/// only remaining type, or `NotFound` if the id does not belong to the user.
+/// Returns `LastType` if this is the only remaining type, or `NotFound` if
+/// the id does not belong to the user.
 #[tracing::instrument(skip(pool), fields(table = "user_day_types", op = "delete"))]
 pub async fn delete(
     pool: &PgPool,
@@ -163,7 +133,6 @@ pub async fn delete(
         "DELETE FROM user_day_types
          WHERE id = $1
            AND user_id = $2
-           AND is_default = false
            AND (SELECT COUNT(*) FROM user_day_types WHERE user_id = $2) > 1",
     )
     .bind(id)
@@ -176,19 +145,18 @@ pub async fn delete(
         return Ok(DeleteDayTypeOutcome::Deleted);
     }
 
-    // Diagnose why delete was blocked: NotFound, IsDefault, or LastType.
-    let row: Option<(bool,)> =
-        sqlx::query_as("SELECT is_default FROM user_day_types WHERE id = $1 AND user_id = $2")
+    // Diagnose why delete was blocked: NotFound or LastType.
+    let exists: Option<(i32,)> =
+        sqlx::query_as("SELECT 1 FROM user_day_types WHERE id = $1 AND user_id = $2")
             .bind(id)
             .bind(user_id)
             .fetch_optional(pool)
             .await
             .map_err(DatabaseError::from)?;
 
-    match row {
+    match exists {
         None => Ok(DeleteDayTypeOutcome::NotFound),
-        Some((true,)) => Ok(DeleteDayTypeOutcome::IsDefault),
-        Some((false,)) => Ok(DeleteDayTypeOutcome::LastType),
+        Some(_) => Ok(DeleteDayTypeOutcome::LastType),
     }
 }
 
@@ -282,56 +250,8 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // create — is_default auto-set
+    // create
     // -----------------------------------------------------------------------
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn create_first_type_sets_is_default_true(pool: PgPool) {
-        let uid = new_user(&pool).await;
-        let dt = make_type(&pool, uid).await;
-        assert!(dt.is_default, "first day type must be default");
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn create_second_type_sets_is_default_false(pool: PgPool) {
-        let uid = new_user(&pool).await;
-        make_type(&pool, uid).await;
-        let second = create(
-            &pool,
-            uid,
-            "Weekends",
-            65,
-            wake(),
-            sleep(),
-            false,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert!(!second.is_default, "second day type must not auto-default");
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn db_rejects_second_default_for_same_user(pool: PgPool) {
-        let uid = new_user(&pool).await;
-        make_type(&pool, uid).await; // first type — auto-set as default
-
-        // Attempt to bypass app logic and insert a second is_default=true row directly
-        let result = sqlx::query(
-            "INSERT INTO user_day_types
-                 (user_id, name, days_bitmask, wake_time, sleep_time, is_default, is_cycle)
-             VALUES ($1, 'Second Default', 65, '08:00'::time, '22:00'::time, true, false)",
-        )
-        .bind(uid)
-        .execute(&pool)
-        .await;
-
-        assert!(
-            result.is_err(),
-            "DB must reject a second is_default=true for the same user"
-        );
-    }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn create_returns_day_type(pool: PgPool) {
@@ -398,45 +318,6 @@ mod tests {
         let uid_b = new_user(&pool).await;
         let dt = make_type(&pool, uid_a).await;
         let result = get_by_id(&pool, dt.id, uid_b).await.unwrap();
-        assert!(result.is_none());
-    }
-
-    // -----------------------------------------------------------------------
-    // set_default
-    // -----------------------------------------------------------------------
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn set_default_promotes_second_type(pool: PgPool) {
-        let uid = new_user(&pool).await;
-        let first = make_type(&pool, uid).await;
-        let second = create(
-            &pool,
-            uid,
-            "Weekends",
-            65,
-            wake(),
-            sleep(),
-            false,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-        assert!(first.is_default);
-        assert!(!second.is_default);
-
-        let promoted = set_default(&pool, second.id, uid).await.unwrap();
-        assert!(promoted.is_some());
-        assert!(promoted.unwrap().is_default);
-
-        let first_now = get_by_id(&pool, first.id, uid).await.unwrap().unwrap();
-        assert!(!first_now.is_default);
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn set_default_returns_none_for_unknown_id(pool: PgPool) {
-        let uid = new_user(&pool).await;
-        let result = set_default(&pool, Uuid::new_v4(), uid).await.unwrap();
         assert!(result.is_none());
     }
 
@@ -572,35 +453,11 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn delete_returns_is_default_when_deleting_default(pool: PgPool) {
-        let uid = new_user(&pool).await;
-        let dt = make_type(&pool, uid).await;
-        create(
-            &pool,
-            uid,
-            "Weekends",
-            65,
-            wake(),
-            sleep(),
-            false,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-        assert!(dt.is_default);
-        let outcome = delete(&pool, dt.id, uid).await.unwrap();
-        assert!(matches!(outcome, DeleteDayTypeOutcome::IsDefault));
-        assert_eq!(list_for_user(&pool, uid).await.unwrap().len(), 2);
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
     async fn delete_returns_last_type_when_only_one(pool: PgPool) {
         let uid = new_user(&pool).await;
         let dt = make_type(&pool, uid).await;
         let outcome = delete(&pool, dt.id, uid).await.unwrap();
-        assert!(matches!(outcome, DeleteDayTypeOutcome::IsDefault));
+        assert!(matches!(outcome, DeleteDayTypeOutcome::LastType));
         assert_eq!(list_for_user(&pool, uid).await.unwrap().len(), 1);
     }
 

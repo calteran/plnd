@@ -17,7 +17,6 @@ const MOCK_RESPONSE: DayTypeResponse = {
   days_bitmask: 62,
   wake_time: '07:00:00',
   sleep_time: '22:00:00',
-  is_default: false,
   is_cycle: false,
   cycle_length: null,
   anchor_date: null,

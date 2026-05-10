@@ -374,10 +374,6 @@ async fn main() {
             "/day-types/{id}",
             put(day_types::update_day_type).delete(day_types::delete_day_type),
         )
-        .route(
-            "/day-types/{id}/default",
-            patch(day_types::set_default_day_type),
-        )
         .route("/briefing/weather", get(briefing::get_weather))
         .route("/briefing/news", get(briefing::get_news))
         .route("/briefing/yesterday", get(briefing::get_yesterday))

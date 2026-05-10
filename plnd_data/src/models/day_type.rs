@@ -12,7 +12,6 @@ pub struct DayType {
     pub days_bitmask: i32,
     pub wake_time: NaiveTime,
     pub sleep_time: NaiveTime,
-    pub is_default: bool,
     pub is_cycle: bool,
     pub cycle_length: Option<i32>,
     pub anchor_date: Option<NaiveDate>,
