@@ -36,6 +36,16 @@ async function completeTasksSpoke(page: Page): Promise<void> {
       await route.fulfill({ status: 201, json: MOCK_DAY_TYPE_WEEKDAYS });
     }
   });
+  // PUT /day-types/:id — ngOnInit now loads existing day types (GET above returns types with IDs),
+  // so save() calls update() instead of create() for already-persisted records.
+  await page.route(`${API_BASE}/day-types/*`, async route => {
+    const method = route.request().method();
+    if (method === 'DELETE') {
+      await route.fulfill({ status: 204, body: '' });
+    } else {
+      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKDAYS });
+    }
+  });
   await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
     const method = route.request().method();
     if (method === 'GET') {
@@ -104,10 +114,24 @@ async function landAtRoutinesTasks(page: Page): Promise<void> {
       await route.fulfill({ status: 201, json: MOCK_DAY_TYPE_WEEKDAYS });
     }
   });
+  await page.route(`${API_BASE}/day-types/*`, async route => {
+    const method = route.request().method();
+    if (method === 'DELETE') {
+      await route.fulfill({ status: 204, body: '' });
+    } else {
+      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKDAYS });
+    }
+  });
   await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
     const method = route.request().method();
     if (method === 'GET') {
-      await route.fulfill({ status: 200, json: [] });
+      // Return 3 meals so ngOnInit populates card.meals — save() will delete then re-create
+      // them, and the resulting DayTypeResponse.meals lets task-placement render .meal-divider.
+      await route.fulfill({ status: 200, json: [
+        { id: 'mock-meal-1', day_type_id: 'mock-dt-uuid', user_id: 'test', name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+        { id: 'mock-meal-2', day_type_id: 'mock-dt-uuid', user_id: 'test', name: 'Lunch',     preferred_time: '12:00:00', tolerance_minutes: 30, sort_order: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+        { id: 'mock-meal-3', day_type_id: 'mock-dt-uuid', user_id: 'test', name: 'Dinner',    preferred_time: '18:00:00', tolerance_minutes: 30, sort_order: 2, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
+      ] });
     } else if (method === 'POST') {
       await route.fulfill({ status: 201, json: {
         id: 'mock-meal-uuid', day_type_id: 'mock-dt-uuid', user_id: 'test',
@@ -559,6 +583,11 @@ test.describe('Onboarding', () => {
       await page.route(`${API_BASE}/day-types`, route =>
         route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
       );
+      // ngOnInit fetches listMeals for each loaded day type; without this mock the
+      // synthetic JWT reaches the real server → 401 → auth logout → substep disappears.
+      await page.route(`${API_BASE}/day-types/**/meals**`, route =>
+        route.fulfill({ status: 200, json: [] })
+      );
       await page.route(`${API_BASE}/routines`, route =>
         route.fulfill({ status: 200, json: [] })
       );
@@ -584,6 +613,11 @@ test.describe('Onboarding', () => {
       await seedOnboarding(page);
       await page.route(`${API_BASE}/day-types`, route =>
         route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
+      );
+      // ngOnInit calls listMeals for each server-loaded day type; without this mock the
+      // synthetic JWT hits the real server → 401 → auth logout → substep disappears.
+      await page.route(`${API_BASE}/day-types/**/meals**`, route =>
+        route.fulfill({ status: 200, json: [] })
       );
       await page.goto('/onboarding');
       await landAtScheduleTypes(page);

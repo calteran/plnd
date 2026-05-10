@@ -633,7 +633,25 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
           });
       });
     } else {
-      this.cards.set(defaultCards());
+      // In-memory state is empty (e.g. page refresh). Fetch from server so returning
+      // users see their existing day types with IDs — save() can then UPDATE rather
+      // than CREATE, avoiding a bitmask-overlap 422 on already-created records.
+      this.dayTypesService.list()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(serverTypes => {
+          if (serverTypes.length > 0) {
+            this.cards.set(serverTypes.map(responseToCard));
+            serverTypes.forEach((dt, idx) => {
+              this.dayTypesService.listMeals(dt.id)
+                .pipe(takeUntilDestroyed(this.destroyRef))
+                .subscribe(meals => {
+                  this.updateCard(idx, { meals: meals.map(mealToDraft) });
+                });
+            });
+          } else {
+            this.cards.set(defaultCards());
+          }
+        });
     }
   }
 

@@ -42,6 +42,7 @@ function makeDayTypesSvcMock() {
     'createMeal',
     'deleteMeal',
   ]);
+  spy.list.and.returnValue(of([]));
   spy.listMeals.and.returnValue(of([]));
   spy.createMeal.and.returnValue(
     of({ id: 'new-meal', day_type_id: 'dt1', user_id: 'u1', name: 'Breakfast',
@@ -96,6 +97,24 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   // ── 2. Pre-populate from stateService on return visit ───────────────────────
+
+  it('fetches from server when stateService is empty and uses server types when present', async () => {
+    // Regression: page refresh clears in-memory state; without a server fetch the component
+    // showed default cards (id=null), causing save() to POST duplicates that fail the
+    // bitmask-overlap constraint with a 422.
+    const serverTypes: DayTypeResponse[] = [
+      { ...MOCK_RESPONSE, id: 'srv-1', name: 'Work Days', days_bitmask: 62 },
+      { ...MOCK_RESPONSE, id: 'srv-2', name: 'Rest Days', days_bitmask: 65 },
+    ];
+    const { fixture, svcMock } = await setup(); // state empty
+    svcMock.list.and.returnValue(of(serverTypes));
+    fixture.detectChanges(); // triggers ngOnInit → list() → cards set from server
+    const inputs: NodeListOf<HTMLInputElement> =
+      fixture.nativeElement.querySelectorAll('.card-name-input');
+    expect(inputs.length).toBe(2);
+    expect(inputs[0].value).toBe('Work Days');
+    expect(inputs[1].value).toBe('Rest Days');
+  });
 
   it('pre-populates cards from stateService.dayTypes() when non-empty', async () => {
     const stored: DayTypeResponse[] = [
