@@ -191,6 +191,86 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
+    async fn create_monthly_routine_accepted(pool: PgPool) {
+        // Regression: schedule_templates_recurrence_check (stale inline constraint from
+        // migration 0011) was never dropped by 0031 due to a wrong constraint name.
+        // 'monthly' and 'yearly' were blocked even though routines_recurrence_tag_check
+        // (the correct constraint) allows them. Migration 0040 drops the stale constraint.
+        let uid = new_user(&pool).await;
+        let t = create(
+            &pool,
+            uid,
+            "general",
+            "Replace vacuum filters",
+            Some("monthly"),
+            "FREQ=MONTHLY",
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("monthly routine should be accepted");
+
+        assert_eq!(t.recurrence_tag.as_deref(), Some("monthly"));
+        assert_eq!(t.recurrence_rule, "FREQ=MONTHLY");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_weekly_routine_accepted(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let t = create(
+            &pool,
+            uid,
+            "general",
+            "Weekly review",
+            Some("weekly"),
+            "FREQ=WEEKLY",
+            None,
+            None,
+            None,
+            "medium",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("weekly routine should be accepted");
+
+        assert_eq!(t.recurrence_tag.as_deref(), Some("weekly"));
+        assert_eq!(t.recurrence_rule, "FREQ=WEEKLY");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn create_yearly_routine_accepted(pool: PgPool) {
+        // Regression: same stale constraint that blocked 'monthly' also blocked 'yearly'.
+        let uid = new_user(&pool).await;
+        let t = create(
+            &pool,
+            uid,
+            "general",
+            "Annual physical",
+            Some("yearly"),
+            "FREQ=YEARLY",
+            None,
+            None,
+            None,
+            "low",
+            false,
+            None,
+            None,
+        )
+        .await
+        .expect("yearly routine should be accepted");
+
+        assert_eq!(t.recurrence_tag.as_deref(), Some("yearly"));
+        assert_eq!(t.recurrence_rule, "FREQ=YEARLY");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
     async fn list_for_user_returns_created_templates(pool: PgPool) {
         let uid = new_user(&pool).await;
 
