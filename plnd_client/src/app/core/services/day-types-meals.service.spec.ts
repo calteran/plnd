@@ -79,6 +79,20 @@ describe('DayTypesMealsService', () => {
       const req = httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'));
       req.flush([]);
     });
+
+    it('sets loadError=true when HTTP request fails', () => {
+      expect(service.loadError()).toBeFalse();
+      service.load();
+      httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
+        .flush('error', { status: 401, statusText: 'Unauthorized' });
+      expect(service.loadError()).toBeTrue();
+    });
+
+    it('loadError starts false and stays false on success', () => {
+      service.load();
+      httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
+      expect(service.loadError()).toBeFalse();
+    });
   });
 
   describe('mealsForDate()', () => {
@@ -157,6 +171,15 @@ describe('DayTypesMealsService', () => {
       expect(service.allEntries()).toEqual([]);
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
+    });
+
+    it('resets loadError on clear', () => {
+      service.load();
+      httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
+        .flush('error', { status: 500, statusText: 'Server Error' });
+      expect(service.loadError()).toBeTrue();
+      service.clear();
+      expect(service.loadError()).toBeFalse();
     });
   });
 });
