@@ -21,10 +21,10 @@ const WEEKEND_MEALS: MealPatternEntry[] = [
 const DAY_TYPES: DayTypeResponse[] = [
   { id: 'dt-work', user_id: 'u1', name: 'Workday', days_bitmask: 62,
     wake_time: '07:00:00', sleep_time: '23:00:00',
-    is_cycle: false, cycle_length: null, anchor_date: null, created_at: '' },
+    is_cycle: false, cycle_length: null, anchor_date: null, cycle_bitmask: 0, created_at: '' },
   { id: 'dt-wknd', user_id: 'u1', name: 'Weekend', days_bitmask: 65,
     wake_time: '08:00:00', sleep_time: '23:00:00',
-    is_cycle: false, cycle_length: null, anchor_date: null, created_at: '' },
+    is_cycle: false, cycle_length: null, anchor_date: null, cycle_bitmask: 0, created_at: '' },
 ];
 
 describe('DayTypesMealsService', () => {
@@ -131,7 +131,7 @@ describe('DayTypesMealsService', () => {
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([
         { id: 'dt-def', user_id: 'u1', name: 'Default', days_bitmask: 127,
           wake_time: '07:00:00', sleep_time: '23:00:00',
-          is_cycle: false, cycle_length: null, anchor_date: null, created_at: '' },
+          is_cycle: false, cycle_length: null, anchor_date: null, cycle_bitmask: 0, created_at: '' },
       ]);
       httpMock.expectOne(r => r.url.includes('/dt-def/meals')).flush(WORKDAY_MEALS);
       expect(service.mealsForDate('2026-03-24').length).toBe(3);

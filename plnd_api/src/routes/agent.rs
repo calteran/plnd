@@ -1223,6 +1223,7 @@ mod tests {
             is_cycle: false,
             cycle_length: None,
             anchor_date: None,
+            cycle_bitmask: 0,
             created_at: chrono::Utc.timestamp_opt(created_secs, 0).unwrap(),
         }
     }

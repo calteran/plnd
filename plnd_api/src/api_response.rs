@@ -527,6 +527,9 @@ pub struct DayTypeResponse {
     pub is_cycle: bool,
     pub cycle_length: Option<i32>,
     pub anchor_date: Option<NaiveDate>,
+    /// For cycle types: low `cycle_length` bits indicate which positions in the
+    /// cycle this day type covers (bit 0 = anchor_date). 0 for weekday types.
+    pub cycle_bitmask: i32,
     pub created_at: DateTime<Utc>,
 }
 
@@ -542,6 +545,7 @@ impl From<DayType> for DayTypeResponse {
             is_cycle: d.is_cycle,
             cycle_length: d.cycle_length,
             anchor_date: d.anchor_date,
+            cycle_bitmask: d.cycle_bitmask,
             created_at: d.created_at,
         }
     }

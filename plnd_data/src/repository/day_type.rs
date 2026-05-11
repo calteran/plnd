@@ -29,6 +29,7 @@ pub trait DayTypeRepository: Send + Sync {
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
+        cycle_bitmask: i32,
     ) -> Result<DayType, crate::Error>;
 
     #[allow(clippy::too_many_arguments)]
@@ -43,6 +44,7 @@ pub trait DayTypeRepository: Send + Sync {
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
+        cycle_bitmask: i32,
     ) -> Result<Option<DayType>, crate::Error>;
 
     async fn count_for_user(&self, user_id: Uuid) -> Result<i64, crate::Error>;
