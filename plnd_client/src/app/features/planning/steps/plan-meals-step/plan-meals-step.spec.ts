@@ -252,6 +252,16 @@ describe('PlanMealsStepComponent', () => {
       expect(service.isGenerating()).toBeFalse();
       expect(service.scheduledMeals()['2026-03-23']?.['breakfast']?.title).toBe('breakfast for 2026-03-23');
     });
+
+    it('should display error banner and stop generating when generateWeek errors', () => {
+      generateWeek$.error(new Error('server error'));
+      fixture.detectChanges();
+
+      expect(service.isGenerating()).toBeFalse();
+      const banner = fixture.nativeElement.querySelector('.gen-error');
+      expect(banner).toBeTruthy();
+      expect(banner.textContent).toContain("Couldn't generate meal plan");
+    });
   });
 
   describe('Refresh modal', () => {

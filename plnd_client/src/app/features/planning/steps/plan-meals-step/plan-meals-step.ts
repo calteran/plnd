@@ -21,6 +21,10 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
         </div>
       }
 
+      @if (errorMessage()) {
+        <div class="gen-error" role="alert">{{ errorMessage() }}</div>
+      }
+
       <!-- Top toolbar: Refresh button + confirmation modal -->
       @if (!isGenerating() && unapprovedCount() > 0) {
         <div class="meals-toolbar">
@@ -136,6 +140,17 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     :host { display: block; }
 
     .plan-meals-wrapper { overflow-x: auto; padding-bottom: 8px; }
+
+    /* ── Generation error banner ── */
+    .gen-error {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      color: #991b1b;
+      font-size: 13px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
 
     /* ── Toolbar ── */
     .meals-toolbar {
@@ -382,6 +397,7 @@ export class PlanMealsStepComponent implements OnInit {
   readonly editingValue    = signal('');
   private confirmingEdit   = false;
   readonly showRefreshModal = signal(false);
+  readonly errorMessage     = signal<string | null>(null);
 
   readonly unapprovedCount = computed(() => {
     const meals = this.weekPlanService.scheduledMeals();
@@ -411,10 +427,14 @@ export class PlanMealsStepComponent implements OnInit {
   }
 
   private runAgentPlan(obs$: Observable<MealPlanResponse>): void {
+    this.errorMessage.set(null);
     this.weekPlanService.setGenerating(true);
     obs$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next:  resp => this.weekPlanService.applyAgentMeals(resp.meals),
-      error: ()   => this.weekPlanService.setGenerating(false),
+      error: ()   => {
+        this.weekPlanService.setGenerating(false);
+        this.errorMessage.set("Couldn't generate meal plan — please try again.");
+      },
     });
   }
 
