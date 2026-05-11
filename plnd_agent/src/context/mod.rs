@@ -410,7 +410,7 @@ pub struct AgentContext {
     pub prior_context: Option<String>,
     /// Structured extra data for tools that need request-scoped state.
     /// Passed to `build_tool_registry` so tools can be constructed with it.
-    /// Only `UseCase::MealPlanning` currently uses this (week schedule state).
+    /// Currently used by `UseCase::MealRebalance` to pass week schedule state.
     pub extra: Option<serde_json::Value>,
 }
 

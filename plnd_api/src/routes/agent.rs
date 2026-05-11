@@ -91,46 +91,53 @@ async fn preload_meal_planning_context(repos: &plnd_data::Repositories, user_id:
             resolve(repos.meal.as_ref(), &preferred_ids),
         )?;
 
+        // Exclude blocked meals from the top-rated list — a meal that is both
+        // highly rated and later blocked must never be re-suggested.
         let top_rated: Vec<_> = meal_prefs
             .iter()
-            .filter(|m| m.rating.unwrap_or(0) >= 4)
+            .filter(|m| !m.is_blocked && m.rating.unwrap_or(0) >= 4)
             .map(|m| m.name.as_str())
             .collect();
 
         let restriction_names: Vec<&str> = restrictions.iter().map(|r| r.name.as_str()).collect();
 
-        let mut blob = String::from("[Meal preferences]\n");
+        let mut lines: Vec<String> = Vec::new();
         if !restriction_names.is_empty() {
-            blob.push_str(&format!(
-                "Dietary restrictions: {}\n",
+            lines.push(format!(
+                "Dietary restrictions: {}",
                 xml_escape(&restriction_names.join(", "))
             ));
         }
         if !blocked_names.is_empty() {
-            blob.push_str(&format!(
-                "Blocked ingredients (never use): {}\n",
+            lines.push(format!(
+                "Blocked ingredients (never use): {}",
                 xml_escape(&blocked_names.join(", "))
             ));
         }
         if !tolerated_names.is_empty() {
-            blob.push_str(&format!(
-                "Tolerated ingredients (avoid when possible): {}\n",
+            lines.push(format!(
+                "Tolerated ingredients (avoid when possible): {}",
                 xml_escape(&tolerated_names.join(", "))
             ));
         }
         if !preferred_names.is_empty() {
-            blob.push_str(&format!(
-                "Preferred ingredients: {}\n",
+            lines.push(format!(
+                "Preferred ingredients: {}",
                 xml_escape(&preferred_names.join(", "))
             ));
         }
         if !top_rated.is_empty() {
-            blob.push_str(&format!(
-                "Top-rated meals (reuse if appropriate): {}\n",
+            lines.push(format!(
+                "Top-rated meals (reuse if appropriate): {}",
                 xml_escape(&top_rated.join(", "))
             ));
         }
-        blob.push('\n');
+
+        let blob = if lines.is_empty() {
+            String::new()
+        } else {
+            format!("[Meal preferences]\n{}\n\n", lines.join("\n"))
+        };
 
         Ok::<String, plnd_data::Error>(blob)
     }
@@ -381,7 +388,7 @@ pub async fn post_meal_plan(
     Ok(Json(MealPlanResponse {
         plan_start,
         meals,
-        nutrition_summary: None,
+        nutrition_summary: None, // per-slot aggregation tracked in #758
         failed_slots: failed,
     }))
 }
@@ -1702,6 +1709,27 @@ mod tests {
         assert!(
             prior.contains(&prev_id),
             "specific meal ref id must be in avoid list"
+        );
+    }
+
+    #[test]
+    fn build_suggest_slot_ctx_locked_entries_appear_in_avoid_context() {
+        let uid = uuid::Uuid::new_v4();
+        let slot = open_slot("2026-05-12", "lunch");
+        let locked = meal_entry("2026-05-11", "breakfast");
+        let locked_id = locked.meal_ref.id.to_string();
+
+        // locked_entries non-empty, chosen empty
+        let ctx = super::build_suggest_slot_ctx(uid, &slot, "", &[locked], &[]);
+        let prior = ctx.prior_context.unwrap();
+
+        assert!(
+            prior.contains("[Avoid these meals:"),
+            "locked entry should populate the avoid block"
+        );
+        assert!(
+            prior.contains(&locked_id),
+            "locked entry meal ref id must appear in avoid list"
         );
     }
 }
