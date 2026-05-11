@@ -63,7 +63,7 @@ export class OnboardingStateService {
     // Use local-noon parsing to avoid UTC-offset day rollback (same pattern as computeFirstPlanPeriod).
     const start = new Date(`${p.start}T12:00:00`);
     const end = new Date(`${p.end}T12:00:00`);
-    return Math.round((end.getTime() - start.getTime()) / 86_400_000);
+    return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
   });
 
   // ── Mutation methods ────────────────────────────────────────────────────
@@ -132,11 +132,13 @@ export function computeFirstPlanPeriod(
     const secondPeriodEnd = addDays(firstPeriodEnd, planLength);
     planEnd = addDays(secondPeriodEnd, offset);
   } else {
-    planEnd = firstPeriodEnd;
+    // Inclusive last day of the first period (all downstream callers treat end as inclusive).
+    planEnd = addDays(firstPeriodEnd, -1);
   }
 
-  // Guard: large negative offsets can push planEnd before firstPeriodEnd.
-  if (planEnd.getTime() < firstPeriodEnd.getTime()) planEnd = firstPeriodEnd;
+  // Guard: ensure planEnd is at least the inclusive last day of the first period.
+  const minPlanEnd = addDays(firstPeriodEnd, -1);
+  if (planEnd.getTime() < minPlanEnd.getTime()) planEnd = minPlanEnd;
 
   return { start: today, end: toISODate(planEnd) };
 }
