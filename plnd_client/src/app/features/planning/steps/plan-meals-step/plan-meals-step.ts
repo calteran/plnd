@@ -143,10 +143,10 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
     /* ── Generation error banner ── */
     .gen-error {
-      background: #fef2f2;
-      border: 1px solid #fca5a5;
+      background: var(--color-destructive-light);
+      border: 1px solid var(--color-destructive-border);
       border-radius: 8px;
-      color: #991b1b;
+      color: var(--color-destructive);
       font-size: 13px;
       padding: 10px 14px;
       margin-bottom: 10px;
