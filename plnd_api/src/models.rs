@@ -626,10 +626,7 @@ mod meal_plan_tests {
         let json = serde_json::to_string(&resp).unwrap();
         let decoded: MealPlanResponse = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.failed_slots.len(), 1);
-        assert_eq!(
-            decoded.failed_slots[0].date.to_string(),
-            "2026-04-22"
-        );
+        assert_eq!(decoded.failed_slots[0].date.to_string(), "2026-04-22");
         assert_eq!(decoded.failed_slots[0].meal_name, "breakfast");
         assert_eq!(decoded.failed_slots[0].reason, "no suitable meal found");
     }

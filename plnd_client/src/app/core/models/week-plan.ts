@@ -43,7 +43,7 @@ export interface SlotRef {
 
 export interface FailedSlot {
   date: string;
-  meal_name: string;
+  meal_name: MealSlot;
   reason: string;
 }
 
