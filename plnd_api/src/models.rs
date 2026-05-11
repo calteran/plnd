@@ -610,4 +610,27 @@ mod meal_plan_tests {
             assert_eq!(req.meal_name, value);
         }
     }
+
+    #[test]
+    fn meal_plan_response_round_trips_with_failed_slots() {
+        let resp = MealPlanResponse {
+            plan_start: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
+            meals: vec![],
+            nutrition_summary: None,
+            failed_slots: vec![FailedSlot {
+                date: chrono::NaiveDate::from_ymd_opt(2026, 4, 22).unwrap(),
+                meal_name: "breakfast".to_string(),
+                reason: "no suitable meal found".to_string(),
+            }],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let decoded: MealPlanResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.failed_slots.len(), 1);
+        assert_eq!(
+            decoded.failed_slots[0].date.to_string(),
+            "2026-04-22"
+        );
+        assert_eq!(decoded.failed_slots[0].meal_name, "breakfast");
+        assert_eq!(decoded.failed_slots[0].reason, "no suitable meal found");
+    }
 }
