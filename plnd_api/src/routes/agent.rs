@@ -21,6 +21,19 @@ struct PlaceTasksOutput {
     entries: Vec<PlaceTasksEntry>,
 }
 
+#[derive(serde::Deserialize)]
+struct ReviewMealPlanOutput {
+    changes_requested: Vec<ReviewChangeRequest>,
+}
+
+#[derive(serde::Deserialize)]
+struct ReviewChangeRequest {
+    date: chrono::NaiveDate,
+    meal_name: String,
+    #[allow(dead_code)]
+    reason: String,
+}
+
 fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> String {
     match context {
         Some(turns) if !turns.is_empty() => {
@@ -211,6 +224,30 @@ fn build_suggest_slot_ctx(
     }
 }
 
+/// Build an `AgentContext` for the week-level review pass.
+///
+/// Serialises the full assembled plan (locked + chosen) as a JSON array and
+/// prepends it after the `prefs_blob` so the review agent sees both user
+/// preferences and the proposed week in a single `prior_context` block.
+fn build_review_meal_plan_ctx(
+    user_id: Uuid,
+    prefs_blob: &str,
+    locked_entries: &[MealEntry],
+    chosen: &[MealEntry],
+) -> AgentContext {
+    let mut all_meals: Vec<&MealEntry> = locked_entries.iter().chain(chosen.iter()).collect();
+    all_meals.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.meal_name.cmp(&b.meal_name)));
+    let week_json = serde_json::to_string(&all_meals).unwrap_or_default();
+
+    AgentContext {
+        user_id,
+        use_case: UseCase::ReviewMealPlan,
+        input: "Review this week's meal plan for quality and variety.".to_string(),
+        prior_context: Some(format!("{prefs_blob}[Current meal plan]\n{week_json}\n")),
+        extra: None,
+    }
+}
+
 /// POST /agent/task — parse free-text task input via the AI agent loop and schedule a task.
 #[utoipa::path(
     post,
@@ -394,6 +431,97 @@ pub async fn post_meal_plan(
                     meal_name: slot.meal_name.clone(),
                     reason: e.to_string(),
                 });
+            }
+        }
+    }
+
+    // Review pass — examine the assembled week and re-suggest flagged slots.
+    // Capped at 2 passes to prevent runaway regeneration.
+    let max_review_passes: u32 = 2;
+    'review: for _pass in 0..max_review_passes {
+        if chosen.is_empty() {
+            break;
+        }
+
+        let review_ctx =
+            build_review_meal_plan_ctx(user_id, &prefs_blob, &locked_entries, &chosen);
+        let review_output = match state.agent.run(&review_ctx).await {
+            Ok(out) => out,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "meal-plan: review agent failed; skipping remaining review passes"
+                );
+                break 'review;
+            }
+        };
+
+        let review: ReviewMealPlanOutput = match serde_json::from_str(&review_output.content) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    content = %review_output.content,
+                    "meal-plan: failed to parse review output; skipping remaining review passes"
+                );
+                break 'review;
+            }
+        };
+
+        if review.changes_requested.is_empty() {
+            break 'review;
+        }
+
+        for change in &review.changes_requested {
+            let Some(pos) = chosen
+                .iter()
+                .position(|m| m.date == change.date && m.meal_name == change.meal_name)
+            else {
+                tracing::warn!(
+                    date = %change.date,
+                    meal_name = %change.meal_name,
+                    "meal-plan: review flagged unknown slot; skipping"
+                );
+                continue;
+            };
+
+            // `chosen[pos]` (the flagged meal) is still present, so its meal_ref
+            // appears in the avoid list that `build_suggest_slot_ctx` constructs.
+            let swap_slot = plnd_data::models::OpenSlot {
+                date: change.date,
+                meal_name: change.meal_name.clone(),
+            };
+            let resuggestion_ctx =
+                build_suggest_slot_ctx(user_id, &swap_slot, &prefs_blob, &locked_entries, &chosen);
+
+            match state.agent.run(&resuggestion_ctx).await {
+                Ok(out) => match serde_json::from_str::<MealEntry>(&out.content) {
+                    Ok(new_meal) => {
+                        tracing::info!(
+                            date = %change.date,
+                            meal_name = %change.meal_name,
+                            reason = %change.reason,
+                            "meal-plan: review pass replaced slot"
+                        );
+                        chosen[pos] = new_meal;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            date = %change.date,
+                            meal_name = %change.meal_name,
+                            "meal-plan: review re-suggestion parse failed; keeping original"
+                        );
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        date = %change.date,
+                        meal_name = %change.meal_name,
+                        "meal-plan: review re-suggestion agent failed; keeping original"
+                    );
+                }
             }
         }
     }
