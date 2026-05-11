@@ -157,20 +157,18 @@ describe('DayTypesSubstepComponent', () => {
     expect(component.cards()[1].days_bitmask).toBe(65);
   });
 
-  it('claiming a day does not affect cycle-mode cards', async () => {
+  it('toggleDay is a no-op when in cycle mode', async () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
-    // Put card 1 into cycle mode with a bitmask to verify it stays untouched.
-    component.updateCard(1, { is_cycle: true, cycle_length: 1, anchor_date: null, days_bitmask: 0b0101 });
-    // Claim Sunday (bit 0) on card 0 — card 0 doesn't own it yet since card 1 is now a cycle card.
+    component.enterCycleMode();
+    const before = component.cards()[0].days_bitmask;
     component.toggleDay(0, 0);
-    // Card 1 (cycle) should be unchanged.
-    expect(component.cards()[1].days_bitmask).toBe(0b0101);
+    expect(component.cards()[0].days_bitmask).toBe(before);
   });
 
-  // ── 4. ✕ button is disabled when days_bitmask > 0 ───────────────────────────
+  // ── 4. ✕ button is disabled when bitmask > 0 ────────────────────────────────
 
-  it('remove button is disabled when days_bitmask is non-zero', async () => {
+  it('remove button is disabled when days_bitmask is non-zero in DOW mode', async () => {
     const { fixture } = await setup();
     fixture.detectChanges();
     const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
@@ -179,7 +177,7 @@ describe('DayTypesSubstepComponent', () => {
     expect(removeBtn.disabled).toBeTrue();
   });
 
-  it('remove button has aria-disabled=true when days_bitmask > 0', async () => {
+  it('remove button has aria-disabled=true when bitmask > 0', async () => {
     const { fixture } = await setup();
     fixture.detectChanges();
     const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
@@ -187,7 +185,7 @@ describe('DayTypesSubstepComponent', () => {
     expect(removeBtn.getAttribute('aria-disabled')).toBe('true');
   });
 
-  // ── 5. ✕ button enabled when days_bitmask = 0 ───────────────────────────────
+  // ── 5. ✕ button enabled when bitmask = 0 ────────────────────────────────────
 
   it('remove button is enabled when days_bitmask is zero', async () => {
     const { fixture, component } = await setup();
@@ -210,7 +208,7 @@ describe('DayTypesSubstepComponent', () => {
     fixture.detectChanges();
     const hint = fixture.nativeElement.querySelector('.remove-hint');
     expect(hint).not.toBeNull();
-    expect(hint.textContent).toContain('Uncheck all days before removing this type');
+    expect(hint.textContent).toContain('Uncheck all days before removing');
     tick(3001);
   }));
 
@@ -242,42 +240,129 @@ describe('DayTypesSubstepComponent', () => {
     expect(inputs[2].value).toBe('');
   });
 
-  // ── 8b. "Non-7-day schedule?" appends a cycle card ───────────────────────────
+  // ── 8b. enterCycleMode wipes DOW cards and starts a single cycle card ───────
 
-  it('clicking "Non-7-day schedule?" appends a card with is_cycle=true and cycle_length=1', async () => {
+  it('enterCycleMode wipes existing DOW cards and creates a single cycle card claiming all 7 positions', async () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
-    const addLinks: NodeListOf<HTMLButtonElement> =
-      fixture.nativeElement.querySelectorAll('.add-link');
-    addLinks[1].click(); // second add-link is "Non-7-day schedule?"
+    expect(component.cards().length).toBe(2);
+    component.enterCycleMode();
     fixture.detectChanges();
-    const cards = component.cards();
-    expect(cards.length).toBe(3);
-    expect(cards[2].is_cycle).toBeTrue();
-    expect(cards[2].cycle_length).toBe(1);
-    const cycleInputs: NodeListOf<HTMLInputElement> =
-      fixture.nativeElement.querySelectorAll('.schedule-card')[2].querySelectorAll('.cycle-input');
-    expect(cycleInputs.length).toBe(2);
+    expect(component.mode()).toBe('cycle');
+    expect(component.cycleLength()).toBe(7);
+    expect(component.anchorDate()).not.toBeNull();
+    expect(component.cards().length).toBe(1);
+    // Top card claims positions 1..7 → bitmask 0b1111111 = 127
+    expect(component.cards()[0].cycle_bitmask).toBe(127);
   });
 
-  // ── 9. Cycle mode toggle shows cycle-length and anchor-date inputs ───────────
-
-  it('clicking "Non-7-day schedule?" shows cycle-length and anchor-date inputs', async () => {
+  it('"Switch to rotating schedule" link calls enterCycleMode and reveals cycle-length / anchor-date inputs', async () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
-    // Put card 0 into cycle mode via updateCard (same path used by addCycleCard)
-    component.updateCard(0, { is_cycle: true, cycle_length: 1, anchor_date: null, days_bitmask: 0 });
+    const addLinks = fixture.nativeElement.querySelectorAll('.add-link') as NodeListOf<HTMLButtonElement>;
+    // First link is "+ Add day type", second is the mode switch
+    const switchLink = Array.from(addLinks).find(b => b.textContent?.includes('rotating'))!;
+    switchLink.click();
     fixture.detectChanges();
-    const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
-    const cycleInputs: NodeListOf<HTMLInputElement> =
-      firstCard.querySelectorAll('.cycle-input');
+    expect(component.mode()).toBe('cycle');
+    const cycleInputs = fixture.nativeElement.querySelectorAll('.cycle-input') as NodeListOf<HTMLInputElement>;
     expect(cycleInputs.length).toBe(2);
     const types = Array.from(cycleInputs).map(i => i.type);
     expect(types).toContain('number');
     expect(types).toContain('date');
   });
 
-  // ── 10. Save: create() called, setDayTypes called, complete emitted ─────
+  it('enterDOWMode wipes cycle cards and restores the default DOW two-card setup', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode();
+    fixture.detectChanges();
+    expect(component.cards().length).toBe(1);
+    component.enterDOWMode();
+    fixture.detectChanges();
+    expect(component.mode()).toBe('dow');
+    expect(component.cycleLength()).toBeNull();
+    expect(component.anchorDate()).toBeNull();
+    expect(component.cards().length).toBe(2);
+    expect(component.cards()[0].name).toBe('Weekdays');
+    expect(component.cards()[1].name).toBe('Weekends');
+  });
+
+  // ── 9. Cycle position toggle: auto-steal between cards ──────────────────────
+
+  it('clicking a cycle position on another card steals it from the original owner', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode();
+    component.addCard(); // second cycle card, cycle_bitmask=0
+    fixture.detectChanges();
+    expect(component.cards()[0].cycle_bitmask).toBe(127);
+    expect(component.cards()[1].cycle_bitmask).toBe(0);
+    // Click position 3 on card 1 — should steal bit 2 (1 << 2 = 4) from card 0.
+    component.toggleCycleDay(1, 3);
+    expect(component.cards()[0].cycle_bitmask).toBe(127 & ~0b100); // 123
+    expect(component.cards()[1].cycle_bitmask).toBe(0b100); // 4
+  });
+
+  it('clicking a cycle position the card already owns is a no-op', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode();
+    fixture.detectChanges();
+    // Card 0 owns position 1 (bit 0) by default. Toggling it should not flip the bit off.
+    component.toggleCycleDay(0, 1);
+    expect(component.cards()[0].cycle_bitmask).toBe(127);
+  });
+
+  it('toggleCycleDay is a no-op when in DOW mode', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    // We're in DOW mode by default. Cards have cycle_bitmask=0; toggleCycleDay should not change them.
+    component.toggleCycleDay(0, 1);
+    expect(component.cards()[0].cycle_bitmask).toBe(0);
+  });
+
+  // ── 9b. setCycleLength adjusts coverage ──────────────────────────────────────
+
+  it('setCycleLength expanding moves new positions to the top card', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode(); // length=7, top card claims 0b1111111
+    fixture.detectChanges();
+    component.setCycleLength(10);
+    // Top card now claims positions 0..9 → 0b1111111111 = 1023
+    expect(component.cycleLength()).toBe(10);
+    expect(component.cards()[0].cycle_bitmask).toBe(1023);
+  });
+
+  it('setCycleLength shrinking masks bits beyond the new length off every card', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode(); // length=7
+    component.addCard();
+    // Steal positions 6 and 7 (bits 5 and 6, value 0b1100000=96) to card 1
+    component.toggleCycleDay(1, 6);
+    component.toggleCycleDay(1, 7);
+    expect(component.cards()[0].cycle_bitmask).toBe(127 & ~96); // 31
+    expect(component.cards()[1].cycle_bitmask).toBe(96);
+    component.setCycleLength(4);
+    // Length=4 → low 4 bits only. Card 0 keeps low bits (31 & 15 = 15). Card 1 loses its high bits.
+    expect(component.cycleLength()).toBe(4);
+    expect(component.cards()[0].cycle_bitmask).toBe(15);
+    expect(component.cards()[1].cycle_bitmask).toBe(0);
+  });
+
+  it('setCycleLength clamps to 1..30', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode();
+    component.setCycleLength(99);
+    expect(component.cycleLength()).toBe(30);
+    component.setCycleLength(0);
+    expect(component.cycleLength()).toBe(1);
+  });
+
+  // ── 10. Save: create() called, setDayTypes called, complete emitted ─────────
 
   it('save() calls DayTypesService.create() for new cards and emits complete', async () => {
     const { fixture, component, stateMock, svcMock } = await setup();
@@ -303,7 +388,33 @@ describe('DayTypesSubstepComponent', () => {
     expect(svcMock.create).not.toHaveBeenCalled();
   });
 
-  // ── 11. Validation: does NOT save when a 7-day card has days_bitmask = 0 ─────
+  it('save() in cycle mode sends cycle_bitmask + cycle_length + anchor_date and zeros days_bitmask', async () => {
+    const { fixture, component, svcMock } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode();
+    component.anchorDate.set('2026-05-11');
+    component.save();
+    expect(svcMock.create).toHaveBeenCalledTimes(1);
+    const payload = svcMock.create.calls.mostRecent().args[0];
+    expect(payload.is_cycle).toBeTrue();
+    expect(payload.cycle_length).toBe(7);
+    expect(payload.anchor_date).toBe('2026-05-11');
+    expect(payload.cycle_bitmask).toBe(127);
+    expect(payload.days_bitmask).toBe(0);
+  });
+
+  it('save() in DOW mode sends cycle_bitmask=0 and is_cycle=false', async () => {
+    const { fixture, component, svcMock } = await setup();
+    fixture.detectChanges();
+    component.save();
+    const payload = svcMock.create.calls.first().args[0];
+    expect(payload.is_cycle).toBeFalse();
+    expect(payload.cycle_bitmask).toBe(0);
+    expect(payload.cycle_length).toBeNull();
+    expect(payload.anchor_date).toBeNull();
+  });
+
+  // ── 11. Validation: does NOT save when a 7-day card has days_bitmask = 0 ────
 
   it('save() does NOT emit complete when a 7-day card has days_bitmask = 0', async () => {
     const { fixture, component, svcMock } = await setup();
@@ -328,27 +439,44 @@ describe('DayTypesSubstepComponent', () => {
     expect(errorEl.textContent).toContain('at least one day');
   });
 
-  it('save shows error when cycle card is missing anchor date', async () => {
+  it('save() in cycle mode shows error when anchor_date is missing', async () => {
     const { fixture, component, svcMock } = await setup();
     fixture.detectChanges();
-    // Add a blank card and enable cycle mode with cycle_length but no anchor_date
-    component.addCard();
-    const cycleCardIdx = component.cards().length - 1;
-    component.updateCard(cycleCardIdx, {
-      is_cycle: true,
-      cycle_length: 7,
-      anchor_date: null,
-      days_bitmask: 0,
-    });
-    const completeSpy = jasmine.createSpy('complete');
-    component.complete.subscribe(completeSpy);
+    component.enterCycleMode();
+    component.anchorDate.set(null);
     component.save();
     fixture.detectChanges();
     expect(svcMock.create).not.toHaveBeenCalled();
-    expect(completeSpy).not.toHaveBeenCalled();
     const errorEl = fixture.nativeElement.querySelector('.save-error');
     expect(errorEl).not.toBeNull();
-    expect(errorEl.textContent).toContain('Cycle day types must have a cycle length and start date.');
+    expect(errorEl.textContent).toContain('cycle length and start date');
+  });
+
+  it('save() in cycle mode shows error when a card has cycle_bitmask = 0', async () => {
+    const { fixture, component, svcMock } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode();
+    component.addCard(); // appends a cycle card with cycle_bitmask=0
+    component.save();
+    fixture.detectChanges();
+    expect(svcMock.create).not.toHaveBeenCalled();
+    const errorEl = fixture.nativeElement.querySelector('.save-error');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl.textContent).toContain('claim at least one position');
+  });
+
+  it('save() in cycle mode shows error when combined bitmask does not cover every position', async () => {
+    const { fixture, component, svcMock } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode();
+    // Manually leave a gap: clear bit 0 from the top card without claiming it elsewhere.
+    component.updateCard(0, { cycle_bitmask: 127 & ~1 });
+    component.save();
+    fixture.detectChanges();
+    expect(svcMock.create).not.toHaveBeenCalled();
+    const errorEl = fixture.nativeElement.querySelector('.save-error');
+    expect(errorEl).not.toBeNull();
+    expect(errorEl.textContent).toContain('cover every day in the cycle');
   });
 
   // ── 12. Save error shown on API failure ──────────────────────────────────────
@@ -407,15 +535,32 @@ describe('DayTypesSubstepComponent', () => {
     expect(component.cards().length).toBe(1);
   });
 
+  // ── 13b. responseToCard / ngOnInit round-trip cycle_bitmask + mode ──────────
+
+  it('hydrates substep-level mode/cycleLength/anchorDate from server cycle types', async () => {
+    const serverTypes: DayTypeResponse[] = [
+      { ...MOCK_RESPONSE, id: 'cyc-1', name: 'Day', is_cycle: true, cycle_length: 4, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b0011 },
+      { ...MOCK_RESPONSE, id: 'cyc-2', name: 'Night', is_cycle: true, cycle_length: 4, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b1100 },
+    ];
+    const { fixture, component, svcMock } = await setup();
+    svcMock.list.and.returnValue(of(serverTypes));
+    fixture.detectChanges();
+    expect(component.mode()).toBe('cycle');
+    expect(component.cycleLength()).toBe(4);
+    expect(component.anchorDate()).toBe('2026-01-01');
+    expect(component.cards().length).toBe(2);
+    expect(component.cards()[0].cycle_bitmask).toBe(0b0011);
+    expect(component.cards()[1].cycle_bitmask).toBe(0b1100);
+  });
+
   // ── 14. addMeal ─────────────────────────────────────────────────────────────
 
   describe('addMeal', () => {
     it('adds a new draft meal to the specified card', async () => {
       const { component } = await setup();
       component.cards.set([{
-        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
-        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
-        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
+        wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,
         meals: [],
       }]);
       component.addMeal(0);
@@ -430,9 +575,8 @@ describe('DayTypesSubstepComponent', () => {
     it('removes a meal by localId', async () => {
       const { component } = await setup();
       component.cards.set([{
-        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
-        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
-        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
+        wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,
         meals: [
           { localId: 'ml1', id: null, name: 'Breakfast', preferred_time: '08:00', tolerance_minutes: 30, sort_order: 0 },
           { localId: 'ml2', id: null, name: 'Lunch', preferred_time: '12:00', tolerance_minutes: 30, sort_order: 1 },
@@ -446,9 +590,8 @@ describe('DayTypesSubstepComponent', () => {
     it('does not remove the last meal', async () => {
       const { component } = await setup();
       component.cards.set([{
-        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
-        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
-        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
+        wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,
         meals: [{ localId: 'ml1', id: null, name: 'Breakfast', preferred_time: '08:00', tolerance_minutes: 30, sort_order: 0 }],
       }]);
       component.removeMeal(0, 'ml1');
@@ -462,9 +605,8 @@ describe('DayTypesSubstepComponent', () => {
     it('patches a meal by localId', async () => {
       const { component } = await setup();
       component.cards.set([{
-        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62,
-        wake_time: '07:00', sleep_time: '22:00', is_cycle: false,
-        cycle_length: null, anchor_date: null, showRemoveHint: false,
+        localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
+        wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,
         meals: [{ localId: 'ml1', id: null, name: 'Breakfast', preferred_time: '08:00', tolerance_minutes: 30, sort_order: 0 }],
       }]);
       component.updateMeal(0, 'ml1', { preferred_time: '09:00' });

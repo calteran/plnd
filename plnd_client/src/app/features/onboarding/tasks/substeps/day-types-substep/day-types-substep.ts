@@ -15,12 +15,11 @@ import { DayTypeResponse } from '../../../../../core/models/day-type';
 import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 
-// Visual order of day pills: M T W T F S S (Mon–Sun, with Sun last)
-// Indices into the days array where days[i].bit maps to a bitmask bit.
-// Bit 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
+// Visual order of day pills: M T W T F S S (Mon–Sun, with Sun last).
+// Bit 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat.
 interface DayPill {
-  bit: number;   // bitmask bit index (0=Sun … 6=Sat)
-  label: string; // single-letter display label
+  bit: number;
+  label: string;
 }
 
 const DAY_PILLS: DayPill[] = [
@@ -33,6 +32,21 @@ const DAY_PILLS: DayPill[] = [
   { bit: 0, label: 'S' },
 ];
 
+// Mode is a user-level binary: every card in a user's setup is the same mode.
+// 'dow'   → days_bitmask drives resolution; cycle_bitmask is unused (0).
+// 'cycle' → cycle_bitmask drives resolution; days_bitmask is unused (0). All
+//           cycle cards share the substep-level cycleLength + anchorDate.
+type Mode = 'dow' | 'cycle';
+
+// Default starting cycle length when the user first enters cycle mode.
+// 7 anchors continuity with the 7-day mode they just left; the user adjusts
+// up (e.g. 14 for an alternating-week rota) or down (e.g. 4 for 2-on-2-off).
+const DEFAULT_CYCLE_LENGTH = 7;
+
+// Mirrors the API's MAX_CYCLE_LENGTH guard against i32 sign-bit overflow:
+// (1 << 31) - 1 wraps because bit 31 is the sign bit, so 30 is the safe cap.
+const MAX_CYCLE_LENGTH = 30;
+
 interface DraftMeal {
   localId: string;           // always set (crypto.randomUUID())
   id: string | null;         // null until saved to server
@@ -42,16 +56,16 @@ interface DraftMeal {
   sort_order: number;
 }
 
+// Per-card state. Mode-level concerns (is_cycle / cycle_length / anchor_date)
+// live on the component, not the card — every card shares the same mode.
 interface ScheduleCard {
   localId: string;
   id: string | null;
   name: string;
-  days_bitmask: number;
+  days_bitmask: number;     // active in 'dow' mode; 0 in 'cycle' mode
+  cycle_bitmask: number;    // active in 'cycle' mode; 0 in 'dow' mode
   wake_time: string;
   sleep_time: string;
-  is_cycle: boolean;
-  cycle_length: number | null;
-  anchor_date: string | null;
   showRemoveHint: boolean;
   meals: DraftMeal[];
 }
@@ -75,35 +89,30 @@ function mealToDraft(m: MealPatternEntry): DraftMeal {
   };
 }
 
-function defaultCards(): ScheduleCard[] {
+function blankCard(overrides: Partial<ScheduleCard> = {}): ScheduleCard {
+  return {
+    localId: crypto.randomUUID(),
+    id: null,
+    name: '',
+    days_bitmask: 0,
+    cycle_bitmask: 0,
+    wake_time: '07:00',
+    sleep_time: '22:00',
+    showRemoveHint: false,
+    meals: defaultDraftMeals(),
+    ...overrides,
+  };
+}
+
+function defaultDOWCards(): ScheduleCard[] {
   return [
-    {
-      localId: crypto.randomUUID(),
-      id: null,
-      name: 'Weekdays',
-      days_bitmask: 62, // Mon–Fri: bits 1–5
-      wake_time: '07:00',
-      sleep_time: '22:00',
-      is_cycle: false,
-      cycle_length: null,
-      anchor_date: null,
-      showRemoveHint: false,
-      meals: defaultDraftMeals(),
-    },
-    {
-      localId: crypto.randomUUID(),
-      id: null,
-      name: 'Weekends',
-      days_bitmask: 65, // Sat+Sun: bits 0+6
-      wake_time: '08:00',
-      sleep_time: '23:00',
-      is_cycle: false,
-      cycle_length: null,
-      anchor_date: null,
-      showRemoveHint: false,
-      meals: defaultDraftMeals(),
-    },
+    blankCard({ name: 'Weekdays', days_bitmask: 62, wake_time: '07:00', sleep_time: '22:00' }), // Mon–Fri: bits 1–5
+    blankCard({ name: 'Weekends', days_bitmask: 65, wake_time: '08:00', sleep_time: '23:00' }), // Sat+Sun: bits 0+6
   ];
+}
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
 }
 
 function responseToCard(r: DayTypeResponse): ScheduleCard {
@@ -115,9 +124,7 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
     wake_time: r.wake_time.length > 5 ? r.wake_time.slice(0, 5) : r.wake_time,
     sleep_time: r.sleep_time.length > 5 ? r.sleep_time.slice(0, 5) : r.sleep_time,
     days_bitmask: r.days_bitmask,
-    is_cycle: r.is_cycle,
-    cycle_length: r.cycle_length,
-    anchor_date: r.anchor_date,
+    cycle_bitmask: r.cycle_bitmask,
     showRemoveHint: false,
     meals: (r.meals ?? []).map(mealToDraft),
   };
@@ -129,6 +136,36 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
   imports: [],
   template: `
     <div class="day-types-substep">
+
+      <!-- Mode-level cycle parameters (rendered once when in cycle mode) -->
+      @if (mode() === 'cycle') {
+        <div class="cycle-fields">
+          <label class="cycle-field-label">
+            <span>Cycle length (days)</span>
+            <input
+              type="number"
+              class="cycle-input"
+              min="1"
+              [attr.max]="MAX_CYCLE_LENGTH"
+              [value]="cycleLength() ?? ''"
+              (change)="setCycleLength(+$any($event.target).value)"
+              aria-label="Cycle length in days"
+              required
+            />
+          </label>
+          <label class="cycle-field-label">
+            <span>Anchor date</span>
+            <input
+              type="date"
+              class="cycle-input"
+              [value]="anchorDate() ?? ''"
+              (change)="anchorDate.set($any($event.target).value || null)"
+              aria-label="Cycle anchor date"
+              required
+            />
+          </label>
+        </div>
+      }
 
       @for (card of cards(); track card.localId; let cardIdx = $index) {
         <div class="schedule-card">
@@ -146,20 +183,20 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
             <button
               type="button"
               class="remove-btn"
-              [class.remove-btn--disabled]="card.days_bitmask !== 0"
-              [attr.aria-disabled]="card.days_bitmask !== 0 ? 'true' : null"
-              [attr.disabled]="card.days_bitmask !== 0 ? '' : null"
+              [class.remove-btn--disabled]="hasClaimedPositions(card)"
+              [attr.aria-disabled]="hasClaimedPositions(card) ? 'true' : null"
+              [attr.disabled]="hasClaimedPositions(card) ? '' : null"
               (click)="onRemoveClick(cardIdx)"
               [attr.aria-label]="'Remove ' + card.name"
             >✕</button>
           </div>
 
           @if (card.showRemoveHint) {
-            <p class="remove-hint">Uncheck all days before removing this type</p>
+            <p class="remove-hint">{{ removeHintText() }}</p>
           }
 
-          <!-- Day pills -->
-          @if (!card.is_cycle) {
+          <!-- Day / position pills -->
+          @if (mode() === 'dow') {
             <div class="day-row">
               @for (day of dayPills; track day.bit) {
                 <button
@@ -173,17 +210,16 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
               }
             </div>
           } @else {
-            <!-- Cycle mode: numbered day pills 1…N -->
-            @if (card.cycle_length && card.cycle_length > 0) {
+            @if (cycleLength()) {
               <div class="day-row">
-                @for (n of cyclePills(card.cycle_length); track n) {
+                @for (n of cyclePills(cycleLength()!); track n) {
                   <button
                     type="button"
                     class="day-pill"
-                    [class.day-pill--active]="isCycleDaySelected(card.days_bitmask, n)"
+                    [class.day-pill--active]="isCycleDaySelected(card.cycle_bitmask, n)"
                     (click)="toggleCycleDay(cardIdx, n)"
-                    [attr.aria-label]="'Day ' + n"
-                    [attr.aria-pressed]="isCycleDaySelected(card.days_bitmask, n)"
+                    [attr.aria-label]="'Cycle position ' + n"
+                    [attr.aria-pressed]="isCycleDaySelected(card.cycle_bitmask, n)"
                   >{{ n }}</button>
                 }
               </div>
@@ -260,52 +296,28 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
             >+ Add meal</button>
           </div>
 
-          <!-- Cycle mode fields (only shown for cycle cards) -->
-          @if (card.is_cycle) {
-            <div class="cycle-fields">
-              <label class="cycle-field-label">
-                <span>Cycle length (days)</span>
-                <input
-                  type="number"
-                  class="cycle-input"
-                  min="1"
-                  [value]="card.cycle_length ?? ''"
-                  (change)="updateCard(cardIdx, { cycle_length: +$any($event.target).value })"
-                  required
-                />
-              </label>
-              <label class="cycle-field-label">
-                <span>Anchor date</span>
-                <input
-                  type="date"
-                  class="cycle-input"
-                  [value]="card.anchor_date ?? ''"
-                  (change)="updateCard(cardIdx, { anchor_date: $any($event.target).value })"
-                  required
-                />
-              </label>
-            </div>
-            <button
-              type="button"
-              class="cycle-toggle-link"
-              (click)="disableCycleMode(cardIdx)"
-            >Switch to 7-day week</button>
-          }
-
         </div>
       }
 
-      <!-- Add day type -->
+      <!-- Add day type / mode switch -->
       <button
         type="button"
         class="add-link"
         (click)="addCard()"
       >+ Add day type</button>
-      <button
-        type="button"
-        class="add-link"
-        (click)="addCycleCard()"
-      >Non-7-day schedule?</button>
+      @if (mode() === 'dow') {
+        <button
+          type="button"
+          class="add-link"
+          (click)="enterCycleMode()"
+        >Switch to rotating schedule</button>
+      } @else {
+        <button
+          type="button"
+          class="add-link"
+          (click)="enterDOWMode()"
+        >Switch to weekday schedule</button>
+      }
 
       <!-- Validation error -->
       @if (validationError()) {
@@ -449,21 +461,14 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
       font-size: 13px;
     }
 
-    .cycle-toggle-link {
-      background: none;
-      border: none;
-      padding: 0;
-      font-size: 12px;
-      color: var(--color-accent);
-      cursor: pointer;
-      text-decoration: underline;
-      text-align: left;
-    }
-
     .cycle-fields {
       display: flex;
       gap: 16px;
       flex-wrap: wrap;
+      padding: 12px 14px;
+      border: 1.5px dashed var(--color-accent-border);
+      border-radius: 8px;
+      background: var(--color-surface-base);
     }
 
     .cycle-field-label {
@@ -609,6 +614,10 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
   private readonly stateService = inject(OnboardingStateService);
   private readonly destroyRef = inject(DestroyRef);
 
+  readonly mode = signal<Mode>('dow');
+  readonly cycleLength = signal<number | null>(null);
+  readonly anchorDate = signal<string | null>(null);
+
   readonly cards = signal<ScheduleCard[]>([]);
   readonly saveError = signal(false);
   readonly deleteError = signal(false);
@@ -618,6 +627,7 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
   private removeHintTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly dayPills = DAY_PILLS;
+  readonly MAX_CYCLE_LENGTH = MAX_CYCLE_LENGTH;
 
   private readonly DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -643,8 +653,18 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
       takeUntilDestroyed(this.destroyRef),
     ).subscribe(result => {
       if (result === null) {
-        this.cards.set(defaultCards());
+        this.enterDOWMode();
       } else {
+        const firstCycle = result.find(({ dt }) => dt.is_cycle)?.dt;
+        if (firstCycle) {
+          this.mode.set('cycle');
+          this.cycleLength.set(firstCycle.cycle_length);
+          this.anchorDate.set(firstCycle.anchor_date);
+        } else {
+          this.mode.set('dow');
+          this.cycleLength.set(null);
+          this.anchorDate.set(null);
+        }
         this.cards.set(result.map(({ dt, meals }) => ({
           ...responseToCard(dt),
           meals: meals.map(mealToDraft),
@@ -691,18 +711,17 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Claim a calendar day for this card, moving it away from whichever card currently owns it. */
+  /** Claim a weekday for this card; steal it from whichever DOW card currently owns it. */
   toggleDay(cardIndex: number, bit: number): void {
+    if (this.mode() !== 'dow') return;
     const bitValue = 1 << bit;
     const card = this.cards()[cardIndex];
-
-    // No-op: day already belongs to this card, or card is in cycle mode.
-    if (!card || card.is_cycle || (card.days_bitmask & bitValue) !== 0) return;
+    if (!card || (card.days_bitmask & bitValue) !== 0) return;
 
     this.cards.update(list =>
       list.map((c, i) => {
         if (i === cardIndex) return { ...c, days_bitmask: c.days_bitmask | bitValue };
-        if (!c.is_cycle && (c.days_bitmask & bitValue) !== 0) {
+        if ((c.days_bitmask & bitValue) !== 0) {
           return { ...c, days_bitmask: c.days_bitmask & ~bitValue };
         }
         return c;
@@ -710,12 +729,22 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
     );
   }
 
-  /** Toggle a numbered cycle day. Cycle days use bits 0…(N-1), day n uses bit (n-1). */
+  /** Claim a cycle position for this card; steal it from whichever cycle card currently owns it. */
   toggleCycleDay(cardIndex: number, dayNumber: number): void {
+    if (this.mode() !== 'cycle') return;
+    const bitValue = 1 << (dayNumber - 1);
     const card = this.cards()[cardIndex];
-    const bit = dayNumber - 1;
-    const newMask = card.days_bitmask ^ (1 << bit);
-    this.updateCard(cardIndex, { days_bitmask: newMask });
+    if (!card || (card.cycle_bitmask & bitValue) !== 0) return;
+
+    this.cards.update(list =>
+      list.map((c, i) => {
+        if (i === cardIndex) return { ...c, cycle_bitmask: c.cycle_bitmask | bitValue };
+        if ((c.cycle_bitmask & bitValue) !== 0) {
+          return { ...c, cycle_bitmask: c.cycle_bitmask & ~bitValue };
+        }
+        return c;
+      })
+    );
   }
 
   isDaySelected(mask: number, bit: number): boolean {
@@ -734,9 +763,20 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
     return Array.from({ length }, (_, i) => i + 1);
   }
 
+  /** True when removing this card would leave its claimed positions/days unassigned. */
+  hasClaimedPositions(card: ScheduleCard): boolean {
+    return this.mode() === 'dow' ? card.days_bitmask !== 0 : card.cycle_bitmask !== 0;
+  }
+
+  removeHintText(): string {
+    return this.mode() === 'dow'
+      ? 'Uncheck all days before removing this type'
+      : 'Reassign this card\'s cycle positions before removing';
+  }
+
   onRemoveClick(index: number): void {
     const card = this.cards()[index];
-    if (card.days_bitmask !== 0) {
+    if (this.hasClaimedPositions(card)) {
       // Show inline hint, auto-dismiss after 3 seconds
       this.updateCard(index, { showRemoveHint: true });
       if (this.removeHintTimer) clearTimeout(this.removeHintTimer);
@@ -768,46 +808,49 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
   }
 
   addCard(): void {
-    const blank: ScheduleCard = {
-      localId: crypto.randomUUID(),
-      id: null,
-      name: '',
-      days_bitmask: 0,
-      wake_time: '07:00',
-      sleep_time: '22:00',
-      is_cycle: false,
-      cycle_length: null,
-      anchor_date: null,
-      showRemoveHint: false,
-      meals: defaultDraftMeals(),
-    };
-    this.cards.update(list => [...list, blank]);
+    this.cards.update(list => [...list, blankCard()]);
   }
 
-  addCycleCard(): void {
-    const blank: ScheduleCard = {
-      localId: crypto.randomUUID(),
-      id: null,
-      name: '',
-      days_bitmask: 0,
-      wake_time: '07:00',
-      sleep_time: '22:00',
-      is_cycle: true,
-      cycle_length: 1,
-      anchor_date: null,
-      showRemoveHint: false,
-      meals: defaultDraftMeals(),
-    };
-    this.cards.update(list => [...list, blank]);
+  /** Switch to cycle mode. Wipes existing cards — per spec, mode is binary and we
+   *  don't carry per-card state across the boundary. Top card claims every position. */
+  enterCycleMode(): void {
+    this.mode.set('cycle');
+    this.cycleLength.set(DEFAULT_CYCLE_LENGTH);
+    this.anchorDate.set(todayIso());
+    const fullMask = (1 << DEFAULT_CYCLE_LENGTH) - 1;
+    this.cards.set([blankCard({ cycle_bitmask: fullMask })]);
+    this.validationError.set('');
   }
 
-  disableCycleMode(index: number): void {
-    this.updateCard(index, {
-      is_cycle: false,
-      cycle_length: null,
-      anchor_date: null,
-      days_bitmask: 0,
-    });
+  /** Switch to DOW mode. Wipes existing cards and restores the default two-card setup. */
+  enterDOWMode(): void {
+    this.mode.set('dow');
+    this.cycleLength.set(null);
+    this.anchorDate.set(null);
+    this.cards.set(defaultDOWCards());
+    this.validationError.set('');
+  }
+
+  /** Update the cycle length. Bits at or beyond the new length are masked off every
+   *  card; any newly-introduced positions are claimed by the top card so coverage
+   *  remains complete after the change. */
+  setCycleLength(n: number): void {
+    if (this.mode() !== 'cycle') return;
+    const clamped = Math.max(1, Math.min(MAX_CYCLE_LENGTH, Math.floor(n)));
+    this.cycleLength.set(clamped);
+    const lowMask = (1 << clamped) - 1;
+    this.cards.update(list =>
+      list.map((c, i) => {
+        const trimmed = c.cycle_bitmask & lowMask;
+        if (i === 0) {
+          const claimedByOthers = list
+            .filter((_, j) => j !== 0)
+            .reduce((m, x) => m | (x.cycle_bitmask & lowMask), 0);
+          return { ...c, cycle_bitmask: lowMask & ~claimedByOthers };
+        }
+        return { ...c, cycle_bitmask: trimmed };
+      })
+    );
   }
 
   save(): void {
@@ -816,29 +859,47 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
     this.saveError.set(false);
     this.validationError.set('');
 
-    // Validate 7-day cards
-    const missing7Day = this.cards().filter(c => !c.is_cycle && c.days_bitmask === 0);
-    // Validate cycle cards
-    const missingCycle = this.cards().filter(c => c.is_cycle && (!c.cycle_length || c.cycle_length < 1 || !c.anchor_date));
+    const isCycle = this.mode() === 'cycle';
 
-    if (missing7Day.length > 0) {
-      this.validationError.set('All day types must have at least one day assigned.');
-      return;
+    if (!isCycle) {
+      const missing = this.cards().filter(c => c.days_bitmask === 0);
+      if (missing.length > 0) {
+        this.validationError.set('All day types must have at least one day assigned.');
+        return;
+      }
+    } else {
+      const length = this.cycleLength();
+      const anchor = this.anchorDate();
+      if (!length || length < 1 || !anchor) {
+        this.validationError.set('Cycle day types must have a cycle length and start date.');
+        return;
+      }
+      const fullMask = (1 << length) - 1;
+      const missingPositions = this.cards().filter(c => c.cycle_bitmask === 0);
+      if (missingPositions.length > 0) {
+        this.validationError.set('All cycle day types must claim at least one position.');
+        return;
+      }
+      const combined = this.cards().reduce((m, c) => m | c.cycle_bitmask, 0);
+      if (combined !== fullMask) {
+        this.validationError.set('Cycle positions must cover every day in the cycle.');
+        return;
+      }
     }
-    if (missingCycle.length > 0) {
-      this.validationError.set('Cycle day types must have a cycle length and start date.');
-      return;
-    }
+
+    const length = this.cycleLength();
+    const anchor = this.anchorDate();
 
     const requests = this.cards().map(card => {
       const req = {
         name: card.name,
-        days_bitmask: card.days_bitmask,
+        days_bitmask: isCycle ? 0 : card.days_bitmask,
+        cycle_bitmask: isCycle ? card.cycle_bitmask : 0,
         wake_time: card.wake_time,
         sleep_time: card.sleep_time,
-        is_cycle: card.is_cycle,
-        cycle_length: card.cycle_length,
-        anchor_date: card.anchor_date,
+        is_cycle: isCycle,
+        cycle_length: isCycle ? length : null,
+        anchor_date: isCycle ? anchor : null,
       };
       if (card.id) {
         return this.dayTypesService.update(card.id, req);

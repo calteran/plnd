@@ -656,20 +656,33 @@ test.describe('Onboarding', () => {
       await expect(firstCard.locator('.remove-hint')).toContainText('Uncheck all days before removing this type');
     });
 
-    test('Non-7-day schedule? adds a new cycle card', async ({ page }) => {
-      await page.getByRole('button', { name: 'Non-7-day schedule?' }).click();
+    test('Switch to rotating schedule wipes DOW cards and seeds a single cycle card', async ({ page }) => {
+      // Mode is a user-level binary: switching wipes the DOW setup and starts over with
+      // a single cycle card that claims every position in the default 7-day cycle.
+      await page.getByRole('button', { name: 'Switch to rotating schedule' }).click();
       const cards = page.locator('.schedule-card');
-      await expect(cards).toHaveCount(3);
-      await expect(cards.nth(2).locator('.cycle-toggle-link')).toHaveText('Switch to 7-day week');
+      await expect(cards).toHaveCount(1);
+      // Substep-level cycle params appear once, not per-card.
+      await expect(page.locator('.cycle-input[type="number"]')).toHaveValue('7');
+      await expect(page.locator('.cycle-input[type="date"]')).not.toHaveValue('');
+      // All 7 numbered position pills are active on the lone cycle card (top card claims all).
+      const positionPills = cards.nth(0).locator('.day-pill');
+      await expect(positionPills).toHaveCount(7);
+      for (let i = 0; i < 7; i++) {
+        await expect(positionPills.nth(i)).toHaveAttribute('aria-pressed', 'true');
+      }
     });
 
-    test('Switch to 7-day week reverts cycle card to letter day pills', async ({ page }) => {
-      await page.getByRole('button', { name: 'Non-7-day schedule?' }).click();
+    test('Switch to weekday schedule reverts cycle setup to default DOW cards', async ({ page }) => {
+      await page.getByRole('button', { name: 'Switch to rotating schedule' }).click();
+      await expect(page.locator('.schedule-card')).toHaveCount(1);
+      await page.getByRole('button', { name: 'Switch to weekday schedule' }).click();
       const cards = page.locator('.schedule-card');
-      const cycleCard = cards.nth(2);
-      await cycleCard.locator('.cycle-toggle-link').click();
-      await expect(cycleCard.locator('.day-pill')).toHaveCount(7);
-      await expect(cycleCard.locator('.cycle-toggle-link')).not.toBeVisible();
+      await expect(cards).toHaveCount(2);
+      await expect(cards.nth(0).locator('.card-name-input')).toHaveValue('Weekdays');
+      await expect(cards.nth(1).locator('.card-name-input')).toHaveValue('Weekends');
+      // Cycle params are gone.
+      await expect(page.locator('.cycle-fields')).not.toBeVisible();
     });
   });
 
