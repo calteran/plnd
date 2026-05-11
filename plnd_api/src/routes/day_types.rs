@@ -13,8 +13,10 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 pub const MAX_NAME_LEN: usize = 200;
-/// Upper bound on `cycle_length`. Bound by the bit-width of `cycle_bitmask: i32`.
-pub const MAX_CYCLE_LENGTH: i32 = 31;
+/// Upper bound on `cycle_length`. `cycle_bitmask` is `i32`; bit 31 is the sign
+/// bit, so the largest "all positions set" mask we can store as positive is
+/// `(1 << 30) - 1`. 30 also covers monthly rotations comfortably.
+pub const MAX_CYCLE_LENGTH: i32 = 30;
 
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct CreateDayTypeRequest {
