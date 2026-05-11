@@ -56,11 +56,15 @@ describe('MealPlannerAgentService', () => {
     expect(result).toEqual(mockEntry);
   });
 
-  it('suggestSlot includes context.avoid_meal_refs when avoid list is non-empty', () => {
+  it('suggestSlot sends avoid_meal_refs at the top level when avoid list is non-empty', () => {
     svc.suggestSlot('2026-03-24', 'dinner', [{ type: 'user', id: 'u1' }]).subscribe();
 
     const req = httpMock.expectOne(r => r.url.endsWith('/agent/meal-plan/suggest') && r.method === 'POST');
-    expect(req.request.body.context).toEqual({ avoid_meal_refs: [{ type: 'user', id: 'u1' }] });
+    expect(req.request.body).toEqual({
+      date: '2026-03-24',
+      meal_name: 'dinner',
+      avoid_meal_refs: [{ type: 'user', id: 'u1' }],
+    });
     req.flush({ date: '2026-03-24', meal_name: 'dinner', meal_ref: null });
   });
 

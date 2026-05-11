@@ -29,7 +29,7 @@ export class MealPlannerAgentService {
     return this.http.post<MealEntry>(`${this.apiBase}/agent/meal-plan/suggest`, {
       date,
       meal_name: mealName,
-      ...(avoid.length ? { context: { avoid_meal_refs: avoid } } : {}),
+      ...(avoid.length ? { avoid_meal_refs: avoid } : {}),
     });
   }
 
