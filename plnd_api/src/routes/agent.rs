@@ -21,6 +21,29 @@ struct PlaceTasksOutput {
     entries: Vec<PlaceTasksEntry>,
 }
 
+#[derive(serde::Deserialize)]
+struct ReviewMealPlanOutput {
+    changes_requested: Vec<ReviewChangeRequest>,
+}
+
+#[derive(serde::Deserialize)]
+struct ReviewChangeRequest {
+    date: chrono::NaiveDate,
+    meal_name: String,
+    reason: String,
+}
+
+/// Enriched view of a `MealEntry` used exclusively in the review context JSON.
+/// Adds `dish_name` so the review agent can reason about meals by name rather
+/// than opaque UUIDs.
+#[derive(serde::Serialize)]
+struct ReviewMealEntry<'a> {
+    date: &'a chrono::NaiveDate,
+    slot: &'a str,
+    dish_name: String,
+    meal_ref: &'a MealRef,
+}
+
 fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> String {
     match context {
         Some(turns) if !turns.is_empty() => {
@@ -211,6 +234,51 @@ fn build_suggest_slot_ctx(
     }
 }
 
+/// Build an `AgentContext` for the week-level review pass.
+///
+/// Serialises the full assembled plan (locked + chosen) as a JSON array of
+/// `ReviewMealEntry` objects — each includes the human-readable `dish_name`
+/// looked up from `dish_names` (falls back to the UUID string when absent).
+/// This allows the review agent to reason about meals by name rather than
+/// opaque UUIDs when checking for blocked ingredients or dietary restrictions.
+fn build_review_meal_plan_ctx(
+    user_id: Uuid,
+    prefs_blob: &str,
+    locked_entries: &[MealEntry],
+    chosen: &[MealEntry],
+    dish_names: &std::collections::HashMap<Uuid, String>,
+) -> AgentContext {
+    let mut all_meals: Vec<ReviewMealEntry> = locked_entries
+        .iter()
+        .chain(chosen.iter())
+        .map(|e| ReviewMealEntry {
+            date: &e.date,
+            slot: &e.meal_name,
+            dish_name: dish_names
+                .get(&e.meal_ref.id)
+                .cloned()
+                .unwrap_or_else(|| e.meal_ref.id.to_string()),
+            meal_ref: &e.meal_ref,
+        })
+        .collect();
+    all_meals.sort_by(|a, b| a.date.cmp(b.date).then_with(|| a.slot.cmp(b.slot)));
+    let week_json = serde_json::to_string(&all_meals).unwrap_or_else(|e| {
+        tracing::warn!(
+            error = %e,
+            "meal-plan: failed to serialise week for review; proceeding with empty plan"
+        );
+        String::new()
+    });
+
+    AgentContext {
+        user_id,
+        use_case: UseCase::ReviewMealPlan,
+        input: "Review this week's meal plan for quality and variety.".to_string(),
+        prior_context: Some(format!("{prefs_blob}[Current meal plan]\n{week_json}\n")),
+        extra: None,
+    }
+}
+
 /// POST /agent/task — parse free-text task input via the AI agent loop and schedule a task.
 #[utoipa::path(
     post,
@@ -394,6 +462,169 @@ pub async fn post_meal_plan(
                     meal_name: slot.meal_name.clone(),
                     reason: e.to_string(),
                 });
+            }
+        }
+    }
+
+    // Pre-fetch dish names for all entries so the review agent sees human-readable
+    // names rather than opaque UUIDs when checking for blocked ingredients.
+    let dish_names: std::collections::HashMap<Uuid, String> = {
+        let catalog_ids: Vec<Uuid> = locked_entries
+            .iter()
+            .chain(chosen.iter())
+            .filter(|e| e.meal_ref.meal_type == "catalog")
+            .map(|e| e.meal_ref.id)
+            .collect();
+        let user_ids: Vec<Uuid> = locked_entries
+            .iter()
+            .chain(chosen.iter())
+            .filter(|e| e.meal_ref.meal_type == "user")
+            .map(|e| e.meal_ref.id)
+            .collect();
+
+        let mut map = std::collections::HashMap::new();
+        if !catalog_ids.is_empty() {
+            match state
+                .repos
+                .meal
+                .catalog_meal_names_by_ids(&catalog_ids)
+                .await
+            {
+                Ok(names) => map.extend(names),
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    "meal-plan: failed to load catalog meal names for review; names will be omitted"
+                ),
+            }
+        }
+        if !user_ids.is_empty() {
+            match state
+                .repos
+                .meal
+                .user_meal_names_by_ids(user_id, &user_ids)
+                .await
+            {
+                Ok(names) => map.extend(names),
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    "meal-plan: failed to load user meal names for review; names will be omitted"
+                ),
+            }
+        }
+        map
+    };
+
+    // Review pass — examine the assembled week and re-suggest flagged slots.
+    // Capped at 2 passes to prevent runaway regeneration.
+    let max_review_passes: u32 = 2;
+    'review: for _pass in 0..max_review_passes {
+        if chosen.is_empty() {
+            break;
+        }
+
+        let review_ctx =
+            build_review_meal_plan_ctx(user_id, &prefs_blob, &locked_entries, &chosen, &dish_names);
+        let review_output = match state.agent.run(&review_ctx).await {
+            Ok(out) => out,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    "meal-plan: review agent failed; skipping remaining review passes"
+                );
+                break 'review;
+            }
+        };
+
+        let review: ReviewMealPlanOutput = match serde_json::from_str(&review_output.content) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    content = %review_output.content,
+                    "meal-plan: failed to parse review output; skipping remaining review passes"
+                );
+                break 'review;
+            }
+        };
+
+        if review.changes_requested.is_empty() {
+            break 'review;
+        }
+
+        // Deduplicate by (date, normalised meal_name) — the LLM may return the same slot
+        // twice in one pass, and a second iteration would re-suggest against the
+        // already-replaced meal.
+        let mut seen_slots: std::collections::HashSet<(chrono::NaiveDate, String)> =
+            std::collections::HashSet::new();
+        for change in &review.changes_requested {
+            if !seen_slots.insert((change.date, change.meal_name.to_lowercase())) {
+                tracing::warn!(
+                    date = %change.date,
+                    meal_name = %change.meal_name,
+                    "meal-plan: review returned duplicate slot in same pass; skipping"
+                );
+                continue;
+            }
+            // Case-insensitive match — the LLM may capitalise slot names differently.
+            let Some(pos) = chosen.iter().position(|m| {
+                m.date == change.date && m.meal_name.eq_ignore_ascii_case(&change.meal_name)
+            }) else {
+                // Distinguish locked slots (can't be swapped) from genuinely unknown slots.
+                if locked_entries.iter().any(|m| {
+                    m.date == change.date && m.meal_name.eq_ignore_ascii_case(&change.meal_name)
+                }) {
+                    tracing::warn!(
+                        date = %change.date,
+                        meal_name = %change.meal_name,
+                        "meal-plan: review flagged a locked slot; skipping replacement"
+                    );
+                } else {
+                    tracing::warn!(
+                        date = %change.date,
+                        meal_name = %change.meal_name,
+                        "meal-plan: review flagged unknown slot; skipping"
+                    );
+                }
+                continue;
+            };
+
+            // `chosen[pos]` (the flagged meal) is still present, so its meal_ref
+            // appears in the avoid list that `build_suggest_slot_ctx` constructs.
+            let swap_slot = plnd_data::models::OpenSlot {
+                date: change.date,
+                meal_name: change.meal_name.clone(),
+            };
+            let resuggestion_ctx =
+                build_suggest_slot_ctx(user_id, &swap_slot, &prefs_blob, &locked_entries, &chosen);
+
+            match state.agent.run(&resuggestion_ctx).await {
+                Ok(out) => match serde_json::from_str::<MealEntry>(&out.content) {
+                    Ok(new_meal) => {
+                        tracing::info!(
+                            date = %change.date,
+                            meal_name = %change.meal_name,
+                            reason = %change.reason,
+                            "meal-plan: review pass replaced slot"
+                        );
+                        chosen[pos] = new_meal;
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            date = %change.date,
+                            meal_name = %change.meal_name,
+                            "meal-plan: review re-suggestion parse failed; keeping original"
+                        );
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        date = %change.date,
+                        meal_name = %change.meal_name,
+                        "meal-plan: review re-suggestion agent failed; keeping original"
+                    );
+                }
             }
         }
     }
@@ -952,7 +1183,10 @@ pub async fn post_place_tasks(
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
+    use super::*;
+    use crate::models::{ActionTaken, MealEntry, MealRef, TaskEntryRequest, TaskEntryResponse};
+    use chrono::NaiveDate;
+    use uuid::Uuid;
 
     #[test]
     fn meal_plan_request_state_deserializes_with_skipped() {
@@ -1736,6 +1970,114 @@ mod tests {
         assert!(
             prior.contains(&locked_id),
             "locked entry meal ref id must appear in avoid list"
+        );
+    }
+
+    // --- build_review_meal_plan_ctx tests ---
+
+    fn make_meal_entry(date: &str, slot: &str, meal_type: &str, id: &str) -> MealEntry {
+        MealEntry {
+            date: NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap(),
+            meal_name: slot.to_string(),
+            meal_ref: MealRef {
+                meal_type: meal_type.to_string(),
+                id: Uuid::parse_str(id).unwrap(),
+            },
+            estimated_nutrition: None,
+        }
+    }
+
+    #[test]
+    fn build_review_ctx_includes_all_entries_in_prior_context() {
+        let user_id = Uuid::new_v4();
+        let meal_a = make_meal_entry(
+            "2026-05-11",
+            "breakfast",
+            "catalog",
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        );
+        let meal_b = make_meal_entry(
+            "2026-05-12",
+            "lunch",
+            "catalog",
+            "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        );
+
+        let ctx =
+            build_review_meal_plan_ctx(user_id, "", &[meal_a], &[meal_b], &Default::default());
+
+        let prior = ctx.prior_context.unwrap();
+        assert!(prior.contains("2026-05-11"), "locked entry date missing");
+        assert!(prior.contains("2026-05-12"), "chosen entry date missing");
+        assert!(prior.contains("breakfast"), "locked slot name missing");
+        assert!(prior.contains("lunch"), "chosen slot name missing");
+        assert!(prior.contains("[Current meal plan]"));
+    }
+
+    #[test]
+    fn build_review_ctx_meal_refs_present_for_preference_checking() {
+        let user_id = Uuid::new_v4();
+        let meal_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+        let meal = make_meal_entry("2026-05-11", "lunch", "catalog", meal_id);
+        let prefs = "[Meal preferences]\nBlocked ingredients (never use): peanuts\n\n";
+
+        let ctx = build_review_meal_plan_ctx(user_id, prefs, &[], &[meal], &Default::default());
+
+        let prior = ctx.prior_context.unwrap();
+        assert!(
+            prior.contains("peanuts"),
+            "blocked ingredient must be visible to review agent"
+        );
+        assert!(
+            prior.contains(meal_id),
+            "meal_ref.id must be visible to review agent"
+        );
+    }
+
+    #[test]
+    fn build_review_ctx_uses_review_meal_plan_use_case() {
+        let ctx = build_review_meal_plan_ctx(Uuid::new_v4(), "", &[], &[], &Default::default());
+        assert_eq!(ctx.use_case, UseCase::ReviewMealPlan);
+    }
+
+    #[test]
+    fn build_review_ctx_prepends_prefs_blob() {
+        let prefs = "[Meal preferences]\nDietary restrictions: vegan\n\n";
+        let ctx = build_review_meal_plan_ctx(Uuid::new_v4(), prefs, &[], &[], &Default::default());
+        let prior = ctx.prior_context.unwrap();
+        assert!(
+            prior.starts_with(prefs),
+            "prefs_blob must precede the meal plan block"
+        );
+    }
+
+    #[test]
+    fn build_review_ctx_includes_dish_name_when_in_map() {
+        let meal_id = Uuid::parse_str("a1b2c3d4-e5f6-7890-abcd-ef1234567890").unwrap();
+        let meal = make_meal_entry("2026-05-11", "dinner", "catalog", &meal_id.to_string());
+        let mut names = std::collections::HashMap::new();
+        names.insert(meal_id, "Chicken Tikka Masala".to_string());
+
+        let ctx = build_review_meal_plan_ctx(Uuid::new_v4(), "", &[], &[meal], &names);
+
+        let prior = ctx.prior_context.unwrap();
+        assert!(
+            prior.contains("Chicken Tikka Masala"),
+            "dish_name must appear in review context"
+        );
+    }
+
+    #[test]
+    fn build_review_ctx_falls_back_to_uuid_when_name_absent() {
+        let meal_id = Uuid::parse_str("a1b2c3d4-e5f6-7890-abcd-ef1234567890").unwrap();
+        let meal = make_meal_entry("2026-05-11", "dinner", "catalog", &meal_id.to_string());
+
+        let ctx = build_review_meal_plan_ctx(Uuid::new_v4(), "", &[], &[meal], &Default::default());
+
+        let prior = ctx.prior_context.unwrap();
+        assert!(
+            prior.contains(&meal_id.to_string()),
+            "UUID fallback must appear in review context when name not in map"
         );
     }
 }

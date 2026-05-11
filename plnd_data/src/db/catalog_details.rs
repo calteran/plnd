@@ -101,6 +101,23 @@ pub async fn get_ingredient_names_by_ids(
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(
+    skip(pool, ids),
+    fields(table = "catalog_meals", op = "get_names_by_ids")
+)]
+pub async fn get_catalog_meal_names_by_ids(
+    pool: &PgPool,
+    ids: &[Uuid],
+) -> Result<Vec<(Uuid, String)>, DatabaseError> {
+    sqlx::query_as::<_, (Uuid, String)>(
+        "SELECT meal_id, name FROM catalog_meals WHERE meal_id = ANY($1::uuid[])",
+    )
+    .bind(ids)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 #[tracing::instrument(skip(pool), fields(table = "catalog_meals", op = "get_nutrition"))]
 pub async fn get_meal_nutrition(
     pool: &PgPool,

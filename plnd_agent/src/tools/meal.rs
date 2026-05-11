@@ -1577,6 +1577,21 @@ mod tests {
                     .collect())
             }
 
+            async fn catalog_meal_names_by_ids(
+                &self,
+                _ids: &[Uuid],
+            ) -> Result<Vec<(Uuid, String)>, plnd_data::Error> {
+                unimplemented!("not needed by tool-logic tests")
+            }
+
+            async fn user_meal_names_by_ids(
+                &self,
+                _user_id: Uuid,
+                _ids: &[Uuid],
+            ) -> Result<Vec<(Uuid, String)>, plnd_data::Error> {
+                unimplemented!("not needed by tool-logic tests")
+            }
+
             async fn search_ingredient_nutrition(
                 &self,
                 q: &str,
