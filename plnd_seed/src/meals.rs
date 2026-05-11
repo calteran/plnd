@@ -1,6 +1,7 @@
 use sqlx::PgConnection;
 use uuid::Uuid;
 
+use crate::dishes::AUTO_SEEDED_TAG;
 use crate::error::SeedError;
 
 struct MealDef {
@@ -19,7 +20,7 @@ const MEALS: &[MealDef] = &[
         description: "Warming oat porridge to start the day",
         slug: "breakfast-morning-porridge",
         occasion_tags: &["breakfast"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["porridge"],
     },
     MealDef {
@@ -27,7 +28,7 @@ const MEALS: &[MealDef] = &[
         description: "Classic scrambled eggs with toast",
         slug: "breakfast-scrambled-egg-plate",
         occasion_tags: &["breakfast"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["scrambled", "egg"],
     },
     MealDef {
@@ -35,7 +36,7 @@ const MEALS: &[MealDef] = &[
         description: "Light protein-rich breakfast with fresh salad",
         slug: "breakfast-egg-salad",
         occasion_tags: &["breakfast"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["egg", "salad"],
     },
     // Lunches (3)
@@ -44,7 +45,7 @@ const MEALS: &[MealDef] = &[
         description: "Grilled chicken with fresh salad",
         slug: "lunch-chicken-salad",
         occasion_tags: &["lunch"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["chicken", "salad"],
     },
     MealDef {
@@ -52,7 +53,7 @@ const MEALS: &[MealDef] = &[
         description: "Satisfying pasta midday meal",
         slug: "lunch-pasta",
         occasion_tags: &["lunch"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["pasta"],
     },
     MealDef {
@@ -60,7 +61,7 @@ const MEALS: &[MealDef] = &[
         description: "Simple grilled chicken lunch",
         slug: "lunch-light-chicken",
         occasion_tags: &["lunch"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["chicken"],
     },
     // Dinners (3)
@@ -69,7 +70,7 @@ const MEALS: &[MealDef] = &[
         description: "Hearty chicken and pasta evening meal",
         slug: "dinner-chicken-pasta",
         occasion_tags: &["dinner"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["chicken", "pasta"],
     },
     MealDef {
@@ -77,16 +78,16 @@ const MEALS: &[MealDef] = &[
         description: "Classic pasta evening meal",
         slug: "dinner-pasta",
         occasion_tags: &["dinner"],
-        tags: &["auto-seeded"],
-        dish_keywords: &["pasta", "chicken"],
+        tags: &[AUTO_SEEDED_TAG],
+        dish_keywords: &["pasta"],
     },
     MealDef {
         name: "Salad Dinner",
         description: "Fresh and light salad dinner",
         slug: "dinner-salad",
         occasion_tags: &["dinner"],
-        tags: &["auto-seeded"],
-        dish_keywords: &["salad", "chicken"],
+        tags: &[AUTO_SEEDED_TAG],
+        dish_keywords: &["salad"],
     },
     // Snacks (2)
     MealDef {
@@ -94,7 +95,7 @@ const MEALS: &[MealDef] = &[
         description: "Quick oat-based energy snack",
         slug: "snack-oat-energy",
         occasion_tags: &["snack"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["porridge"],
     },
     MealDef {
@@ -102,7 +103,7 @@ const MEALS: &[MealDef] = &[
         description: "Refreshing light salad snack",
         slug: "snack-light-salad",
         occasion_tags: &["snack"],
-        tags: &["auto-seeded"],
+        tags: &[AUTO_SEEDED_TAG],
         dish_keywords: &["salad"],
     },
 ];
