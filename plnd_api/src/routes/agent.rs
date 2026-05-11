@@ -70,26 +70,36 @@ async fn preload_meal_planning_context(repos: &plnd_data::Repositories, user_id:
             .map(|p| p.catalog_ingredient_id)
             .collect();
 
-        async fn resolve(
-            repo: &dyn plnd_data::repository::MealRepository,
-            ids: &[Uuid],
-        ) -> Result<Vec<String>, plnd_data::Error> {
-            if ids.is_empty() {
-                return Ok(vec![]);
-            }
-            Ok(repo
-                .ingredient_names_by_ids(ids)
+        // Combine all three ID lists into a single DB round-trip, then partition
+        // the results back by score category using the returned (id, name) pairs.
+        let all_ingredient_ids: Vec<Uuid> = blocked_ids
+            .iter()
+            .chain(tolerated_ids.iter())
+            .chain(preferred_ids.iter())
+            .copied()
+            .collect();
+        let names_map: std::collections::HashMap<Uuid, String> = if all_ingredient_ids.is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            repos
+                .meal
+                .ingredient_names_by_ids(&all_ingredient_ids)
                 .await?
                 .into_iter()
-                .map(|(_, name)| name)
-                .collect())
-        }
-
-        let (blocked_names, tolerated_names, preferred_names) = tokio::try_join!(
-            resolve(repos.meal.as_ref(), &blocked_ids),
-            resolve(repos.meal.as_ref(), &tolerated_ids),
-            resolve(repos.meal.as_ref(), &preferred_ids),
-        )?;
+                .collect()
+        };
+        let blocked_names: Vec<String> = blocked_ids
+            .iter()
+            .filter_map(|id| names_map.get(id).cloned())
+            .collect();
+        let tolerated_names: Vec<String> = tolerated_ids
+            .iter()
+            .filter_map(|id| names_map.get(id).cloned())
+            .collect();
+        let preferred_names: Vec<String> = preferred_ids
+            .iter()
+            .filter_map(|id| names_map.get(id).cloned())
+            .collect();
 
         // Exclude blocked meals from the top-rated list — a meal that is both
         // highly rated and later blocked must never be re-suggested.
@@ -156,6 +166,17 @@ async fn preload_meal_planning_context(repos: &plnd_data::Repositories, user_id:
     }
 }
 
+/// Format a `[Avoid these meals: ...]` context block from a slice of meal refs.
+/// Returns an empty string when `refs` is empty.
+fn build_avoid_str(refs: &[MealRef]) -> String {
+    if refs.is_empty() {
+        return String::new();
+    }
+    serde_json::to_string(refs)
+        .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
+        .unwrap_or_default()
+}
+
 /// Build an `AgentContext` for a single open meal slot.
 ///
 /// The `prior_context` carries:
@@ -172,18 +193,12 @@ fn build_suggest_slot_ctx(
     let date = slot.date.format("%Y-%m-%d").to_string();
     let meal_name = &slot.meal_name;
 
-    let avoid_refs: Vec<&MealRef> = locked_entries
+    let avoid_refs: Vec<MealRef> = locked_entries
         .iter()
         .chain(chosen.iter())
-        .map(|e| &e.meal_ref)
+        .map(|e| e.meal_ref.clone())
         .collect();
-    let avoid_str = if !avoid_refs.is_empty() {
-        serde_json::to_string(&avoid_refs)
-            .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
+    let avoid_str = build_avoid_str(&avoid_refs);
 
     AgentContext {
         user_id,
@@ -497,16 +512,7 @@ pub async fn post_meal_plan_suggest(
     let date = body.date.format("%Y-%m-%d").to_string();
     let meal_name = body.meal_name;
 
-    let avoid_str = body
-        .avoid_meal_refs
-        .as_deref()
-        .filter(|refs| !refs.is_empty())
-        .map(|refs| {
-            serde_json::to_string(refs)
-                .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
-                .unwrap_or_default()
-        })
-        .unwrap_or_default();
+    let avoid_str = build_avoid_str(body.avoid_meal_refs.as_deref().unwrap_or(&[]));
 
     let ctx = AgentContext {
         user_id,
