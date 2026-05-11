@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
-import { PostSchedulePlanRequest } from '../models/week-plan';
+import { MealRef, PostSchedulePlanRequest } from '../models/week-plan';
 import { DayTypesMealsService } from './day-types-meals.service';
 
 describe('WeekPlanService', () => {
@@ -465,33 +465,40 @@ describe('WeekPlanService', () => {
   });
 
   describe('currentState()', () => {
-    it('returns a MealPlanState with all horizon days × meal pattern slots', () => {
+    it('returns empty categorized arrays when no meals are set', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const state = service.currentState();
-      expect(state.week_start).toBe('2026-03-24');
-      expect(state.meals.length).toBe(3); // 1 day × 3 slots
+      expect(state.approved).toEqual([]);
+      expect(state.skipped).toEqual([]);
+      expect(state.custom).toEqual([]);
     });
 
-    it('marks an approved meal correctly in currentState', () => {
+    it('puts an approved meal with mealRef into the approved array', () => {
       service.initSession('2026-03-24', '2026-03-24');
-      service.approveMeal('2026-03-24', 'breakfast');
-      // approveMeal on a non-existent cell is a no-op; pre-seed first
-      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'proposed', mealRef: null, title: 'Oatmeal' });
-      service.approveMeal('2026-03-24', 'breakfast');
+      const ref: MealRef = { type: 'catalog', id: '00000000-0000-0000-0000-000000000001' };
+      service.setMeal('2026-03-24', 'breakfast', { approvalState: 'approved', mealRef: ref, title: 'Oatmeal' });
       const state = service.currentState();
-      const entry = state.meals.find(m => m.meal_name === 'breakfast');
-      expect(entry?.approved).toBeTrue();
-      expect(entry?.skipped).toBeFalse();
+      const entry = state.approved.find(m => m.meal_name === 'breakfast');
+      expect(entry?.meal_ref).toEqual(ref);
+      expect(state.skipped.some(s => s.meal_name === 'breakfast')).toBeFalse();
     });
 
-    it('marks a skipped meal correctly in currentState', () => {
+    it('excludes an approved meal with null mealRef from all arrays', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMeal('2026-03-24', 'lunch', { approvalState: 'approved', mealRef: null, title: 'No ref yet' });
+      const state = service.currentState();
+      expect(state.approved.some(m => m.meal_name === 'lunch')).toBeFalse();
+      expect(state.skipped.some(s => s.meal_name === 'lunch')).toBeFalse();
+    });
+
+    it('puts a skipped meal into the skipped array', () => {
       service.initSession('2026-03-24', '2026-03-24');
       service.setMeal('2026-03-24', 'dinner', { approvalState: 'proposed', mealRef: null, title: 'Pasta' });
       service.skipMeal('2026-03-24', 'dinner');
       const state = service.currentState();
-      const entry = state.meals.find(m => m.meal_name === 'dinner');
-      expect(entry?.skipped).toBeTrue();
-      expect(entry?.approved).toBeFalse();
+      const entry = state.skipped.find(s => s.meal_name === 'dinner');
+      expect(entry?.date).toBe('2026-03-24');
+      expect(state.approved.some(m => m.meal_name === 'dinner')).toBeFalse();
     });
   });
 });

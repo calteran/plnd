@@ -5,12 +5,9 @@ import { MealPlannerAgentService } from './meal-planner-agent.service';
 import { MealPlanState } from '../models/week-plan';
 
 const MOCK_STATE: MealPlanState = {
-  week_start: '2026-03-24',
-  meals: [
-    { date: '2026-03-24', meal_name: 'breakfast', approved: false, skipped: false },
-    { date: '2026-03-24', meal_name: 'lunch',     approved: false, skipped: false },
-    { date: '2026-03-24', meal_name: 'dinner',    approved: false, skipped: false },
-  ],
+  approved: [],
+  skipped: [],
+  custom: [],
 };
 
 describe('MealPlannerAgentService', () => {
