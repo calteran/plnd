@@ -1137,7 +1137,10 @@ mod tests {
     fn review_meal_plan_memory_categories_match_meal_use_cases() {
         let cats = UseCase::ReviewMealPlan.memory_categories();
         assert!(cats.contains(&"food"), "ReviewMealPlan must include food");
-        assert!(cats.contains(&"habits"), "ReviewMealPlan must include habits");
+        assert!(
+            cats.contains(&"habits"),
+            "ReviewMealPlan must include habits"
+        );
         assert!(!cats.contains(&"schedule"));
         assert!(!cats.contains(&"energy"));
     }

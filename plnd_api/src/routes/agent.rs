@@ -236,7 +236,11 @@ fn build_review_meal_plan_ctx(
     chosen: &[MealEntry],
 ) -> AgentContext {
     let mut all_meals: Vec<&MealEntry> = locked_entries.iter().chain(chosen.iter()).collect();
-    all_meals.sort_by(|a, b| a.date.cmp(&b.date).then_with(|| a.meal_name.cmp(&b.meal_name)));
+    all_meals.sort_by(|a, b| {
+        a.date
+            .cmp(&b.date)
+            .then_with(|| a.meal_name.cmp(&b.meal_name))
+    });
     let week_json = serde_json::to_string(&all_meals).unwrap_or_default();
 
     AgentContext {
@@ -443,8 +447,7 @@ pub async fn post_meal_plan(
             break;
         }
 
-        let review_ctx =
-            build_review_meal_plan_ctx(user_id, &prefs_blob, &locked_entries, &chosen);
+        let review_ctx = build_review_meal_plan_ctx(user_id, &prefs_blob, &locked_entries, &chosen);
         let review_output = match state.agent.run(&review_ctx).await {
             Ok(out) => out,
             Err(e) => {
@@ -1920,8 +1923,14 @@ mod tests {
         let ctx = build_review_meal_plan_ctx(user_id, prefs, &[], &[meal]);
 
         let prior = ctx.prior_context.unwrap();
-        assert!(prior.contains("peanuts"), "blocked ingredient must be visible to review agent");
-        assert!(prior.contains(meal_id), "meal_ref.id must be visible to review agent");
+        assert!(
+            prior.contains("peanuts"),
+            "blocked ingredient must be visible to review agent"
+        );
+        assert!(
+            prior.contains(meal_id),
+            "meal_ref.id must be visible to review agent"
+        );
     }
 
     #[test]
