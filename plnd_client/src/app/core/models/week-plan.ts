@@ -38,7 +38,7 @@ export interface PlannedMeal {
 
 export interface SlotRef {
   date: string;
-  meal_name: string;
+  meal_name: MealSlot;
 }
 
 export interface MealPlanState {

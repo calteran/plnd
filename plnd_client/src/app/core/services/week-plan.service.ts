@@ -282,6 +282,7 @@ export class WeekPlanService {
     const meals = this.scheduledMealsSignal();
     const approved: MealEntry[] = [];
     const skipped: SlotRef[] = [];
+    // Precondition: dayTypesMealsService.loaded() must be true before calling this method.
 
     this.horizonDays().forEach(date => {
       this.dayTypesMealsService.mealsForDate(date).forEach(patternEntry => {
