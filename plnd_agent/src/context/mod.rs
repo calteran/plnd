@@ -83,7 +83,20 @@ const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
   "properties": {
     "plan_start":        { "type": "string", "format": "date" },
     "meals":             { "type": "array", "items": { "$ref": "#/definitions/MealEntry" } },
-    "nutrition_summary": { "$ref": "#/definitions/NutritionSummary" }
+    "nutrition_summary": { "$ref": "#/definitions/NutritionSummary" },
+    "failed_slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "meal_name", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "date":      { "type": "string", "format": "date" },
+          "meal_name": { "type": "string" },
+          "reason":    { "type": "string" }
+        }
+      }
+    }
   },
   "definitions": {
     "MealEntry": {
