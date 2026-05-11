@@ -1080,7 +1080,10 @@ pub async fn post_place_tasks(
 
 #[cfg(test)]
 mod tests {
-    use crate::models::{ActionTaken, TaskEntryRequest, TaskEntryResponse};
+    use super::*;
+    use crate::models::{ActionTaken, MealEntry, MealRef, TaskEntryRequest, TaskEntryResponse};
+    use chrono::NaiveDate;
+    use uuid::Uuid;
 
     #[test]
     fn meal_plan_request_state_deserializes_with_skipped() {
@@ -1864,6 +1867,77 @@ mod tests {
         assert!(
             prior.contains(&locked_id),
             "locked entry meal ref id must appear in avoid list"
+        );
+    }
+
+    // --- build_review_meal_plan_ctx tests ---
+
+    fn make_meal_entry(date: &str, slot: &str, meal_type: &str, id: &str) -> MealEntry {
+        MealEntry {
+            date: NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap(),
+            meal_name: slot.to_string(),
+            meal_ref: MealRef {
+                meal_type: meal_type.to_string(),
+                id: Uuid::parse_str(id).unwrap(),
+            },
+            estimated_nutrition: None,
+        }
+    }
+
+    #[test]
+    fn build_review_ctx_includes_all_entries_in_prior_context() {
+        let user_id = Uuid::new_v4();
+        let meal_a = make_meal_entry(
+            "2026-05-11",
+            "breakfast",
+            "catalog",
+            "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        );
+        let meal_b = make_meal_entry(
+            "2026-05-12",
+            "lunch",
+            "catalog",
+            "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+        );
+
+        let ctx = build_review_meal_plan_ctx(user_id, "", &[meal_a], &[meal_b]);
+
+        let prior = ctx.prior_context.unwrap();
+        assert!(prior.contains("2026-05-11"), "locked entry date missing");
+        assert!(prior.contains("2026-05-12"), "chosen entry date missing");
+        assert!(prior.contains("breakfast"), "locked slot name missing");
+        assert!(prior.contains("lunch"), "chosen slot name missing");
+        assert!(prior.contains("[Current meal plan]"));
+    }
+
+    #[test]
+    fn build_review_ctx_meal_refs_present_for_preference_checking() {
+        let user_id = Uuid::new_v4();
+        let meal_id = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+        let meal = make_meal_entry("2026-05-11", "lunch", "catalog", meal_id);
+        let prefs = "[Meal preferences]\nBlocked ingredients (never use): peanuts\n\n";
+
+        let ctx = build_review_meal_plan_ctx(user_id, prefs, &[], &[meal]);
+
+        let prior = ctx.prior_context.unwrap();
+        assert!(prior.contains("peanuts"), "blocked ingredient must be visible to review agent");
+        assert!(prior.contains(meal_id), "meal_ref.id must be visible to review agent");
+    }
+
+    #[test]
+    fn build_review_ctx_uses_review_meal_plan_use_case() {
+        let ctx = build_review_meal_plan_ctx(Uuid::new_v4(), "", &[], &[]);
+        assert_eq!(ctx.use_case, UseCase::ReviewMealPlan);
+    }
+
+    #[test]
+    fn build_review_ctx_prepends_prefs_blob() {
+        let prefs = "[Meal preferences]\nDietary restrictions: vegan\n\n";
+        let ctx = build_review_meal_plan_ctx(Uuid::new_v4(), prefs, &[], &[]);
+        let prior = ctx.prior_context.unwrap();
+        assert!(
+            prior.starts_with(prefs),
+            "prefs_blob must precede the meal plan block"
         );
     }
 }
