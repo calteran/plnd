@@ -380,15 +380,15 @@ pub async fn resolve_open_slots(
     let mut result = Vec::new();
     let mut date = plan_start;
     while date <= plan_end {
-        if let Some(dt) = day_types.iter().find(|dt| day_type_applies_on(dt, date)) {
-            if let Some(meal_names) = meals_by_day_type.get(&dt.id) {
-                for meal_name in meal_names {
-                    if !locked_set.contains(&(date, meal_name.as_str())) {
-                        result.push(OpenSlot {
-                            date,
-                            meal_name: meal_name.clone(),
-                        });
-                    }
+        if let Some(dt) = day_types.iter().find(|dt| day_type_applies_on(dt, date))
+            && let Some(meal_names) = meals_by_day_type.get(&dt.id)
+        {
+            for meal_name in meal_names {
+                if !locked_set.contains(&(date, meal_name.as_str())) {
+                    result.push(OpenSlot {
+                        date,
+                        meal_name: meal_name.clone(),
+                    });
                 }
             }
         }
