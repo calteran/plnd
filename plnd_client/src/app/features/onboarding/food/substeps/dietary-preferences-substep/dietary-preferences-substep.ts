@@ -204,7 +204,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
     .prefs-substep { display: flex; flex-direction: column; gap: 20px; }
     .banner { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--color-accent-dark); }
     .section { border: 1.5px solid var(--color-btn-neutral-border); border-radius: 10px; overflow: hidden; }
-    .section-header { width: 100%; background: var(--color-surface-base); border: none; border-bottom: 1.5px solid var(--color-btn-neutral-border); padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; justify-content: space-between; }
+    .section-header { width: 100%; background: var(--color-surface-base); color: var(--color-text-body); border: none; border-bottom: 1.5px solid var(--color-btn-neutral-border); padding: 10px 14px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; justify-content: space-between; }
     .section-header-static { background: var(--color-surface-base); border-bottom: 1.5px solid var(--color-btn-neutral-border); padding: 10px 14px; font-size: 13px; font-weight: 700; }
     .section-subtitle { padding: 8px 14px 0; font-size: 12px; color: var(--color-text-muted); }
     .selected-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px; }
@@ -212,7 +212,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
     .group { display: flex; flex-direction: column; gap: 6px; }
     .group-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--color-text-muted); letter-spacing: 0.05em; }
     .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
-    .chip { border: 1.5px solid var(--color-btn-neutral-border); background: var(--color-surface-white); border-radius: 20px; padding: 4px 10px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+    .chip { border: 1.5px solid var(--color-btn-neutral-border); background: var(--color-surface-white); color: var(--color-text-body); border-radius: 20px; padding: 4px 10px; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
     .chip--amber { background: var(--color-accent-light); border-color: var(--color-accent); font-weight: 700; color: var(--color-accent-dark); }
     .chip--muted { background: none; color: var(--color-text-muted); border-color: var(--color-btn-neutral-border); }
     .custom-add { display: flex; flex-direction: column; gap: 6px; }
