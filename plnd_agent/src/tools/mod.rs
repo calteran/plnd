@@ -215,6 +215,8 @@ pub(crate) fn build_tool_registry(
         UseCase::PlaceTasks => {
             register_place_tasks_tools(&mut registry);
         }
+        // ReviewMealPlan receives the full plan via prior_context; no tools needed.
+        UseCase::ReviewMealPlan => {}
     }
     registry
 }

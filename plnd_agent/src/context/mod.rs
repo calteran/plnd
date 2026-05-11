@@ -10,6 +10,7 @@ const MEAL_REBALANCE_PROMPT: &str = include_str!("../prompts/meal_rebalance.md")
 const MEAL_SUGGEST_SLOT_PROMPT: &str = include_str!("../prompts/meal_suggest_slot.md");
 const MEAL_ADHOC_RESOLVE_PROMPT: &str = include_str!("../prompts/meal_adhoc_resolve.md");
 const PLACE_TASKS_PROMPT: &str = include_str!("../prompts/place_tasks.md");
+const REVIEW_MEAL_PLAN_PROMPT: &str = include_str!("../prompts/review_meal_plan.md");
 
 // ── Response schemas ─────────────────────────────────────────────────────────
 
@@ -301,6 +302,45 @@ static PLACE_TASKS_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(||
         .expect("BUG: failed to compile PLACE_TASKS_RESPONSE_SCHEMA")
 });
 
+/// JSON Schema (Draft 7) for the `ReviewMealPlan` response.
+///
+/// `changes_requested` may be empty (plan looks good) or contain one entry
+/// per slot the agent recommends swapping. Extra fields are rejected so schema
+/// drift surfaces quickly.
+const REVIEW_MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ReviewMealPlanResponse",
+  "type": "object",
+  "required": ["changes_requested"],
+  "additionalProperties": false,
+  "properties": {
+    "changes_requested": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "meal_name", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "date":      { "type": "string", "format": "date" },
+          "meal_name": { "type": "string", "minLength": 1 },
+          "reason":    { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}"##;
+
+/// Pre-compiled validator for [`REVIEW_MEAL_PLAN_RESPONSE_SCHEMA`].
+static REVIEW_MEAL_PLAN_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| {
+    let schema: serde_json::Value = serde_json::from_str(REVIEW_MEAL_PLAN_RESPONSE_SCHEMA)
+        .expect("BUG: REVIEW_MEAL_PLAN_RESPONSE_SCHEMA is not valid JSON");
+    jsonschema::options()
+        .with_draft(jsonschema::Draft::Draft7)
+        .should_validate_formats(true)
+        .build(&schema)
+        .expect("BUG: failed to compile REVIEW_MEAL_PLAN_RESPONSE_SCHEMA")
+});
+
 /// Identifies the type of agentic interaction.
 ///
 /// Each variant maps to a system prompt and a [`ProviderTier`]. The tool
@@ -328,6 +368,9 @@ pub enum UseCase {
     /// scheduled placement per task (date, time, duration, energy level).
     /// No DB writes; the client commits via `POST /schedule/plan`.
     PlaceTasks,
+    /// Orchestrator-invoked: examines the assembled week and returns any slots
+    /// to swap. Receives the full plan as `prior_context` text; no tools required.
+    ReviewMealPlan,
 }
 
 impl UseCase {
@@ -340,6 +383,7 @@ impl UseCase {
             UseCase::MealSuggestSlot => MEAL_SUGGEST_SLOT_PROMPT,
             UseCase::MealAdhocResolve => MEAL_ADHOC_RESOLVE_PROMPT,
             UseCase::PlaceTasks => PLACE_TASKS_PROMPT,
+            UseCase::ReviewMealPlan => REVIEW_MEAL_PLAN_PROMPT,
         }
     }
 
@@ -353,7 +397,8 @@ impl UseCase {
             UseCase::MealPlanning
             | UseCase::MealRebalance
             | UseCase::MealSuggestSlot
-            | UseCase::MealAdhocResolve => &["food", "habits"],
+            | UseCase::MealAdhocResolve
+            | UseCase::ReviewMealPlan => &["food", "habits"],
             UseCase::PlaceTasks => &["habits", "schedule", "energy"],
         }
     }
@@ -370,7 +415,8 @@ impl UseCase {
             | UseCase::MealRebalance
             | UseCase::MealSuggestSlot
             | UseCase::MealAdhocResolve
-            | UseCase::PlaceTasks => ProviderTier::Capable,
+            | UseCase::PlaceTasks
+            | UseCase::ReviewMealPlan => ProviderTier::Capable,
         }
     }
 
@@ -389,6 +435,7 @@ impl UseCase {
             UseCase::MealSuggestSlot => Some(&SUGGEST_SLOT_VALIDATOR),
             UseCase::MealAdhocResolve => Some(&RESOLVE_VALIDATOR),
             UseCase::PlaceTasks => Some(&PLACE_TASKS_VALIDATOR),
+            UseCase::ReviewMealPlan => Some(&REVIEW_MEAL_PLAN_VALIDATOR),
         }
     }
 }
