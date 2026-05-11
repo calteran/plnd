@@ -1,12 +1,13 @@
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, Datelike, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::models::{
     CarryoverDecision, CommitPlanInput, DayType, MealPatternEntry, OpenSlot, ScheduleEntry,
+    day_type_applies_to,
 };
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
@@ -304,23 +305,6 @@ pub async fn commit_plan(
     })
 }
 
-/// True if `dt` covers `date`. Mirrors `plnd_api::scheduling::day_type_applies_to`.
-/// Priority is resolved by the caller (sort by `created_at DESC`, first match wins).
-fn day_type_applies_on(dt: &DayType, date: NaiveDate) -> bool {
-    if dt.is_cycle {
-        let (Some(length), Some(anchor)) = (dt.cycle_length, dt.anchor_date) else {
-            return false;
-        };
-        if length <= 0 {
-            return false;
-        }
-        let days_offset = (date - anchor).num_days();
-        let position = days_offset.rem_euclid(length as i64) as i32;
-        return (dt.cycle_bitmask & (1_i32 << position)) != 0;
-    }
-    (dt.days_bitmask & (1_i32 << date.weekday().num_days_from_sunday())) != 0
-}
-
 /// Returns the meal slots that are still open for `[plan_start, plan_end]`.
 ///
 /// For each date the active day type is determined (most-recently-created first;
@@ -380,7 +364,7 @@ pub async fn resolve_open_slots(
     let mut result = Vec::new();
     let mut date = plan_start;
     while date <= plan_end {
-        if let Some(dt) = day_types.iter().find(|dt| day_type_applies_on(dt, date))
+        if let Some(dt) = day_types.iter().find(|dt| day_type_applies_to(dt, date))
             && let Some(meal_names) = meals_by_day_type.get(&dt.id)
         {
             for meal_name in meal_names {
@@ -402,7 +386,7 @@ pub async fn resolve_open_slots(
 mod tests {
     use std::collections::HashMap;
 
-    use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
+    use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Utc};
     use sqlx::PgPool;
     use uuid::Uuid;
 
