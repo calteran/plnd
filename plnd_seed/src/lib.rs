@@ -2,6 +2,7 @@ pub mod dev_user;
 pub mod dishes;
 pub mod error;
 pub mod ingredients;
+pub mod meals;
 
 pub use error::SeedError;
 
@@ -79,6 +80,9 @@ pub async fn seed(
 
     let dishes_upserted = dishes::insert_dishes(&mut tx, &fetched_dishes).await?;
     println!("Catalog seed: upserted {} dish(es).", dishes_upserted);
+
+    let meals_inserted = meals::insert_meals(&mut tx).await?;
+    println!("Catalog seed: inserted {} meal(s).", meals_inserted);
 
     tx.commit().await?;
     println!("Catalog seed: complete.");
