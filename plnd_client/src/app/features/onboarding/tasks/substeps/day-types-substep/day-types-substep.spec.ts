@@ -362,6 +362,68 @@ describe('DayTypesSubstepComponent', () => {
     expect(component.cycleLength()).toBe(1);
   });
 
+  it('setCycleLength is a no-op when given NaN', async () => {
+    // Regression: 1 << NaN evaluates to 1 in JS (NaN→0 coercion), so without a guard
+    // a NaN input would silently clear every position's bit on every card.
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    component.enterCycleMode(); // length=7, top card bitmask=127
+    component.setCycleLength(NaN);
+    expect(component.cycleLength()).toBe(7);
+    expect(component.cards()[0].cycle_bitmask).toBe(127);
+  });
+
+  // ── 9c. Mode switch queues server records for deferred deletion ──────────────
+
+  it('enterCycleMode queues existing server-side day-type IDs for deferred deletion', async () => {
+    const stored: DayTypeResponse[] = [
+      { ...MOCK_RESPONSE, id: 'srv-1', name: 'Weekdays', days_bitmask: 62 },
+      { ...MOCK_RESPONSE, id: 'srv-2', name: 'Weekends', days_bitmask: 65 },
+    ];
+    const { fixture, component } = await setup(stored);
+    fixture.detectChanges();
+    expect(component.pendingDeletions()).toEqual([]);
+    component.enterCycleMode();
+    expect(component.pendingDeletions().sort()).toEqual(['srv-1', 'srv-2']);
+  });
+
+  it('enterDOWMode queues existing server-side cycle records for deferred deletion', async () => {
+    const stored: DayTypeResponse[] = [
+      { ...MOCK_RESPONSE, id: 'cyc-1', name: 'Day', is_cycle: true, cycle_length: 2, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b01 },
+      { ...MOCK_RESPONSE, id: 'cyc-2', name: 'Night', is_cycle: true, cycle_length: 2, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b10 },
+    ];
+    const { fixture, component } = await setup(stored);
+    fixture.detectChanges();
+    component.enterDOWMode();
+    expect(component.pendingDeletions().sort()).toEqual(['cyc-1', 'cyc-2']);
+  });
+
+  it('mode switch on client-only (id=null) cards leaves pendingDeletions empty', async () => {
+    const { fixture, component } = await setup();
+    fixture.detectChanges();
+    // Default cards have id=null on first visit
+    component.enterCycleMode();
+    expect(component.pendingDeletions()).toEqual([]);
+  });
+
+  it('save() deletes pendingDeletions before creating new records and clears the queue', async () => {
+    const stored: DayTypeResponse[] = [
+      { ...MOCK_RESPONSE, id: 'srv-1', name: 'Weekdays', days_bitmask: 62 },
+      { ...MOCK_RESPONSE, id: 'srv-2', name: 'Weekends', days_bitmask: 65 },
+    ];
+    const { fixture, component, svcMock } = await setup(stored);
+    svcMock.delete.and.returnValue(of(undefined));
+    fixture.detectChanges();
+    component.enterCycleMode();
+    component.anchorDate.set('2026-05-11');
+    component.save();
+    fixture.detectChanges();
+    expect(svcMock.delete).toHaveBeenCalledWith('srv-1');
+    expect(svcMock.delete).toHaveBeenCalledWith('srv-2');
+    expect(svcMock.create).toHaveBeenCalledTimes(1);
+    expect(component.pendingDeletions()).toEqual([]);
+  });
+
   // ── 10. Save: create() called, setDayTypes called, complete emitted ─────────
 
   it('save() calls DayTypesService.create() for new cards and emits complete', async () => {

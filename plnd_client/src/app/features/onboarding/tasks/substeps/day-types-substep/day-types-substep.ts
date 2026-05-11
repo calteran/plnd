@@ -624,6 +624,13 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
   readonly validationError = signal('');
   readonly isSaving = signal(false);
 
+  // IDs of server-side day-type records that the user has dropped via a mode switch.
+  // We can't delete them eagerly because the user might cancel/abandon the substep
+  // before saving; deferring to save() lets the deletion ride the same transaction
+  // as the new mode's creates. Without this the API would reject the next save with
+  // a mode-homogeneity 422 (existing DOW records vs. a new cycle CREATE, or vice versa).
+  readonly pendingDeletions = signal<string[]>([]);
+
   private removeHintTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly dayPills = DAY_PILLS;
@@ -811,9 +818,21 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
     this.cards.update(list => [...list, blankCard()]);
   }
 
+  /** Capture any current cards' server IDs for deferred deletion. Mode switch
+   *  drops them locally; the actual server-side delete happens at save time so
+   *  it rides the same transaction as the new mode's creates. */
+  private queueDeletionsForCurrentCards(): void {
+    const ids = this.cards()
+      .map(c => c.id)
+      .filter((id): id is string => id !== null);
+    if (ids.length === 0) return;
+    this.pendingDeletions.update(prev => [...prev, ...ids]);
+  }
+
   /** Switch to cycle mode. Wipes existing cards — per spec, mode is binary and we
    *  don't carry per-card state across the boundary. Top card claims every position. */
   enterCycleMode(): void {
+    this.queueDeletionsForCurrentCards();
     this.mode.set('cycle');
     this.cycleLength.set(DEFAULT_CYCLE_LENGTH);
     this.anchorDate.set(todayIso());
@@ -824,6 +843,7 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
 
   /** Switch to DOW mode. Wipes existing cards and restores the default two-card setup. */
   enterDOWMode(): void {
+    this.queueDeletionsForCurrentCards();
     this.mode.set('dow');
     this.cycleLength.set(null);
     this.anchorDate.set(null);
@@ -836,6 +856,9 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
    *  remains complete after the change. */
   setCycleLength(n: number): void {
     if (this.mode() !== 'cycle') return;
+    // Number.isFinite rejects NaN and ±Infinity. 1 << NaN is 1 in JS (NaN→0
+    // coercion), so a NaN here would silently clear every position's bit.
+    if (!Number.isFinite(n)) return;
     const clamped = Math.max(1, Math.min(MAX_CYCLE_LENGTH, Math.floor(n)));
     this.cycleLength.set(clamped);
     const lowMask = (1 << clamped) - 1;
@@ -907,15 +930,22 @@ export class DayTypesSubstepComponent implements OnInit, OnDestroy {
       return this.dayTypesService.create(req);
     });
 
-    if (requests.length === 0) {
-      this.stateService.setDayTypes([]);
-      this.complete.emit();
-      return;
-    }
+    // Delete any server records orphaned by an earlier mode switch BEFORE creating
+    // new ones — the API's check_mode_homogeneous would otherwise reject the create
+    // because records of the opposite mode still exist.
+    const pendingIds = this.pendingDeletions();
+    const deletions$ = pendingIds.length > 0
+      ? forkJoin(pendingIds.map(id => this.dayTypesService.delete(id)))
+      : of([] as void[]);
 
     this.isSaving.set(true);
-    forkJoin(requests).pipe(
+    deletions$.pipe(
+      switchMap(() => {
+        this.pendingDeletions.set([]);
+        return requests.length > 0 ? forkJoin(requests) : of([] as DayTypeResponse[]);
+      }),
       switchMap(dayTypeResults => {
+        if (dayTypeResults.length === 0) return of([] as DayTypeResponse[]);
         const mealSaves = dayTypeResults.map((dt, idx) => {
           const card = this.cards()[idx];
           // Fetch current server meals so we catch removals (not just UI-tracked IDs).
