@@ -5,7 +5,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::models::{CarryoverDecision, CommitPlanInput, DayType, MealPatternEntry, OpenSlot, ScheduleEntry};
+use crate::models::{
+    CarryoverDecision, CommitPlanInput, DayType, MealPatternEntry, OpenSlot, ScheduleEntry,
+};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 const ENTRY_COLS: &str =
@@ -325,7 +327,10 @@ fn day_type_applies_on(dt: &DayType, date: NaiveDate) -> bool {
 /// first match wins) and its pattern entries are collected. Slots present in
 /// `locked` — a list of `(date, meal_name)` pairs representing approved,
 /// skipped, and custom meals — are subtracted before returning.
-#[tracing::instrument(skip(pool, locked), fields(table = "meal_pattern_entries", op = "resolve_open_slots"))]
+#[tracing::instrument(
+    skip(pool, locked),
+    fields(table = "meal_pattern_entries", op = "resolve_open_slots")
+)]
 pub async fn resolve_open_slots(
     pool: &PgPool,
     user_id: Uuid,
@@ -1052,9 +1057,20 @@ mod tests {
     async fn make_binary_day_type(pool: &PgPool, user_id: Uuid, days_bitmask: i32) -> DayType {
         use crate::db::day_type;
         let t = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
-        day_type::create(pool, user_id, "test-binary", days_bitmask, t, t, false, None, None, 0)
-            .await
-            .expect("failed to create binary day type")
+        day_type::create(
+            pool,
+            user_id,
+            "test-binary",
+            days_bitmask,
+            t,
+            t,
+            false,
+            None,
+            None,
+            0,
+        )
+        .await
+        .expect("failed to create binary day type")
     }
 
     async fn make_cycle_day_type(
@@ -1067,8 +1083,16 @@ mod tests {
         use crate::db::day_type;
         let t = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
         day_type::create(
-            pool, user_id, "test-cycle", 0, t, t, true,
-            Some(length), Some(anchor), cycle_bitmask,
+            pool,
+            user_id,
+            "test-cycle",
+            0,
+            t,
+            t,
+            true,
+            Some(length),
+            Some(anchor),
+            cycle_bitmask,
         )
         .await
         .expect("failed to create cycle day type")
@@ -1102,13 +1126,19 @@ mod tests {
         let start = monday(); // Mon 2026-05-11
         let end = start + Duration::days(6); // Sun 2026-05-17
 
-        let slots = resolve_open_slots(&pool, uid, start, end, &[]).await.unwrap();
+        let slots = resolve_open_slots(&pool, uid, start, end, &[])
+            .await
+            .unwrap();
 
         // 5 weekdays × 2 meals = 10 slots
         assert_eq!(slots.len(), 10);
         // All should be on weekdays
         for slot in &slots {
-            assert!(slot.date.weekday().num_days_from_monday() < 5, "expected weekday, got {:?}", slot.date);
+            assert!(
+                slot.date.weekday().num_days_from_monday() < 5,
+                "expected weekday, got {:?}",
+                slot.date
+            );
         }
     }
 
@@ -1123,7 +1153,9 @@ mod tests {
         let start = anchor;
         let end = start + Duration::days(6);
 
-        let slots = resolve_open_slots(&pool, uid, start, end, &[]).await.unwrap();
+        let slots = resolve_open_slots(&pool, uid, start, end, &[])
+            .await
+            .unwrap();
 
         // 4 matching days (offsets 0, 2, 4, 6) × 1 meal = 4 slots
         assert_eq!(slots.len(), 4);
@@ -1150,7 +1182,9 @@ mod tests {
         let start = anchor; // Mon
         let end = start + Duration::days(6); // Sun
 
-        let slots = resolve_open_slots(&pool, uid, start, end, &[]).await.unwrap();
+        let slots = resolve_open_slots(&pool, uid, start, end, &[])
+            .await
+            .unwrap();
 
         // 5 weekdays × 2 meals + 2 weekend days × 1 meal = 12
         assert_eq!(slots.len(), 12);
@@ -1176,13 +1210,23 @@ mod tests {
             (start + Duration::days(2), "Dinner".to_string()),
         ];
 
-        let slots = resolve_open_slots(&pool, uid, start, end, &locked).await.unwrap();
+        let slots = resolve_open_slots(&pool, uid, start, end, &locked)
+            .await
+            .unwrap();
 
         // 5 days × 2 meals − 2 locked = 8
         assert_eq!(slots.len(), 8);
         // Locked slots must not appear
-        assert!(!slots.iter().any(|s| s.date == start && s.meal_name == "Breakfast"));
-        assert!(!slots.iter().any(|s| s.date == start + Duration::days(2) && s.meal_name == "Dinner"));
+        assert!(
+            !slots
+                .iter()
+                .any(|s| s.date == start && s.meal_name == "Breakfast")
+        );
+        assert!(
+            !slots
+                .iter()
+                .any(|s| s.date == start + Duration::days(2) && s.meal_name == "Dinner")
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -1198,7 +1242,9 @@ mod tests {
             .map(|d| (start + Duration::days(d), "Breakfast".to_string()))
             .collect();
 
-        let slots = resolve_open_slots(&pool, uid, start, end, &locked).await.unwrap();
+        let slots = resolve_open_slots(&pool, uid, start, end, &locked)
+            .await
+            .unwrap();
         assert!(slots.is_empty());
     }
 
@@ -1225,7 +1271,9 @@ mod tests {
         let start = monday();
         let end = start + Duration::days(20); // 21-day inclusive span ending on Sun 2026-05-31
 
-        let slots = resolve_open_slots(&pool, uid, start, end, &[]).await.unwrap();
+        let slots = resolve_open_slots(&pool, uid, start, end, &[])
+            .await
+            .unwrap();
 
         // 3 full Mon–Fri weeks = 15 weekday slots; range ends on Sunday so no 16th
         assert_eq!(slots.len(), 15);
@@ -1241,7 +1289,9 @@ mod tests {
         let start = monday(); // Mon 2026-05-11
         let end = start + Duration::days(6); // Mon–Sun
 
-        let slots = resolve_open_slots(&pool, uid, start, end, &[]).await.unwrap();
+        let slots = resolve_open_slots(&pool, uid, start, end, &[])
+            .await
+            .unwrap();
 
         // Only Wednesday (2026-05-13) produces a slot
         assert_eq!(slots.len(), 1);
