@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, map, noop, of, switchMap, tap, throwError } from 'rxjs';
 import { ConfigService } from './config.service';
 import {
-  CarryoverApiResponse, CarryoverDecision, DropReason, MealEntry, MealNutrition, MealPlanState, MealRef,
+  CarryoverApiResponse, CarryoverDecision, DropReason, MealEntry, MealNutrition, MealPlanState, MealRef, SlotRef,
   MealSlot, PlanDraftShape, PlanEntryRequest, PlannedMeal, PlannedTask, FloatingTask,
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, ScheduleEntryDto, SchedulePeriodResponse,
@@ -280,22 +280,25 @@ export class WeekPlanService {
   /** Serialises current scheduledMeals into the shape the agent API expects. */
   currentState(): MealPlanState {
     const meals = this.scheduledMealsSignal();
-    // Precondition: dayTypesMealsService.loaded() must be true before calling this method.
-    const entries = this.horizonDays().flatMap(date =>
-      this.dayTypesMealsService.mealsForDate(date).map(patternEntry => {
+    const approved: MealEntry[] = [];
+    const skipped: SlotRef[] = [];
+
+    this.horizonDays().forEach(date => {
+      this.dayTypesMealsService.mealsForDate(date).forEach(patternEntry => {
         const slot = patternEntry.name;
         const meal = meals[date]?.[slot];
-        return {
-          date,
-          meal_name: slot,
-          meal_ref: meal?.mealRef ?? null,
-          title: meal?.title,
-          approved: meal?.approvalState === 'approved',
-          skipped: meal?.approvalState === 'skipped',
-        };
-      })
-    );
-    return { week_start: this.planStartSignal(), meals: entries };
+        if (!meal) return;
+
+        if (meal.approvalState === 'skipped') {
+          skipped.push({ date, meal_name: slot });
+        } else if (meal.approvalState === 'approved' && meal.mealRef) {
+          approved.push({ date, meal_name: slot, meal_ref: meal.mealRef });
+        }
+        // 'proposed' slots are omitted — open for the agent to fill
+      });
+    });
+
+    return { approved, skipped, custom: [] };
   }
 
   /** Merges agent-returned meals into scheduledMeals in a single update, preserving approved/skipped cells. */

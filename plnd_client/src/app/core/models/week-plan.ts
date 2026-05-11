@@ -36,18 +36,15 @@ export interface PlannedMeal {
 
 // ── Agent API types ─────────────────────────────────────────────────────────
 
-export interface MealPlanStateEntry {
+export interface SlotRef {
   date: string;
-  meal_name: MealSlot;
-  meal_ref?: MealRef | null;
-  title?: string;
-  approved: boolean;
-  skipped: boolean;
+  meal_name: string;
 }
 
 export interface MealPlanState {
-  week_start: string;
-  meals: MealPlanStateEntry[];
+  approved: MealEntry[];
+  skipped: SlotRef[];
+  custom: MealEntry[];
 }
 
 export interface MealEntry {
