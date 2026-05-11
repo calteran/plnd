@@ -7,7 +7,7 @@ use crate::models::DayType;
 use crate::repository::day_type::DeleteDayTypeOutcome;
 
 const COLUMNS: &str = "id, user_id, name, days_bitmask, wake_time, sleep_time, \
-     is_cycle, cycle_length, anchor_date, created_at";
+     is_cycle, cycle_length, anchor_date, cycle_bitmask, created_at";
 
 /// List all day types for a user, ordered by created_at ascending.
 #[tracing::instrument(skip(pool), fields(table = "user_day_types", op = "list"))]
@@ -51,12 +51,13 @@ pub async fn create(
     is_cycle: bool,
     cycle_length: Option<i32>,
     anchor_date: Option<NaiveDate>,
+    cycle_bitmask: i32,
 ) -> Result<DayType, DatabaseError> {
     sqlx::query_as::<_, DayType>(&format!(
         "INSERT INTO user_day_types
             (user_id, name, days_bitmask, wake_time, sleep_time,
-             is_cycle, cycle_length, anchor_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             is_cycle, cycle_length, anchor_date, cycle_bitmask)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING {COLUMNS}"
     ))
     .bind(user_id)
@@ -67,6 +68,7 @@ pub async fn create(
     .bind(is_cycle)
     .bind(cycle_length)
     .bind(anchor_date)
+    .bind(cycle_bitmask)
     .fetch_one(pool)
     .await
     .map_err(DatabaseError::from)
@@ -87,11 +89,13 @@ pub async fn update(
     is_cycle: bool,
     cycle_length: Option<i32>,
     anchor_date: Option<NaiveDate>,
+    cycle_bitmask: i32,
 ) -> Result<Option<DayType>, DatabaseError> {
     sqlx::query_as::<_, DayType>(&format!(
         "UPDATE user_day_types
          SET name = $3, days_bitmask = $4, wake_time = $5, sleep_time = $6,
-             is_cycle = $7, cycle_length = $8, anchor_date = $9
+             is_cycle = $7, cycle_length = $8, anchor_date = $9,
+             cycle_bitmask = $10
          WHERE id = $1 AND user_id = $2
          RETURNING {COLUMNS}"
     ))
@@ -104,6 +108,7 @@ pub async fn update(
     .bind(is_cycle)
     .bind(cycle_length)
     .bind(anchor_date)
+    .bind(cycle_bitmask)
     .fetch_optional(pool)
     .await
     .map_err(DatabaseError::from)
@@ -199,6 +204,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .expect("create failed")
@@ -228,6 +234,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .unwrap();
@@ -282,6 +289,7 @@ mod tests {
             true,
             Some(10),
             Some(anchor),
+            0b0000010101,
         )
         .await
         .expect("create cycle failed");
@@ -290,6 +298,7 @@ mod tests {
         assert_eq!(dt.cycle_length, Some(10));
         assert_eq!(dt.anchor_date, Some(anchor));
         assert_eq!(dt.days_bitmask, 0, "cycle type must have days_bitmask=0");
+        assert_eq!(dt.cycle_bitmask, 0b0000010101);
     }
 
     // -----------------------------------------------------------------------
@@ -342,6 +351,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .unwrap()
@@ -366,6 +376,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .unwrap();
@@ -389,6 +400,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .unwrap();
@@ -418,6 +430,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .unwrap();
@@ -442,6 +455,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .unwrap();

@@ -20,6 +20,7 @@ const MOCK_RESPONSE: DayTypeResponse = {
   is_cycle: false,
   cycle_length: null,
   anchor_date: null,
+  cycle_bitmask: 0,
   created_at: '2024-01-01T00:00:00Z',
 };
 

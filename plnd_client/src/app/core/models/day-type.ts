@@ -10,6 +10,9 @@ export interface DayTypeResponse {
   is_cycle: boolean;
   cycle_length: number | null;
   anchor_date: string | null;
+  // For cycle types: low `cycle_length` bits indicate which positions in the
+  // cycle this day type covers (bit 0 = anchor_date). 0 for weekday types.
+  cycle_bitmask: number;
   created_at: string;
   meals?: MealPatternEntry[];
 }
@@ -22,4 +25,5 @@ export interface CreateDayTypeRequest {
   is_cycle: boolean;
   cycle_length: number | null;
   anchor_date: string | null;
+  cycle_bitmask?: number;
 }

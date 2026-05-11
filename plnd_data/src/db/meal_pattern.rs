@@ -143,6 +143,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .expect("create day type")
@@ -193,6 +194,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .expect("create second day type")
@@ -234,6 +236,7 @@ mod tests {
             false,
             None,
             None,
+            0,
         )
         .await
         .expect("create second day type")

@@ -87,7 +87,7 @@ function makeStateMock(
     days_bitmask: 127,
     wake_time: '07:00:00', sleep_time: '22:00:00',
     is_cycle: false,
-    cycle_length: null, anchor_date: null,
+    cycle_length: null, anchor_date: null, cycle_bitmask: 0,
     created_at: '2026-01-01T00:00:00Z',
     meals: [
       { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: 'u1', day_type_id: 'default-dt', created_at: '', updated_at: '' },

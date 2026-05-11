@@ -52,6 +52,26 @@ fn create_request_cycle_type_deserializes() {
     assert!(req.is_cycle);
     assert_eq!(req.cycle_length, Some(10));
     assert!(req.anchor_date.is_some());
+    // cycle_bitmask is optional — defaults to None on the request, then
+    // resolved to full coverage by the handler.
+    assert!(req.cycle_bitmask.is_none());
+}
+
+#[test]
+fn create_request_cycle_with_partition_bitmask_deserializes() {
+    let json = r#"{
+        "name": "Day Shift",
+        "days_bitmask": 0,
+        "wake_time": "06:30",
+        "sleep_time": "22:00",
+        "is_cycle": true,
+        "cycle_length": 4,
+        "anchor_date": "2026-05-11",
+        "cycle_bitmask": 1
+    }"#;
+    let req: CreateDayTypeRequest =
+        serde_json::from_str(json).expect("partition deserialize failed");
+    assert_eq!(req.cycle_bitmask, Some(1));
 }
 
 #[test]

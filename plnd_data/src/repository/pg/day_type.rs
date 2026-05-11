@@ -43,6 +43,7 @@ impl DayTypeRepository for PgDayTypeRepository {
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
+        cycle_bitmask: i32,
     ) -> Result<DayType, crate::Error> {
         db::create(
             &self.pool,
@@ -54,6 +55,7 @@ impl DayTypeRepository for PgDayTypeRepository {
             is_cycle,
             cycle_length,
             anchor_date,
+            cycle_bitmask,
         )
         .await
         .map_err(Into::into)
@@ -70,6 +72,7 @@ impl DayTypeRepository for PgDayTypeRepository {
         is_cycle: bool,
         cycle_length: Option<i32>,
         anchor_date: Option<NaiveDate>,
+        cycle_bitmask: i32,
     ) -> Result<Option<DayType>, crate::Error> {
         db::update(
             &self.pool,
@@ -82,6 +85,7 @@ impl DayTypeRepository for PgDayTypeRepository {
             is_cycle,
             cycle_length,
             anchor_date,
+            cycle_bitmask,
         )
         .await
         .map_err(Into::into)

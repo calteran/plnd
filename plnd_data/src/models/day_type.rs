@@ -15,5 +15,10 @@ pub struct DayType {
     pub is_cycle: bool,
     pub cycle_length: Option<i32>,
     pub anchor_date: Option<NaiveDate>,
+    /// For cycle types: low `cycle_length` bits indicate which positions in the
+    /// cycle this day type covers, where position 0 is `anchor_date`. Must be 0
+    /// when `is_cycle = false`. See `plnd_api::scheduling::day_type_applies_to`
+    /// for resolution semantics.
+    pub cycle_bitmask: i32,
     pub created_at: DateTime<Utc>,
 }

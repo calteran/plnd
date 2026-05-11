@@ -126,7 +126,7 @@ describe('OnboardingStateService', () => {
       {
         id: 'st-1', user_id: 'u1', name: 'Weekdays',
         days_bitmask: 0b0111110, wake_time: '07:00:00', sleep_time: '22:00:00',
-        is_cycle: false, cycle_length: null, anchor_date: null,
+        is_cycle: false, cycle_length: null, anchor_date: null, cycle_bitmask: 0,
         created_at: '2026-04-22T00:00:00Z',
       },
     ];
