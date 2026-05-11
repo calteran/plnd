@@ -3,9 +3,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::catalog_details::{
-    get_dish, get_ingredient, get_ingredient_names_by_ids, get_meal, get_meal_nutrition,
+    get_catalog_meal_names_by_ids, get_dish, get_ingredient, get_ingredient_names_by_ids, get_meal,
+    get_meal_nutrition,
 };
 use crate::db::dietary_restrictions;
+use crate::db::user_meals::get_user_meal_names_by_ids;
 
 use crate::db::search::{
     search_catalog_meals as db_search_catalog_meals,
@@ -90,6 +92,25 @@ impl MealRepository for PgMealRepository {
         ids: &[Uuid],
     ) -> Result<Vec<(Uuid, String)>, crate::Error> {
         get_ingredient_names_by_ids(&self.pool, ids)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn catalog_meal_names_by_ids(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, String)>, crate::Error> {
+        get_catalog_meal_names_by_ids(&self.pool, ids)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn user_meal_names_by_ids(
+        &self,
+        user_id: Uuid,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, String)>, crate::Error> {
+        get_user_meal_names_by_ids(&self.pool, user_id, ids)
             .await
             .map_err(Into::into)
     }

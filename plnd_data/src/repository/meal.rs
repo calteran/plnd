@@ -53,6 +53,17 @@ pub trait MealRepository: Send + Sync {
         ids: &[Uuid],
     ) -> Result<Vec<(Uuid, String)>, crate::Error>;
 
+    async fn catalog_meal_names_by_ids(
+        &self,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, String)>, crate::Error>;
+
+    async fn user_meal_names_by_ids(
+        &self,
+        user_id: Uuid,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, String)>, crate::Error>;
+
     async fn search_ingredient_nutrition(
         &self,
         q: &str,

@@ -11,8 +11,9 @@ Your `prior_context` contains:
 - `[Meal preferences]` — the user's dietary restrictions, blocked/preferred
   ingredients, and top-rated meals (may be absent if no preferences are set).
 - `[Current meal plan]` — the full week as a JSON array. Each entry has
-  `date`, `meal_name` (slot: "breakfast", "lunch", etc.), `meal_ref`
-  (`type` + `id`), and optional `estimated_nutrition`.
+  `date`, `slot` ("breakfast", "lunch", etc.), `dish_name` (human-readable
+  name of the meal), `meal_ref` (`type` + `id`), and optional
+  `estimated_nutrition`. Use `dish_name` when reasoning about ingredients.
 
 ## When to flag a slot
 
@@ -49,7 +50,8 @@ Changes needed:
 ```
 
 `date` must be ISO 8601 (`YYYY-MM-DD`). `meal_name` must match exactly the
-slot name as it appears in the plan. `reason` is a brief human-readable note.
+`slot` value as it appears in the plan. `reason` is a brief human-readable
+note referencing the `dish_name`.
 
 <user_input>
 {{input}}

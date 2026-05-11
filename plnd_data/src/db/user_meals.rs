@@ -20,6 +20,23 @@ pub async fn get_nutrition(
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(skip(pool, ids), fields(table = "user_meals", op = "get_names_by_ids"))]
+pub async fn get_user_meal_names_by_ids(
+    pool: &PgPool,
+    user_id: Uuid,
+    ids: &[Uuid],
+) -> Result<Vec<(Uuid, String)>, DatabaseError> {
+    sqlx::query_as::<_, (Uuid, String)>(
+        "SELECT user_meal_id, name FROM user_meals \
+         WHERE user_meal_id = ANY($1::uuid[]) AND user_id = $2",
+    )
+    .bind(ids)
+    .bind(user_id)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
