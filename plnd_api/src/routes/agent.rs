@@ -30,7 +30,6 @@ struct ReviewMealPlanOutput {
 struct ReviewChangeRequest {
     date: chrono::NaiveDate,
     meal_name: String,
-    #[allow(dead_code)]
     reason: String,
 }
 
@@ -241,7 +240,13 @@ fn build_review_meal_plan_ctx(
             .cmp(&b.date)
             .then_with(|| a.meal_name.cmp(&b.meal_name))
     });
-    let week_json = serde_json::to_string(&all_meals).unwrap_or_default();
+    let week_json = serde_json::to_string(&all_meals).unwrap_or_else(|e| {
+        tracing::warn!(
+            error = %e,
+            "meal-plan: failed to serialise week for review; proceeding with empty plan"
+        );
+        String::new()
+    });
 
     AgentContext {
         user_id,
@@ -475,7 +480,19 @@ pub async fn post_meal_plan(
             break 'review;
         }
 
+        // Deduplicate by (date, meal_name) — the LLM may return the same slot twice in one
+        // pass, and a second iteration would re-suggest against the already-replaced meal.
+        let mut seen_slots: std::collections::HashSet<(chrono::NaiveDate, String)> =
+            std::collections::HashSet::new();
         for change in &review.changes_requested {
+            if !seen_slots.insert((change.date, change.meal_name.clone())) {
+                tracing::warn!(
+                    date = %change.date,
+                    meal_name = %change.meal_name,
+                    "meal-plan: review returned duplicate slot in same pass; skipping"
+                );
+                continue;
+            }
             let Some(pos) = chosen
                 .iter()
                 .position(|m| m.date == change.date && m.meal_name == change.meal_name)
