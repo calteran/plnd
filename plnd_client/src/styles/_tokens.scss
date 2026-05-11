@@ -1,5 +1,6 @@
 // plnd_client/src/styles/_tokens.scss
 :root {
+  color-scheme: light;
   --color-surface-base:   #fafafa;
   --color-surface-warm:   #fef9f0;
   --color-surface-meal:   #fffbf0;
@@ -41,6 +42,7 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --color-surface-base:   #1e1e2e;
   --color-surface-warm:   #222235;
   --color-surface-meal:   #252538;

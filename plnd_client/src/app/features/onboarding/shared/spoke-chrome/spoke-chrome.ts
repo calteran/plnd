@@ -25,7 +25,6 @@ type DotState = 'completed' | 'current' | 'ahead';
               class="dot"
               [class.dot--completed]="dot.state === 'completed'"
               [class.dot--current]="dot.state === 'current'"
-              [title]="'Step ' + ($index + 1)"
             ></span>
           }
         </div>
@@ -107,7 +106,7 @@ type DotState = 'completed' | 'current' | 'ahead';
       width: 10px;
       height: 10px;
       border-radius: 50%;
-      background: #d1d5db;
+      background: var(--color-btn-neutral-border);
       border: 2px solid transparent;
       box-sizing: border-box;
       transition: background 0.15s, border-color 0.15s;
