@@ -187,6 +187,13 @@ pub struct SlotRef {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+pub struct FailedSlot {
+    pub date: NaiveDate,
+    pub meal_name: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MealPlanState {
     pub approved: Vec<MealEntry>,
     pub skipped: Vec<SlotRef>,
@@ -226,6 +233,8 @@ pub struct MealPlanResponse {
     pub plan_start: NaiveDate,
     pub meals: Vec<MealEntry>,
     pub nutrition_summary: Option<NutritionSummary>,
+    #[serde(default)]
+    pub failed_slots: Vec<FailedSlot>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -490,6 +499,7 @@ mod meal_plan_tests {
             plan_start: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
             meals: vec![],
             nutrition_summary: None,
+            failed_slots: vec![],
         };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"plan_start\":\"2026-04-21\""));

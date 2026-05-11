@@ -7,9 +7,9 @@ use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
 use crate::models::{
-    MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealPlanRequest,
-    MealPlanResponse, MealSuggestRequest, PlaceTasksEntry, PlaceTasksRequest, TaskEntryRequest,
-    TaskEntryResponse,
+    FailedSlot, MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealPlanRequest,
+    MealPlanResponse, MealRef, MealSuggestRequest, PlaceTasksEntry, PlaceTasksRequest,
+    TaskEntryRequest, TaskEntryResponse,
 };
 use crate::scheduling::{
     constrained_dates_for_rule, day_type_applies_to, has_floating_instance_in_window,
@@ -40,6 +40,174 @@ fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> Str
             format!("<prior_context>\n{turns_xml}\n</prior_context>\n")
         }
         _ => String::new(),
+    }
+}
+
+/// Load the user's meal preferences once and format them as a `[Meal preferences]` block
+/// suitable for injection into `prior_context`. Returns an empty string on error so callers
+/// can degrade gracefully (same fallback pattern as `build_anchor_context_for_user`).
+async fn preload_meal_planning_context(repos: &plnd_data::Repositories, user_id: Uuid) -> String {
+    let result = async {
+        let (restrictions, ingredient_prefs, meal_prefs) = tokio::try_join!(
+            repos.meal.list_dietary_restrictions(user_id),
+            repos.user_ingredient_pref.list(user_id),
+            repos.user_meal_pref.list(user_id),
+        )?;
+
+        let blocked_ids: Vec<Uuid> = ingredient_prefs
+            .iter()
+            .filter(|p| p.preference_score == -2)
+            .map(|p| p.catalog_ingredient_id)
+            .collect();
+        let tolerated_ids: Vec<Uuid> = ingredient_prefs
+            .iter()
+            .filter(|p| p.preference_score == -1)
+            .map(|p| p.catalog_ingredient_id)
+            .collect();
+        let preferred_ids: Vec<Uuid> = ingredient_prefs
+            .iter()
+            .filter(|p| p.preference_score >= 1)
+            .map(|p| p.catalog_ingredient_id)
+            .collect();
+
+        // Combine all three ID lists into a single DB round-trip, then partition
+        // the results back by score category using the returned (id, name) pairs.
+        let all_ingredient_ids: Vec<Uuid> = blocked_ids
+            .iter()
+            .chain(tolerated_ids.iter())
+            .chain(preferred_ids.iter())
+            .copied()
+            .collect();
+        let names_map: std::collections::HashMap<Uuid, String> = if all_ingredient_ids.is_empty() {
+            std::collections::HashMap::new()
+        } else {
+            repos
+                .meal
+                .ingredient_names_by_ids(&all_ingredient_ids)
+                .await?
+                .into_iter()
+                .collect()
+        };
+        let blocked_names: Vec<String> = blocked_ids
+            .iter()
+            .filter_map(|id| names_map.get(id).cloned())
+            .collect();
+        let tolerated_names: Vec<String> = tolerated_ids
+            .iter()
+            .filter_map(|id| names_map.get(id).cloned())
+            .collect();
+        let preferred_names: Vec<String> = preferred_ids
+            .iter()
+            .filter_map(|id| names_map.get(id).cloned())
+            .collect();
+
+        // Exclude blocked meals from the top-rated list — a meal that is both
+        // highly rated and later blocked must never be re-suggested.
+        let top_rated: Vec<_> = meal_prefs
+            .iter()
+            .filter(|m| !m.is_blocked && m.rating.unwrap_or(0) >= 4)
+            .map(|m| m.name.as_str())
+            .collect();
+
+        let restriction_names: Vec<&str> = restrictions.iter().map(|r| r.name.as_str()).collect();
+
+        let mut lines: Vec<String> = Vec::new();
+        if !restriction_names.is_empty() {
+            lines.push(format!(
+                "Dietary restrictions: {}",
+                xml_escape(&restriction_names.join(", "))
+            ));
+        }
+        if !blocked_names.is_empty() {
+            lines.push(format!(
+                "Blocked ingredients (never use): {}",
+                xml_escape(&blocked_names.join(", "))
+            ));
+        }
+        if !tolerated_names.is_empty() {
+            lines.push(format!(
+                "Tolerated ingredients (avoid when possible): {}",
+                xml_escape(&tolerated_names.join(", "))
+            ));
+        }
+        if !preferred_names.is_empty() {
+            lines.push(format!(
+                "Preferred ingredients: {}",
+                xml_escape(&preferred_names.join(", "))
+            ));
+        }
+        if !top_rated.is_empty() {
+            lines.push(format!(
+                "Top-rated meals (reuse if appropriate): {}",
+                xml_escape(&top_rated.join(", "))
+            ));
+        }
+
+        let blob = if lines.is_empty() {
+            String::new()
+        } else {
+            format!("[Meal preferences]\n{}\n\n", lines.join("\n"))
+        };
+
+        Ok::<String, plnd_data::Error>(blob)
+    }
+    .await;
+
+    match result {
+        Ok(blob) => blob,
+        Err(e) => {
+            tracing::warn!(
+                user_id = %user_id,
+                error = %e,
+                "meal-plan: failed to preload meal planning context; proceeding without preferences"
+            );
+            String::new()
+        }
+    }
+}
+
+/// Format a `[Avoid these meals: ...]` context block from a slice of meal refs.
+/// Returns an empty string when `refs` is empty.
+fn build_avoid_str(refs: &[MealRef]) -> String {
+    if refs.is_empty() {
+        return String::new();
+    }
+    serde_json::to_string(refs)
+        .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
+        .unwrap_or_default()
+}
+
+/// Build an `AgentContext` for a single open meal slot.
+///
+/// The `prior_context` carries:
+/// - `prefs_blob` — preloaded user preferences (dietary restrictions, blocked/preferred ingredients)
+/// - avoid list derived from `locked_entries` + `chosen` (grows each iteration for carryover)
+/// - slot date and meal name
+fn build_suggest_slot_ctx(
+    user_id: Uuid,
+    slot: &plnd_data::models::OpenSlot,
+    prefs_blob: &str,
+    locked_entries: &[MealEntry],
+    chosen: &[MealEntry],
+) -> AgentContext {
+    let date = slot.date.format("%Y-%m-%d").to_string();
+    let meal_name = &slot.meal_name;
+
+    let avoid_refs: Vec<MealRef> = locked_entries
+        .iter()
+        .chain(chosen.iter())
+        .map(|e| e.meal_ref.clone())
+        .collect();
+    let avoid_str = build_avoid_str(&avoid_refs);
+
+    AgentContext {
+        user_id,
+        use_case: UseCase::MealSuggestSlot,
+        input: format!("Suggest a {meal_name} meal for {date}."),
+        prior_context: Some(format!(
+            "{prefs_blob}{avoid_str}[Date: {date}]\n[Meal: {meal_name}]\n"
+        )),
+        extra: None,
     }
 }
 
@@ -108,11 +276,13 @@ pub async fn post_task(
     Ok(Json(response))
 }
 
-/// POST /agent/meal-plan — generate a full-week meal plan proposal via the AI agent.
+/// POST /agent/meal-plan — generate a full-week meal plan proposal via per-slot AI agent calls.
 ///
 /// The client POSTs the current wizard state (approved/skipped/custom slots for the week).
-/// The agent preserves those slots and fills the open ones. Returns a full week envelope;
-/// the Angular wizard commits it via `WeekPlanService.commitPlan()` — no DB writes here.
+/// Open slots are filled sequentially via `MealSuggestSlot`; each call carries a growing
+/// avoid list so the agent doesn't repeat choices. Locked slots (approved + custom) are
+/// preserved verbatim. Per-slot failures are captured in `failed_slots` rather than
+/// aborting the whole request. No DB writes occur here.
 #[utoipa::path(
     post,
     path = "/agent/meal-plan",
@@ -123,9 +293,8 @@ pub async fn post_task(
         (status = 200, description = "Meal plan proposal for period", body = MealPlanResponse),
         (status = 400, description = "plan_end must be >= plan_start"),
         (status = 401, description = "Unauthorized"),
-        (status = 422, description = "Agent response failed schema validation"),
         (status = 429, description = "Too Many Requests — per-user rate limit exceeded"),
-        (status = 500, description = "LLM provider failure or infrastructure error"),
+        (status = 500, description = "Failed to resolve open slots"),
     )
 )]
 #[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
@@ -134,6 +303,8 @@ pub async fn post_meal_plan(
     Extension(claims): Extension<Claims>,
     Json(body): Json<MealPlanRequest>,
 ) -> Result<Json<MealPlanResponse>, StatusCode> {
+    // Rate-limit check is the single outer guard — per-slot calls inside the loop
+    // do NOT consume additional budget.
     if state.agent_task_limiter.check_key(&claims.sub).is_err() {
         tracing::warn!(user_id = %claims.sub, "agent meal-plan rate limit exceeded");
         return Err(StatusCode::TOO_MANY_REQUESTS);
@@ -146,36 +317,95 @@ pub async fn post_meal_plan(
     if plan_end < plan_start {
         return Err(StatusCode::BAD_REQUEST);
     }
-    let current_state_json = serde_json::to_value(&body.current_state).map_err(|e| {
-        tracing::error!(error = %e, "failed to serialize current_state");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
 
-    let ctx = AgentContext {
-        user_id,
-        use_case: UseCase::MealPlanning,
-        input: format!("Plan meals for the period {plan_start} through {plan_end}."),
-        prior_context: Some(format!("[Period: {plan_start} through {plan_end}]\n")),
-        extra: Some(current_state_json),
-    };
+    // Build the locked set: (date, meal_name) for approved + skipped + custom.
+    let locked_slots: Vec<(chrono::NaiveDate, String)> = body
+        .current_state
+        .approved
+        .iter()
+        .map(|e| (e.date, e.meal_name.clone()))
+        .chain(
+            body.current_state
+                .skipped
+                .iter()
+                .map(|s| (s.date, s.meal_name.clone())),
+        )
+        .chain(
+            body.current_state
+                .custom
+                .iter()
+                .map(|e| (e.date, e.meal_name.clone())),
+        )
+        .collect();
 
-    let output = state.agent.run(&ctx).await.map_err(|e| match &e {
-        AgentError::SchemaValidation { .. } => StatusCode::UNPROCESSABLE_ENTITY,
-        AgentError::ContextWindowExhausted { .. } | AgentError::EmptyRetryOutput => {
-            StatusCode::SERVICE_UNAVAILABLE
-        }
-        _ => {
-            tracing::error!(error = %e, "agent meal-plan run failed");
+    let open_slots = state
+        .repos
+        .schedule
+        .resolve_open_slots(user_id, plan_start, plan_end, &locked_slots)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "meal-plan: failed to resolve open slots");
             StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    // Preload preferences once; degrades to empty string on error (non-fatal).
+    let prefs_blob = preload_meal_planning_context(&state.repos, user_id).await;
+
+    // Locked meal entries carried forward into the final response and avoid list.
+    let locked_entries: Vec<MealEntry> = body
+        .current_state
+        .approved
+        .iter()
+        .chain(body.current_state.custom.iter())
+        .cloned()
+        .collect();
+
+    let mut chosen: Vec<MealEntry> = Vec::new();
+    let mut failed: Vec<FailedSlot> = Vec::new();
+
+    for slot in &open_slots {
+        let ctx = build_suggest_slot_ctx(user_id, slot, &prefs_blob, &locked_entries, &chosen);
+        match state.agent.run(&ctx).await {
+            Ok(output) => match serde_json::from_str::<MealEntry>(&output.content) {
+                Ok(meal) => chosen.push(meal),
+                Err(e) => {
+                    tracing::warn!(
+                        error = %e,
+                        date = %slot.date,
+                        meal_name = %slot.meal_name,
+                        "meal-plan: failed to parse slot suggestion"
+                    );
+                    failed.push(FailedSlot {
+                        date: slot.date,
+                        meal_name: slot.meal_name.clone(),
+                        reason: e.to_string(),
+                    });
+                }
+            },
+            Err(e) => {
+                tracing::warn!(
+                    error = %e,
+                    date = %slot.date,
+                    meal_name = %slot.meal_name,
+                    "meal-plan: agent slot suggestion failed"
+                );
+                failed.push(FailedSlot {
+                    date: slot.date,
+                    meal_name: slot.meal_name.clone(),
+                    reason: e.to_string(),
+                });
+            }
         }
-    })?;
+    }
 
-    let response: MealPlanResponse = serde_json::from_str(&output.content).map_err(|e| {
-        tracing::error!(error = %e, content = %output.content, "failed to parse meal plan output");
-        StatusCode::INTERNAL_SERVER_ERROR
-    })?;
+    let meals: Vec<MealEntry> = locked_entries.into_iter().chain(chosen).collect();
 
-    Ok(Json(response))
+    Ok(Json(MealPlanResponse {
+        plan_start,
+        meals,
+        nutrition_summary: None, // per-slot aggregation tracked in #758
+        failed_slots: failed,
+    }))
 }
 
 /// POST /agent/meal-plan/rebalance — rebalance an in-progress week plan via the AI agent.
@@ -282,16 +512,7 @@ pub async fn post_meal_plan_suggest(
     let date = body.date.format("%Y-%m-%d").to_string();
     let meal_name = body.meal_name;
 
-    let avoid_str = body
-        .avoid_meal_refs
-        .as_deref()
-        .filter(|refs| !refs.is_empty())
-        .map(|refs| {
-            serde_json::to_string(refs)
-                .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
-                .unwrap_or_default()
-        })
-        .unwrap_or_default();
+    let avoid_str = build_avoid_str(body.avoid_meal_refs.as_deref().unwrap_or(&[]));
 
     let ctx = AgentContext {
         user_id,
@@ -1439,6 +1660,82 @@ mod tests {
         assert!(
             !block.contains("[Day-type assignments]"),
             "single in-use day type should omit assignments block"
+        );
+    }
+
+    // --- build_suggest_slot_ctx tests ---
+
+    fn open_slot(date_str: &str, name: &str) -> plnd_data::models::OpenSlot {
+        plnd_data::models::OpenSlot {
+            date: chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap(),
+            meal_name: name.to_string(),
+        }
+    }
+
+    fn meal_entry(date_str: &str, slot: &str) -> crate::models::MealEntry {
+        crate::models::MealEntry {
+            date: chrono::NaiveDate::parse_from_str(date_str, "%Y-%m-%d").unwrap(),
+            meal_name: slot.to_string(),
+            meal_ref: crate::models::MealRef {
+                meal_type: "catalog".to_string(),
+                id: uuid::Uuid::new_v4(),
+            },
+            estimated_nutrition: None,
+        }
+    }
+
+    #[test]
+    fn build_suggest_slot_ctx_no_chosen_has_no_avoid_str() {
+        let uid = uuid::Uuid::new_v4();
+        let slot = open_slot("2026-05-12", "lunch");
+        let ctx = super::build_suggest_slot_ctx(uid, &slot, "", &[], &[]);
+        let prior = ctx.prior_context.unwrap();
+        assert!(
+            !prior.contains("[Avoid these meals:"),
+            "empty avoid list should produce no avoid block"
+        );
+        assert!(prior.contains("[Date: 2026-05-12]"));
+        assert!(prior.contains("[Meal: lunch]"));
+    }
+
+    #[test]
+    fn build_suggest_slot_ctx_chosen_meals_appear_in_avoid_context() {
+        let uid = uuid::Uuid::new_v4();
+        let slot = open_slot("2026-05-12", "lunch");
+        let prev = meal_entry("2026-05-11", "breakfast");
+        let prev_id = prev.meal_ref.id.to_string();
+
+        let ctx = super::build_suggest_slot_ctx(uid, &slot, "", &[], &[prev]);
+        let prior = ctx.prior_context.unwrap();
+
+        assert!(
+            prior.contains("[Avoid these meals:"),
+            "chosen meal should appear in avoid block"
+        );
+        assert!(
+            prior.contains(&prev_id),
+            "specific meal ref id must be in avoid list"
+        );
+    }
+
+    #[test]
+    fn build_suggest_slot_ctx_locked_entries_appear_in_avoid_context() {
+        let uid = uuid::Uuid::new_v4();
+        let slot = open_slot("2026-05-12", "lunch");
+        let locked = meal_entry("2026-05-11", "breakfast");
+        let locked_id = locked.meal_ref.id.to_string();
+
+        // locked_entries non-empty, chosen empty
+        let ctx = super::build_suggest_slot_ctx(uid, &slot, "", &[locked], &[]);
+        let prior = ctx.prior_context.unwrap();
+
+        assert!(
+            prior.contains("[Avoid these meals:"),
+            "locked entry should populate the avoid block"
+        );
+        assert!(
+            prior.contains(&locked_id),
+            "locked entry meal ref id must appear in avoid list"
         );
     }
 }

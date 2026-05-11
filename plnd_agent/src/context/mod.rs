@@ -83,7 +83,20 @@ const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
   "properties": {
     "plan_start":        { "type": "string", "format": "date" },
     "meals":             { "type": "array", "items": { "$ref": "#/definitions/MealEntry" } },
-    "nutrition_summary": { "$ref": "#/definitions/NutritionSummary" }
+    "nutrition_summary": { "$ref": "#/definitions/NutritionSummary" },
+    "failed_slots": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["date", "meal_name", "reason"],
+        "additionalProperties": false,
+        "properties": {
+          "date":      { "type": "string", "format": "date" },
+          "meal_name": { "type": "string" },
+          "reason":    { "type": "string" }
+        }
+      }
+    }
   },
   "definitions": {
     "MealEntry": {
@@ -397,7 +410,7 @@ pub struct AgentContext {
     pub prior_context: Option<String>,
     /// Structured extra data for tools that need request-scoped state.
     /// Passed to `build_tool_registry` so tools can be constructed with it.
-    /// Only `UseCase::MealPlanning` currently uses this (week schedule state).
+    /// Currently used by `UseCase::MealRebalance` to pass week schedule state.
     pub extra: Option<serde_json::Value>,
 }
 
