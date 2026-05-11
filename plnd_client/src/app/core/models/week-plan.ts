@@ -41,6 +41,12 @@ export interface SlotRef {
   meal_name: MealSlot;
 }
 
+export interface FailedSlot {
+  date: string;
+  meal_name: MealSlot;
+  reason: string;
+}
+
 export interface MealPlanState {
   approved: MealEntry[];
   skipped: SlotRef[];
@@ -60,6 +66,7 @@ export interface MealPlanResponse {
   plan_start: string;
   meals: MealEntry[];
   nutrition_summary?: { daily_avg_calories?: number };
+  failed_slots?: FailedSlot[];
 }
 
 export interface ResolveResponse {
