@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::schedule;
-use crate::models::{CommitPlanInput, ScheduleEntry};
+use crate::models::{CommitPlanInput, OpenSlot, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 use crate::repository::schedule::ScheduleRepository;
 
@@ -78,6 +78,18 @@ impl ScheduleRepository for PgScheduleRepository {
         before: NaiveDate,
     ) -> Result<Vec<ScheduleEntry>, crate::Error> {
         schedule::get_carryover(&self.pool, user_id, before)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn resolve_open_slots(
+        &self,
+        user_id: Uuid,
+        plan_start: NaiveDate,
+        plan_end: NaiveDate,
+        locked: &[(NaiveDate, String)],
+    ) -> Result<Vec<OpenSlot>, crate::Error> {
+        schedule::resolve_open_slots(&self.pool, user_id, plan_start, plan_end, locked)
             .await
             .map_err(Into::into)
     }

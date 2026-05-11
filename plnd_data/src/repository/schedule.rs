@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::NaiveDate;
 use uuid::Uuid;
 
-use crate::models::{CommitPlanInput, ScheduleEntry};
+use crate::models::{CommitPlanInput, OpenSlot, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 #[async_trait]
@@ -45,4 +45,12 @@ pub trait ScheduleRepository: Send + Sync {
         user_id: Uuid,
         before: NaiveDate,
     ) -> Result<Vec<ScheduleEntry>, crate::Error>;
+
+    async fn resolve_open_slots(
+        &self,
+        user_id: Uuid,
+        plan_start: NaiveDate,
+        plan_end: NaiveDate,
+        locked: &[(NaiveDate, String)],
+    ) -> Result<Vec<OpenSlot>, crate::Error>;
 }
