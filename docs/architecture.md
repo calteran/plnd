@@ -802,21 +802,22 @@ Token definitions live in `plnd_client/src/styles/_tokens.scss`; this section ca
 
 ### 8.5 Loading states for agent-backed actions
 
-Any UI action that triggers an LLM-backed agent call **must** surface visible loading chrome for the duration of the call. Agent runs commonly take 3–30 seconds; without feedback, a user cannot distinguish "still working" from "silently failed." A loading boolean without a visible affordance is a defect, not a state.
+Any UI action that triggers an LLM-backed agent call **must** surface visible loading chrome for the duration of the call. Agent runs commonly take 1–10s; without feedback, a user cannot distinguish "still working" from "silently failed." A loading boolean without a visible affordance is a defect, not a state.
 
 **Design dimensions.** Each loader is designed for the specific interaction it covers — a one-size-fits-all spinner is not appropriate. When designing, consider:
 
-- **Wait time.** A 2 s call deserves a quiet shimmer; a 15 s call needs progressive copy or per-step affordances. Match pacing to the actual range, not the average.
+- **Wait time.** A 2s call deserves a quiet shimmer; a 15s call needs progressive copy or per-step affordances. Match pacing to the actual range, not the average.
 - **Specificity.** Scope the loader to the affected surface, not the whole app. A per-cell skeleton is fine for a one-shot cell refresh; a section-level loader is appropriate when the whole region is in flight.
-- **Affordance.** Communicate *what* is happening, not just *that* something is. Personalized progressive copy beats an indeterminate spinner for any call over ~3 s.
+- **Affordance.** Communicate *what* is happening, not just *that* something is. Personalized progressive copy beats an indeterminate spinner for any call over ~3s.
 - **Accessibility.** Use `aria-live="polite"` for streaming text. Animations must honor `prefers-reduced-motion: reduce` with a static fallback.
 - **Failure handoff.** When the request fails, the loader must hand off cleanly to a user-visible error state — never disappear silently into an empty success surface.
+- **Cancellability.** For any call expected to exceed ~5s, provide an explicit cancel affordance to allow the user to interrupt the process (as noted in §9.4).
 
 **Anti-patterns.**
 
 - A loading boolean with no visible UI affordance. The user sees an apparently-idle screen during a multi-second call and cannot tell whether to wait or retry.
 - Per-cell skeletons covering an operation that affects the whole view, with no higher-level indicator explaining what is happening.
-- Indeterminate spinners on calls longer than ~5 s with no contextual copy. If you can describe what the agent is doing, describe it.
+- Indeterminate spinners on calls longer than ~5s with no contextual copy. If you can describe what the agent is doing, describe it.
 
 ---
 
