@@ -474,6 +474,7 @@ mod tests {
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
             UseCase::PlaceTasks,
+            UseCase::ReviewMealPlan,
         ] {
             assert!(
                 !case.system_prompt().is_empty(),
@@ -491,6 +492,7 @@ mod tests {
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
             UseCase::PlaceTasks,
+            UseCase::ReviewMealPlan,
         ] {
             assert!(
                 case.system_prompt().contains("<user_input>"),
@@ -1011,5 +1013,132 @@ mod tests {
                 "expected acceptance for time_window_start={good_time}"
             );
         }
+    }
+
+    // ── ReviewMealPlan schema tests ───────────────────────────────────────────
+
+    #[test]
+    fn review_meal_plan_has_response_validator() {
+        assert!(UseCase::ReviewMealPlan.response_validator().is_some());
+    }
+
+    #[test]
+    fn review_meal_plan_validator_accepts_empty_changes_requested() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let ok = serde_json::json!({ "changes_requested": [] });
+        assert!(v.is_valid(&ok), "empty changes_requested must be valid");
+    }
+
+    #[test]
+    fn review_meal_plan_validator_accepts_one_change() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "changes_requested": [
+                {
+                    "date": "2026-05-12",
+                    "meal_name": "lunch",
+                    "reason": "Contains peanuts (blocked ingredient)"
+                }
+            ]
+        });
+        assert!(v.is_valid(&ok));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_accepts_multiple_changes() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let ok = serde_json::json!({
+            "changes_requested": [
+                { "date": "2026-05-12", "meal_name": "lunch", "reason": "Contains peanuts (blocked ingredient)" },
+                { "date": "2026-05-14", "meal_name": "dinner", "reason": "Contains shellfish (dietary restriction: shellfish allergy)" }
+            ]
+        });
+        assert!(v.is_valid(&ok));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_missing_changes_requested() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({});
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_extra_top_level_field() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "changes_requested": [],
+            "surprise": "boom"
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_entry_missing_date() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "changes_requested": [{ "meal_name": "lunch", "reason": "duplicate" }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_entry_missing_meal_name() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "changes_requested": [{ "date": "2026-05-12", "reason": "duplicate" }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_entry_missing_reason() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "changes_requested": [{ "date": "2026-05-12", "meal_name": "lunch" }]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_entry_extra_field() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "changes_requested": [
+                { "date": "2026-05-12", "meal_name": "lunch", "reason": "dup", "extra": "nope" }
+            ]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_invalid_date_format() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "changes_requested": [
+                { "date": "not-a-date", "meal_name": "lunch", "reason": "dup" }
+            ]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_validator_rejects_empty_meal_name() {
+        let v = UseCase::ReviewMealPlan.response_validator().unwrap();
+        let bad = serde_json::json!({
+            "changes_requested": [
+                { "date": "2026-05-12", "meal_name": "", "reason": "dup" }
+            ]
+        });
+        assert!(!v.is_valid(&bad));
+    }
+
+    #[test]
+    fn review_meal_plan_memory_categories_match_meal_use_cases() {
+        let cats = UseCase::ReviewMealPlan.memory_categories();
+        assert!(cats.contains(&"food"), "ReviewMealPlan must include food");
+        assert!(cats.contains(&"habits"), "ReviewMealPlan must include habits");
+        assert!(!cats.contains(&"schedule"));
+        assert!(!cats.contains(&"energy"));
     }
 }
