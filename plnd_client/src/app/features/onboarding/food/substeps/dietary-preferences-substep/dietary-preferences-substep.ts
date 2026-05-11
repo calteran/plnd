@@ -218,7 +218,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
     .custom-add { display: flex; flex-direction: column; gap: 6px; }
     .field-label { font-size: 12px; font-weight: 700; color: var(--color-text-body); }
     .row { display: flex; gap: 8px; }
-    .text-input { border: 1.5px solid var(--color-border-input); border-radius: 6px; padding: 7px 10px; font-size: 13px; background: var(--color-surface-white); color: var(--color-text-body); }
+    .text-input { border: 1.5px solid var(--color-border-input); border-radius: 6px; padding: 7px 10px; font-size: 13px; }
     .flex-1 { flex: 1; }
     .btn-add { background: var(--color-accent); color: var(--color-btn-accent-text); border: none; border-radius: 6px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
     .btn-add:disabled { opacity: 0.5; cursor: not-allowed; }

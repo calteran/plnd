@@ -129,11 +129,11 @@ describe('SpokeChromeComponent', () => {
     expect(spacers.length).toBe(2); // left spacer (step 1) + right spacer (no continue)
   });
 
-  it('dots each have a title attribute', () => {
+  it('dots have no title attribute — accessibility comes from parent progressbar aria attrs', () => {
     const fixture = setup(3, 1);
     const dots: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.dot');
-    dots.forEach((dot, i) => {
-      expect(dot.getAttribute('title')).toBe(`Step ${i + 1}`);
+    dots.forEach(dot => {
+      expect(dot.getAttribute('title')).toBeNull();
     });
   });
 
