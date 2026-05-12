@@ -204,7 +204,8 @@ fn build_avoid_str(refs: &[MealRef]) -> String {
 ///
 /// The `prior_context` carries:
 /// - `prefs_blob` — preloaded user preferences (dietary restrictions, blocked/preferred ingredients)
-/// - avoid list derived from `locked_entries` + `chosen` (grows each iteration for carryover)
+/// - avoid list derived from `locked_entries` + `chosen` (pass `&[]` for `chosen` when
+///   caller handles cross-slot deduplication separately, e.g. via a review pass)
 /// - slot date and meal name
 fn build_suggest_slot_ctx(
     user_id: Uuid,
@@ -394,8 +395,9 @@ where
 /// POST /agent/meal-plan — generate a full-week meal plan proposal via per-slot AI agent calls.
 ///
 /// The client POSTs the current wizard state (approved/skipped/custom slots for the week).
-/// Open slots are filled sequentially via `MealSuggestSlot`; each call carries a growing
-/// avoid list so the agent doesn't repeat choices. Locked slots (approved + custom) are
+/// Open slots are filled in parallel (bounded by `AppState::meal_plan_concurrency`) via
+/// `MealSuggestSlot`; each slot sees only the locked context — the review pass handles
+/// cross-slot clashes. Locked slots (approved + custom) are
 /// preserved verbatim. Per-slot failures are captured in `failed_slots` rather than
 /// aborting the whole request. No DB writes occur here.
 #[utoipa::path(
