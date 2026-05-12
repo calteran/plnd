@@ -212,6 +212,10 @@ impl AppConfig {
             return Err("agent.rate_limit_per_minute must be greater than 0".to_string());
         }
 
+        if self.agent.meal_plan_concurrency == 0 {
+            return Err("agent.meal_plan_concurrency must be greater than 0".to_string());
+        }
+
         Ok(())
     }
 }
