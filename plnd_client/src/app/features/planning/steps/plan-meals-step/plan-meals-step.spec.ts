@@ -338,6 +338,42 @@ describe('PlanMealsStepComponent', () => {
         // Cell should no longer be flagged
         expect(fixture.nativeElement.querySelectorAll('.gc-failed').length).toBe(0);
       });
+
+      it('should remove .gc-failed from a cell when the cell is skipped', () => {
+        generateWeek$.next({
+          plan_start: '2026-03-23',
+          meals: [],
+          failed_slots: [{ date: '2026-03-23', meal_name: 'breakfast', reason: 'timeout' }],
+        });
+        generateWeek$.complete();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelectorAll('.gc-failed').length).toBe(1);
+
+        component.skipMeal('2026-03-23', 'breakfast');
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelectorAll('.gc-failed').length).toBe(0);
+      });
+
+      it('should remove .gc-failed from a cell when the user types in a manual edit', () => {
+        const resolve$ = new Subject<{ meal_ref: null; confirmation: string }>();
+        agentSpy.resolveText = jasmine.createSpy('resolveText').and.returnValue(resolve$);
+
+        generateWeek$.next({
+          plan_start: '2026-03-23',
+          meals: [],
+          failed_slots: [{ date: '2026-03-23', meal_name: 'breakfast', reason: 'timeout' }],
+        });
+        generateWeek$.complete();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelectorAll('.gc-failed').length).toBe(1);
+
+        component.confirmEdit('2026-03-23', 'breakfast', 'Pancakes');
+        resolve$.next({ meal_ref: null, confirmation: 'Pancakes' });
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelectorAll('.gc-failed').length).toBe(0);
+      });
     });
   });
 

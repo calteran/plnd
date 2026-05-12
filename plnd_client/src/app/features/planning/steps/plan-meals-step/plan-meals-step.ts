@@ -159,10 +159,10 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
     /* ── Partial-success banner ── */
     .partial-banner {
-      background: var(--color-warning-light, #fffbeb);
-      border: 1px solid var(--color-warning-border, #fcd34d);
+      background: var(--color-warning-light);
+      border: 1px solid var(--color-warning-border);
       border-radius: 8px;
-      color: var(--color-warning, #92400e);
+      color: var(--color-warning);
       font-size: 13px;
       padding: 10px 14px;
       margin-bottom: 10px;
@@ -270,7 +270,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .gc.gc-editing  { border-color: var(--color-accent-border); box-shadow: 0 0 0 2px var(--color-accent-light); }
     .gc.gc-loading  { overflow: hidden; }
     .gc.gc-na { background: var(--color-surface-base); opacity: 0.2; border-style: dashed; }
-    .gc.gc-failed { border-color: var(--color-warning-border, #fcd34d); background: var(--color-warning-light, #fffbeb); }
+    .gc.gc-failed { border-color: var(--color-warning-border); background: var(--color-warning-light); }
 
     /* ── Skeleton shimmer ── */
     .gc-skeleton {
@@ -416,12 +416,13 @@ export class PlanMealsStepComponent implements OnInit {
   readonly showRefreshModal = signal(false);
   readonly errorMessage     = signal<string | null>(null);
   readonly failedSlots      = signal<FailedSlot[]>([]);
-  private  filledCount      = signal(0);
-  readonly partialBannerMsg = computed(() => {
+  private  totalPlannedCount = signal(0);
+  readonly partialBannerMsg  = computed(() => {
     const failed = this.failedSlots();
     if (failed.length === 0) return null;
-    const total = this.filledCount() + failed.length;
-    return `Filled ${this.filledCount()} of ${total} slots. Tap a missing meal to retry.`;
+    const total  = this.totalPlannedCount();
+    const filled = total - failed.length;
+    return `Filled ${filled} of ${total} slots. Tap a missing meal to retry.`;
   });
 
   readonly unapprovedCount = computed(() => {
@@ -454,12 +455,12 @@ export class PlanMealsStepComponent implements OnInit {
   private runAgentPlan(obs$: Observable<MealPlanResponse>): void {
     this.errorMessage.set(null);
     this.failedSlots.set([]);
-    this.filledCount.set(0);
+    this.totalPlannedCount.set(0);
     this.weekPlanService.setGenerating(true);
     obs$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: resp => {
         this.weekPlanService.applyAgentMeals(resp.meals);
-        this.filledCount.set(resp.meals.length);
+        this.totalPlannedCount.set(resp.meals.length + (resp.failed_slots?.length ?? 0));
         this.failedSlots.set(resp.failed_slots ?? []);
       },
       error: () => {
@@ -497,6 +498,10 @@ export class PlanMealsStepComponent implements OnInit {
     return this.failedSlots().some(f => f.date === date && f.meal_name === slot);
   }
 
+  private clearFailedSlot(date: string, slot: MealSlot): void {
+    this.failedSlots.update(slots => slots.filter(f => !(f.date === date && f.meal_name === slot)));
+  }
+
   // ── Actions ───────────────────────────────────────────────
 
   approveMeal(date: string, slot: MealSlot): void {
@@ -505,6 +510,7 @@ export class PlanMealsStepComponent implements OnInit {
 
   skipMeal(date: string, slot: MealSlot): void {
     this.weekPlanService.skipMeal(date, slot);
+    this.clearFailedSlot(date, slot);
   }
 
   undoSkip(date: string, slot: MealSlot): void {
@@ -529,10 +535,14 @@ export class PlanMealsStepComponent implements OnInit {
       .resolveText(trimmed, slot, date)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: resp =>
-          this.weekPlanService.setMealRef(date, slot, resp.meal_ref, trimmed, resp.estimated_nutrition),
-        error: () =>
-          this.weekPlanService.setMealRef(date, slot, null, trimmed),
+        next: resp => {
+          this.weekPlanService.setMealRef(date, slot, resp.meal_ref, trimmed, resp.estimated_nutrition);
+          this.clearFailedSlot(date, slot);
+        },
+        error: () => {
+          this.weekPlanService.setMealRef(date, slot, null, trimmed);
+          this.clearFailedSlot(date, slot);
+        },
       });
     this.confirmingEdit = false;
   }
@@ -554,7 +564,7 @@ export class PlanMealsStepComponent implements OnInit {
       .subscribe({
         next: entry => {
           this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title ?? '', entry.estimated_nutrition, entry.estimated);
-          this.failedSlots.update(slots => slots.filter(f => !(f.date === date && f.meal_name === slot)));
+          this.clearFailedSlot(date, slot);
         },
         error: () => { /* leave cell unchanged; no user-visible feedback for now */ },
       });
