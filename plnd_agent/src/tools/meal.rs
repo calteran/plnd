@@ -473,100 +473,6 @@ impl Tool for GetWeekScheduleTool {
     }
 }
 
-// ── ProposeMealPlanTool ───────────────────────────────────────────────────────
-
-/// Terminal tool: the LLM calls this with the full week plan it has assembled.
-///
-/// The input is returned verbatim as the agent's final output. Schema validation
-/// in `AgentService::run` enforces `MEAL_PLAN_RESPONSE_SCHEMA` before the API
-/// layer ever sees the data. No DB writes here.
-pub struct ProposeMealPlanTool;
-
-#[async_trait::async_trait]
-impl Tool for ProposeMealPlanTool {
-    fn name(&self) -> &str {
-        "propose_meal_plan"
-    }
-
-    fn description(&self) -> &str {
-        "Submit the completed weekly meal plan. Call this as your final action \
-         once all open slots are filled. Pass the full week envelope including \
-         every meal (approved slots preserved as-is, open slots filled by you)."
-    }
-
-    fn schema(&self) -> serde_json::Value {
-        serde_json::json!({
-            "type": "object",
-            "required": ["plan_start", "meals"],
-            "additionalProperties": false,
-            "properties": {
-                "plan_start": {
-                    "type": "string",
-                    "format": "date",
-                    "description": "ISO date of the first day of the planning period"
-                },
-                "meals": {
-                    "type": "array",
-                    "description": "All meal slots for the week",
-                    "items": {
-                        "type": "object",
-                        "required": ["date", "meal_name", "meal_ref"],
-                        "additionalProperties": false,
-                        "properties": {
-                            "date":     { "type": "string", "format": "date" },
-                            "meal_name": {
-                                "type": "string",
-                                "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
-                            },
-                            "meal_ref": {
-                                "type": "object",
-                                "required": ["type", "id"],
-                                "additionalProperties": false,
-                                "properties": {
-                                    "type": { "type": "string", "enum": ["catalog", "user"] },
-                                    "id":   { "type": "string", "format": "uuid" }
-                                }
-                            },
-                            "estimated_nutrition": {
-                                "type": "object",
-                                "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
-                                "additionalProperties": false,
-                                "properties": {
-                                    "kcal":      { "type": "number" },
-                                    "protein_g": { "type": "number" },
-                                    "carbs_g":   { "type": "number" },
-                                    "fat_g":     { "type": "number" }
-                                }
-                            }
-                        }
-                    }
-                },
-                "nutrition_summary": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "properties": {
-                        "avg_kcal":    { "type": "number" },
-                        "avg_protein": { "type": "number" },
-                        "flags":       { "type": "array", "items": { "type": "string" } }
-                    }
-                }
-            }
-        })
-    }
-
-    fn is_terminal(&self) -> bool {
-        true
-    }
-
-    async fn execute(
-        &self,
-        _ctx: &ToolContext,
-        input: serde_json::Value,
-    ) -> Result<serde_json::Value, ToolError> {
-        Ok(input)
-    }
-}
-
 // ── RebalanceMealPlanTool ─────────────────────────────────────────────────────
 
 /// Terminal tool: the LLM calls this with the full rebalanced week plan.
@@ -934,15 +840,6 @@ pub fn register_meal_read_tools(
     registry.register(Arc::new(EstimateNutritionFromDescriptionTool(meal_repo)));
 }
 
-/// Registers the terminal tools for the `MealPlanning` use case.
-///
-/// `week_state` is the client-provided `MealPlanState` JSON, baked into
-/// `GetWeekScheduleTool` at construction so the LLM can explicitly retrieve it.
-pub fn register_meal_planning_tools(registry: &mut ToolRegistry, week_state: serde_json::Value) {
-    registry.register(Arc::new(GetWeekScheduleTool(week_state)));
-    registry.register(Arc::new(ProposeMealPlanTool));
-}
-
 /// Registers the terminal tools for the `MealRebalance` use case.
 ///
 /// `week_state` is the client-provided `MealPlanState` JSON (the existing
@@ -1288,11 +1185,6 @@ mod tests {
     }
 
     #[test]
-    fn propose_meal_plan_tool_is_terminal() {
-        assert!(ProposeMealPlanTool.is_terminal());
-    }
-
-    #[test]
     fn suggest_slot_meal_tool_is_terminal() {
         assert!(SuggestSlotMealTool.is_terminal());
     }
@@ -1436,29 +1328,6 @@ mod tests {
         });
         let result = tool.execute(&ctx, input).await;
         assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    async fn propose_meal_plan_returns_input_verbatim() {
-        let input = serde_json::json!({
-            "plan_start": "2026-04-21",
-            "meals": [
-                {
-                    "date": "2026-04-21",
-                    "meal_name": "breakfast",
-                    "meal_ref": { "type": "catalog", "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890" }
-                }
-            ]
-        });
-        let ctx = crate::tools::ToolContext {
-            user_id: uuid::Uuid::new_v4(),
-        };
-        let result = ProposeMealPlanTool
-            .execute(&ctx, input.clone())
-            .await
-            .unwrap();
-        assert_eq!(result["plan_start"], "2026-04-21");
-        assert_eq!(result["meals"].as_array().unwrap().len(), 1);
     }
 
     // ── In-memory fakes for tool-logic tests ─────────────────────────────────

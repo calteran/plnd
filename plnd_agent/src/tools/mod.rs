@@ -1,6 +1,5 @@
 pub(crate) mod meal;
 pub(crate) use meal::register_meal_adhoc_resolve_tools;
-pub(crate) use meal::register_meal_planning_tools;
 pub(crate) use meal::register_meal_read_tools;
 pub(crate) use meal::register_meal_rebalance_tools;
 pub(crate) use meal::register_meal_suggest_slot_tools;
@@ -173,16 +172,6 @@ pub(crate) fn build_tool_registry(
                 Arc::clone(&repos.task),
                 Arc::clone(&repos.schedule),
             );
-        }
-        UseCase::MealPlanning => {
-            register_meal_read_tools(
-                &mut registry,
-                Arc::clone(&repos.meal),
-                Arc::clone(&repos.user_ingredient_pref),
-                Arc::clone(&repos.user_meal_pref),
-            );
-            let week_state = extra.unwrap_or_default();
-            register_meal_planning_tools(&mut registry, week_state);
         }
         UseCase::MealRebalance => {
             register_meal_read_tools(

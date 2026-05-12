@@ -69,7 +69,7 @@ fn build_context_str(context: Option<&[crate::models::ConversationTurn]>) -> Str
 /// Load the user's meal preferences once and format them as a `[Meal preferences]` block
 /// suitable for injection into `prior_context`. Returns an empty string on error so callers
 /// can degrade gracefully (same fallback pattern as `build_anchor_context_for_user`).
-async fn preload_meal_planning_context(repos: &plnd_data::Repositories, user_id: Uuid) -> String {
+async fn preload_meal_pref_context(repos: &plnd_data::Repositories, user_id: Uuid) -> String {
     let result = async {
         let (restrictions, ingredient_prefs, meal_prefs) = tokio::try_join!(
             repos.meal.list_dietary_restrictions(user_id),
@@ -467,7 +467,7 @@ pub async fn post_meal_plan(
         })?;
 
     // Preload preferences once; degrades to empty string on error (non-fatal).
-    let prefs_blob = preload_meal_planning_context(&state.repos, user_id).await;
+    let prefs_blob = preload_meal_pref_context(&state.repos, user_id).await;
 
     // Locked meal entries carried forward into the final response and avoid list.
     let locked_entries: Vec<MealEntry> = body
