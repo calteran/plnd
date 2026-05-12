@@ -204,7 +204,8 @@ fn build_avoid_str(refs: &[MealRef]) -> String {
 ///
 /// The `prior_context` carries:
 /// - `prefs_blob` — preloaded user preferences (dietary restrictions, blocked/preferred ingredients)
-/// - avoid list derived from `locked_entries` + `chosen` (grows each iteration for carryover)
+/// - avoid list derived from `locked_entries` + `chosen` (pass `&[]` for `chosen` when
+///   caller handles cross-slot deduplication separately, e.g. via a review pass)
 /// - slot date and meal name
 fn build_suggest_slot_ctx(
     user_id: Uuid,
@@ -344,11 +345,60 @@ pub async fn post_task(
     Ok(Json(response))
 }
 
+/// Fan out per-slot agent calls with bounded concurrency.
+///
+/// Each slot is submitted to `call` independently; at most `concurrency` futures
+/// run simultaneously. Results are returned in original slot order regardless of
+/// completion order. Task panics are logged but do not abort the batch.
+async fn fill_slots_parallel<F, Fut>(
+    open_slots: Vec<plnd_data::models::OpenSlot>,
+    concurrency: usize,
+    call: F,
+) -> (Vec<MealEntry>, Vec<FailedSlot>)
+where
+    F: Fn(plnd_data::models::OpenSlot) -> Fut + Send + Sync + 'static,
+    Fut: std::future::Future<Output = Result<MealEntry, FailedSlot>> + Send + 'static,
+{
+    let n = open_slots.len();
+    let sem = Arc::new(tokio::sync::Semaphore::new(concurrency));
+    let mut join_set: tokio::task::JoinSet<(usize, Result<MealEntry, FailedSlot>)> =
+        tokio::task::JoinSet::new();
+
+    for (i, slot) in open_slots.into_iter().enumerate() {
+        let sem = Arc::clone(&sem);
+        let fut = call(slot);
+        join_set.spawn(async move {
+            let _permit = sem.acquire().await.expect("semaphore closed");
+            (i, fut.await)
+        });
+    }
+
+    let mut indexed = Vec::with_capacity(n);
+    while let Some(join_result) = join_set.join_next().await {
+        match join_result {
+            Ok(pair) => indexed.push(pair),
+            Err(e) => tracing::error!(error = %e, "meal-plan: slot suggestion task panicked"),
+        }
+    }
+    indexed.sort_by_key(|(i, _)| *i);
+
+    let mut chosen = Vec::new();
+    let mut failed = Vec::new();
+    for (_, result) in indexed {
+        match result {
+            Ok(meal) => chosen.push(meal),
+            Err(slot) => failed.push(slot),
+        }
+    }
+    (chosen, failed)
+}
+
 /// POST /agent/meal-plan — generate a full-week meal plan proposal via per-slot AI agent calls.
 ///
 /// The client POSTs the current wizard state (approved/skipped/custom slots for the week).
-/// Open slots are filled sequentially via `MealSuggestSlot`; each call carries a growing
-/// avoid list so the agent doesn't repeat choices. Locked slots (approved + custom) are
+/// Open slots are filled in parallel (bounded by `AppState::meal_plan_concurrency`) via
+/// `MealSuggestSlot`; each slot sees only the locked context — the review pass handles
+/// cross-slot clashes. Locked slots (approved + custom) are
 /// preserved verbatim. Per-slot failures are captured in `failed_slots` rather than
 /// aborting the whole request. No DB writes occur here.
 #[utoipa::path(
@@ -428,43 +478,53 @@ pub async fn post_meal_plan(
         .cloned()
         .collect();
 
-    let mut chosen: Vec<MealEntry> = Vec::new();
-    let mut failed: Vec<FailedSlot> = Vec::new();
+    // Parallel fan-out: each slot sees only locked context (no sibling awareness).
+    // The review pass below catches any resulting clashes or imbalance.
+    let agent = state.agent.clone();
+    let locked_for_ctx = Arc::new(locked_entries.clone());
+    let prefs_for_ctx = Arc::new(prefs_blob.clone());
+    let concurrency = state.meal_plan_concurrency;
 
-    for slot in &open_slots {
-        let ctx = build_suggest_slot_ctx(user_id, slot, &prefs_blob, &locked_entries, &chosen);
-        match state.agent.run(&ctx).await {
-            Ok(output) => match serde_json::from_str::<MealEntry>(&output.content) {
-                Ok(meal) => chosen.push(meal),
+    let (mut chosen, failed) = fill_slots_parallel(open_slots, concurrency, move |slot| {
+        let agent = agent.clone();
+        let locked = Arc::clone(&locked_for_ctx);
+        let prefs = Arc::clone(&prefs_for_ctx);
+        async move {
+            let ctx = build_suggest_slot_ctx(user_id, &slot, &prefs, &locked, &[]);
+            match agent.run(&ctx).await {
+                Ok(output) => match serde_json::from_str::<MealEntry>(&output.content) {
+                    Ok(meal) => Ok(meal),
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            date = %slot.date,
+                            meal_name = %slot.meal_name,
+                            "meal-plan: failed to parse slot suggestion"
+                        );
+                        Err(FailedSlot {
+                            date: slot.date,
+                            meal_name: slot.meal_name,
+                            reason: e.to_string(),
+                        })
+                    }
+                },
                 Err(e) => {
                     tracing::warn!(
                         error = %e,
                         date = %slot.date,
                         meal_name = %slot.meal_name,
-                        "meal-plan: failed to parse slot suggestion"
+                        "meal-plan: agent slot suggestion failed"
                     );
-                    failed.push(FailedSlot {
+                    Err(FailedSlot {
                         date: slot.date,
-                        meal_name: slot.meal_name.clone(),
+                        meal_name: slot.meal_name,
                         reason: e.to_string(),
-                    });
+                    })
                 }
-            },
-            Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    date = %slot.date,
-                    meal_name = %slot.meal_name,
-                    "meal-plan: agent slot suggestion failed"
-                );
-                failed.push(FailedSlot {
-                    date: slot.date,
-                    meal_name: slot.meal_name.clone(),
-                    reason: e.to_string(),
-                });
             }
         }
-    }
+    })
+    .await;
 
     // Pre-fetch dish names for all entries so the review agent sees human-readable
     // names rather than opaque UUIDs when checking for blocked ingredients.
@@ -2079,5 +2139,99 @@ mod tests {
             prior.contains(&meal_id.to_string()),
             "UUID fallback must appear in review context when name not in map"
         );
+    }
+
+    // --- fill_slots_parallel tests ---
+
+    #[tokio::test]
+    async fn fill_slots_parallel_respects_concurrency_limit() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        };
+
+        let concurrency = 3usize;
+        let n_slots = 6usize;
+        let in_flight = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+
+        let open_slots: Vec<plnd_data::models::OpenSlot> = (0..n_slots)
+            .map(|i| plnd_data::models::OpenSlot {
+                date: chrono::NaiveDate::from_ymd_opt(2026, 5, 12 + i as u32).unwrap(),
+                meal_name: format!("meal_{i}"),
+            })
+            .collect();
+
+        let in_flight_ref = Arc::clone(&in_flight);
+        let peak_ref = Arc::clone(&peak);
+
+        let (chosen, failed) = super::fill_slots_parallel(open_slots, concurrency, move |slot| {
+            let in_flight = Arc::clone(&in_flight_ref);
+            let peak = Arc::clone(&peak_ref);
+            async move {
+                let current = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(current, Ordering::SeqCst);
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                in_flight.fetch_sub(1, Ordering::SeqCst);
+                Ok(MealEntry {
+                    date: slot.date,
+                    meal_name: slot.meal_name.clone(),
+                    meal_ref: MealRef {
+                        meal_type: "catalog".to_string(),
+                        id: uuid::Uuid::new_v4(),
+                    },
+                    estimated_nutrition: None,
+                })
+            }
+        })
+        .await;
+
+        let observed_peak = peak.load(Ordering::SeqCst);
+        assert_eq!(chosen.len(), n_slots, "all slots should succeed");
+        assert!(failed.is_empty(), "no failures expected");
+        assert!(
+            observed_peak <= concurrency,
+            "peak concurrent ({observed_peak}) exceeded limit ({concurrency})"
+        );
+    }
+
+    #[tokio::test]
+    async fn fill_slots_parallel_collects_failures() {
+        let open_slots: Vec<plnd_data::models::OpenSlot> = vec![
+            plnd_data::models::OpenSlot {
+                date: chrono::NaiveDate::from_ymd_opt(2026, 5, 12).unwrap(),
+                meal_name: "breakfast".to_string(),
+            },
+            plnd_data::models::OpenSlot {
+                date: chrono::NaiveDate::from_ymd_opt(2026, 5, 12).unwrap(),
+                meal_name: "lunch".to_string(),
+            },
+        ];
+
+        let (chosen, failed) = super::fill_slots_parallel(open_slots, 4, |slot| async move {
+            if slot.meal_name == "breakfast" {
+                Ok(MealEntry {
+                    date: slot.date,
+                    meal_name: slot.meal_name.clone(),
+                    meal_ref: MealRef {
+                        meal_type: "catalog".to_string(),
+                        id: uuid::Uuid::new_v4(),
+                    },
+                    estimated_nutrition: None,
+                })
+            } else {
+                Err(FailedSlot {
+                    date: slot.date,
+                    meal_name: slot.meal_name.clone(),
+                    reason: "mock failure".to_string(),
+                })
+            }
+        })
+        .await;
+
+        assert_eq!(chosen.len(), 1);
+        assert_eq!(failed.len(), 1);
+        assert_eq!(chosen[0].meal_name, "breakfast");
+        assert_eq!(failed[0].meal_name, "lunch");
     }
 }

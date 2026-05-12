@@ -111,6 +111,12 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.agent.rate_limit_per_minute = limit;
     }
 
+    if let Ok(v) = std::env::var("APP_AGENT__MEAL_PLAN_CONCURRENCY")
+        && let Ok(limit) = v.parse::<usize>()
+    {
+        app_config.agent.meal_plan_concurrency = limit;
+    }
+
     if let Ok(v) = std::env::var("APP_OTEL__ENDPOINT") {
         app_config.otel.endpoint = if v.is_empty() { None } else { Some(v) };
     }

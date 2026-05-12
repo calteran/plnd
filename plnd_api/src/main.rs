@@ -229,6 +229,7 @@ async fn main() {
         client_error_limiter,
         agent_task_limiter,
         agent,
+        meal_plan_concurrency: config.agent.meal_plan_concurrency,
     });
 
     let x_request_id = HeaderName::from_static("x-request-id");
