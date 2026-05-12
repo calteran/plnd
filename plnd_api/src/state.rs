@@ -26,4 +26,7 @@ pub struct AppState {
     pub agent_task_limiter: Arc<DefaultKeyedRateLimiter<String>>,
     /// Agent service for LLM-backed task and meal-plan generation.
     pub agent: AgentService,
+    /// Max parallel LLM calls per POST /agent/meal-plan request.
+    /// Bounded by a per-request semaphore; parallel slots see only locked context.
+    pub meal_plan_concurrency: usize,
 }

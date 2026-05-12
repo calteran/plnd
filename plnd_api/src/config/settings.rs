@@ -135,16 +135,24 @@ pub struct AgentConfig {
     /// Max requests per minute per authenticated user for POST /agent/task.
     #[serde(default = "default_agent_rate_limit")]
     pub rate_limit_per_minute: u32,
+    /// Max parallel LLM calls per `POST /agent/meal-plan` request.
+    #[serde(default = "default_meal_plan_concurrency")]
+    pub meal_plan_concurrency: usize,
 }
 
 fn default_agent_rate_limit() -> u32 {
     10
 }
 
+fn default_meal_plan_concurrency() -> usize {
+    4
+}
+
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
             rate_limit_per_minute: default_agent_rate_limit(),
+            meal_plan_concurrency: default_meal_plan_concurrency(),
         }
     }
 }
