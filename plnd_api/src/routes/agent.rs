@@ -475,43 +475,53 @@ pub async fn post_meal_plan(
         .cloned()
         .collect();
 
-    let mut chosen: Vec<MealEntry> = Vec::new();
-    let mut failed: Vec<FailedSlot> = Vec::new();
+    // Parallel fan-out: each slot sees only locked context (no sibling awareness).
+    // The review pass below catches any resulting clashes or imbalance.
+    let agent = state.agent.clone();
+    let locked_for_ctx = locked_entries.clone();
+    let prefs_for_ctx = prefs_blob.clone();
+    let concurrency = state.meal_plan_concurrency;
 
-    for slot in &open_slots {
-        let ctx = build_suggest_slot_ctx(user_id, slot, &prefs_blob, &locked_entries, &chosen);
-        match state.agent.run(&ctx).await {
-            Ok(output) => match serde_json::from_str::<MealEntry>(&output.content) {
-                Ok(meal) => chosen.push(meal),
+    let (mut chosen, failed) = fill_slots_parallel(open_slots, concurrency, move |slot| {
+        let agent = agent.clone();
+        let locked = locked_for_ctx.clone();
+        let prefs = prefs_for_ctx.clone();
+        async move {
+            let ctx = build_suggest_slot_ctx(user_id, &slot, &prefs, &locked, &[]);
+            match agent.run(&ctx).await {
+                Ok(output) => match serde_json::from_str::<MealEntry>(&output.content) {
+                    Ok(meal) => Ok(meal),
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            date = %slot.date,
+                            meal_name = %slot.meal_name,
+                            "meal-plan: failed to parse slot suggestion"
+                        );
+                        Err(FailedSlot {
+                            date: slot.date,
+                            meal_name: slot.meal_name,
+                            reason: e.to_string(),
+                        })
+                    }
+                },
                 Err(e) => {
                     tracing::warn!(
                         error = %e,
                         date = %slot.date,
                         meal_name = %slot.meal_name,
-                        "meal-plan: failed to parse slot suggestion"
+                        "meal-plan: agent slot suggestion failed"
                     );
-                    failed.push(FailedSlot {
+                    Err(FailedSlot {
                         date: slot.date,
-                        meal_name: slot.meal_name.clone(),
+                        meal_name: slot.meal_name,
                         reason: e.to_string(),
-                    });
+                    })
                 }
-            },
-            Err(e) => {
-                tracing::warn!(
-                    error = %e,
-                    date = %slot.date,
-                    meal_name = %slot.meal_name,
-                    "meal-plan: agent slot suggestion failed"
-                );
-                failed.push(FailedSlot {
-                    date: slot.date,
-                    meal_name: slot.meal_name.clone(),
-                    reason: e.to_string(),
-                });
             }
         }
-    }
+    })
+    .await;
 
     // Pre-fetch dish names for all entries so the review agent sees human-readable
     // names rather than opaque UUIDs when checking for blocked ingredients.
@@ -2152,29 +2162,25 @@ mod tests {
         let in_flight_ref = Arc::clone(&in_flight);
         let peak_ref = Arc::clone(&peak);
 
-        let (chosen, failed) = super::fill_slots_parallel(
-            open_slots,
-            concurrency,
-            move |slot| {
-                let in_flight = Arc::clone(&in_flight_ref);
-                let peak = Arc::clone(&peak_ref);
-                async move {
-                    let current = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
-                    peak.fetch_max(current, Ordering::SeqCst);
-                    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
-                    in_flight.fetch_sub(1, Ordering::SeqCst);
-                    Ok(MealEntry {
-                        date: slot.date,
-                        meal_name: slot.meal_name.clone(),
-                        meal_ref: MealRef {
-                            meal_type: "catalog".to_string(),
-                            id: uuid::Uuid::new_v4(),
-                        },
-                        estimated_nutrition: None,
-                    })
-                }
-            },
-        )
+        let (chosen, failed) = super::fill_slots_parallel(open_slots, concurrency, move |slot| {
+            let in_flight = Arc::clone(&in_flight_ref);
+            let peak = Arc::clone(&peak_ref);
+            async move {
+                let current = in_flight.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(current, Ordering::SeqCst);
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                in_flight.fetch_sub(1, Ordering::SeqCst);
+                Ok(MealEntry {
+                    date: slot.date,
+                    meal_name: slot.meal_name.clone(),
+                    meal_ref: MealRef {
+                        meal_type: "catalog".to_string(),
+                        id: uuid::Uuid::new_v4(),
+                    },
+                    estimated_nutrition: None,
+                })
+            }
+        })
         .await;
 
         let observed_peak = peak.load(Ordering::SeqCst);
