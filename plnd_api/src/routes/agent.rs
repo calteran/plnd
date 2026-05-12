@@ -359,6 +359,7 @@ where
     F: Fn(plnd_data::models::OpenSlot) -> Fut + Send + Sync + 'static,
     Fut: std::future::Future<Output = Result<MealEntry, FailedSlot>> + Send + 'static,
 {
+    let n = open_slots.len();
     let sem = Arc::new(tokio::sync::Semaphore::new(concurrency));
     let mut join_set: tokio::task::JoinSet<(usize, Result<MealEntry, FailedSlot>)> =
         tokio::task::JoinSet::new();
@@ -372,7 +373,7 @@ where
         });
     }
 
-    let mut indexed: Vec<(usize, Result<MealEntry, FailedSlot>)> = Vec::new();
+    let mut indexed = Vec::with_capacity(n);
     while let Some(join_result) = join_set.join_next().await {
         match join_result {
             Ok(pair) => indexed.push(pair),
@@ -480,14 +481,14 @@ pub async fn post_meal_plan(
     // Parallel fan-out: each slot sees only locked context (no sibling awareness).
     // The review pass below catches any resulting clashes or imbalance.
     let agent = state.agent.clone();
-    let locked_for_ctx = locked_entries.clone();
-    let prefs_for_ctx = prefs_blob.clone();
+    let locked_for_ctx = Arc::new(locked_entries.clone());
+    let prefs_for_ctx = Arc::new(prefs_blob.clone());
     let concurrency = state.meal_plan_concurrency;
 
     let (mut chosen, failed) = fill_slots_parallel(open_slots, concurrency, move |slot| {
         let agent = agent.clone();
-        let locked = locked_for_ctx.clone();
-        let prefs = prefs_for_ctx.clone();
+        let locked = Arc::clone(&locked_for_ctx);
+        let prefs = Arc::clone(&prefs_for_ctx);
         async move {
             let ctx = build_suggest_slot_ctx(user_id, &slot, &prefs, &locked, &[]);
             match agent.run(&ctx).await {
