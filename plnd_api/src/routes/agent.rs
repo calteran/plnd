@@ -358,12 +358,12 @@ where
     F: Fn(plnd_data::models::OpenSlot) -> Fut + Send + Sync + 'static,
     Fut: std::future::Future<Output = Result<MealEntry, FailedSlot>> + Send + 'static,
 {
-    let sem = std::sync::Arc::new(tokio::sync::Semaphore::new(concurrency));
+    let sem = Arc::new(tokio::sync::Semaphore::new(concurrency));
     let mut join_set: tokio::task::JoinSet<(usize, Result<MealEntry, FailedSlot>)> =
         tokio::task::JoinSet::new();
 
     for (i, slot) in open_slots.into_iter().enumerate() {
-        let sem = std::sync::Arc::clone(&sem);
+        let sem = Arc::clone(&sem);
         let fut = call(slot);
         join_set.spawn(async move {
             let _permit = sem.acquire().await.expect("semaphore closed");
