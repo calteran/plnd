@@ -487,7 +487,7 @@ The `UseCase` enum is the unit of variation. A use case binds:
 
 - A **system prompt** (a `.md` file under `plnd_agent/src/prompts/` included via `include_str!()` so prompt edits are git-reviewable).
 - A **provider tier**.
-- A **tool subset** registered in the registry — `TaskEntry` never sees meal-planning tools; `MealPlanning` never sees task-creation tools.
+- A **tool subset** registered in the registry — `TaskEntry` never sees meal tools; meal use cases never see task-creation tools.
 - A **memory filter** — which categories get auto-injected.
 - A **response schema** the LLM output must validate against before being returned to the API layer.
 
@@ -497,7 +497,6 @@ Current use cases:
 |---------|------|---------------|---------------|
 | `TaskEntry` | Capable | habits + schedule + energy | `create_task` or `request_clarification` |
 | `PlaceTasks` | Capable | habits + schedule + energy | `place_tasks` |
-| `MealPlanning` | Capable | food + habits | `propose_meal_plan` |
 | `MealRebalance` | Capable | food + habits | `rebalance_meal_plan` |
 | `MealSuggestSlot` | Capable | food + habits | `suggest_slot_meal` |
 | `MealAdhocResolve` | Capable | food + habits | `resolve_meal_description` |

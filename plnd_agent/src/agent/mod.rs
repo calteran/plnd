@@ -1246,7 +1246,7 @@ mod tests {
 
         let mock = MockLlmProvider::new("test");
         let last_request = mock.last_request_handle();
-        // Must use TaskEntry (not MealPlanning) so we can assert category filtering:
+        // Must use TaskEntry (not MealSuggestSlot) so we can assert category filtering:
         // habits/schedule/energy in, food out. Provide a schema-conforming response
         // so the new TaskEntry schema validator does not reject the mock output.
         mock.push_response(CompletionResponse {
@@ -1284,11 +1284,11 @@ mod tests {
         );
     }
 
-    /// Meal planning run must receive food/habits memories but not schedule.
+    /// MealSuggestSlot run must receive food/habits memories but not schedule.
     ///
     /// Requires `DATABASE_URL` to be set (provided by `just verify`).
     #[tokio::test]
-    async fn test_meal_planning_injects_meal_memories_not_schedule() {
+    async fn test_meal_suggest_slot_injects_meal_memories_not_schedule() {
         let repos = match test_db().await {
             Some(repos) => repos,
             None => return,

@@ -5,7 +5,6 @@ use crate::provider::ProviderTier;
 // Prompts are embedded at compile time so changes are git-diffable and
 // bisectable like any other source change.
 const TASK_ENTRY_PROMPT: &str = include_str!("../prompts/task_entry.md");
-const MEAL_PLANNING_PROMPT: &str = include_str!("../prompts/meal_planning.md");
 const MEAL_REBALANCE_PROMPT: &str = include_str!("../prompts/meal_rebalance.md");
 const MEAL_SUGGEST_SLOT_PROMPT: &str = include_str!("../prompts/meal_suggest_slot.md");
 const MEAL_ADHOC_RESOLVE_PROMPT: &str = include_str!("../prompts/meal_adhoc_resolve.md");
@@ -72,7 +71,7 @@ static TASK_ENTRY_VALIDATOR: LazyLock<jsonschema::Validator> = LazyLock::new(|| 
 
 /// JSON Schema (Draft 7) for the `MealPlanResponse` type.
 ///
-/// Validates the full-week proposal returned by `propose_meal_plan`.
+/// Validates the full-week plan returned by `rebalance_meal_plan`.
 /// `estimated_nutrition` and `nutrition_summary` are optional — the agent
 /// may omit them when no nutrition data is available.
 const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
@@ -352,10 +351,6 @@ pub enum UseCase {
     /// Agent infers properties and calls `create_task`.
     TaskEntry,
 
-    /// User requested a weekly meal plan proposal.
-    /// Agent searches the catalog and calls `propose_meal_plan`.
-    MealPlanning,
-
     /// User pinned or unpinned a meal slot; agent rebalances remaining open slots.
     /// Agent calls `rebalance_meal_plan` as its terminal action.
     MealRebalance,
@@ -378,7 +373,6 @@ impl UseCase {
     pub fn system_prompt(&self) -> &'static str {
         match self {
             UseCase::TaskEntry => TASK_ENTRY_PROMPT,
-            UseCase::MealPlanning => MEAL_PLANNING_PROMPT,
             UseCase::MealRebalance => MEAL_REBALANCE_PROMPT,
             UseCase::MealSuggestSlot => MEAL_SUGGEST_SLOT_PROMPT,
             UseCase::MealAdhocResolve => MEAL_ADHOC_RESOLVE_PROMPT,
@@ -394,8 +388,7 @@ impl UseCase {
     pub fn memory_categories(&self) -> &'static [&'static str] {
         match self {
             UseCase::TaskEntry => &["habits", "schedule", "energy"],
-            UseCase::MealPlanning
-            | UseCase::MealRebalance
+            UseCase::MealRebalance
             | UseCase::MealSuggestSlot
             | UseCase::MealAdhocResolve
             | UseCase::ReviewMealPlan => &["food", "habits"],
@@ -411,7 +404,6 @@ impl UseCase {
     pub fn provider_tier(&self) -> ProviderTier {
         match self {
             UseCase::TaskEntry
-            | UseCase::MealPlanning
             | UseCase::MealRebalance
             | UseCase::MealSuggestSlot
             | UseCase::MealAdhocResolve
@@ -431,7 +423,7 @@ impl UseCase {
     pub fn response_validator(&self) -> Option<&'static jsonschema::Validator> {
         match self {
             UseCase::TaskEntry => Some(&TASK_ENTRY_VALIDATOR),
-            UseCase::MealPlanning | UseCase::MealRebalance => Some(&MEAL_PLAN_VALIDATOR),
+            UseCase::MealRebalance => Some(&MEAL_PLAN_VALIDATOR),
             UseCase::MealSuggestSlot => Some(&SUGGEST_SLOT_VALIDATOR),
             UseCase::MealAdhocResolve => Some(&RESOLVE_VALIDATOR),
             UseCase::PlaceTasks => Some(&PLACE_TASKS_VALIDATOR),
@@ -469,7 +461,6 @@ mod tests {
     fn system_prompts_are_non_empty() {
         for case in [
             UseCase::TaskEntry,
-            UseCase::MealPlanning,
             UseCase::MealRebalance,
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
@@ -487,7 +478,6 @@ mod tests {
     fn system_prompts_contain_security_guard() {
         for case in [
             UseCase::TaskEntry,
-            UseCase::MealPlanning,
             UseCase::MealRebalance,
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
@@ -516,21 +506,6 @@ mod tests {
         );
         assert!(cats.contains(&"energy"), "TaskEntry must include energy");
         assert!(!cats.contains(&"food"), "TaskEntry must not include food");
-    }
-
-    #[test]
-    fn meal_planning_categories_exclude_schedule() {
-        let cats = UseCase::MealPlanning.memory_categories();
-        assert!(cats.contains(&"food"), "MealPlanning must include food");
-        assert!(cats.contains(&"habits"), "MealPlanning must include habits");
-        assert!(
-            !cats.contains(&"schedule"),
-            "MealPlanning must not include schedule"
-        );
-        assert!(
-            !cats.contains(&"energy"),
-            "MealPlanning must not include energy"
-        );
     }
 
     #[test]
@@ -647,13 +622,8 @@ mod tests {
     }
 
     #[test]
-    fn meal_planning_has_response_validator() {
-        assert!(UseCase::MealPlanning.response_validator().is_some());
-    }
-
-    #[test]
-    fn meal_plan_validator_accepts_minimal_valid_plan() {
-        let validator = UseCase::MealPlanning.response_validator().unwrap();
+    fn meal_rebalance_validator_accepts_minimal_valid_plan() {
+        let validator = UseCase::MealRebalance.response_validator().unwrap();
         let ok = serde_json::json!({
             "plan_start": "2026-04-21",
             "meals": [
@@ -668,8 +638,8 @@ mod tests {
     }
 
     #[test]
-    fn meal_plan_validator_accepts_plan_with_nutrition() {
-        let validator = UseCase::MealPlanning.response_validator().unwrap();
+    fn meal_rebalance_validator_accepts_plan_with_nutrition() {
+        let validator = UseCase::MealRebalance.response_validator().unwrap();
         let ok = serde_json::json!({
             "plan_start": "2026-04-21",
             "meals": [
@@ -689,16 +659,16 @@ mod tests {
     }
 
     #[test]
-    fn meal_plan_validator_rejects_missing_plan_start() {
-        let validator = UseCase::MealPlanning.response_validator().unwrap();
+    fn meal_rebalance_validator_rejects_missing_plan_start() {
+        let validator = UseCase::MealRebalance.response_validator().unwrap();
         let bad = serde_json::json!({ "meals": [] });
         assert!(!validator.is_valid(&bad));
     }
 
     #[test]
-    fn meal_plan_validator_accepts_user_defined_meal_name() {
+    fn meal_rebalance_validator_accepts_user_defined_meal_name() {
         // meal_name is an open string — any name from the active day type's meals is valid
-        let validator = UseCase::MealPlanning.response_validator().unwrap();
+        let validator = UseCase::MealRebalance.response_validator().unwrap();
         let ok = serde_json::json!({
             "plan_start": "2026-04-21",
             "meals": [
@@ -716,8 +686,8 @@ mod tests {
     }
 
     #[test]
-    fn meal_plan_validator_rejects_extra_properties() {
-        let validator = UseCase::MealPlanning.response_validator().unwrap();
+    fn meal_rebalance_validator_rejects_extra_properties() {
+        let validator = UseCase::MealRebalance.response_validator().unwrap();
         let bad = serde_json::json!({
             "plan_start": "2026-04-21",
             "meals": [],
@@ -810,7 +780,6 @@ mod tests {
     fn all_use_cases_use_capable_tier() {
         for case in [
             UseCase::TaskEntry,
-            UseCase::MealPlanning,
             UseCase::MealRebalance,
             UseCase::MealSuggestSlot,
             UseCase::MealAdhocResolve,
