@@ -5,7 +5,7 @@ import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { formatDayName, formatDayDate, daysInRange } from '../../utils/date-format.utils';
-import { MealPlanResponse, MealSlot, PlannedMeal } from '../../../../core/models/week-plan';
+import { FailedSlot, MealPlanResponse, MealSlot, PlannedMeal } from '../../../../core/models/week-plan';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
 @Component({
@@ -23,6 +23,10 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
       @if (errorMessage()) {
         <div class="gen-error" role="alert">{{ errorMessage() }}</div>
+      }
+
+      @if (partialBannerMsg()) {
+        <div class="partial-banner" role="alert">{{ partialBannerMsg() }}</div>
       }
 
       <!-- Top toolbar: Refresh button + confirmation modal -->
@@ -74,7 +78,8 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
                  [class.approved-g]="isApproved(day, entry.name)"
                  [class.skipped-g]="isSkipped(day, entry.name)"
                  [class.gc-editing]="isCellEditing(day, entry.name)"
-                 [class.gc-loading]="isGenerating() && !getMeal(day, entry.name)">
+                 [class.gc-loading]="isGenerating() && !getMeal(day, entry.name)"
+                 [class.gc-failed]="isFailedSlot(day, entry.name)">
 
               @if (isGenerating() && !getMeal(day, entry.name)) {
                 <!-- Skeleton shimmer while auto-generating -->
@@ -147,6 +152,17 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
       border: 1px solid var(--color-destructive-border);
       border-radius: 8px;
       color: var(--color-destructive);
+      font-size: 13px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+
+    /* ── Partial-success banner ── */
+    .partial-banner {
+      background: var(--color-warning-light, #fffbeb);
+      border: 1px solid var(--color-warning-border, #fcd34d);
+      border-radius: 8px;
+      color: var(--color-warning, #92400e);
       font-size: 13px;
       padding: 10px 14px;
       margin-bottom: 10px;
@@ -254,6 +270,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .gc.gc-editing  { border-color: var(--color-accent-border); box-shadow: 0 0 0 2px var(--color-accent-light); }
     .gc.gc-loading  { overflow: hidden; }
     .gc.gc-na { background: var(--color-surface-base); opacity: 0.2; border-style: dashed; }
+    .gc.gc-failed { border-color: var(--color-warning-border, #fcd34d); background: var(--color-warning-light, #fffbeb); }
 
     /* ── Skeleton shimmer ── */
     .gc-skeleton {
@@ -398,6 +415,14 @@ export class PlanMealsStepComponent implements OnInit {
   private confirmingEdit   = false;
   readonly showRefreshModal = signal(false);
   readonly errorMessage     = signal<string | null>(null);
+  readonly failedSlots      = signal<FailedSlot[]>([]);
+  private  filledCount      = signal(0);
+  readonly partialBannerMsg = computed(() => {
+    const failed = this.failedSlots();
+    if (failed.length === 0) return null;
+    const total = this.filledCount() + failed.length;
+    return `Filled ${this.filledCount()} of ${total} slots. Tap a missing meal to retry.`;
+  });
 
   readonly unapprovedCount = computed(() => {
     const meals = this.weekPlanService.scheduledMeals();
@@ -428,10 +453,16 @@ export class PlanMealsStepComponent implements OnInit {
 
   private runAgentPlan(obs$: Observable<MealPlanResponse>): void {
     this.errorMessage.set(null);
+    this.failedSlots.set([]);
+    this.filledCount.set(0);
     this.weekPlanService.setGenerating(true);
     obs$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next:  resp => this.weekPlanService.applyAgentMeals(resp.meals),
-      error: ()   => {
+      next: resp => {
+        this.weekPlanService.applyAgentMeals(resp.meals);
+        this.filledCount.set(resp.meals.length);
+        this.failedSlots.set(resp.failed_slots ?? []);
+      },
+      error: () => {
         this.weekPlanService.setGenerating(false);
         this.errorMessage.set("Couldn't generate meal plan — please try again.");
       },
@@ -460,6 +491,10 @@ export class PlanMealsStepComponent implements OnInit {
   isCellEditing(date: string, slot: MealSlot): boolean {
     const e = this.editingCell();
     return e?.date === date && e?.slot === slot;
+  }
+
+  isFailedSlot(date: string, slot: MealSlot): boolean {
+    return this.failedSlots().some(f => f.date === date && f.meal_name === slot);
   }
 
   // ── Actions ───────────────────────────────────────────────
@@ -517,8 +552,11 @@ export class PlanMealsStepComponent implements OnInit {
       .suggestSlot(date, slot, avoid)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next:  entry => this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title ?? '', entry.estimated_nutrition, entry.estimated),
-        error: ()    => { /* leave cell unchanged; no user-visible feedback for now */ },
+        next: entry => {
+          this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title ?? '', entry.estimated_nutrition, entry.estimated);
+          this.failedSlots.update(slots => slots.filter(f => !(f.date === date && f.meal_name === slot)));
+        },
+        error: () => { /* leave cell unchanged; no user-visible feedback for now */ },
       });
   }
 
