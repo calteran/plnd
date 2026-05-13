@@ -118,6 +118,7 @@ pub async fn update_entry_status(
 #[derive(sqlx::FromRow)]
 struct InsertedRow {
     entry_id: Uuid,
+    task_type: Option<String>,
     title: Option<String>,
     date: NaiveDate,
     after_anchor: Option<String>,
@@ -220,7 +221,7 @@ pub async fn commit_plan(
                     unnest($3::text[]), unnest($4::date[]), unnest($5::timestamptz[]),
                     'planned', unnest($6::text[]),
                     unnest($7::int4[]), unnest($8::text[]), unnest($9::bool[])
-             RETURNING entry_id, title, date, after_anchor",
+             RETURNING entry_id, task_type, title, date, after_anchor",
         )
         .bind(user_id)
         .bind(&task_types)
@@ -346,11 +347,17 @@ async fn pair_and_insert_meal_entries(
     inserted: &[InsertedRow],
     staging: &[PlannedMealEntryStaging],
 ) -> Result<(), DatabaseError> {
-    // Index inserted meal-anchor rows by (date, meal_name). We use a HashMap of
-    // vectors so duplicate (date, meal_name) pairs are matched in order.
+    // Index inserted meal-anchor rows by (date, meal_name). Only rows with
+    // `task_type IS NULL` are meal anchors — floating tasks that share an
+    // `after_anchor` value (e.g. a "general" task that runs after breakfast)
+    // must NOT be eligible pairing targets or the meal entry would attach to
+    // the wrong schedule_entries row. We use a HashMap of vectors so duplicate
+    // (date, meal_name) pairs are matched in order.
     let mut anchor_index: HashMap<(NaiveDate, String), Vec<Uuid>> = HashMap::new();
     for row in inserted {
-        if let Some(name) = &row.after_anchor {
+        if row.task_type.is_none()
+            && let Some(name) = &row.after_anchor
+        {
             anchor_index
                 .entry((row.date, name.clone()))
                 .or_default()
@@ -989,6 +996,123 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(count, 1, "exactly one planned_meal_entries row");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_pairs_meal_entries_only_to_meal_anchors(pool: PgPool) {
+        // Regression: the pairing helper used to index every inserted row by
+        // (date, after_anchor), so a floating task whose after_anchor matched a
+        // meal anchor could collide and steal the pairing. Only rows with
+        // `task_type IS NULL` (true meal anchors) may participate.
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        // Meal anchor (task_type = None) for breakfast.
+        let meal_anchor = PlanEntryInput {
+            date: start,
+            task_type: None,
+            title: Some("Oatmeal".to_string()),
+            scheduled_start: None,
+            after_anchor: Some("breakfast".to_string()),
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+        };
+
+        // Floating task that ALSO uses after_anchor = "breakfast" on the same
+        // date — but its task_type is set, so it must NOT be a pairing target.
+        let colliding_task = PlanEntryInput {
+            date: start,
+            task_type: Some("general".to_string()),
+            title: Some("Take meds".to_string()),
+            scheduled_start: None,
+            after_anchor: Some("breakfast".to_string()),
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+        };
+
+        let meal_ref_id = Uuid::new_v4();
+        let staging = PlannedMealEntryStaging {
+            date: start,
+            meal_name: "breakfast".to_string(),
+            meal_ref_id,
+            meal_ref_type: "user_meal".to_string(),
+            title: Some("Oatmeal Bowl".to_string()),
+        };
+
+        // Order the floating task FIRST in the entries vec — if the pairing
+        // helper ignored task_type and used FIFO, it would pick this row and
+        // the assertion below would fail.
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![colliding_task, meal_anchor],
+            meal_entries: vec![staging],
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        // The planned_meal_entries row's schedule_entry_id must reference the
+        // meal anchor (task_type IS NULL), NOT the floating task.
+        let (schedule_entry_id, paired_task_type, paired_title): (
+            Uuid,
+            Option<String>,
+            Option<String>,
+        ) = sqlx::query_as(
+            "SELECT pme.schedule_entry_id, se.task_type, se.title
+             FROM planned_meal_entries pme
+             JOIN schedule_entries se ON se.entry_id = pme.schedule_entry_id
+             WHERE pme.user_id = $1",
+        )
+        .bind(uid)
+        .fetch_one(&pool)
+        .await
+        .expect("expected exactly one planned_meal_entries row");
+
+        assert!(
+            paired_task_type.is_none(),
+            "planned_meal_entries must be paired with a meal anchor (task_type IS NULL), \
+             got task_type={paired_task_type:?}"
+        );
+        assert_eq!(
+            paired_title.as_deref(),
+            Some("Oatmeal"),
+            "paired schedule_entries row should be the meal anchor titled 'Oatmeal', \
+             not the floating task"
+        );
+
+        // Sanity: both schedule_entries rows were actually inserted.
+        let total: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM schedule_entries WHERE user_id = $1")
+                .bind(uid)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            total, 2,
+            "both the meal anchor and floating task must exist"
+        );
+
+        // The floating task must NOT be referenced by any planned_meal_entries row.
+        let floating_id: Uuid = sqlx::query_scalar(
+            "SELECT entry_id FROM schedule_entries
+             WHERE user_id = $1 AND task_type = 'general'",
+        )
+        .bind(uid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_ne!(
+            schedule_entry_id, floating_id,
+            "planned_meal_entries must not reference the floating task row"
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
