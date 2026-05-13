@@ -135,7 +135,7 @@ jobs:
             -e INTERACTIVE_LOGIN=true \
             -e JSON_CONFIG=true \
             -v ${{ github.workspace }}/config/mock-oauth:/config \
-            ghcr.io/navikt/mock-oauth2-server:3.0.1
+            ghcr.io/navikt/mock-oauth2-server:3.0.3
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
