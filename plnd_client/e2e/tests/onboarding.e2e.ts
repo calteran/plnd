@@ -9,7 +9,6 @@ import {
   MOCK_TEMPLATE_MORNING_WALK, MOCK_PLACED_TASKS, MOCK_MEAL_PLAN,
   MOCK_DIETARY_RESTRICTION_ALLERGY,
   MOCK_PLAN_COMMITTED,
-  MOCK_MEAL_PATTERN,
   seedOnboarding,
 } from '../helpers/onboarding-mocks';
 
@@ -259,9 +258,6 @@ test.describe('Onboarding', () => {
     await page.route(`${API_BASE}/dietary-restrictions`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
     );
-    await page.route(`${API_BASE}/meal-pattern**`, route =>
-      route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
-    );
 
     await injectAuthToken(page);
     await page.goto('/onboarding');
@@ -306,9 +302,6 @@ test.describe('Onboarding', () => {
     );
     await page.route(`${API_BASE}/dietary-restrictions`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-    );
-    await page.route(`${API_BASE}/meal-pattern**`, route =>
-      route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
     );
 
     await injectAuthToken(page);
@@ -535,7 +528,7 @@ test.describe('Onboarding', () => {
     });
 
     test('email is shown as static text from user data', async ({ page }) => {
-      await expect(page.locator('.email-display')).toHaveText('testuser@mock.plnd');
+      await expect(page.locator('.email-display')).toHaveText(MOCK_USER_NEW.email);
     });
 
     test('SMS input is hidden until SMS toggle is switched on', async ({ page }) => {

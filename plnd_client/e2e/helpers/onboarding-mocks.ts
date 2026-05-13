@@ -1,14 +1,5 @@
 import { Page } from '@playwright/test';
-import { API_BASE, MOCK_USER_NEW, MOCK_PREFS, injectAuthToken } from './auth';
-
-// Default meal pattern entries surfaced during onboarding (Food spoke, Meal Times substep).
-// Also prevents the 401 → authErrorInterceptor → logout cascade for tests that
-// use a synthetic token against the real API server.
-export const MOCK_MEAL_PATTERN = [
-  { id: 'mp1', user_id: 'test', name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp2', user_id: 'test', name: 'Lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, created_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp3', user_id: 'test', name: 'Dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, created_at: '2026-01-01T00:00:00Z' },
-];
+import { API_BASE, injectAuthToken, seedTestState, SEED_ONBOARDING_SUB } from './auth';
 
 // ── Day Types ─────────────────────────────────────────────────────────────────
 
@@ -116,28 +107,16 @@ export const MOCK_PLAN_COMMITTED = {
 };
 
 // ── seedOnboarding ────────────────────────────────────────────────────────────
-// Sets up a new (non-onboarded) user session with fixed clock 2026-03-28.
-// Handles both GET and PATCH for preferences/me (component only needs 200 + valid body).
-// Override individual routes after calling this (LIFO: last handler wins).
+// Sets up a non-onboarded user session with fixed clock 2026-03-28.
+// The user's /users/me, /preferences/me, and /dietary-restrictions responses
+// are now served by the real backend (auto-created during /auth/token exchange,
+// reconciled by /test/seed). Override individual routes after calling this for
+// test-specific data shaping.
 
 export async function seedOnboarding(page: Page): Promise<void> {
   await page.clock.setFixedTime('2026-03-28T00:00:00');
-  await injectAuthToken(page);
-  await page.route(`${API_BASE}/users/me`, route =>
-    route.fulfill({ status: 200, json: MOCK_USER_NEW })
-  );
-  await page.route(`${API_BASE}/dietary-restrictions`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-  // Handles both GET and PATCH (component only needs a 200 + valid body)
-  await page.route(`${API_BASE}/preferences/me`, route =>
-    route.fulfill({ status: 200, json: MOCK_PREFS })
-  );
-  // Prevents 401 → authErrorInterceptor → logout cascade; also supplies
-  // default B/L/D entries for the Meal Times substep rendering.
-  await page.route(`${API_BASE}/meal-pattern**`, route =>
-    route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
-  );
+  await injectAuthToken(page, SEED_ONBOARDING_SUB);
+  await seedTestState(SEED_ONBOARDING_SUB, { preset: 'new' });
   await mockUserCatalogEmpty(page);
 }
 

@@ -173,6 +173,26 @@ pub async fn complete_onboarding(pool: &PgPool, user_id: Uuid) -> Result<bool, D
     .map_err(DatabaseError::from)
 }
 
+/// Set the onboarding_completed flag to an explicit value.
+/// Idempotent — returns true only if the row was actually changed.
+#[tracing::instrument(skip(pool), fields(table = "users", op = "set_onboarding_completed"))]
+pub async fn set_onboarding_completed(
+    pool: &PgPool,
+    user_id: Uuid,
+    completed: bool,
+) -> Result<bool, DatabaseError> {
+    sqlx::query(
+        "UPDATE users SET onboarding_completed = $2, updated_at = NOW()
+         WHERE user_id = $1 AND onboarding_completed <> $2",
+    )
+    .bind(user_id)
+    .bind(completed)
+    .execute(pool)
+    .await
+    .map(|r| r.rows_affected() > 0)
+    .map_err(DatabaseError::from)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

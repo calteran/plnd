@@ -28,6 +28,8 @@ use plnd_api::auth::{JwksCache, JwtService, SessionService};
 use plnd_api::briefing::BriefingState;
 use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
+#[cfg(debug_assertions)]
+use plnd_api::routes::test_seed;
 use plnd_api::routes::{
     agent, auth, briefing, catalog_details, catalog_ingest, day_types, dietary_restrictions,
     meal_pattern, meal_suggestions, preferences, routine, schedule, search, system, tasks,
@@ -393,11 +395,18 @@ async fn main() {
             "/agent/meal-plan/resolve",
             post(agent::post_meal_plan_resolve),
         )
-        .route("/agent/place-tasks", post(agent::post_place_tasks))
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth_middleware,
-        ));
+        .route("/agent/place-tasks", post(agent::post_place_tasks));
+
+    // Dev-only test seeding endpoint. The route is physically absent from
+    // release builds; e2e tests use it to put the calling user into a
+    // deterministic state without page.route() mocks. See routes/test_seed.rs.
+    #[cfg(debug_assertions)]
+    let protected = protected.route("/test/seed", post(test_seed::post_seed));
+
+    let protected = protected.layer(middleware::from_fn_with_state(
+        state.clone(),
+        auth_middleware,
+    ));
 
     let public = Router::new()
         .route("/health", get(system::health_check))
