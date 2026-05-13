@@ -8,6 +8,7 @@ import {
   PostSchedulePlanRequest, PostSchedulePlanResponse,
   PlanStatusResponse, ScheduleEntryDto, SchedulePeriodResponse,
 } from '../models/week-plan';
+import type { MealEntryRequest } from '../models/planned-meal-entry';
 import { TaskType } from '../models/routine';
 import { DayTypesMealsService } from './day-types-meals.service';
 import { preferredTimeHHMM } from '../models/meal-pattern';
@@ -122,14 +123,18 @@ export class WeekPlanService {
         ) {
           const tasks: PlannedTask[] = [];
           const meals: Record<string, Partial<Record<MealSlot, PlannedMeal>>> = {};
+          const plannedByScheduleEntryId = new Map(
+            resp.planned_meals.map(pm => [pm.schedule_entry_id, pm] as const),
+          );
           for (const entry of resp.entries) {
             if (entry.task_type == null && entry.after_anchor) {
               const slot = entry.after_anchor as MealSlot;
               meals[entry.date] ??= {};
+              const planned = plannedByScheduleEntryId.get(entry.entry_id);
               meals[entry.date][slot] = {
                 approvalState: 'approved',
-                mealRef: entry.task_ref_id
-                  ? { type: (entry.task_ref_type ?? 'user') as 'catalog' | 'user', id: entry.task_ref_id }
+                mealRef: planned
+                  ? { type: planned.meal_ref_type === 'catalog_meal' ? 'catalog' : 'user', id: planned.meal_ref_id }
                   : null,
                 title: entry.title ?? slot,
               };
@@ -139,8 +144,6 @@ export class WeekPlanService {
                 title: entry.title ?? entry.task_type ?? '',
                 energy: 'medium',
                 task_type: entry.task_type ?? undefined,
-                task_ref_id: entry.task_ref_id,
-                task_ref_type: entry.task_ref_type,
                 scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
               });
             }
@@ -384,6 +387,7 @@ export class WeekPlanService {
     const meals   = this.scheduledMealsSignal();
     const tasks   = this.scheduledTasksSignal();
     const entries: PlanEntryRequest[] = [];
+    const mealEntries: MealEntryRequest[] = [];
 
     // Precondition: dayTypesMealsService.loaded() must be true before calling this method.
     for (const date of this.horizonDays()) {
@@ -393,12 +397,19 @@ export class WeekPlanService {
         if (meal?.approvalState === 'skipped') continue;
         entries.push({
           date,
-          task_ref_id: meal?.mealRef?.id,
-          task_ref_type: meal?.mealRef?.type,
           title: meal?.mealRef ? undefined : (meal?.title ?? `(${slot})`),
           scheduled_start: preferredTimeHHMM(patternEntry.preferred_time),
           after_anchor: slot,
         });
+        if (meal?.mealRef) {
+          mealEntries.push({
+            date,
+            meal_name: slot,
+            meal_ref_id: meal.mealRef.id,
+            meal_ref_type: meal.mealRef.type === 'catalog' ? 'catalog_meal' : 'user_meal',
+            title: meal.title,
+          });
+        }
       }
     }
 
@@ -407,8 +418,6 @@ export class WeekPlanService {
       entries.push({
         date: task.date,
         task_type: type as TaskType,
-        task_ref_id: task.task_ref_id,
-        task_ref_type: task.task_ref_type,
         title: task.title,
         scheduled_start: task.scheduled_start ?? '09:00',
       });
@@ -419,6 +428,7 @@ export class WeekPlanService {
       plan_end: this.planEndSignal(),
       planning_task_id: taskId,
       entries,
+      meal_entries: mealEntries,
       replace: replace || undefined,
       carryover_decisions: this.carryoverDecisionsSignal(),
       carryover_drop_reasons: this.dropReasonsSignal(),

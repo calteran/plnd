@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
-import { MealRef, PostSchedulePlanRequest } from '../models/week-plan';
+import { MealRef, PostSchedulePlanRequest, SchedulePeriodResponse } from '../models/week-plan';
 import { DayTypesMealsService } from './day-types-meals.service';
 
 describe('WeekPlanService', () => {
@@ -229,6 +229,83 @@ describe('WeekPlanService', () => {
     });
   });
 
+  describe('loadPeriod', () => {
+    it('hydrates scheduledMeals.mealRef from planned_meals keyed by schedule_entry_id', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      const resp: SchedulePeriodResponse = {
+        entries: [
+          {
+            entry_id: 'anchor-breakfast',
+            task_type: null,
+            title: 'Eggs',
+            date: '2026-03-24',
+            scheduled_start: '2026-03-24T08:00:00Z',
+            status: 'scheduled',
+            after_anchor: 'breakfast',
+          },
+          {
+            entry_id: 'anchor-lunch',
+            task_type: null,
+            title: 'Salad',
+            date: '2026-03-24',
+            scheduled_start: '2026-03-24T12:00:00Z',
+            status: 'scheduled',
+            after_anchor: 'lunch',
+          },
+        ],
+        carryover: [],
+        planned_meals: [
+          {
+            meal_entry_id: 'pme-1',
+            schedule_entry_id: 'anchor-breakfast',
+            meal_ref_id: 'u1',
+            meal_ref_type: 'user_meal',
+            title: 'Eggs',
+          },
+          {
+            meal_entry_id: 'pme-2',
+            schedule_entry_id: 'anchor-lunch',
+            meal_ref_id: 'c1',
+            meal_ref_type: 'catalog_meal',
+            title: 'Salad',
+          },
+        ],
+      };
+      service.loadPeriod('2026-03-24', '2026-03-24').subscribe();
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/period') && r.method === 'GET');
+      req.flush(resp);
+
+      const breakfast = service.scheduledMeals()['2026-03-24']?.['breakfast'];
+      expect(breakfast?.mealRef).toEqual({ type: 'user', id: 'u1' });
+      const lunch = service.scheduledMeals()['2026-03-24']?.['lunch'];
+      expect(lunch?.mealRef).toEqual({ type: 'catalog', id: 'c1' });
+    });
+
+    it('sets mealRef to null when no planned_meals entry matches the anchor', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      const resp: SchedulePeriodResponse = {
+        entries: [
+          {
+            entry_id: 'anchor-breakfast',
+            task_type: null,
+            title: 'Pending',
+            date: '2026-03-24',
+            scheduled_start: '2026-03-24T08:00:00Z',
+            status: 'scheduled',
+            after_anchor: 'breakfast',
+          },
+        ],
+        carryover: [],
+        planned_meals: [],
+      };
+      service.loadPeriod('2026-03-24', '2026-03-24').subscribe();
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/period') && r.method === 'GET');
+      req.flush(resp);
+
+      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.mealRef).toBeNull();
+    });
+  });
+
   describe('commitPlan / buildCommitRequest', () => {
     it('commitPlan posts directly to /schedule/plan without waiting for suggestions', () => {
       service.initSession('2026-03-24', '2026-03-24');
@@ -317,18 +394,44 @@ describe('WeekPlanService', () => {
       req.flush({ committed: 2, planning_task_status: 'completed' });
     });
 
-    it('buildCommitRequest uses task_ref_id and type for approved meals with a mealRef', () => {
+    it('buildCommitRequest emits meal_entries for approved meals with a mealRef', () => {
       service.initSession('2026-03-24', '2026-03-24');
       service.setMealRef('2026-03-24', 'lunch', { type: 'user', id: 'u1' }, 'Greek yogurt');
       service.commitPlan('task-1').subscribe();
 
       const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       const body = req.request.body as PostSchedulePlanRequest;
-      const lunch = body.entries.find(e => e.after_anchor === 'lunch');
-      expect(lunch).toBeTruthy();
-      expect(lunch!.task_ref_id).toBe('u1');
-      expect(lunch!.task_ref_type).toBe('user');
-      expect(lunch!.title).toBeUndefined();
+      const lunchAnchor = body.entries.find(e => e.after_anchor === 'lunch');
+      expect(lunchAnchor).toBeTruthy();
+      expect(lunchAnchor!.title).toBeUndefined();
+      const lunchMeal = body.meal_entries.find(m => m.meal_name === 'lunch' && m.date === '2026-03-24');
+      expect(lunchMeal).toBeTruthy();
+      expect(lunchMeal!.meal_ref_id).toBe('u1');
+      expect(lunchMeal!.meal_ref_type).toBe('user_meal');
+      expect(lunchMeal!.title).toBe('Greek yogurt');
+      req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest maps catalog mealRef to catalog_meal in meal_entries', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.setMealRef('2026-03-24', 'breakfast', { type: 'catalog', id: 'c1' }, 'Oatmeal bowl');
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      const breakfastMeal = body.meal_entries.find(m => m.meal_name === 'breakfast');
+      expect(breakfastMeal!.meal_ref_id).toBe('c1');
+      expect(breakfastMeal!.meal_ref_type).toBe('catalog_meal');
+      req.flush({ committed: 3, planning_task_status: 'completed' });
+    });
+
+    it('buildCommitRequest omits meal_entries for slots with no mealRef', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      service.commitPlan('task-1').subscribe();
+
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
+      const body = req.request.body as PostSchedulePlanRequest;
+      expect(body.meal_entries).toEqual([]);
       req.flush({ committed: 3, planning_task_status: 'completed' });
     });
 

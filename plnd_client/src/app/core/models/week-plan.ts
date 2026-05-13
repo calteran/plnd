@@ -1,6 +1,6 @@
 import type { MealEntryRequest, PlannedMealEntryDto } from './planned-meal-entry';
 
-export type { MealEntryRequest, PlannedMealEntryDto, MealRefType } from './planned-meal-entry';
+export type { MealRefType } from './planned-meal-entry';
 
 export type CarryoverDecision = 'carry' | 'defer' | 'drop';
 
