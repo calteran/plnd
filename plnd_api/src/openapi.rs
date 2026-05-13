@@ -3,11 +3,11 @@ use utoipa::{Modify, OpenApi};
 
 use crate::api_response::{
     CarryoverApiResponse, CatalogDishIngredientResponse, CatalogIngredientResponse,
-    CatalogMealDishResponse, DayTypeResponse, DietaryRestrictionResponse, DishDetailApiResponse,
-    MealDetailApiResponse, MealPatternEntryResponse, MealSuggestionResponse, PlanStatusApiResponse,
-    PostSchedulePlanApiResponse, RoutineResponse, ScheduleEntryResponse, SchedulePeriodApiResponse,
-    TaskResponse, UserDishPrefDetailResponse, UserIngredientPrefResponse,
-    UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
+    CatalogMealDishResponse, CommittedEntryRef, DayTypeResponse, DietaryRestrictionResponse,
+    DishDetailApiResponse, MealDetailApiResponse, MealPatternEntryResponse, MealSuggestionResponse,
+    PlanStatusApiResponse, PostSchedulePlanApiResponse, RoutineResponse, ScheduleEntryResponse,
+    SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
+    UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealPatternEntryRequest, FailedSlot,
