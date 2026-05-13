@@ -7,7 +7,9 @@ use crate::models::{
     CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryStatusRequest,
     PlanEntryRequest, PostSchedulePlanRequest,
 };
-use crate::routes::domain_constants::{VALID_ENERGY_LEVELS, VALID_TASK_TYPES};
+use crate::routes::domain_constants::{
+    VALID_ENERGY_LEVELS, VALID_MEAL_REF_TYPES, VALID_TASK_TYPES,
+};
 use crate::state::AppState;
 use axum::{
     Json,
@@ -68,9 +70,6 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
 // ---------------------------------------------------------------------------
 // Meal-entry mapping helper — used to stage `meal_entries` for commit_plan.
 // ---------------------------------------------------------------------------
-
-const VALID_MEAL_REF_TYPES: &[&str] =
-    &["user_meal", "catalog_meal", "user_dish", "catalog_dish"];
 
 fn map_meal_entry(e: MealEntryRequest) -> Result<PlannedMealEntryStaging, StatusCode> {
     if !VALID_MEAL_REF_TYPES.contains(&e.meal_ref_type.as_str()) {
