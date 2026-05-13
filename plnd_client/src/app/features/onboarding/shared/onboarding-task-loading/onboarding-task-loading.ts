@@ -195,7 +195,10 @@ export const MAX_PERSONALISED_NAMES = 5;
       .plan-icon,
       .bubble.entering,
       .typing-bubble,
-      .dot { animation: none !important; }
+      .dot {
+        animation: none !important;
+        transition: none !important;
+      }
     }
   `],
 })
