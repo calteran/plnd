@@ -33,6 +33,13 @@ test.describe('Profile', () => {
 
   test('read-only section displays email address, member since, and last login', async ({ page }) => {
     await seedAuth(page);
+    // last_login: null verifies the "Never" rendering path. The real backend
+    // sets last_login on every token exchange, so this test mocks /users/me
+    // locally to keep the null-rendering assertion meaningful. Replaced by
+    // per-test DB isolation in chunk 4 (#775).
+    await page.route(`${API_BASE}/users/me`, route =>
+      route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
+    );
     const profile = await goToProfile(page);
 
     await expect(profile.getEmailRow()).toHaveText(MOCK_USER_ONBOARDED.email);

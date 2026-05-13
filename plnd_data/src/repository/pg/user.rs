@@ -41,6 +41,16 @@ impl UserRepository for PgUserRepository {
             .map_err(Into::into)
     }
 
+    async fn set_onboarding_completed(
+        &self,
+        user_id: Uuid,
+        completed: bool,
+    ) -> Result<bool, crate::Error> {
+        users::set_onboarding_completed(&self.pool, user_id, completed)
+            .await
+            .map_err(Into::into)
+    }
+
     async fn deactivate_user(&self, user_id: Uuid) -> Result<bool, crate::Error> {
         users::deactivate_user(&self.pool, user_id)
             .await

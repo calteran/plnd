@@ -4,8 +4,15 @@ export const API_BASE = 'http://localhost:3000';
 
 const MOCK_OAUTH_TOKEN_URL = 'http://localhost:8080/plnd-dev/token';
 const BACKEND_TOKEN_EXCHANGE_URL = `${API_BASE}/auth/token`;
+const BACKEND_TEST_SEED_URL = `${API_BASE}/test/seed`;
 const MOCK_OAUTH_CLIENT_SECRET = 'mock-secret';
 const DEFAULT_TEST_SUB = 'e2e-test-uuid';
+// Helper-specific subs so seedAuth (onboarded) and seedOnboarding (new) operate
+// on different DB rows. Avoids one helper's seed clobbering another's when
+// tests run in parallel workers against a shared DB. Replaced by per-test DB
+// isolation in chunk 4 (#775).
+export const SEED_AUTH_SUB = 'e2e-onboarded-user';
+export const SEED_ONBOARDING_SUB = 'e2e-onboarding-user';
 
 // Cache is per-worker (per Node module instance) and keyed by `sub`. Safe under
 // chunk-1 invariants because no test currently invalidates its own session
@@ -70,9 +77,14 @@ export async function mintTestToken(sub: string = DEFAULT_TEST_SUB): Promise<str
   return exchangeJson.access_token;
 }
 
+// These mirror what the real backend produces for the seeded subs, used as
+// reference values in test assertions (e.g. profile.e2e.ts checks email +
+// display_name). Backend-generated fields (user_id, timestamps, last_login)
+// are placeholders here; tests should not assert on them directly. Replaced
+// entirely by per-test DB isolation in chunk 4 (#775).
 export const MOCK_USER_NEW = {
   user_id: 'e2e-test-uuid',
-  email: 'testuser@mock.plnd',
+  email: `${SEED_ONBOARDING_SUB}@mock.plnd`,
   display_name: null,
   avatar_url: null,
   created_at: '2026-01-01T00:00:00Z',
@@ -84,7 +96,7 @@ export const MOCK_USER_NEW = {
 
 export const MOCK_USER_ONBOARDED = {
   user_id: 'e2e-test-uuid',
-  email: 'testuser@mock.plnd',
+  email: `${SEED_AUTH_SUB}@mock.plnd`,
   display_name: 'Test User',
   avatar_url: null,
   created_at: '2026-01-01T00:00:00Z',
@@ -140,14 +152,36 @@ export async function injectAuthToken(page: Page, sub: string = DEFAULT_TEST_SUB
   }, token);
 }
 
+// Calls the dev-only POST /test/seed endpoint to reconcile the calling user's
+// DB state to a target shape. The endpoint is `#[cfg(debug_assertions)]`-gated
+// in plnd_api, so it's physically absent from release builds. See plnd_api/
+// src/routes/test_seed.rs for the supported body shape.
+export interface TestSeedBody {
+  preset?: 'onboarded' | 'new';
+  user?: { onboarding_completed?: boolean; display_name?: string };
+  default_day_type?: boolean;
+}
+
+export async function seedTestState(sub: string, body: TestSeedBody): Promise<void> {
+  const token = await mintTestToken(sub);
+  const res = await fetch(BACKEND_TEST_SEED_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '<no body>');
+    throw new Error(
+      `seedTestState: plnd_api returned ${res.status} from ${BACKEND_TEST_SEED_URL}. ` +
+        `Is plnd_api running in a dev/debug profile? The /test/seed route is gated by ` +
+        `cfg(debug_assertions) and is absent from release builds. Body: ${text.slice(0, 200)}`,
+    );
+  }
+}
+
 export async function seedAuth(page: Page) {
-  await injectAuthToken(page);
-  await page.route(`${API_BASE}/users/me`, route =>
-    route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
-  );
-  await page.route(`${API_BASE}/preferences/me`, route =>
-    route.fulfill({ status: 200, json: MOCK_PREFS })
-  );
+  await injectAuthToken(page, SEED_AUTH_SUB);
+  await seedTestState(SEED_AUTH_SUB, { preset: 'onboarded' });
   await page.route(`${API_BASE}/schedule/plan/status**`, route =>
     route.fulfill({ status: 200, json: { planned: false } })
   );
