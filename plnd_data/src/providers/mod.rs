@@ -6,6 +6,8 @@ pub mod news;
 #[cfg(debug_assertions)]
 pub mod news_fixture;
 pub mod nutrition;
+#[cfg(debug_assertions)]
+pub mod nutrition_fixture;
 pub mod open_food_facts;
 pub mod recipe;
 pub mod themealdb;
@@ -23,6 +25,8 @@ pub use news::{NewsHeadline, NewsProvider, NewsQuery, RssFeedProvider};
 #[cfg(debug_assertions)]
 pub use news_fixture::FixtureNewsProvider;
 pub use nutrition::NutritionProvider;
+#[cfg(debug_assertions)]
+pub use nutrition_fixture::FixtureNutritionProvider;
 pub use open_food_facts::OpenFoodFactsProvider;
 pub use recipe::RecipeProvider;
 pub use themealdb::TheMealDbProvider;

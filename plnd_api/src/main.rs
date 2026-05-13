@@ -38,7 +38,7 @@ use plnd_api::routes::{
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
 #[cfg(debug_assertions)]
-use plnd_data::providers::{FixtureNewsProvider, FixtureWeatherProvider};
+use plnd_data::providers::{FixtureNewsProvider, FixtureNutritionProvider, FixtureWeatherProvider};
 use plnd_data::providers::{
     NewsProvider, OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider,
     UsdaFdcProvider, WeatherProvider,
@@ -143,9 +143,9 @@ async fn main() {
         .expect("invalid CORS origin in auth.frontend_origin");
 
     // Construct external providers
-    let nutrition_usda = Arc::new(UsdaFdcProvider::new(
-        &config.external_providers.usda_fdc_api_key,
-    ));
+    let nutrition_usda: Arc<dyn plnd_data::providers::NutritionProvider> = Arc::new(
+        UsdaFdcProvider::new(&config.external_providers.usda_fdc_api_key),
+    );
     let off_basic_auth = if config.external_providers.off_basic_auth_user.is_empty() {
         None
     } else {
@@ -154,10 +154,9 @@ async fn main() {
             config.external_providers.off_basic_auth_password.clone(),
         ))
     };
-    let nutrition_off = Arc::new(OpenFoodFactsProvider::new(
-        &config.external_providers.off_base_url,
-        off_basic_auth,
-    ));
+    let nutrition_off: Arc<dyn plnd_data::providers::NutritionProvider> = Arc::new(
+        OpenFoodFactsProvider::new(&config.external_providers.off_base_url, off_basic_auth),
+    );
     let recipe_mdb = Arc::new(TheMealDbProvider::new(
         &config.external_providers.themealdb_api_key,
     ));
@@ -176,6 +175,9 @@ async fn main() {
     // The seed is idempotent — safe to run on every startup.
     {
         let seed_url = config.database.url.clone();
+        // The seed always uses live providers — fixture_path only affects the search
+        // fan-out. The seed is idempotent and fails gracefully, so a missing API key
+        // or network error produces a non-fatal warning, not a startup failure.
         let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::providers::NutritionProvider>> =
             vec![nutrition_usda.clone(), nutrition_off.clone()];
         let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::providers::RecipeProvider>> =
@@ -188,12 +190,13 @@ async fn main() {
     }
 
     let search_cache = SearchCache::new(config.external_providers.search_cache_ttl_hours);
-    let provider_search = ProviderSearchService::new(
-        vec![nutrition_usda, nutrition_off],
-        vec![recipe_mdb],
-        vec![],
-        search_cache,
+    let search_nutrition = build_nutrition_providers(
+        &config.external_providers,
+        nutrition_usda.clone(),
+        nutrition_off.clone(),
     );
+    let provider_search =
+        ProviderSearchService::new(search_nutrition, vec![recipe_mdb], vec![], search_cache);
 
     let (weather_provider, news_provider) = build_briefing_providers(&config.external_providers);
     let briefing = BriefingState::new(weather_provider, news_provider);
@@ -490,4 +493,42 @@ fn build_briefing_providers(
         Arc::new(OpenMeteoProvider::new()),
         Arc::new(RssFeedProvider::new(&external.news_feed_urls)),
     )
+}
+
+/// Constructs the nutrition providers for the search service.
+///
+/// In debug builds, if `external.fixture_path` is set, returns file-backed
+/// implementations that replay captured search results from disk — used by
+/// e2e to keep tests deterministic and offline. Otherwise (and always in
+/// release builds) returns the real USDA FDC + Open Food Facts providers.
+///
+/// The live providers are passed in rather than constructed here because they
+/// are also used by the catalog seed task running concurrently.
+fn build_nutrition_providers(
+    external: &plnd_api::config::settings::ExternalProvidersConfig,
+    usda: Arc<dyn plnd_data::providers::NutritionProvider>,
+    off: Arc<dyn plnd_data::providers::NutritionProvider>,
+) -> Vec<Arc<dyn plnd_data::providers::NutritionProvider>> {
+    #[cfg(debug_assertions)]
+    if let Some(fixture_root) = &external.fixture_path {
+        tracing::warn!(
+            path = %fixture_root.display(),
+            "USING FIXTURE NUTRITION PROVIDERS for /search/ingredients — debug builds only; never enable in prod"
+        );
+        let make = |source: &str, rel: &str| {
+            let path = fixture_root.join(rel);
+            FixtureNutritionProvider::new(source.to_string(), path).unwrap_or_else(|e| {
+                tracing::error!(error = %e, "failed to load nutrition fixture");
+                std::process::exit(1);
+            })
+        };
+        return vec![
+            Arc::new(make("usda_fdc", "nutrition/usda_fdc/search.json")),
+            Arc::new(make(
+                "openfoodfacts",
+                "nutrition/open_food_facts/search.json",
+            )),
+        ];
+    }
+    vec![usda, off]
 }
