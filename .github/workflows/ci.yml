@@ -10,6 +10,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# `CI=true` signals to scripts and test runners (e.g. plnd_client/e2e/global-setup.ts)
+# that they should skip local infra management since the workflow has its own
+# setup steps. GitHub Actions sets `CI=true` by default; declaring it here makes
+# the dependency explicit and survives alternative runners (act, self-hosted
+# without the standard env).
+env:
+  CI: true
+
 jobs:
   # ── Job 1: Rust lint + build + unit tests ───────────────────────────────────
   backend:
@@ -131,9 +139,7 @@ jobs:
           docker run -d \
             --name mock-oauth-server \
             -p 8080:8080 \
-            -e ISSUER_ID=plnd-dev \
-            -e INTERACTIVE_LOGIN=true \
-            -e JSON_CONFIG=true \
+            -e JSON_CONFIG_PATH=/config/config.json \
             -v ${{ github.workspace }}/config/mock-oauth:/config \
             ghcr.io/navikt/mock-oauth2-server:3.0.3
 
@@ -184,7 +190,8 @@ jobs:
         run: |
           cd plnd_api
           APP_DATABASE__URL=postgres://plnd:plnd_dev@localhost/plnd_dev \
-          APP_AUTH__MOCK_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev \
+          APP_AUTH__OIDC_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev \
+          APP_AUTH__FRONTEND_ORIGIN=http://localhost:4200 \
           ../target/debug/plnd_api &
           timeout 30s bash -c 'until curl -sf http://localhost:3000/health; do sleep 1; done'
 

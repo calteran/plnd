@@ -1,5 +1,5 @@
 import { Page } from '@playwright/test';
-import { API_BASE, MOCK_USER_NEW, MOCK_PREFS } from './auth';
+import { API_BASE, MOCK_USER_NEW, MOCK_PREFS, injectAuthToken } from './auth';
 
 // Default meal pattern entries surfaced during onboarding (Food spoke, Meal Times substep).
 // Also prevents the 401 → authErrorInterceptor → logout cascade for tests that
@@ -122,9 +122,7 @@ export const MOCK_PLAN_COMMITTED = {
 
 export async function seedOnboarding(page: Page): Promise<void> {
   await page.clock.setFixedTime('2026-03-28T00:00:00');
-  await page.addInitScript(() => {
-    localStorage.setItem('auth_token', 'synthetic.test.token');
-  });
+  await injectAuthToken(page);
   await page.route(`${API_BASE}/users/me`, route =>
     route.fulfill({ status: 200, json: MOCK_USER_NEW })
   );

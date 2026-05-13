@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { seedAuth, API_BASE, MOCK_USER_NEW } from '../helpers/auth';
+import { seedAuth, injectAuthToken, API_BASE, MOCK_USER_NEW } from '../helpers/auth';
 import { mockUserCatalogEmpty } from '../helpers/onboarding-mocks';
 
 // Fixed date: 2026-03-28 (Saturday)
@@ -56,9 +56,7 @@ test.describe('Planning Wizard', () => {
     });
 
     test('authenticated non-onboarded user is redirected to /onboarding', async ({ page }) => {
-      await page.addInitScript(() => {
-        localStorage.setItem('auth_token', 'synthetic.test.token');
-      });
+      await injectAuthToken(page);
       await page.route(`${API_BASE}/users/me`, route =>
         route.fulfill({ status: 200, json: MOCK_USER_NEW })
       );

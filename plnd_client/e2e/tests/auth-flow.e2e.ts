@@ -1,21 +1,27 @@
 import { test, expect } from '@playwright/test';
 import { DayViewPage } from '../pages/day-view.page';
-import { API_BASE, MOCK_USER_ONBOARDED, seedAuth } from '../helpers/auth';
+import { API_BASE, MOCK_USER_ONBOARDED, mintTestToken, seedAuth } from '../helpers/auth';
 
-// Test 1 requires full Docker stack: docker compose up -d db api mock-oauth-server
-// Test 2 can run with only ng serve (uses addInitScript + route mocks).
+// Both tests require the full stack (db, mock-oauth-server, plnd_api) — e2e
+// tests now mint real backend JWTs via the OIDC → /auth/token exchange.
+// `just verify` and `just dev` bring this up; standalone playwright runs need
+// `just api` or `just dev` first.
 
 test.describe('OAuth login flow', () => {
   test('completes full OIDC login and lands on dashboard', async ({ page }) => {
-    // Mock the backend token exchange so the test does not require a running PLND API.
-    // The Angular OIDC library still talks to the real mock OAuth server (port 8080)
-    // to exchange the authorization code for an ID token — that is a real network call.
+    // Mock the backend token exchange so this test asserts only the OIDC code
+    // flow + redirect, without depending on a freshly-seeded user. The Angular
+    // OIDC library still talks to the real mock-oauth-server on :8080 to
+    // exchange the authorization code for an ID token — that is a real network
+    // call. `mintTestToken()` gives us a real backend JWT to return from the
+    // mocked /auth/token so subsequent requests carry a valid Bearer.
+    const backendToken = await mintTestToken();
     await page.route(`${API_BASE}/auth/token`, route =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          access_token: 'synthetic.backend.jwt',
+          access_token: backendToken,
           token_type: 'Bearer',
           expires_in: 86400
         })
