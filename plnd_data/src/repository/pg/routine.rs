@@ -35,8 +35,6 @@ impl RoutineRepository for PgRoutineRepository {
         duration_minutes: Option<i32>,
         energy_required: &str,
         is_anchor: bool,
-        task_ref_id: Option<Uuid>,
-        task_ref_type: Option<&str>,
     ) -> Result<Routine, crate::Error> {
         db::create(
             &self.pool,
@@ -50,8 +48,6 @@ impl RoutineRepository for PgRoutineRepository {
             duration_minutes,
             energy_required,
             is_anchor,
-            task_ref_id,
-            task_ref_type,
         )
         .await
         .map_err(Into::into)
@@ -75,8 +71,6 @@ impl RoutineRepository for PgRoutineRepository {
         duration_minutes: Option<i32>,
         energy_required: &str,
         is_anchor: bool,
-        task_ref_id: Option<Uuid>,
-        task_ref_type: Option<&str>,
     ) -> Result<Option<Routine>, crate::Error> {
         db::update(
             &self.pool,
@@ -90,8 +84,6 @@ impl RoutineRepository for PgRoutineRepository {
             duration_minutes,
             energy_required,
             is_anchor,
-            task_ref_id,
-            task_ref_type,
         )
         .await
         .map_err(Into::into)

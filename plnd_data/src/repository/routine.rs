@@ -21,8 +21,6 @@ pub trait RoutineRepository: Send + Sync {
         duration_minutes: Option<i32>,
         energy_required: &str,
         is_anchor: bool,
-        task_ref_id: Option<Uuid>,
-        task_ref_type: Option<&str>,
     ) -> Result<Routine, crate::Error>;
 
     async fn delete_routine(&self, user_id: Uuid, routine_id: Uuid) -> Result<bool, crate::Error>;
@@ -40,7 +38,5 @@ pub trait RoutineRepository: Send + Sync {
         duration_minutes: Option<i32>,
         energy_required: &str,
         is_anchor: bool,
-        task_ref_id: Option<Uuid>,
-        task_ref_type: Option<&str>,
     ) -> Result<Option<Routine>, crate::Error>;
 }

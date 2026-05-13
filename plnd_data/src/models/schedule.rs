@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
+use super::meal_plan::PlannedMealEntryStaging;
+
 // ---------------------------------------------------------------------------
 // Routines (recurring patterns)
 // ---------------------------------------------------------------------------
@@ -20,8 +22,6 @@ pub struct Routine {
     pub duration_minutes: Option<i32>,
     pub energy_required: String,
     pub is_anchor: bool,
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>, // 'user_meal' | 'user_dish' | 'user_exercise' | ...
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -36,8 +36,6 @@ pub struct ScheduleEntry {
     pub user_id: Uuid,
     pub routine_id: Option<Uuid>,  // null for ad-hoc entries
     pub task_type: Option<String>, // None = meal anchor; Some(...) = task entry
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
     pub title: Option<String>,
     pub date: NaiveDate,
     pub scheduled_start: Option<DateTime<Utc>>,
@@ -76,6 +74,13 @@ pub struct CommitPlanInput {
     pub plan_end: NaiveDate,
     pub planning_task_id: Uuid,
     pub entries: Vec<PlanEntryInput>,
+    /// Meal entries staged for insertion into `planned_meal_entries`.
+    ///
+    /// Each staging entry carries the `(date, meal_name)` that identifies the
+    /// schedule_entries row it should attach to. `commit_plan` pairs each
+    /// staging entry with the inserted schedule entry that has matching
+    /// `(date, after_anchor)` and then inserts into `planned_meal_entries`.
+    pub meal_entries: Vec<PlannedMealEntryStaging>,
     /// Pre-resolved from the HTTP request's `Option<bool>` with a default of `false`.
     pub replace: bool,
     pub carryover_decisions: HashMap<Uuid, CarryoverDecision>,
@@ -87,8 +92,6 @@ pub struct CommitPlanInput {
 pub struct PlanEntryInput {
     pub date: NaiveDate,
     pub task_type: Option<String>, // None for meal anchor entries
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
     pub title: Option<String>,
     pub scheduled_start: Option<NaiveTime>,
     pub after_anchor: Option<String>,

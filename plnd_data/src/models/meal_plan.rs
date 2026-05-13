@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -17,6 +17,21 @@ pub struct PlannedMealEntry {
 #[derive(Debug, Clone)]
 pub struct PlannedMealEntryInput {
     pub schedule_entry_id: Uuid,
+    pub meal_ref_id: Uuid,
+    pub meal_ref_type: String,
+    pub title: Option<String>,
+}
+
+/// Staging type for meal entries carried on `CommitPlanInput`.
+///
+/// HTTP callers identify the target schedule entry by `(date, meal_name)`;
+/// `schedule::commit_plan` resolves that pair against the schedule entries it
+/// just inserted and builds the final `PlannedMealEntryInput` with the real
+/// `schedule_entry_id`.
+#[derive(Debug, Clone)]
+pub struct PlannedMealEntryStaging {
+    pub date: NaiveDate,
+    pub meal_name: String,
     pub meal_ref_id: Uuid,
     pub meal_ref_type: String,
     pub title: Option<String>,

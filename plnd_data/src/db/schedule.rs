@@ -6,15 +6,14 @@ use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::models::{
-    CarryoverDecision, CommitPlanInput, DayType, MealPatternEntry, OpenSlot, ScheduleEntry,
-    day_type_applies_to,
+    CarryoverDecision, CommitPlanInput, DayType, MealPatternEntry, OpenSlot, PlannedMealEntryInput,
+    ScheduleEntry, day_type_applies_to,
 };
 use crate::query_types::{
     CommittedEntry, PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
 
-const ENTRY_COLS: &str =
-    "entry_id, user_id, routine_id, task_type, task_ref_id, task_ref_type, title,
+const ENTRY_COLS: &str = "entry_id, user_id, routine_id, task_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
      after_anchor, slot_anchor_id, deviation_note,
      duration_minutes, energy_required, one_shot, created_at, updated_at";
@@ -188,8 +187,6 @@ pub async fn commit_plan(
 
     // Collect and batch-insert all new entries in a single unnest query
     let mut task_types: Vec<Option<String>> = Vec::new();
-    let mut task_ref_ids: Vec<Option<Uuid>> = Vec::new();
-    let mut task_ref_types: Vec<Option<String>> = Vec::new();
     let mut titles: Vec<Option<String>> = Vec::new();
     let mut dates: Vec<NaiveDate> = Vec::new();
     let mut scheduled_starts: Vec<Option<DateTime<Utc>>> = Vec::new();
@@ -203,8 +200,6 @@ pub async fn commit_plan(
             .scheduled_start
             .map(|t| entry.date.and_time(t).and_utc());
         task_types.push(entry.task_type.clone());
-        task_ref_ids.push(entry.task_ref_id);
-        task_ref_types.push(entry.task_ref_type.clone());
         titles.push(entry.title.clone());
         dates.push(entry.date);
         scheduled_starts.push(scheduled_start);
@@ -214,22 +209,20 @@ pub async fn commit_plan(
         one_shot_vals.push(entry.one_shot.unwrap_or(false));
     }
 
-    let entries: Vec<CommittedEntry> = if !task_types.is_empty() {
+    let inserted_rows: Vec<InsertedRow> = if !task_types.is_empty() {
         sqlx::query_as::<_, InsertedRow>(
             "INSERT INTO schedule_entries
-               (user_id, task_type, task_ref_id, task_ref_type, title,
+               (user_id, task_type, title,
                 date, scheduled_start, status, after_anchor,
                 duration_minutes, energy_required, one_shot)
-             SELECT $1, unnest($2::text[]), unnest($3::uuid[]), unnest($4::text[]),
-                    unnest($5::text[]), unnest($6::date[]), unnest($7::timestamptz[]),
-                    'planned', unnest($8::text[]),
-                    unnest($9::int4[]), unnest($10::text[]), unnest($11::bool[])
+             SELECT $1, unnest($2::text[]),
+                    unnest($3::text[]), unnest($4::date[]), unnest($5::timestamptz[]),
+                    'planned', unnest($6::text[]),
+                    unnest($7::int4[]), unnest($8::text[]), unnest($9::bool[])
              RETURNING entry_id, title, date, after_anchor",
         )
         .bind(user_id)
         .bind(&task_types)
-        .bind(&task_ref_ids)
-        .bind(&task_ref_types)
         .bind(&titles)
         .bind(&dates)
         .bind(&scheduled_starts)
@@ -240,6 +233,83 @@ pub async fn commit_plan(
         .fetch_all(&mut *tx)
         .await
         .map_err(DatabaseError::from)?
+    } else {
+        Vec::new()
+    };
+
+    // Pair meal_entries (staging) with the inserted schedule_entries rows by
+    // (date, after_anchor) — after_anchor on a meal anchor row holds the meal
+    // name (e.g. "breakfast"). Each pairing produces a `PlannedMealEntryInput`
+    // with the real `schedule_entry_id` that we then insert in-tx.
+    if !req.meal_entries.is_empty() {
+        let mut planned_inputs: Vec<PlannedMealEntryInput> =
+            Vec::with_capacity(req.meal_entries.len());
+        // Index inserted meal-anchor rows by (date, meal_name). We use a HashMap
+        // of vectors so duplicate (date, meal_name) pairs are matched in order.
+        let mut anchor_index: HashMap<(NaiveDate, String), Vec<Uuid>> = HashMap::new();
+        for row in &inserted_rows {
+            if let Some(name) = &row.after_anchor {
+                anchor_index
+                    .entry((row.date, name.clone()))
+                    .or_default()
+                    .push(row.entry_id);
+            }
+        }
+        // Reverse each vec so we can `pop` to consume the earliest match first.
+        for v in anchor_index.values_mut() {
+            v.reverse();
+        }
+
+        for meal in &req.meal_entries {
+            let key = (meal.date, meal.meal_name.clone());
+            let entry_id = anchor_index
+                .get_mut(&key)
+                .and_then(|v| v.pop())
+                .ok_or_else(|| {
+                    DatabaseError::QueryError(format!(
+                        "meal_entry references missing schedule anchor for ({}, {})",
+                        meal.date, meal.meal_name
+                    ))
+                })?;
+            planned_inputs.push(PlannedMealEntryInput {
+                schedule_entry_id: entry_id,
+                meal_ref_id: meal.meal_ref_id,
+                meal_ref_type: meal.meal_ref_type.clone(),
+                title: meal.title.clone(),
+            });
+        }
+
+        // Insert all planned_meal_entries in the same transaction so the commit
+        // remains atomic. We inline the SQL here (rather than calling
+        // `meal_plan::insert_many`) because that helper takes a `&PgPool` and
+        // would commit outside our transaction.
+        let schedule_entry_ids: Vec<Uuid> =
+            planned_inputs.iter().map(|p| p.schedule_entry_id).collect();
+        let meal_ref_ids: Vec<Uuid> = planned_inputs.iter().map(|p| p.meal_ref_id).collect();
+        let meal_ref_types: Vec<String> = planned_inputs
+            .iter()
+            .map(|p| p.meal_ref_type.clone())
+            .collect();
+        let meal_titles: Vec<Option<String>> =
+            planned_inputs.iter().map(|p| p.title.clone()).collect();
+
+        sqlx::query(
+            "INSERT INTO planned_meal_entries
+               (user_id, schedule_entry_id, meal_ref_id, meal_ref_type, title)
+             SELECT $1, unnest($2::uuid[]), unnest($3::uuid[]),
+                    unnest($4::varchar[]), unnest($5::varchar[])",
+        )
+        .bind(user_id)
+        .bind(&schedule_entry_ids)
+        .bind(&meal_ref_ids)
+        .bind(&meal_ref_types)
+        .bind(&meal_titles)
+        .execute(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?;
+    }
+
+    let entries: Vec<CommittedEntry> = inserted_rows
         .into_iter()
         .map(|r| CommittedEntry {
             entry_id: r.entry_id,
@@ -247,10 +317,7 @@ pub async fn commit_plan(
             date: r.date,
             after_anchor: r.after_anchor,
         })
-        .collect()
-    } else {
-        Vec::new()
-    };
+        .collect();
     let committed = entries.len() as i64;
 
     // Mark planning task as completed
@@ -442,8 +509,6 @@ mod tests {
         PlanEntryInput {
             date,
             task_type: Some("work".to_string()),
-            task_ref_id: None,
-            task_ref_type: None,
             title: Some("Test task".to_string()),
             scheduled_start: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
             after_anchor: None,
@@ -497,6 +562,7 @@ mod tests {
             plan_end: end,
             planning_task_id: task_id,
             entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
@@ -528,6 +594,7 @@ mod tests {
                 work_entry(start + Duration::days(1)),
                 work_entry(start + Duration::days(2)),
             ],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
@@ -611,6 +678,7 @@ mod tests {
             plan_end,
             planning_task_id: task_id,
             entries: vec![],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: decisions,
             drop_reasons: HashMap::new(),
@@ -663,6 +731,7 @@ mod tests {
             plan_end: end,
             planning_task_id: task_id_1,
             entries: vec![work_entry(start), work_entry(start + Duration::days(1))],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
@@ -675,8 +744,6 @@ mod tests {
         let bad_entry = PlanEntryInput {
             date: start,
             task_type: Some("invalid_type".to_string()), // violates CHECK constraint
-            task_ref_id: None,
-            task_ref_type: None,
             title: None,
             scheduled_start: Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
             after_anchor: None,
@@ -689,6 +756,7 @@ mod tests {
             plan_end: end,
             planning_task_id: task_id_2,
             entries: vec![bad_entry],
+            meal_entries: Vec::new(),
             replace: true,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
@@ -727,8 +795,6 @@ mod tests {
         let bucket_entry = PlanEntryInput {
             date: start,
             task_type: Some("work".to_string()),
-            task_ref_id: None,
-            task_ref_type: None,
             title: Some("Bucket task".to_string()),
             scheduled_start: None,
             after_anchor: Some("lunch".to_string()),
@@ -742,6 +808,7 @@ mod tests {
             plan_end: end,
             planning_task_id: task_id,
             entries: vec![bucket_entry],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
@@ -772,8 +839,6 @@ mod tests {
         let entry = PlanEntryInput {
             date: start,
             task_type: Some("work".to_string()),
-            task_ref_id: None,
-            task_ref_type: None,
             title: Some("Timed task".to_string()),
             scheduled_start: Some(NaiveTime::from_hms_opt(10, 0, 0).unwrap()),
             after_anchor: None,
@@ -787,6 +852,7 @@ mod tests {
             plan_end: end,
             planning_task_id: task_id,
             entries: vec![entry],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
@@ -819,8 +885,6 @@ mod tests {
         let meal_entry = PlanEntryInput {
             date: start,
             task_type: None,
-            task_ref_id: None,
-            task_ref_type: None,
             title: Some("Oatmeal".to_string()),
             scheduled_start: None,
             after_anchor: Some("breakfast".to_string()),
@@ -834,6 +898,7 @@ mod tests {
             plan_end: end,
             planning_task_id: task_id,
             entries: vec![meal_entry],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
@@ -1019,6 +1084,7 @@ mod tests {
             plan_end,
             planning_task_id: task_id,
             entries: vec![],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
