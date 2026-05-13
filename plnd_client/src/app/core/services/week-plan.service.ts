@@ -134,7 +134,12 @@ export class WeekPlanService {
               meals[entry.date][slot] = {
                 approvalState: 'approved',
                 mealRef: planned
-                  ? { type: planned.meal_ref_type === 'catalog_meal' ? 'catalog' : 'user', id: planned.meal_ref_id }
+                  ? {
+                      // MealRefType narrows DB-side meal vs dish into UI-side provenance.
+                      // catalog_meal/catalog_dish → 'catalog'; user_meal/user_dish → 'user'.
+                      type: planned.meal_ref_type.startsWith('catalog') ? 'catalog' : 'user',
+                      id: planned.meal_ref_id,
+                    }
                   : null,
                 title: entry.title ?? slot,
               };
@@ -406,6 +411,8 @@ export class WeekPlanService {
             date,
             meal_name: slot,
             meal_ref_id: meal.mealRef.id,
+            // Wizard only authors meals; dishes are not yet a UI concept.
+            // If a future surface emits a dish-typed MealRef, expand this mapping.
             meal_ref_type: meal.mealRef.type === 'catalog' ? 'catalog_meal' : 'user_meal',
             title: meal.title,
           });

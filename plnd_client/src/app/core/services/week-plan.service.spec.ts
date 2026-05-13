@@ -281,6 +281,39 @@ describe('WeekPlanService', () => {
       expect(lunch?.mealRef).toEqual({ type: 'catalog', id: 'c1' });
     });
 
+    it('treats catalog_dish provenance as catalog in mealRef', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      const resp: SchedulePeriodResponse = {
+        entries: [
+          {
+            entry_id: 'anchor-breakfast',
+            task_type: null,
+            title: 'Avocado toast',
+            date: '2026-03-24',
+            scheduled_start: '2026-03-24T08:00:00Z',
+            status: 'scheduled',
+            after_anchor: 'breakfast',
+          },
+        ],
+        carryover: [],
+        planned_meals: [
+          {
+            meal_entry_id: 'pme-1',
+            schedule_entry_id: 'anchor-breakfast',
+            meal_ref_id: 'cd1',
+            meal_ref_type: 'catalog_dish',
+            title: 'Avocado toast',
+          },
+        ],
+      };
+      service.loadPeriod('2026-03-24', '2026-03-24').subscribe();
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/period') && r.method === 'GET');
+      req.flush(resp);
+
+      const breakfast = service.scheduledMeals()['2026-03-24']?.['breakfast'];
+      expect(breakfast?.mealRef).toEqual({ type: 'catalog', id: 'cd1' });
+    });
+
     it('sets mealRef to null when no planned_meals entry matches the anchor', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const resp: SchedulePeriodResponse = {
