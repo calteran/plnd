@@ -197,6 +197,21 @@ wait_for_api() {
         cat "$API_LOG"
         return 1
     fi
+    # Verify the freshly-built binary is the process serving :3000.
+    # A stale plnd_api from a prior session could hold the port; in that case
+    # the new binary crashes with AddrInUse, the health probe passes against the
+    # stale process, and e2e tests run against the wrong binary (issue #780).
+    if ! kill -0 "$API_PID" 2>/dev/null; then
+        local stale_pid
+        stale_pid=$(lsof -i TCP:3000 -sTCP:LISTEN -t 2>/dev/null | head -1 || true)
+        echo "plnd_api (PID $API_PID) exited — port 3000 is likely held by a stale process."
+        if [[ -n "$stale_pid" ]]; then
+            echo "Stale process on port 3000: PID $stale_pid. Run: kill $stale_pid"
+        fi
+        echo "API log:"
+        cat "$API_LOG"
+        return 1
+    fi
 }
 run_sync "api healthy" "$PROJECT_ROOT" wait_for_api
 
