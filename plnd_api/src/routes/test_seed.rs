@@ -95,7 +95,7 @@ pub async fn post_seed(
             })?;
     }
 
-    if let Some(name) = &resolved.display_name {
+    if let Some(name) = resolved.display_name.as_deref() {
         state
             .repos
             .user
