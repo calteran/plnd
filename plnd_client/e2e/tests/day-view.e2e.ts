@@ -15,9 +15,9 @@ test.describe('Day View', () => {
   test.describe('authenticated', () => {
     test.beforeEach(async ({ page }) => {
       const { sub } = await seedAuth(page);
-      // Seed entries that the Schedule-display tests assert against. Tests
-      // that need an empty/error/loading schedule still install their own
-      // /schedule/period mocks to override these.
+      // Seed entries for the planning week containing 2026-03-28. Tests that
+      // exercise empty/loading/error states navigate to dates outside this
+      // window or install their own /schedule/period mock to override.
       await seedScheduleEntries(sub, {
         plan_start: '2026-03-23',
         plan_end: '2026-03-29',
@@ -74,6 +74,8 @@ test.describe('Day View', () => {
         // Hold the schedule response so we can observe the skeleton while the
         // request is in flight. ScheduleService now uses HttpClient (not setTimeout),
         // so we control timing via the route handler rather than page.clock.
+        // Reason: the real backend responds in milliseconds, faster than Playwright
+        // can reliably observe the skeleton; we must hold the request open ourselves.
         let releaseResponse!: () => void;
         const hold = new Promise<void>(r => { releaseResponse = r; });
         await page.route(`${API_BASE}/schedule/period**`, async route => {
@@ -94,7 +96,6 @@ test.describe('Day View', () => {
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
 
-        // Wait for schedule list (mock data loads after 300 ms in current implementation)
         await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
         await expect(dayView.getMealRows().first()).toBeVisible();
         await expect(dayView.getTaskRows().first()).toBeVisible();
@@ -105,7 +106,7 @@ test.describe('Day View', () => {
         await dayView.gotoDate('2026-03-28');
         await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
 
-        // seedAuth mock returns a breakfast meal; MEAL_SLOTS maps 'breakfast' → 🥣
+        // Seeded breakfast meal anchor; MEAL_SLOTS maps 'breakfast' → 🥣
         await expect(dayView.getMealRows().first()).toContainText('Breakfast');
         await expect(dayView.getMealRows().first()).toContainText('🥣');
       });
@@ -115,19 +116,17 @@ test.describe('Day View', () => {
         await dayView.gotoDate('2026-03-28');
         await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
 
-        // seedAuth mock returns a 'Morning stretch' task
+        // Seeded 'Morning stretch' task placed for 2026-03-28
         await expect(dayView.getTaskRows().first()).toContainText('stretch');
       });
     });
 
     test.describe('Empty state', () => {
       test('shows "Nothing planned yet" when the schedule is empty', async ({ page }) => {
-        await page.route(`${API_BASE}/schedule/period**`, route =>
-          route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
-        );
-
+        // Navigate to a date outside the seeded planning window so the real
+        // backend returns an empty entries list — no mock required.
         const dayView = new DayViewPage(page);
-        await dayView.gotoDate('2026-03-28');
+        await dayView.gotoDate('2026-04-15');
 
         await expect(dayView.getEmptyState()).toBeVisible({ timeout: 5_000 });
         await expect(dayView.getEmptyState()).toContainText('Nothing planned yet');
@@ -136,6 +135,9 @@ test.describe('Day View', () => {
 
     test.describe('Error state', () => {
       test('shows error message with retry button when the schedule API fails', async ({ page }) => {
+        // Reason: the real backend has no path that reliably returns 500 for an
+        // authenticated /schedule/period request without breaking other tests
+        // (e.g. by killing the DB); this test asserts the frontend's failure UI.
         await page.route(`${API_BASE}/schedule/period**`, route =>
           route.fulfill({ status: 500, json: { error: 'Internal Server Error' } })
         );
@@ -148,6 +150,10 @@ test.describe('Day View', () => {
       });
 
       test('retry button re-fetches the schedule', async ({ page }) => {
+        // Reason: forces the first /schedule/period call to fail (500) so the
+        // retry button can be exercised; the real backend cannot be coerced into
+        // a one-shot 500-then-200 sequence. The second call falls through to the
+        // real backend, which serves the entries seeded in beforeEach.
         let callCount = 0;
         await page.route(`${API_BASE}/schedule/period**`, async route => {
           callCount++;

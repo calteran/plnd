@@ -7,11 +7,14 @@ import { seedScheduleEntries } from '../helpers/seed-data';
 
 test.describe('Day View — Add Entry', () => {
 
+  let testSub: string;
+
   test.beforeEach(async ({ page }) => {
     const { sub } = await seedAuth(page);
-    // Minimal seed so the schedule list (which hosts the "Add something…"
-    // trigger row) renders. Tests then exercise the add flow against the
-    // mocked /agent/task endpoint.
+    testSub = sub;
+    // Seed an existing task so the schedule list (which hosts the "Add
+    // something…" trigger row) renders against the real backend. Tests that
+    // exercise the add flow then mock /agent/task to control the LLM response.
     await seedScheduleEntries(sub, {
       plan_start: '2026-03-23',
       plan_end: '2026-03-29',
@@ -80,7 +83,9 @@ test.describe('Day View — Add Entry', () => {
     }
 
     test('shows loading indicator while agent request is in flight', async ({ page }) => {
-      // Delay the agent response so we can observe the loading state
+      // Reason: /agent/task is an LLM endpoint — mocking is permitted by §9.7
+      // and required here so we can hold the response open long enough to
+      // observe the loading indicator.
       await page.route(`${API_BASE}/agent/task`, async route => {
         await new Promise(r => setTimeout(r, 500));
         await route.fulfill({
@@ -97,6 +102,8 @@ test.describe('Day View — Add Entry', () => {
     });
 
     test('shows confirmation message after agent responds', async ({ page }) => {
+      // Reason: /agent/task is an LLM endpoint — §9.7 permits mocking so the
+      // test can assert on a deterministic confirmation string.
       await page.route(`${API_BASE}/agent/task`, route =>
         route.fulfill({
           status: 200,
@@ -112,6 +119,9 @@ test.describe('Day View — Add Entry', () => {
     });
 
     test('shows error message when agent call fails', async ({ page }) => {
+      // Reason: /agent/task is an LLM endpoint — §9.7 permits mocking; this
+      // test exercises the frontend's failure-path UI which the real backend
+      // would not reliably trigger.
       await page.route(`${API_BASE}/agent/task`, route =>
         route.fulfill({ status: 500 }),
       );
@@ -123,38 +133,21 @@ test.describe('Day View — Add Entry', () => {
     });
 
     test('submitting the form adds the entry to the schedule list', async ({ page }) => {
-      const SEED_ITEM = {
-        entry_id: 'seed-1',
-        task_type: 'general',
-        title: 'Existing task',
-        status: 'planned',
-        date: '2026-03-28',
-        scheduled_start: '2026-03-28T09:00:00Z',
-      };
-      const NEW_ITEM = {
-        entry_id: 'new-entry-1',
-        task_type: 'general',
-        title: 'call mum',
-        status: 'planned',
-        date: '2026-03-28',
-        scheduled_start: '2026-03-28T09:01:00Z',
-      };
-
-      // Stateful mock: after the agent creates the task the reload returns the updated list.
-      let taskCreated = false;
-      await page.route(`${API_BASE}/schedule/period**`, route =>
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            entries: taskCreated ? [SEED_ITEM, NEW_ITEM] : [SEED_ITEM],
-            carryover: [],
-          }),
-        }),
-      );
-      await page.route(`${API_BASE}/agent/task`, route => {
-        taskCreated = true;
-        return route.fulfill({
+      // Reason: /agent/task is an LLM endpoint — §9.7 permits mocking. The
+      // mocked agent simulates its real side-effect (creating a schedule
+      // entry) by re-seeding the schedule via the real backend before
+      // returning success. The day-view then reloads /schedule/period from
+      // the real backend and sees the new entry.
+      await page.route(`${API_BASE}/agent/task`, async route => {
+        await seedScheduleEntries(testSub, {
+          plan_start: '2026-03-23',
+          plan_end: '2026-03-29',
+          placed_tasks: [
+            { date: '2026-03-28', task_type: 'general', title: 'Existing task', scheduled_start: '09:00:00' },
+            { date: '2026-03-28', task_type: 'general', title: 'call mum',      scheduled_start: '09:01:00' },
+          ],
+        });
+        await route.fulfill({
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
