@@ -41,7 +41,12 @@ export async function mintTestToken(sub: string = DEFAULT_TEST_SUB): Promise<str
         `Is the docker stack up? Try \`docker compose up -d mock-oauth-server\`. Body: ${body.slice(0, 200)}`,
     );
   }
-  const oauthJson = (await oauthRes.json()) as { access_token: string };
+  const oauthJson = (await oauthRes.json()) as { access_token?: string };
+  if (!oauthJson.access_token) {
+    throw new Error(
+      `mintTestToken: mock-oauth-server response missing access_token. Got: ${JSON.stringify(oauthJson).slice(0, 200)}`,
+    );
+  }
 
   const exchangeRes = await fetch(BACKEND_TOKEN_EXCHANGE_URL, {
     method: 'POST',
@@ -55,7 +60,12 @@ export async function mintTestToken(sub: string = DEFAULT_TEST_SUB): Promise<str
         `Is plnd_api running on :3000? Try \`just api\`, \`just dev\`, or \`just verify\`. Body: ${body.slice(0, 200)}`,
     );
   }
-  const exchangeJson = (await exchangeRes.json()) as { access_token: string };
+  const exchangeJson = (await exchangeRes.json()) as { access_token?: string };
+  if (!exchangeJson.access_token) {
+    throw new Error(
+      `mintTestToken: plnd_api /auth/token response missing access_token. Got: ${JSON.stringify(exchangeJson).slice(0, 200)}`,
+    );
+  }
   tokenCache.set(sub, exchangeJson.access_token);
   return exchangeJson.access_token;
 }
@@ -121,9 +131,10 @@ export const MOCK_BRIEFING_YESTERDAY = {
 
 // Injects a real minted JWT into localStorage before page load. Use this for
 // tests that need to bypass login but set up their own route mocks (rather
-// than seedAuth's defaults).
-export async function injectAuthToken(page: Page): Promise<void> {
-  const token = await mintTestToken();
+// than seedAuth's defaults). `sub` flows through to mintTestToken for tests
+// that need a distinct identity (chunks 2+ will use this for per-test users).
+export async function injectAuthToken(page: Page, sub: string = DEFAULT_TEST_SUB): Promise<void> {
+  const token = await mintTestToken(sub);
   await page.addInitScript((t: string) => {
     localStorage.setItem('auth_token', t);
   }, token);

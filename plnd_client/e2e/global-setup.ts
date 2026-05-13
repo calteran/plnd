@@ -1,7 +1,10 @@
 import { execSync } from 'node:child_process';
+import { setTimeout as delay } from 'node:timers/promises';
 import * as path from 'node:path';
 
 const API_HEALTH_URL = 'http://localhost:3000/health';
+const API_READY_TIMEOUT_MS = 5_000;
+const API_PROBE_INTERVAL_MS = 500;
 
 async function isReady(url: string): Promise<boolean> {
   try {
@@ -10,6 +13,17 @@ async function isReady(url: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// Short retry loop to absorb "API just started, not quite serving yet" cases
+// without papering over "API isn't running at all" (the timeout is short).
+async function waitForApi(url: string): Promise<boolean> {
+  const deadline = Date.now() + API_READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (await isReady(url)) return true;
+    await delay(API_PROBE_INTERVAL_MS);
+  }
+  return false;
 }
 
 export default async function globalSetup(): Promise<void> {
@@ -26,11 +40,12 @@ export default async function globalSetup(): Promise<void> {
   });
 
   // plnd_api lifecycle is not managed by playwright — verify.sh starts it,
-  // standalone runs need `just api` or `just dev`. Probe and fail fast with
-  // an actionable message rather than letting mintTestToken trip on each test.
-  if (!(await isReady(API_HEALTH_URL))) {
+  // standalone runs need `just api` or `just dev`. Probe with a short retry to
+  // tolerate "API just booted" and fail fast with an actionable message when
+  // it really isn't running.
+  if (!(await waitForApi(API_HEALTH_URL))) {
     throw new Error(
-      `plnd_api is not reachable at ${API_HEALTH_URL}. ` +
+      `plnd_api is not reachable at ${API_HEALTH_URL} after ${API_READY_TIMEOUT_MS}ms. ` +
         'E2E tests now perform a real OIDC → backend token exchange and need the API running. ' +
         'Run `just api`, `just dev`, or invoke through `just verify`.',
     );
