@@ -888,6 +888,23 @@ The local development environment runs as a Docker Compose stack (`just dev`) co
 
 The **production deployment shape has not been designed yet**. The current local setup does not imply a particular production architecture; that work is deferred until product needs solidify enough to justify infrastructure decisions.
 
+### 9.7 End-to-end testing
+
+End-to-end tests drive the real backend through the real API surface. The browser does not intercept HTTP for endpoints that are part of the product — user data, configuration, and schedule state flow through the live stack.
+
+**Isolation via per-test user accounts.** Parallel test workers achieve safety not through database-level partitioning (no per-test schemas, no per-worker databases, no transactional rollback) but through the application's own tenancy boundary: each test mints a fresh OIDC subject, the token-exchange endpoint find-or-creates a new user row, and every write the test performs is scoped to that user. Two tests with two different user identities cannot collide. Test users are use-then-forget; in CI the ephemeral stack disposes of them with each run, in development they accumulate harmlessly.
+
+**Constraint on future design.** Today every writable table is user-scoped. A feature that introduces writable state without a `user_id` boundary — cross-user fan-out, admin actions modifying shared rows, global configuration mutations — invalidates this isolation strategy and requires it to be revisited. New feature proposals that touch shared writable state should call this out explicitly so the testing impact is part of the design conversation.
+
+**Data seeding via real API.** When a test needs preexisting domain data (an existing schedule entry, a saved routine, a dietary restriction), the test helper drives the public API the same way a user would. Test-only seeding endpoints exist only for state that has no public API representation — for example, forcing an onboarding flag — and are physically absent from release builds. The bias is toward exercising the same code paths real callers use, including when seeding setup.
+
+**What may remain mocked.** Two categories, and only these:
+
+1. **Agent endpoints** that invoke an LLM (or any non-deterministic, billable upstream). The cost and timing variance of real model calls makes them unsuitable for CI defaults. Real-agent coverage can be re-enabled selectively for opt-in runs.
+2. **Genuinely external services** that the application does not own — for example, third-party content APIs whose response shape we capture as fixtures and replay deterministically.
+
+Every other interception is technical debt. New tests should follow the critical-journey exemplar: zero browser-level route interception unless an agent endpoint or external service is in the call path.
+
 ---
 
 ## 10. Glossary
@@ -1017,3 +1034,4 @@ A log of substantive changes to this document.
 | 2026-05-06 | Robert Chambers | 1.5 — J.3: Clarified that per-step sub-navigation (per-day card grids) is an allowed internal pattern within the linear planning wizard and does not violate its linear shape. Added one sentence to §4.9. |
 | 2026-05-06 | Robert Chambers | 1.6 — Added §1.2 design principle *Honor user intention regardless of expression* (system commits to observable states, not the surfaces that produce them). Restructured §4.6 to introduce two independent axes for meals — anchor presence (data, governed by `meal_pattern_entries`) and advance meal planning (preference, governed by new `user_preferences.advance_meal_planning_enabled`, default `true`). Established the conjunction rule: meal planning runs only when both axes permit it (anchors exist AND flag is `true`). Documented the four-corner state table including the all-four-reachable case where deleting all default anchors silently suppresses planning even with the flag at its default. Noted the food-preferences onboarding spoke is hidden when advance planning is off; dietary restrictions remain. Updated §3.1 preferences list to include the new flag. Updated §4.9 to note scope-empty wizard steps skip themselves and that the onboarding meal spoke surfaces the advance-planning toggle as an *I don't want to plan meals in advance* affordance. Added empty-scope graceful-skipping language to §4.10 (carryover skipped when no incomplete tasks; inventory/distribution/memory passes skipped when inventory empty; meals step gated by §4.6). Added glossary entries for *Advance meal planning* and *Meal anchor*; updated *Meal* and *Meal pattern* to reference the two axes. Closes #661 by codifying the architecture's answer to the zero-meal-pattern question. |
 | 2026-05-08 | Robert Chambers | 1.7 — Restructured daily rhythm: each day type now owns its own ordered list of meals (name, `preferred_time`, `tolerance_minutes`, `sort_order`) alongside wake/sleep. Eliminated the global meal-pattern + per-day-type-override model — pattern variance across day types now emerges from the day-type definitions themselves, and cross-day-type continuity is reasoned about by the LLM via fuzzy text matching, not by the data model. §4.2, §4.3, §4.6, §4.7, §4.8, §10 updated; *Meal pattern* deprecated in glossary. Closes #692 (per-meal overrides obsolete). |
+| 2026-05-13 | Robert Chambers | 1.8 — Added §9.7 *End-to-end testing*: per-test user-account isolation (no DB partitioning), data seeding via real API rather than test-only DB shortcuts, and the mock policy (only LLM/agent endpoints and genuinely external services may remain mocked). Sets the constraint that future shared-writable-state features must call out their testing impact. Closes #776; advances #775 and #157. |

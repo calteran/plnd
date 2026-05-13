@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { DayViewPage } from '../pages/day-view.page';
 import { API_BASE, seedAuth } from '../helpers/auth';
+import { seedScheduleEntries } from '../helpers/seed-data';
 
 const TEST_DATE = '2026-03-29';
 
@@ -8,7 +9,14 @@ test.describe('Day View — Meal Review Pane', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime('2026-03-28T00:00:00');
-    await seedAuth(page);
+    const { sub } = await seedAuth(page);
+    await seedScheduleEntries(sub, {
+      plan_start: '2026-03-23',
+      plan_end: '2026-03-29',
+      entries: [
+        { date: TEST_DATE, after_anchor: 'breakfast', scheduled_start: '08:00:00' },
+      ],
+    });
   });
 
   test('Review button opens the review pane', async ({ page }) => {
