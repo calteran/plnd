@@ -135,6 +135,21 @@ Food is modeled as a three-layer composition: **Ingredient → Dish → Meal**. 
 - **Dishes** are recipes that compose ingredients (pasta with sauce; granola; eggs benedict). Each dish has nutrition either computed by summing its ingredients or manually entered and flagged as overridden.
 - **Meals** are eating-occasion templates that compose one or more dishes (a "breakfast meal" might include granola + yogurt + coffee). A meal is what gets scheduled into a day.
 
+The catalog is **lazy-populated**: it starts empty in every environment, including production. Items
+enter through one of three paths:
+
+1. **Local hit** — the catalog already has a matching row from a prior discovery or contribution.
+   The search API returns the existing `ingredient_id` directly.
+2. **External-provider hit** — the search fan-out finds the ingredient in USDA FDC or Open Food
+   Facts. The API ingests the result into `catalog_ingredients` (via the ingest endpoint) and
+   returns the new local `ingredient_id`.
+3. **User contribution** — no hit anywhere. The user provides a name (and optionally allergens and
+   occasion tags); the API creates a new catalog entry attributed to that user via
+   `contributed_by_user_id` and returns the `ingredient_id`.
+
+All three paths produce the same `ingredient_id` shape and are transparent to the user. No
+pre-seeding step is required in production.
+
 Avoiding flat opaque records (a single `food` table with JSON nutrition blobs) is a deliberate choice: precise composition enables LLM reasoning ("you have these ingredients on hand, here are dishes you could make"), enables nutrition computation that survives substitutions, and avoids duplication when the same dish appears in many meals.
 
 #### 3.2.2 The `_overridden` flag pattern
@@ -148,7 +163,9 @@ Without this flag, a future ingredient-data refresh would silently clobber manua
 
 #### 3.2.3 Public/personal split and the fork pattern
 
-The catalog is shared and externally seeded; it is **not** browsed by users in a conventional sense. Catalog content reaches users indirectly: the LLM uses the catalog as a search space when proposing meals, dishes, or exercises, and matches free-text user input ("I want a Greek salad tonight") against the catalog — falling back to drafting a custom user-library entry when no match exists. The user-facing experience is "describe what you want, see what comes back," not "browse a directory of recipes."
+The catalog is shared but starts empty; it is **not** browsed by users in a conventional sense, and requires no pre-seeding step in production. Catalog content reaches users indirectly: the LLM uses the catalog as a search and matching surface when proposing meals, dishes, or exercises, and matches free-text user input ("I want a Greek salad tonight") against the catalog — falling back to drafting a custom user-library entry when no match exists. The user-facing experience is "describe what you want, see what comes back," not "browse a directory of recipes."
+
+`plnd_seed` is a **development-only convenience tool**. Its purpose is to pre-populate the catalog so developers have realistic sample data to look at during local manual testing. It plays no role in production deployments. Any e2e tests or production code that depends on `plnd_seed` having run is relying on the wrong primitive.
 
 Personal libraries (`user_dishes`, `user_meals`, `user_exercises`) are fully owned: the user can rename, edit, override allergens, adjust nutrition, mark as safe food, mark as blocked. When a catalog item is imported into a personal library, the system copies fields and records `catalog_*_id` as a fork-origin pointer — but there is no ongoing FK enforcement. After fork, the personal copy is independent.
 
@@ -897,6 +914,14 @@ End-to-end tests drive the real backend through the real API surface. The browse
 **Constraint on future design.** Today every writable table is user-scoped. A feature that introduces writable state without a `user_id` boundary — cross-user fan-out, admin actions modifying shared rows, global configuration mutations — invalidates this isolation strategy and requires it to be revisited. New feature proposals that touch shared writable state should call this out explicitly so the testing impact is part of the design conversation.
 
 **Data seeding via real API.** When a test needs preexisting domain data (an existing schedule entry, a saved routine, a dietary restriction), the test helper drives the public API the same way a user would. Test-only seeding endpoints exist only for state that has no public API representation — for example, forcing an onboarding flag — and are physically absent from release builds. The bias is toward exercising the same code paths real callers use, including when seeding setup.
+
+**Catalog ingredient discovery.** The ingredient discovery flow has three paths (§3.2.1); e2e tests must cover all three end-to-end:
+
+1. **Path 1 — local hit.** A catalog row exists before the test runs. Either a prior test in the same session contributed or ingested an ingredient (shared-catalog accumulation), or a small fixture is pre-seeded per verify run. The test searches for a known term, confirms a `local[]` hit, and proceeds.
+2. **Path 2 — external-provider hit.** The test searches for a term, the search fan-out returns an external result, and the API ingests it into `catalog_ingredients`. Provider responses are captured as deterministic fixtures (alongside the briefing fixtures in `plnd_data/fixtures/`) and replayed in CI — not live-called.
+3. **Path 3 — user contribution.** The test calls `POST /catalog/ingredients` directly (no search), receives an `ingredient_id`, and uses it immediately. This path has no external dependencies and is the default mechanism for tests that need a valid catalog FK without pre-existing data.
+
+The ingredient-preference API (`PUT /my/ingredient-prefs/{id}`) tests use path 3 by default. Separate tests exercise paths 1 and 2 to keep each case's behaviour independently verified.
 
 **What may remain mocked.** Two categories, and only these:
 
