@@ -47,8 +47,8 @@ export const MAX_PARTICLES        = 16;
 const PERIMETER_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
 
 function dayLabel(iso: string): string {
-  const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString(undefined, { weekday: 'long' });
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString('en-US', { weekday: 'long' });
 }
 
 @Component({
@@ -310,12 +310,10 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
 
   // Pre-built pool of slot/day captions, recomputed when inputs change.
   private readonly slotCaptions = computed(() =>
-    this.slotsByDay().flatMap(({ day, slots }) =>
-      slots.flatMap(slot => [
-        `Picking ${slot} for ${dayLabel(day)}…`,
-        `Searching ${dayLabel(day)} options…`,
-      ])
-    )
+    this.slotsByDay().flatMap(({ day, slots }) => [
+      ...slots.map(slot => `Picking ${slot} for ${dayLabel(day)}…`),
+      `Searching ${dayLabel(day)} options…`,
+    ])
   );
 
   private readonly blockedCaptions = computed(() =>
