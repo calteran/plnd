@@ -1,37 +1,19 @@
 {
-  "issuer": "plnd-dev",
   "interactiveLogin": true,
-  "users": [
+  "tokenCallbacks": [
     {
-      "id": "user1",
-      "username": "testuser@example.com",
-      "password": "password",
-      "name": "Test User",
-      "email": "testuser@example.com",
-      "email_verified": true,
-      "given_name": "Test",
-      "family_name": "User",
-      "picture": "https://example.com/profile.jpg"
-    },
-    {
-      "id": "user2",
-      "username": "anotheruser@example.com",
-      "password": "password",
-      "name": "Another User",
-      "email": "anotheruser@example.com",
-      "email_verified": true,
-      "given_name": "Another",
-      "family_name": "User",
-      "picture": "https://example.com/another.jpg"
-    }
-  ],
-  "clients": [
-    {
-      "clientId": "mock-client",
-      "clientSecret": "mock-secret",
-      "redirectUris": ["http://localhost:3000/auth/oauth/mock/callback"],
-      "scopes": ["openid", "email", "profile"],
-      "grantTypes": ["authorization_code", "refresh_token"]
+      "issuerId": "plnd-dev",
+      "tokenExpiry": 3600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": "^client_credentials$",
+          "claims": {
+            "sub": "${client_id}",
+            "aud": ["mock-client"]
+          }
+        }
+      ]
     }
   ]
 }

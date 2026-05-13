@@ -2,6 +2,64 @@ import { Page } from '@playwright/test';
 
 export const API_BASE = 'http://localhost:3000';
 
+const MOCK_OAUTH_TOKEN_URL = 'http://localhost:8080/plnd-dev/token';
+const BACKEND_TOKEN_EXCHANGE_URL = `${API_BASE}/auth/token`;
+const MOCK_OAUTH_CLIENT_SECRET = 'mock-secret';
+const DEFAULT_TEST_SUB = 'e2e-test-uuid';
+
+// Cache is per-worker (per Node module instance) and keyed by `sub`. Safe under
+// chunk-1 invariants because no test currently invalidates its own session
+// (every /auth/logout call is page.route-mocked). When chunks 2–5 remove logout
+// mocks, this cache strategy needs to be revisited — the cached JTI may be
+// revoked mid-run.
+const tokenCache = new Map<string, string>();
+
+// Mints a real backend HS256 JWT by performing the full production auth flow:
+//   1. Mint an OIDC id_token from mock-oauth-server (client-credentials grant)
+//   2. POST it to plnd_api's /auth/token, which validates via JWKS, finds-or-
+//      creates the user, and mints a backend HS256 JWT bound to a session row.
+// The returned token is what the frontend stores as `auth_token`; sending it as
+// Bearer satisfies auth_middleware (HS256 + jti/session check), so unmocked
+// endpoints reach their real handler instead of cascading to /login.
+export async function mintTestToken(sub: string = DEFAULT_TEST_SUB): Promise<string> {
+  const cached = tokenCache.get(sub);
+  if (cached) return cached;
+
+  const oauthRes = await fetch(MOCK_OAUTH_TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: sub,
+      client_secret: MOCK_OAUTH_CLIENT_SECRET,
+    }),
+  });
+  if (!oauthRes.ok) {
+    const body = await oauthRes.text().catch(() => '<no body>');
+    throw new Error(
+      `mintTestToken: mock-oauth-server returned ${oauthRes.status} from ${MOCK_OAUTH_TOKEN_URL}. ` +
+        `Is the docker stack up? Try \`docker compose up -d mock-oauth-server\`. Body: ${body.slice(0, 200)}`,
+    );
+  }
+  const oauthJson = (await oauthRes.json()) as { access_token: string };
+
+  const exchangeRes = await fetch(BACKEND_TOKEN_EXCHANGE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id_token: oauthJson.access_token, provider: 'mock' }),
+  });
+  if (!exchangeRes.ok) {
+    const body = await exchangeRes.text().catch(() => '<no body>');
+    throw new Error(
+      `mintTestToken: plnd_api returned ${exchangeRes.status} from ${BACKEND_TOKEN_EXCHANGE_URL}. ` +
+        `Is plnd_api running on :3000? Try \`just api\`, \`just dev\`, or \`just verify\`. Body: ${body.slice(0, 200)}`,
+    );
+  }
+  const exchangeJson = (await exchangeRes.json()) as { access_token: string };
+  tokenCache.set(sub, exchangeJson.access_token);
+  return exchangeJson.access_token;
+}
+
 export const MOCK_USER_NEW = {
   user_id: 'e2e-test-uuid',
   email: 'testuser@mock.plnd',
@@ -61,10 +119,18 @@ export const MOCK_BRIEFING_YESTERDAY = {
   meals_planned: 3,
 };
 
+// Injects a real minted JWT into localStorage before page load. Use this for
+// tests that need to bypass login but set up their own route mocks (rather
+// than seedAuth's defaults).
+export async function injectAuthToken(page: Page): Promise<void> {
+  const token = await mintTestToken();
+  await page.addInitScript((t: string) => {
+    localStorage.setItem('auth_token', t);
+  }, token);
+}
+
 export async function seedAuth(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem('auth_token', 'synthetic.test.token');
-  });
+  await injectAuthToken(page);
   await page.route(`${API_BASE}/users/me`, route =>
     route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
   );

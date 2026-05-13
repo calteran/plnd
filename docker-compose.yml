@@ -21,9 +21,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - ISSUER_ID=plnd-dev
-      - INTERACTIVE_LOGIN=true
-      - JSON_CONFIG=true
+      - JSON_CONFIG_PATH=/config/config.json
     volumes:
       - ./config/mock-oauth:/config
     healthcheck:

@@ -8,6 +8,7 @@ export default defineConfig({
   retries: process.env['CI'] ? 1 : 0,
   workers: process.env['CI'] ? 1 : undefined,
   reporter: process.env['CI'] ? 'github' : 'list',
+  globalSetup: require.resolve('./e2e/global-setup.ts'),
   use: {
     baseURL: 'http://localhost:4200',
     trace: 'on-first-retry',

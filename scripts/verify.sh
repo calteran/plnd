@@ -7,17 +7,15 @@
 #   • On failure the full captured log is dumped under the ✗ line.
 #   • Completions appear in real-time via a named FIFO + reader process.
 #
-# Services: ephemeral docker containers (--rm, auto-removed on stop).
-# Cleanup trap fires on EXIT, INT, and TERM.
+# Services: docker-compose `db` and `mock-oauth-server` (same services as `just
+# dev`), with secrets/config injected via `doppler run`. Cleanup trap calls
+# `docker compose down --volumes` on EXIT/INT/TERM — matching `just stop`.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-VERIFY_DB_PASS="plnd_verify_local"
-VERIFY_DB_NAME="plnd-verify-db"
-VERIFY_OAUTH_NAME="plnd-verify-oauth"
 API_PID=""
 API_LOG=""
 READER_PID=""
@@ -38,7 +36,7 @@ cleanup() {
     for f in "${JOB_TMPFILES[@]+"${JOB_TMPFILES[@]}"}"; do
         rm -f "$f" 2>/dev/null || true
     done
-    docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
+    (cd "$PROJECT_ROOT" && doppler run -- docker compose down --volumes) 2>/dev/null || true
     [[ -n "${FIFO:-}" ]] && rm -f "$FIFO" 2>/dev/null || true
     [[ -n "${API_LOG:-}" ]] && rm -f "$API_LOG" 2>/dev/null || true
 }
@@ -55,6 +53,10 @@ if ! command -v flock &>/dev/null; then
 fi
 if ! docker info &>/dev/null; then
     echo "✗ Docker is not running — start Docker Desktop and retry" >&2
+    exit 1
+fi
+if ! command -v doppler &>/dev/null; then
+    echo "✗ 'doppler' not found — install: brew install dopplerhq/cli/doppler" >&2
     exit 1
 fi
 
@@ -138,26 +140,10 @@ wait_all() {
 
 echo "◆ Starting verification..."
 
-# ── Kill any leftover containers from a previous run ──────────────────────────
-docker rm -f "$VERIFY_DB_NAME" "$VERIFY_OAUTH_NAME" 2>/dev/null || true
-
-# ── Launch supporting services ─────────────────────────────────────────────────
-docker run --rm -d \
-    --name "$VERIFY_DB_NAME" \
-    -p 5432:5432 \
-    -e POSTGRES_USER=plnd \
-    -e POSTGRES_PASSWORD="$VERIFY_DB_PASS" \
-    -e POSTGRES_DB=plnd_dev \
-    postgres:15 > /dev/null
-
-docker run --rm -d \
-    --name "$VERIFY_OAUTH_NAME" \
-    -p 8080:8080 \
-    -e ISSUER_ID=plnd-dev \
-    -e INTERACTIVE_LOGIN=true \
-    -e JSON_CONFIG=true \
-    -v "$PROJECT_ROOT/config/mock-oauth:/config" \
-    ghcr.io/navikt/mock-oauth2-server:3.0.3 > /dev/null
+# ── Bring up supporting services (idempotent; same compose services as `just dev`) ─
+# `--wait` blocks until each service is healthy per its compose healthcheck.
+(cd "$PROJECT_ROOT" && doppler run -- docker compose down --volumes) 2>/dev/null || true
+(cd "$PROJECT_ROOT" && doppler run -- docker compose up -d --wait db mock-oauth-server)
 
 # ── Rust read-only checks — no target/ lock, safe to parallelize ───────────────
 run_job "cargo fmt"     "$PROJECT_ROOT" cargo fmt --check
@@ -180,36 +166,23 @@ run_job "ng test" "$PROJECT_ROOT/plnd_client" \
 # ── Cargo build (critical path — gates nextest, clippy, and e2e) ───────────────
 run_sync "cargo build" "$PROJECT_ROOT" cargo build --workspace
 
-# ── Services must be healthy before nextest — sqlx::test creates per-test DBs ──
-wait_for_services() {
-    timeout 30s bash -c \
-        "until docker exec $VERIFY_DB_NAME pg_isready -U plnd 2>/dev/null; do sleep 1; done"
-    timeout 30s bash -c \
-        'until curl -sf http://localhost:8080/plnd-dev/.well-known/openid-configuration \
-         > /dev/null 2>&1; do sleep 1; done'
-}
-run_sync "services healthy" "$PROJECT_ROOT" wait_for_services
-
 # ── Post-build: nextest → clippy (sequential within, parallel with e2e) ────────
-# DATABASE_URL is required by sqlx::test to create isolated per-test databases.
-run_job "nextest → clippy" "$PROJECT_ROOT" bash -c \
-    "DATABASE_URL='postgres://plnd:${VERIFY_DB_PASS}@localhost:5432/plnd_dev' \
-     cargo nextest run --workspace && \
-     cargo clippy --workspace --all-targets --all-features -- -D warnings"
+# sqlx::test uses DATABASE_URL to create isolated per-test databases. We derive
+# it from Doppler's APP_DATABASE__URL (`export` so it propagates to both `cargo`
+# invocations, and quoting is safe against any value Doppler may return).
+run_job "nextest → clippy" "$PROJECT_ROOT" \
+    doppler run -- bash -c 'export DATABASE_URL="$APP_DATABASE__URL"; cargo nextest run --workspace && cargo clippy --workspace --all-targets --all-features -- -D warnings'
 
-# ── E2E gate: start API, run e2e (services already verified healthy above) ─────
+# ── E2E gate: start API, run e2e (compose services healthy via `--wait` above) ─
 
 API_LOG=$(mktemp /tmp/plnd-verify-api-XXXXXX)
 cd "$PROJECT_ROOT/plnd_api"
 # Close fd 3 (FIFO write-end) in the API subprocess so the reader can see
 # EOF once the main script closes fd 3.  Without this, the API process keeps
 # the write-end open and `wait "$READER_PID"` hangs indefinitely.
-doppler run -- sh -c \
-    "APP_DATABASE__URL='postgres://plnd:${VERIFY_DB_PASS}@localhost:5432/plnd_dev' \
-     APP_AUTH__OIDC_INTERNAL_ISSUER_URL='http://localhost:8080/plnd-dev' \
-     APP_AUTH__FRONTEND_ORIGIN='http://localhost:4200' \
-     exec ../target/debug/plnd_api" \
-    > "$API_LOG" 2>&1 3>&- &
+# APP_DATABASE__URL, APP_AUTH__OIDC_INTERNAL_ISSUER_URL, APP_AUTH__FRONTEND_ORIGIN
+# all come from Doppler — no inline overrides needed.
+doppler run -- ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- &
 API_PID=$!
 cd "$PROJECT_ROOT"
 

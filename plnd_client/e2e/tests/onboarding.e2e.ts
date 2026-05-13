@@ -2,6 +2,7 @@ import { test, expect, Page } from '@playwright/test';
 import {
   API_BASE, MOCK_USER_NEW, MOCK_USER_ONBOARDED, MOCK_PREFS,
   MOCK_BRIEFING_WEATHER, MOCK_BRIEFING_NEWS, MOCK_BRIEFING_YESTERDAY,
+  injectAuthToken,
 } from '../helpers/auth';
 import {
   MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS,
@@ -262,9 +263,7 @@ test.describe('Onboarding', () => {
       route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
     );
 
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
+    await injectAuthToken(page);
     await page.goto('/onboarding');
     await expect(page).toHaveURL(/\/onboarding/);
     await expect(page.locator('h1')).toHaveText('Welcome to PLND!');
@@ -296,9 +295,7 @@ test.describe('Onboarding', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
     );
 
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
+    await injectAuthToken(page);
     await page.goto('/onboarding');
     await expect(page).toHaveURL(/\/day\//);
   });
@@ -314,9 +311,7 @@ test.describe('Onboarding', () => {
       route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
     );
 
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
+    await injectAuthToken(page);
     await page.goto('/today');
     await expect(page).toHaveURL(/\/onboarding/);
   });
@@ -332,9 +327,7 @@ test.describe('Onboarding', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
     );
 
-    await page.addInitScript(() => {
-      localStorage.setItem('auth_token', 'synthetic.test.token');
-    });
+    await injectAuthToken(page);
     await page.goto('/onboarding/account');
     await expect(page).toHaveURL(/\/onboarding\/account/);
     await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
@@ -949,9 +942,7 @@ test.describe('Onboarding', () => {
   test.describe('Guard: already-onboarded user', () => {
     test('onboarded user visiting /onboarding/tasks redirects to /today', async ({ page }) => {
       await page.clock.setFixedTime('2026-03-28T00:00:00');
-      await page.addInitScript(() => {
-        localStorage.setItem('auth_token', 'synthetic.test.token');
-      });
+      await injectAuthToken(page);
       await page.route(`${API_BASE}/users/me`, route =>
         route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
       );
