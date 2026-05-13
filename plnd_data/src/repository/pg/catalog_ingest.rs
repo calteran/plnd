@@ -2,9 +2,11 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::db::catalog_ingest::{self, IngestIngredientParams};
+use crate::db::catalog_ingest::{self, ContributeIngredientParams, IngestIngredientParams};
 
-use crate::repository::catalog_ingest::{CatalogIngestRepository, IngestIngredientInput};
+use crate::repository::catalog_ingest::{
+    CatalogIngestRepository, ContributeIngredientInput, IngestIngredientInput,
+};
 
 pub struct PgCatalogIngestRepository {
     pool: PgPool,
@@ -28,6 +30,23 @@ impl CatalogIngestRepository for PgCatalogIngestRepository {
                 description: input.description.as_deref(),
                 serving_size_g: input.serving_size_g,
                 nutrition: input.nutrition,
+                allergens: &input.allergens,
+                occasion_tags: &input.occasion_tags,
+            },
+        )
+        .await
+        .map_err(Into::into)
+    }
+
+    async fn contribute_ingredient(
+        &self,
+        input: ContributeIngredientInput,
+    ) -> Result<Uuid, crate::Error> {
+        catalog_ingest::contribute_ingredient(
+            &self.pool,
+            ContributeIngredientParams {
+                name: &input.name,
+                contributed_by_user_id: input.contributed_by_user_id,
                 allergens: &input.allergens,
                 occasion_tags: &input.occasion_tags,
             },

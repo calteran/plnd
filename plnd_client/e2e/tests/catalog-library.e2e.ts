@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { API_BASE, seedAuth } from '../helpers/auth';
-import { seedDish } from '../helpers/seed-data';
+import { seedCatalogIngredient, seedDish } from '../helpers/seed-data';
 
 // Tests verify the API contract for catalog library endpoints:
 // GET/POST /my/dishes, PATCH /my/dishes/{id}, GET/POST /my/meals,
@@ -98,14 +98,37 @@ test.describe('Catalog Library — API Contract', () => {
     });
   });
 
-  // Skipped: the backend FK on user_ingredient_prefs.catalog_ingredient_id
-  // requires a real catalog_ingredients row, but the verify pipeline brings up
-  // an empty DB and there is no public API to seed catalog ingredients.
-  // Tracked in https://github.com/calteran/plnd/issues/792. When re-enabling,
-  // discover an ingredient via GET /search/ingredients?q=... and upsert against
-  // its uuid with body { preference_score: -2, notes: 'severe allergy' }.
-  test.skip('PUT /my/ingredient-prefs/{id} upserts a preference and returns the correct shape', () => {
-    expect(true).toBe(true);
+  test('PUT /my/ingredient-prefs/{id} upserts a preference and returns the correct shape', async ({
+    page,
+  }) => {
+    const sub = await seedAuthAndNavigate(page);
+    const { ingredient_id } = await seedCatalogIngredient(sub, 'Test Tomato');
+
+    const result = await page.evaluate(
+      async ({ apiBase, prefIngredientId }) => {
+        const token = localStorage.getItem('auth_token') ?? '';
+        const res = await fetch(`${apiBase}/my/ingredient-prefs/${prefIngredientId}`, {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ preference_score: -2, notes: 'severe allergy' }),
+        });
+        return { status: res.status, body: await res.json() };
+      },
+      { apiBase: API_BASE, prefIngredientId: ingredient_id },
+    );
+
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      catalog_ingredient_id: ingredient_id,
+      preference_score: -2,
+      notes: 'severe allergy',
+    });
+    expect(result.body.user_ingredient_pref_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
   });
 
   test('POST /my/meals with name returns the correct UserMealPref shape', async ({ page }) => {

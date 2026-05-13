@@ -19,7 +19,10 @@ use crate::models::{
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
-    catalog_ingest::{IngestIngredientBody, IngestIngredientResponse},
+    catalog_ingest::{
+        ContributeIngredientBody, ContributeIngredientResponse, IngestIngredientBody,
+        IngestIngredientResponse,
+    },
     day_types::{CreateDayTypeRequest, UpdateDayTypeRequest},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
     routine::CreateRoutineRequest,
@@ -84,6 +87,7 @@ impl Modify for BearerSecurityAddon {
         crate::routes::meal_pattern::update_meal_pattern_entry,
         crate::routes::meal_pattern::delete_meal_pattern_entry,
         // Catalog
+        crate::routes::catalog_ingest::contribute_ingredient,
         crate::routes::catalog_ingest::ingest_ingredient,
         crate::routes::catalog_details::get_ingredient,
         crate::routes::catalog_details::get_dish,
@@ -163,6 +167,8 @@ impl Modify for BearerSecurityAddon {
         MealDetailApiResponse,
         IngestIngredientBody,
         IngestIngredientResponse,
+        ContributeIngredientBody,
+        ContributeIngredientResponse,
         // Tasks
         TaskResponse,
         // Schedule
