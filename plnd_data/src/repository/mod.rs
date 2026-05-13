@@ -7,6 +7,7 @@ pub mod day_type;
 pub mod exercise;
 pub mod meal;
 pub mod meal_pattern;
+pub mod meal_plan;
 pub mod meal_search;
 pub mod meal_suggestion;
 pub mod memory;
@@ -27,6 +28,7 @@ pub use day_type::DayTypeRepository;
 pub use exercise::ExerciseRepository;
 pub use meal::MealRepository;
 pub use meal_pattern::MealPatternRepository;
+pub use meal_plan::MealPlanRepository;
 pub use meal_search::MealSearchRepository;
 pub use meal_suggestion::MealSuggestionRepository;
 pub use memory::MemoryRepository;
@@ -50,6 +52,7 @@ pub struct Repositories {
     pub exercise: Arc<dyn ExerciseRepository>,
     pub meal: Arc<dyn MealRepository>,
     pub meal_pattern: Arc<dyn MealPatternRepository>,
+    pub meal_plan: Arc<dyn MealPlanRepository>,
     pub meal_search: Arc<dyn MealSearchRepository>,
     pub meal_suggestion: Arc<dyn MealSuggestionRepository>,
     pub memory: Arc<dyn MemoryRepository>,
@@ -83,6 +86,7 @@ impl Repositories {
             exercise: Arc::new(pg::exercise::PgExerciseRepository::new(pool.clone())),
             meal: Arc::new(pg::meal::PgMealRepository::new(pool.clone())),
             meal_pattern: Arc::new(pg::meal_pattern::PgMealPatternRepository::new(pool.clone())),
+            meal_plan: Arc::new(pg::meal_plan::PgMealPlanRepository::new(pool.clone())),
             meal_search: Arc::new(pg::meal_search::PgMealSearchRepository::new(pool.clone())),
             meal_suggestion: Arc::new(pg::meal_suggestion::PgMealSuggestionRepository::new(
                 pool.clone(),
