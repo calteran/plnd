@@ -6,10 +6,43 @@ import {
   MIN_DELAY_MS,
 } from './onboarding-task-loading';
 
+let _originalMatchMedia: typeof window.matchMedia | undefined;
+
+function stubMatchMedia(prefersReduce: boolean): void {
+  if (_originalMatchMedia === undefined) {
+    _originalMatchMedia = window.matchMedia;
+  }
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: ((q: string) => ({
+      matches: prefersReduce && q.includes('prefers-reduced-motion'),
+      media: q,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia,
+  });
+}
+
+afterEach(() => {
+  if (_originalMatchMedia !== undefined) {
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      writable: true,
+      value: _originalMatchMedia,
+    });
+  }
+});
+
 describe('OnboardingTaskLoadingComponent', () => {
   let fixture: ComponentFixture<OnboardingTaskLoadingComponent>;
 
   beforeEach(async () => {
+    stubMatchMedia(false);
     await TestBed.configureTestingModule({
       imports: [OnboardingTaskLoadingComponent],
     }).compileComponents();
@@ -69,5 +102,17 @@ describe('OnboardingTaskLoadingComponent', () => {
     fixture.detectChanges();
     fixture.destroy();
     tick(10000); // no thrown errors means all timers were cleared
+  }));
+
+  it('hides the typing-bubble when prefers-reduced-motion is reduce', fakeAsync(() => {
+    stubMatchMedia(true);
+    const reducedFixture = TestBed.createComponent(OnboardingTaskLoadingComponent);
+    reducedFixture.componentRef.setInput('taskCount', 3);
+    reducedFixture.componentRef.setInput('routineCount', 2);
+    reducedFixture.componentRef.setInput('taskNames', ['Morning walk', 'Deep work']);
+    reducedFixture.detectChanges();
+    expect(reducedFixture.nativeElement.querySelector('.typing-bubble')).toBeNull();
+    reducedFixture.destroy();
+    tick(10000);
   }));
 });
