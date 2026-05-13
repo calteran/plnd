@@ -157,7 +157,7 @@ docker run --rm -d \
     -e INTERACTIVE_LOGIN=true \
     -e JSON_CONFIG=true \
     -v "$PROJECT_ROOT/config/mock-oauth:/config" \
-    ghcr.io/navikt/mock-oauth2-server:3.0.1 > /dev/null
+    ghcr.io/navikt/mock-oauth2-server:3.0.3 > /dev/null
 
 # ── Rust read-only checks — no target/ lock, safe to parallelize ───────────────
 run_job "cargo fmt"     "$PROJECT_ROOT" cargo fmt --check
