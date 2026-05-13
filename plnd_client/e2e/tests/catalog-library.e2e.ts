@@ -140,8 +140,6 @@ test.describe('Catalog Library — API Contract', () => {
   }) => {
     await seedAuthAndNavigate(page);
 
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-
     const result = await page.evaluate(async (apiBase) => {
       const token = localStorage.getItem('auth_token') ?? '';
       const authHeader = { Authorization: `Bearer ${token}` };
@@ -156,11 +154,14 @@ test.describe('Catalog Library — API Contract', () => {
         return { step: 'search', searchStatus: searchRes.status, searchBody };
       }
 
-      const hit = searchBody.external[0] as {
+      const hit = (searchBody.external as Array<{
         external_id: string;
         name: string;
         description: string | null;
-      };
+      }>).find((r) => r.external_id === '1750340');
+      if (!hit) {
+        return { step: 'search', searchStatus: searchRes.status, searchBody };
+      }
 
       // Step 2: Ingest the external hit into the local catalog.
       const ingestRes = await fetch(`${apiBase}/catalog/ingredients/ingest`, {
@@ -175,7 +176,7 @@ test.describe('Catalog Library — API Contract', () => {
       });
       const ingestBody = await ingestRes.json();
       if (ingestRes.status !== 201) {
-        return { step: 'ingest', ingestStatus: ingestRes.status, ingestBody };
+        return { step: 'ingest', searchStatus: searchRes.status, ingestStatus: ingestRes.status, ingestBody, searchBody };
       }
 
       // Step 3: Upsert a preference against the newly-ingested ingredient.
@@ -204,14 +205,19 @@ test.describe('Catalog Library — API Contract', () => {
     expect(result.searchStatus).toBe(200);
     expect(result.externalCount).toBeGreaterThan(0);
     expect(result.ingestStatus).toBe(201);
-    expect(result.catalogIngredientId).toMatch(UUID_RE);
+    expect(result.catalogIngredientId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
     expect(result.prefStatus).toBe(200);
     expect(result.prefBody).toMatchObject({
       catalog_ingredient_id: result.catalogIngredientId,
       preference_score: 1,
       notes: 'path-2 e2e',
     });
-    expect(result.prefBody.user_ingredient_pref_id).toMatch(UUID_RE);
+    expect(result.prefBody.user_ingredient_pref_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    expect(result.prefBody.user_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
   });
 
   test('POST /my/meals with name returns the correct UserMealPref shape', async ({ page }) => {
