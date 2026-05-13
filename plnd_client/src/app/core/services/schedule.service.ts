@@ -55,6 +55,9 @@ export class ScheduleService {
   }
 
   toggleItem(id: string): void {
+    const currentStatus = findItemStatus(this._items(), id);
+    if (currentStatus === null) return;
+
     this._items.update(items =>
       items.map(item => {
         if (isMealAnchor(item)) {
@@ -69,6 +72,10 @@ export class ScheduleService {
         return item.id === id ? { ...item, status: flip(item.status) } : item;
       }),
     );
+
+    this.http
+      .patch(`${this.apiBase}/schedule/entries/${id}/status`, { status: toApiStatus(currentStatus) })
+      .subscribe({ error: () => this.loadDay(this._date()) });
   }
 
   skipMeal(id: string): void {
@@ -112,6 +119,22 @@ export function offsetIso(days: number): string {
 
 function flip(status: 'pending' | 'done'): 'pending' | 'done' {
   return status === 'done' ? 'pending' : 'done';
+}
+
+function toApiStatus(status: 'pending' | 'done'): string {
+  return status === 'pending' ? 'completed' : 'planned';
+}
+
+function findItemStatus(items: ScheduleItem[], id: string): 'pending' | 'done' | null {
+  for (const item of items) {
+    if (isMealAnchor(item)) {
+      const task = item.duringMealTasks.find(t => t.id === id);
+      if (task) return task.status;
+    } else if (item.id === id) {
+      return item.status;
+    }
+  }
+  return null;
 }
 
 // ── API → model mapping ───────────────────────────────────────────────────────
