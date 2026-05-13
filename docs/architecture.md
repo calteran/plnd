@@ -135,8 +135,10 @@ Food is modeled as a three-layer composition: **Ingredient → Dish → Meal**. 
 - **Dishes** are recipes that compose ingredients (pasta with sauce; granola; eggs benedict). Each dish has nutrition either computed by summing its ingredients or manually entered and flagged as overridden.
 - **Meals** are eating-occasion templates that compose one or more dishes (a "breakfast meal" might include granola + yogurt + coffee). A meal is what gets scheduled into a day.
 
-The catalog is **lazy-populated**: it starts empty in every environment, including production. Items
-enter through one of three paths:
+The catalog is **lazy-populated**: it requires no pre-seeding step to function correctly in any
+environment. Catalog content can accumulate from background seeding at API startup (`plnd_seed`),
+from user activity, or it can start empty — the system works either way. Items enter through one
+of three paths:
 
 1. **Local hit** — the catalog already has a matching row from a prior discovery or contribution.
    The search API returns the existing `ingredient_id` directly.
@@ -145,10 +147,9 @@ enter through one of three paths:
    returns the new local `ingredient_id`.
 3. **User contribution** — no hit anywhere. The user provides a name (and optionally allergens and
    occasion tags); the API creates a new catalog entry attributed to that user via
-   `contributed_by_user_id` and returns the `ingredient_id`.
+   `contributed_by_user_id` and returns an `ingredient_id`. (Endpoint planned — see issue #796.)
 
-All three paths produce the same `ingredient_id` shape and are transparent to the user. No
-pre-seeding step is required in production.
+All three paths return an `ingredient_id` and are transparent to the user.
 
 Avoiding flat opaque records (a single `food` table with JSON nutrition blobs) is a deliberate choice: precise composition enables LLM reasoning ("you have these ingredients on hand, here are dishes you could make"), enables nutrition computation that survives substitutions, and avoids duplication when the same dish appears in many meals.
 
@@ -163,9 +164,9 @@ Without this flag, a future ingredient-data refresh would silently clobber manua
 
 #### 3.2.3 Public/personal split and the fork pattern
 
-The catalog is shared but starts empty; it is **not** browsed by users in a conventional sense, and requires no pre-seeding step in production. Catalog content reaches users indirectly: the LLM uses the catalog as a search and matching surface when proposing meals, dishes, or exercises, and matches free-text user input ("I want a Greek salad tonight") against the catalog — falling back to drafting a custom user-library entry when no match exists. The user-facing experience is "describe what you want, see what comes back," not "browse a directory of recipes."
+The catalog is shared and does not require pre-seeding to function; it is **not** browsed by users in a conventional sense. Catalog content reaches users indirectly: the LLM uses the catalog as a search and matching surface when proposing meals, dishes, or exercises, and matches free-text user input ("I want a Greek salad tonight") against the catalog — falling back to drafting a custom user-library entry when no match exists. The user-facing experience is "describe what you want, see what comes back," not "browse a directory of recipes."
 
-`plnd_seed` is a **development-only convenience tool**. Its purpose is to pre-populate the catalog so developers have realistic sample data to look at during local manual testing. It plays no role in production deployments. Any e2e tests or production code that depends on `plnd_seed` having run is relying on the wrong primitive.
+`plnd_seed` pre-populates the catalog on API startup (idempotent, background task). It provides richer search results sooner and gives developers realistic sample data during local testing, but it is not a hard dependency — the system operates correctly on an empty catalog.
 
 Personal libraries (`user_dishes`, `user_meals`, `user_exercises`) are fully owned: the user can rename, edit, override allergens, adjust nutrition, mark as safe food, mark as blocked. When a catalog item is imported into a personal library, the system copies fields and records `catalog_*_id` as a fork-origin pointer — but there is no ongoing FK enforcement. After fork, the personal copy is independent.
 
@@ -919,7 +920,7 @@ End-to-end tests drive the real backend through the real API surface. The browse
 
 1. **Path 1 — local hit.** A catalog row exists before the test runs. Either a prior test in the same session contributed or ingested an ingredient (shared-catalog accumulation), or a small fixture is pre-seeded per verify run. The test searches for a known term, confirms a `local[]` hit, and proceeds.
 2. **Path 2 — external-provider hit.** The test searches for a term, the search fan-out returns an external result, and the API ingests it into `catalog_ingredients`. Provider responses are captured as deterministic fixtures (alongside the briefing fixtures in `plnd_data/fixtures/`) and replayed in CI — not live-called.
-3. **Path 3 — user contribution.** The test calls `POST /catalog/ingredients` directly (no search), receives an `ingredient_id`, and uses it immediately. This path has no external dependencies and is the default mechanism for tests that need a valid catalog FK without pre-existing data.
+3. **Path 3 — user contribution.** The test calls `POST /catalog/ingredients` directly (no search), receives an `ingredient_id`, and uses it immediately. This path has no external dependencies and is the default mechanism for tests that need a valid catalog FK without pre-existing data. The endpoint is planned (see issue #796); until it exists, tests can rely on ingredients populated by `plnd_seed` at API startup.
 
 The ingredient-preference API (`PUT /my/ingredient-prefs/{id}`) tests use path 3 by default. Separate tests exercise paths 1 and 2 to keep each case's behaviour independently verified.
 
@@ -1060,4 +1061,4 @@ A log of substantive changes to this document.
 | 2026-05-06 | Robert Chambers | 1.6 — Added §1.2 design principle *Honor user intention regardless of expression* (system commits to observable states, not the surfaces that produce them). Restructured §4.6 to introduce two independent axes for meals — anchor presence (data, governed by `meal_pattern_entries`) and advance meal planning (preference, governed by new `user_preferences.advance_meal_planning_enabled`, default `true`). Established the conjunction rule: meal planning runs only when both axes permit it (anchors exist AND flag is `true`). Documented the four-corner state table including the all-four-reachable case where deleting all default anchors silently suppresses planning even with the flag at its default. Noted the food-preferences onboarding spoke is hidden when advance planning is off; dietary restrictions remain. Updated §3.1 preferences list to include the new flag. Updated §4.9 to note scope-empty wizard steps skip themselves and that the onboarding meal spoke surfaces the advance-planning toggle as an *I don't want to plan meals in advance* affordance. Added empty-scope graceful-skipping language to §4.10 (carryover skipped when no incomplete tasks; inventory/distribution/memory passes skipped when inventory empty; meals step gated by §4.6). Added glossary entries for *Advance meal planning* and *Meal anchor*; updated *Meal* and *Meal pattern* to reference the two axes. Codifies the architecture's answer to the zero-meal-pattern question. |
 | 2026-05-08 | Robert Chambers | 1.7 — Restructured daily rhythm: each day type now owns its own ordered list of meals (name, `preferred_time`, `tolerance_minutes`, `sort_order`) alongside wake/sleep. Eliminated the global meal-pattern + per-day-type-override model — pattern variance across day types now emerges from the day-type definitions themselves, and cross-day-type continuity is reasoned about by the LLM via fuzzy text matching, not by the data model. §4.2, §4.3, §4.6, §4.7, §4.8, §10 updated; *Meal pattern* deprecated in glossary (per-meal overrides obsolete). |
 | 2026-05-13 | Claude Code | 1.8 - I had to delete several implementation & PR/Issue details from the document because I failed to follow instructions.  I was reminded *several times* not to include such details in this document but did it anyway.  This note is here to publicize my shame and ensure I don't do it again. |
-| 2026-05-13 | Robert Chambers | 1.9 — Documented the lazy-catalog model and three-path ingredient discovery flow. §3.2.1: catalog starts empty in all environments; items enter via local hit, external-provider ingest, or user contribution — all three paths produce the same `ingredient_id` shape and are transparent to the user. §3.2.3: corrected "externally seeded" framing; added clarification that `plnd_seed` is a development-only convenience tool with no production role. §9.7: added catalog ingredient discovery subsection specifying that e2e tests must cover all three discovery paths, with fixture-based provider replay for path 2. |
+| 2026-05-13 | Robert Chambers | 1.9 — Documented the lazy-catalog model and three-path ingredient discovery flow. §3.2.1: catalog requires no pre-seeding to function; items enter via local hit, external-provider ingest, or user contribution — all three paths return an `ingredient_id` and are transparent to the user. `plnd_seed` provides background startup seeding (idempotent) and richer local data but is not a hard dependency. §3.2.3: corrected "externally seeded" framing; clarified `plnd_seed` role. §9.7: added catalog ingredient discovery subsection specifying that e2e tests must cover all three discovery paths, with fixture-based provider replay for path 2. |
