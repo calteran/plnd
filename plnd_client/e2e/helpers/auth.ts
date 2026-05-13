@@ -83,49 +83,6 @@ export async function mintTestToken(sub: string = generateTestSub()): Promise<st
   return exchangeJson.access_token;
 }
 
-// Fixture shapes used by tests that mock GET /users/me, GET /preferences/me, or
-// related read endpoints via page.route().fulfill(). The values here are
-// fixtures, not what the real backend returns — tests assert against them only
-// in the context of route mocks that serve them back. With per-test user
-// isolation, the real backend's email for a given test is `e2e-<uuid>@mock.plnd`,
-// not these static strings.
-export const MOCK_USER_NEW = {
-  user_id: 'e2e-test-uuid',
-  email: 'e2e-mock-new-fixture@mock.plnd',
-  display_name: null,
-  avatar_url: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  is_active: true,
-  last_login: null,
-  onboarding_completed: false,
-};
-
-export const MOCK_USER_ONBOARDED = {
-  user_id: 'e2e-test-uuid',
-  email: 'e2e-mock-onboarded-fixture@mock.plnd',
-  display_name: 'Test User',
-  avatar_url: null,
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  is_active: true,
-  last_login: null,
-  onboarding_completed: true,
-};
-
-export const MOCK_PREFS = {
-  user_id: 'e2e-test-uuid',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-  week_start_day: 1,
-  planning_trigger_offset: 0,
-  default_plan_length_days: 7,
-  email_notifications_enabled: false,
-  sms_notifications_enabled: false,
-  push_notifications_enabled: false,
-  phone_number: null,
-};
-
 // Injects a real minted JWT into localStorage before page load. Use this for
 // tests that need to bypass login but set up their own route mocks (rather
 // than seedAuth's defaults). Pass an explicit `sub` when the test needs to

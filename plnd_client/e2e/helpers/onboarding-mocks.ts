@@ -1,5 +1,5 @@
 import { Page } from '@playwright/test';
-import { API_BASE, generateTestSub, injectAuthToken, seedTestState } from './auth';
+import { generateTestSub, injectAuthToken, seedTestState } from './auth';
 
 // ── Agent fixtures (LLM endpoints) ────────────────────────────────────────────
 //
@@ -73,20 +73,3 @@ export async function seedOnboarding(page: Page): Promise<{ sub: string }> {
   return { sub };
 }
 
-/**
- * Mock GET /my/meals and GET /my/dishes to empty arrays.
- *
- * Used by the planning-wizard tests (`planning-wizard*.e2e.ts`) which still
- * rely on shaped fixtures for the meal-plan loader. The onboarding tests no
- * longer need this because they hit the real backend (seed empty user → empty
- * arrays naturally). Once the planning-wizard tests are de-mocked this helper
- * can be removed.
- */
-export async function mockUserCatalogEmpty(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/my/meals`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-  await page.route(`${API_BASE}/my/dishes`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-}
