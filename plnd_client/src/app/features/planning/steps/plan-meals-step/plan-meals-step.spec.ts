@@ -7,8 +7,12 @@ import { PlanMealsStepComponent } from './plan-meals-step';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
+import { UserMealsService } from '../../../../core/services/user-meals.service';
+import { UserDishesService } from '../../../../core/services/user-dishes.service';
 import { MealEntry, MealPlanResponse } from '../../../../core/models/week-plan';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
+import { UserMealPref } from '../../../../core/models/user-meal-pref';
+import { UserDishPref } from '../../../../core/models/user-dish-pref';
 
 const PATTERN_FIXTURE: MealPatternEntry[] = [
   { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
@@ -23,6 +27,20 @@ function makeDayTypesMealsMock(entries: MealPatternEntry[] = PATTERN_FIXTURE) {
     loaded: signal(true).asReadonly(),
     mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => entries),
     clear: jasmine.createSpy('clear'),
+  };
+}
+
+function makeUserMealsMock(meals: UserMealPref[] = []) {
+  return {
+    load:  jasmine.createSpy('load'),
+    meals: signal<UserMealPref[]>(meals).asReadonly(),
+  };
+}
+
+function makeUserDishesMock(dishes: UserDishPref[] = []) {
+  return {
+    load:   jasmine.createSpy('load'),
+    dishes: signal<UserDishPref[]>(dishes).asReadonly(),
   };
 }
 
@@ -63,6 +81,8 @@ describe('PlanMealsStepComponent', () => {
         provideHttpClientTesting(),
         { provide: MealPlannerAgentService, useValue: agentSpy },
         { provide: DayTypesMealsService, useValue: makeDayTypesMealsMock() },
+        { provide: UserMealsService,      useValue: makeUserMealsMock() },
+        { provide: UserDishesService,     useValue: makeUserDishesMock() },
       ],
     }).compileComponents();
 
@@ -242,6 +262,70 @@ describe('PlanMealsStepComponent', () => {
 
     it('should set isGenerating while generating', () => {
       expect(service.isGenerating()).toBeTrue();
+    });
+
+    it('should render the meal-plan loader (and not the grid) while generating', () => {
+      expect(fixture.nativeElement.querySelector('app-meal-plan-loading')).not.toBeNull();
+      expect(fixture.nativeElement.querySelector('.meals-grid')).toBeNull();
+    });
+
+    it('should hide the loader and render the grid once generation succeeds', () => {
+      const days = ['2026-03-23', '2026-03-24', '2026-03-25', '2026-03-26', '2026-03-27'];
+      generateWeek$.next(makeMockPlanResponse(days));
+      generateWeek$.complete();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('app-meal-plan-loading')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.meals-grid')).not.toBeNull();
+    });
+
+    it('should NOT render any per-cell .gc-skeleton placeholders (loader covers that)', () => {
+      // Skeleton was deleted as part of the loader work.
+      expect(fixture.nativeElement.querySelector('.gc-skeleton')).toBeNull();
+    });
+
+    describe('cancel mid-generation', () => {
+      it('should hide the loader and show the cancellation card on cancelGeneration()', () => {
+        component.cancelGeneration();
+        fixture.detectChanges();
+
+        expect(service.isGenerating()).toBeFalse();
+        expect(fixture.nativeElement.querySelector('app-meal-plan-loading')).toBeNull();
+
+        const card = fixture.nativeElement.querySelector('.cancel-card');
+        expect(card).not.toBeNull();
+        expect(card.querySelector('.btn-cancel-primary')).not.toBeNull();   // Try again
+        expect(card.querySelector('.btn-cancel-secondary')).not.toBeNull(); // Skip
+      });
+
+      it('Try again should re-trigger generateWeek and re-show the loader', () => {
+        agentSpy.generateWeek.calls.reset();
+        component.cancelGeneration();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('.cancel-card')).not.toBeNull();
+
+        // Hand the agent a fresh subject so the new subscription has somewhere to land.
+        const next$ = new Subject<MealPlanResponse>();
+        agentSpy.generateWeek.and.returnValue(next$);
+
+        (fixture.nativeElement.querySelector('.btn-cancel-primary') as HTMLButtonElement).click();
+        fixture.detectChanges();
+
+        expect(agentSpy.generateWeek).toHaveBeenCalledTimes(1);
+        expect(service.isGenerating()).toBeTrue();
+        expect(fixture.nativeElement.querySelector('app-meal-plan-loading')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('.cancel-card')).toBeNull();
+      });
+
+      it('Skip should clear the cancellation card and reveal the (empty) grid', () => {
+        component.cancelGeneration();
+        fixture.detectChanges();
+
+        (fixture.nativeElement.querySelector('.btn-cancel-secondary') as HTMLButtonElement).click();
+        fixture.detectChanges();
+
+        expect(fixture.nativeElement.querySelector('.cancel-card')).toBeNull();
+        expect(fixture.nativeElement.querySelector('.meals-grid')).not.toBeNull();
+      });
     });
 
     it('should populate cells when generateWeek emits', () => {
@@ -466,6 +550,8 @@ describe('PlanMealsStepComponent', () => {
           provideHttpClientTesting(),
           { provide: MealPlannerAgentService, useValue: narrowAgentSpy },
           { provide: DayTypesMealsService, useValue: narrowMock },
+          { provide: UserMealsService,      useValue: makeUserMealsMock() },
+          { provide: UserDishesService,     useValue: makeUserDishesMock() },
         ],
       }).compileComponents();
 

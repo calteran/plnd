@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { seedAuth, API_BASE } from '../helpers/auth';
+import { mockUserCatalogEmpty } from '../helpers/onboarding-mocks';
 
 // Fixed seed: 7-day horizon Mon 2026-03-30 → Sun 2026-04-05
 // MOCK_PREFS (from seedAuth): week_start_day=1, default_plan_length_days=7
@@ -36,6 +37,7 @@ async function seedWizard(page: Page): Promise<void> {
   await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
     route.fulfill({ json: { carryover: [] } })
   );
+  await mockUserCatalogEmpty(page);
   // Step 3 auto-generates via agent on first entry when no meals are stored.
   // Return empty meals list so skeleton resolves immediately without stalling navigation.
   await page.route(`${API_BASE}/agent/meal-plan`, route =>

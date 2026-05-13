@@ -140,4 +140,27 @@ export async function seedOnboarding(page: Page): Promise<void> {
   await page.route(`${API_BASE}/meal-pattern**`, route =>
     route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
   );
+  await mockUserCatalogEmpty(page);
+}
+
+/**
+ * Mock GET /my/meals and GET /my/dishes to empty arrays.
+ *
+ * plan-meals-step (used by the planning wizard step 3 and onboarding food
+ * spoke) calls `userMealsService.load()` and `userDishesService.load()` on
+ * init to drive blocked-item personalization in the meal-plan loader.
+ * Without these mocks, the synthetic test token hits the real backend,
+ * returns 401, and `authErrorInterceptor` triggers a session_expired
+ * redirect — which silently breaks downstream test assertions.
+ *
+ * Call from every test helper that navigates to a route that mounts
+ * plan-meals-step.
+ */
+export async function mockUserCatalogEmpty(page: Page): Promise<void> {
+  await page.route(`${API_BASE}/my/meals`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
+  await page.route(`${API_BASE}/my/dishes`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
 }
