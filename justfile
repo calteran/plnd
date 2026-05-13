@@ -208,6 +208,22 @@ test-e2e-report:
 seed:
     doppler run -- cargo run -p plnd_seed
 
+# Refresh captured upstream fixtures used by debug builds when
+# APP_EXTERNAL__FIXTURE_PATH is set (e.g. the e2e leg of `just verify`).
+# Run this when an upstream response shape changes or fixtures go stale.
+# Feed URLs must match config/api/default.toml news_feed_urls.
+refresh-fixtures:
+    @echo "→ Capturing real upstream responses into plnd_data/fixtures/ ..."
+    @mkdir -p plnd_data/fixtures/open-meteo
+    @rm -rf plnd_data/fixtures/rss && mkdir -p plnd_data/fixtures/rss
+    curl -fsSL 'https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&current=temperature_2m,precipitation,weather_code&daily=temperature_2m_max,temperature_2m_min&forecast_days=1' \
+        -o plnd_data/fixtures/open-meteo/forecast.json
+    curl -fsSL 'https://xkcd.com/rss.xml' -o plnd_data/fixtures/rss/xkcd.xml
+    curl -fsSL 'https://news.ycombinator.com/rss' -o plnd_data/fixtures/rss/hn.xml
+    curl -fsSL 'https://en.wikipedia.org/w/api.php?action=featuredfeed&feed=featured&feedformat=atom' \
+        -o plnd_data/fixtures/rss/wikipedia.xml
+    @echo "✅ Done. Review the diff (git diff plnd_data/fixtures/) and commit if intentional."
+
 # Clean build artifacts
 clean:
     cargo clean

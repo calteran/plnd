@@ -37,8 +37,11 @@ use plnd_api::routes::{
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
+#[cfg(debug_assertions)]
+use plnd_data::providers::{FixtureNewsProvider, FixtureWeatherProvider};
 use plnd_data::providers::{
-    OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider, UsdaFdcProvider,
+    NewsProvider, OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider,
+    UsdaFdcProvider, WeatherProvider,
 };
 use plnd_data::search::ProviderSearchService;
 
@@ -192,18 +195,17 @@ async fn main() {
         search_cache,
     );
 
-    let weather_provider = Arc::new(OpenMeteoProvider::new());
-    let news_provider = Arc::new(RssFeedProvider::new(
-        &config.external_providers.news_feed_urls,
-    ));
+    let (weather_provider, news_provider) = build_briefing_providers(&config.external_providers);
     let briefing = BriefingState::new(weather_provider, news_provider);
-    if config.external_providers.news_feed_urls.is_empty() {
-        tracing::warn!("briefing news feed disabled (news_feed_urls not set)");
-    } else {
-        tracing::info!(
-            feed_count = config.external_providers.news_feed_urls.len(),
-            "briefing news feeds configured"
-        );
+    if config.external_providers.fixture_path.is_none() {
+        if config.external_providers.news_feed_urls.is_empty() {
+            tracing::warn!("briefing news feed disabled (news_feed_urls not set)");
+        } else {
+            tracing::info!(
+                feed_count = config.external_providers.news_feed_urls.len(),
+                "briefing news feeds configured"
+            );
+        }
     }
 
     // Per-IP rate limiter for unauthenticated /api/client_error requests.
@@ -441,4 +443,47 @@ async fn main() {
     if let Some(providers) = otel_providers {
         telemetry::shutdown_providers(providers);
     }
+}
+
+/// Constructs the weather + news providers for the briefing handlers.
+///
+/// In debug builds, if `external.fixture_path` is set, returns file-backed
+/// implementations that read captured upstream responses from disk — used by
+/// e2e to keep tests deterministic and offline. Otherwise (and always in
+/// release builds, where the fixture impls do not exist) returns the real
+/// Open-Meteo + RSS providers.
+fn build_briefing_providers(
+    external: &plnd_api::config::settings::ExternalProvidersConfig,
+) -> (Arc<dyn WeatherProvider>, Arc<dyn NewsProvider>) {
+    #[cfg(debug_assertions)]
+    if let Some(fixture_root) = &external.fixture_path {
+        tracing::warn!(
+            path = %fixture_root.display(),
+            "USING FIXTURE PROVIDERS for /briefing/* — debug builds only; never enable in prod"
+        );
+        let weather_path = fixture_root.join("open-meteo/forecast.json");
+        let weather = FixtureWeatherProvider::new(weather_path).unwrap_or_else(|e| {
+            tracing::error!(error = %e, "failed to load fixture weather provider");
+            std::process::exit(1);
+        });
+        let rss_dir = fixture_root.join("rss");
+        let feed_paths: Vec<std::path::PathBuf> = std::fs::read_dir(&rss_dir)
+            .unwrap_or_else(|e| {
+                tracing::error!(path = %rss_dir.display(), error = %e, "failed to read fixture rss dir");
+                std::process::exit(1);
+            })
+            .filter_map(|entry| entry.ok().map(|e| e.path()))
+            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("xml"))
+            .collect();
+        let news = FixtureNewsProvider::new(feed_paths).unwrap_or_else(|e| {
+            tracing::error!(error = %e, "failed to load fixture news provider");
+            std::process::exit(1);
+        });
+        return (Arc::new(weather), Arc::new(news));
+    }
+
+    (
+        Arc::new(OpenMeteoProvider::new()),
+        Arc::new(RssFeedProvider::new(&external.news_feed_urls)),
+    )
 }

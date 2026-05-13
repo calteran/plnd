@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::path::PathBuf;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct DatabaseConfig {
@@ -116,6 +117,12 @@ pub struct ExternalProvidersConfig {
     /// RSS/Atom feed URLs for briefing headlines. Empty list disables news.
     #[serde(default)]
     pub news_feed_urls: Vec<String>,
+    /// Root directory of captured upstream fixtures. When `Some`, debug builds
+    /// swap `OpenMeteoProvider` and `RssFeedProvider` for file-backed impls that
+    /// read `{root}/open-meteo/forecast.json` and `{root}/rss/*.xml`. Never set
+    /// in production — the fixture impls do not exist in release binaries.
+    #[serde(default)]
+    pub fixture_path: Option<PathBuf>,
 }
 
 fn default_themealdb_key() -> String {

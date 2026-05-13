@@ -48,7 +48,9 @@ pub(crate) fn parse_feed_headlines(
 
 /// Parse RSS/Atom bytes into `(unix_timestamp, NewsHeadline)` pairs.
 /// Entries without a publish date fall back to Unix epoch (sort to bottom).
-fn parse_feed_entries_with_time(content: &[u8]) -> Result<Vec<(i64, NewsHeadline)>, String> {
+pub(crate) fn parse_feed_entries_with_time(
+    content: &[u8],
+) -> Result<Vec<(i64, NewsHeadline)>, String> {
     use feed_rs::parser;
     let feed = parser::parse(content).map_err(|e| e.to_string())?;
     let entries = feed
