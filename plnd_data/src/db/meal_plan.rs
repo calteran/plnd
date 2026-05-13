@@ -35,6 +35,30 @@ pub async fn list_for_date(
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "planned_meal_entries", op = "list_for_period")
+)]
+pub async fn list_for_period(
+    pool: &PgPool,
+    user_id: Uuid,
+    start: NaiveDate,
+    end: NaiveDate,
+) -> Result<Vec<PlannedMealEntry>, DatabaseError> {
+    sqlx::query_as::<_, PlannedMealEntry>(&format!(
+        "SELECT {PREFIXED_COLUMNS} \
+         FROM planned_meal_entries pme \
+         JOIN schedule_entries se ON se.entry_id = pme.schedule_entry_id \
+         WHERE pme.user_id = $1 AND se.date BETWEEN $2 AND $3"
+    ))
+    .bind(user_id)
+    .bind(start)
+    .bind(end)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 /// Insert a batch of planned-meal-entry rows.
 ///
 /// The `executor` parameter accepts either a `&PgPool` (for standalone calls

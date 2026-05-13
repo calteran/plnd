@@ -12,6 +12,13 @@ pub trait MealPlanRepository: Send + Sync {
         date: NaiveDate,
     ) -> Result<Vec<PlannedMealEntry>, crate::Error>;
 
+    async fn list_for_period(
+        &self,
+        user_id: Uuid,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<PlannedMealEntry>, crate::Error>;
+
     async fn insert_many(
         &self,
         user_id: Uuid,

@@ -29,6 +29,17 @@ impl MealPlanRepository for PgMealPlanRepository {
             .map_err(Into::into)
     }
 
+    async fn list_for_period(
+        &self,
+        user_id: Uuid,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<PlannedMealEntry>, crate::Error> {
+        db::list_for_period(&self.pool, user_id, start, end)
+            .await
+            .map_err(Into::into)
+    }
+
     async fn insert_many(
         &self,
         user_id: Uuid,

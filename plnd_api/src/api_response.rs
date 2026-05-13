@@ -484,8 +484,11 @@ pub struct SchedulePeriodApiResponse {
     pub planned_meals: Vec<PlannedMealEntryResponse>,
 }
 
-impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
-    fn from(r: SchedulePeriodResponse) -> Self {
+impl SchedulePeriodApiResponse {
+    /// Assemble a `SchedulePeriodApiResponse` from the schedule period query
+    /// result plus the planned-meal rows fetched separately via
+    /// `MealPlanRepository::list_for_period`.
+    pub fn from_parts(r: SchedulePeriodResponse, planned_meals: Vec<PlannedMealEntry>) -> Self {
         Self {
             entries: r
                 .entries
@@ -497,8 +500,10 @@ impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
                 .into_iter()
                 .map(ScheduleEntryResponse::from)
                 .collect(),
-            // TODO(Task 6): populate via MealPlanRepository fetch in route handler
-            planned_meals: Vec::new(),
+            planned_meals: planned_meals
+                .into_iter()
+                .map(PlannedMealEntryResponse::from)
+                .collect(),
         }
     }
 }

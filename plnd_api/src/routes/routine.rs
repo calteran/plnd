@@ -138,8 +138,6 @@ pub async fn create_routine(
             body.duration_minutes,
             energy,
             body.is_anchor.unwrap_or(false),
-            body.task_ref_id,
-            body.task_ref_type.as_deref(),
         )
         .await
         .map(|t| (StatusCode::CREATED, Json(RoutineResponse::from(t))))
@@ -242,8 +240,6 @@ pub async fn update_routine(
             body.duration_minutes,
             energy,
             body.is_anchor.unwrap_or(false),
-            body.task_ref_id,
-            body.task_ref_type.as_deref(),
         )
         .await
         .map_err(|e| match e {
