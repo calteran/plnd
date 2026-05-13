@@ -8,6 +8,8 @@ import {
   signal,
 } from '@angular/core';
 
+import { detectReducedMotion } from '../../../../core/utils/browser-utils';
+
 export type StageMode = 'spiral' | 'drop';
 
 interface Particle {
@@ -299,7 +301,7 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
   protected readonly dropParticles    = signal<Particle[]>([]);
   protected readonly lastTextParticle = signal<string>('');
   protected readonly staticCaption    = signal<string>('Planning…');
-  protected readonly reducedMotion    = signal<boolean>(this.detectReducedMotion());
+  protected readonly reducedMotion    = signal<boolean>(detectReducedMotion());
 
   private nextParticleId = 0;
   private foodTimer: ReturnType<typeof setInterval> | null = null;
@@ -348,15 +350,6 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
     if (this.staticTimer) clearInterval(this.staticTimer);
     this.particleRemovers.forEach(t => clearTimeout(t));
     this.particleRemovers = [];
-  }
-
-  private detectReducedMotion(): boolean {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-    try {
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch {
-      return false;
-    }
   }
 
   private emitFoodParticle(): void {
