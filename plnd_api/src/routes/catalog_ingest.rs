@@ -94,7 +94,7 @@ pub struct ContributeIngredientResponse {
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state, body), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn contribute_ingredient(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
