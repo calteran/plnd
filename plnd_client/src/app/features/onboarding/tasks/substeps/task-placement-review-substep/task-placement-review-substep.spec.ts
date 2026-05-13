@@ -173,7 +173,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     fixture.detectChanges();
 
     const loadingScreen: HTMLElement | null =
-      fixture.nativeElement.querySelector('app-onboarding-loading-screen');
+      fixture.nativeElement.querySelector('app-onboarding-task-loading');
     expect(loadingScreen).not.toBeNull();
 
     const h2: HTMLElement | null = loadingScreen!.querySelector('h2');
@@ -471,7 +471,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     fixture.detectChanges();
 
     // Loading screen visible while agent is in flight
-    expect(fixture.nativeElement.querySelector('app-onboarding-loading-screen')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-onboarding-task-loading')).not.toBeNull();
 
     // Agent IS called even for routines-only — it schedules templates server-side
     const req = httpController.expectOne(`${API_BASE}/agent/place-tasks`);

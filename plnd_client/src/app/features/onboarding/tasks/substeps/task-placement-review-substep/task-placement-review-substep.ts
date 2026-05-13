@@ -20,7 +20,7 @@ import {
   RoutineTemplateInput,
 } from '../../../../../core/models/week-plan';
 import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
-import { OnboardingLoadingScreenComponent } from '../../../shared/onboarding-loading-screen/onboarding-loading-screen';
+import { OnboardingTaskLoadingComponent } from '../../../shared/onboarding-task-loading/onboarding-task-loading';
 
 // ── Meal slot divider definitions ────────────────────────────────────────────
 
@@ -180,7 +180,7 @@ export function buildDayCards(
 @Component({
   selector: 'app-task-placement-review-substep',
   standalone: true,
-  imports: [OnboardingLoadingScreenComponent],
+  imports: [OnboardingTaskLoadingComponent],
   template: `
     <div class="placement-review">
 
@@ -197,7 +197,7 @@ export function buildDayCards(
 
       } @else if (isLoading()) {
         <!-- Loading state -->
-        <app-onboarding-loading-screen
+        <app-onboarding-task-loading
           [taskCount]="loadingTaskNames().length"
           [routineCount]="loadingRoutineCount()"
           [taskNames]="loadingTaskNames()"

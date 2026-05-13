@@ -50,7 +50,7 @@ export const EASTER_EGG_EVERY      = 15;
 export const MAX_PERSONALISED_NAMES = 5;
 
 @Component({
-  selector: 'app-onboarding-loading-screen',
+  selector: 'app-onboarding-task-loading',
   standalone: true,
   template: `
     <div class="loading-screen">
@@ -81,7 +81,7 @@ export const MAX_PERSONALISED_NAMES = 5;
               }
             </div>
           }
-          @if (showTyping()) {
+          @if (showTyping() && !reducedMotion()) {
             <div class="typing-bubble" aria-label="Thinking">
               <span class="dot"></span>
               <span class="dot"></span>
@@ -190,15 +190,26 @@ export const MAX_PERSONALISED_NAMES = 5;
       0%,100% { transform: translateY(0); opacity: 0.5; }
       50%      { transform: translateY(-4px); opacity: 1; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      .plan-icon,
+      .bubble.entering,
+      .typing-bubble,
+      .dot {
+        animation: none !important;
+        transition: none !important;
+      }
+    }
   `],
 })
-export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
+export class OnboardingTaskLoadingComponent implements OnInit, OnDestroy {
   readonly taskCount    = input.required<number>();
   readonly routineCount = input.required<number>();
   readonly taskNames    = input.required<string[]>();
 
-  protected readonly messages   = signal<ChatMessage[]>([]);
-  protected readonly showTyping = signal(false);
+  protected readonly messages      = signal<ChatMessage[]>([]);
+  protected readonly showTyping    = signal(false);
+  protected readonly reducedMotion = signal<boolean>(this.detectReducedMotion());
 
   private pendingT1: ReturnType<typeof setTimeout> | null = null;
   private pendingT2: ReturnType<typeof setTimeout> | null = null;
@@ -219,6 +230,15 @@ export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.pendingT1 !== null) clearTimeout(this.pendingT1);
     if (this.pendingT2 !== null) clearTimeout(this.pendingT2);
+  }
+
+  private detectReducedMotion(): boolean {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+    try {
+      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    } catch {
+      return false;
+    }
   }
 
   private buildPersonalisedPool(): MessagePart[][] {
