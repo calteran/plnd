@@ -1,4 +1,5 @@
 import { Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 
 export const API_BASE = 'http://localhost:3000';
 
@@ -6,19 +7,20 @@ const MOCK_OAUTH_TOKEN_URL = 'http://localhost:8080/plnd-dev/token';
 const BACKEND_TOKEN_EXCHANGE_URL = `${API_BASE}/auth/token`;
 const BACKEND_TEST_SEED_URL = `${API_BASE}/test/seed`;
 const MOCK_OAUTH_CLIENT_SECRET = 'mock-secret';
-const DEFAULT_TEST_SUB = 'e2e-test-uuid';
-// Helper-specific subs so seedAuth (onboarded) and seedOnboarding (new) operate
-// on different DB rows. Avoids one helper's seed clobbering another's when
-// tests run in parallel workers against a shared DB. Replaced by per-test DB
-// isolation in chunk 4 (#775).
-export const SEED_AUTH_SUB = 'e2e-onboarded-user';
-export const SEED_ONBOARDING_SUB = 'e2e-onboarding-user';
 
-// Cache is per-worker (per Node module instance) and keyed by `sub`. Safe under
-// chunk-1 invariants because no test currently invalidates its own session
-// (every /auth/logout call is page.route-mocked). When chunks 2–5 remove logout
-// mocks, this cache strategy needs to be revisited — the cached JTI may be
-// revoked mid-run.
+// Returns a fresh per-test OIDC subject. The /auth/token handler find-or-creates
+// the user, so each unique sub yields a brand-new user row — the isolation
+// primitive that lets parallel e2e tests share one DB. See docs/architecture.md
+// §9 for the policy.
+export function generateTestSub(): string {
+  return `e2e-${randomUUID()}`;
+}
+
+// Cache is per-worker (per Node module instance) and keyed by `sub`. When a
+// helper like seedAuth calls both injectAuthToken and seedTestState with the
+// same generated sub, the cache prevents a second OIDC round-trip for that
+// test. Across tests the keys are unique so there are no hits — which is
+// correct, because each test wants its own identity.
 const tokenCache = new Map<string, string>();
 
 // Mints a real backend HS256 JWT by performing the full production auth flow:
@@ -28,7 +30,11 @@ const tokenCache = new Map<string, string>();
 // The returned token is what the frontend stores as `auth_token`; sending it as
 // Bearer satisfies auth_middleware (HS256 + jti/session check), so unmocked
 // endpoints reach their real handler instead of cascading to /login.
-export async function mintTestToken(sub: string = DEFAULT_TEST_SUB): Promise<string> {
+//
+// Pass an explicit `sub` when a test needs to know its own identity (e.g. to
+// assert on backend-returned email). Otherwise the default generates a fresh
+// per-call sub, giving each test its own user.
+export async function mintTestToken(sub: string = generateTestSub()): Promise<string> {
   const cached = tokenCache.get(sub);
   if (cached) return cached;
 
@@ -77,14 +83,15 @@ export async function mintTestToken(sub: string = DEFAULT_TEST_SUB): Promise<str
   return exchangeJson.access_token;
 }
 
-// These mirror what the real backend produces for the seeded subs, used as
-// reference values in test assertions (e.g. profile.e2e.ts checks email +
-// display_name). Backend-generated fields (user_id, timestamps, last_login)
-// are placeholders here; tests should not assert on them directly. Replaced
-// entirely by per-test DB isolation in chunk 4 (#775).
+// Fixture shapes used by tests that mock GET /users/me, GET /preferences/me, or
+// related read endpoints via page.route().fulfill(). The values here are
+// fixtures, not what the real backend returns — tests assert against them only
+// in the context of route mocks that serve them back. With per-test user
+// isolation, the real backend's email for a given test is `e2e-<uuid>@mock.plnd`,
+// not these static strings.
 export const MOCK_USER_NEW = {
   user_id: 'e2e-test-uuid',
-  email: `${SEED_ONBOARDING_SUB}@mock.plnd`,
+  email: 'e2e-mock-new-fixture@mock.plnd',
   display_name: null,
   avatar_url: null,
   created_at: '2026-01-01T00:00:00Z',
@@ -96,7 +103,7 @@ export const MOCK_USER_NEW = {
 
 export const MOCK_USER_ONBOARDED = {
   user_id: 'e2e-test-uuid',
-  email: `${SEED_AUTH_SUB}@mock.plnd`,
+  email: 'e2e-mock-onboarded-fixture@mock.plnd',
   display_name: 'Test User',
   avatar_url: null,
   created_at: '2026-01-01T00:00:00Z',
@@ -119,14 +126,12 @@ export const MOCK_PREFS = {
   phone_number: null,
 };
 
-// Today date as fixed by page.clock.setFixedTime in e2e tests.
-const E2E_TODAY = '2026-03-28';
-
 // Injects a real minted JWT into localStorage before page load. Use this for
 // tests that need to bypass login but set up their own route mocks (rather
-// than seedAuth's defaults). `sub` flows through to mintTestToken for tests
-// that need a distinct identity (chunks 2+ will use this for per-test users).
-export async function injectAuthToken(page: Page, sub: string = DEFAULT_TEST_SUB): Promise<void> {
+// than seedAuth's defaults). Pass an explicit `sub` when the test needs to
+// reference the same identity from multiple call sites; otherwise the default
+// generates a fresh per-test user.
+export async function injectAuthToken(page: Page, sub: string = generateTestSub()): Promise<void> {
   const token = await mintTestToken(sub);
   await page.addInitScript((t: string) => {
     localStorage.setItem('auth_token', t);
@@ -160,45 +165,16 @@ export async function seedTestState(sub: string, body: TestSeedBody): Promise<vo
   }
 }
 
-export async function seedAuth(page: Page) {
-  await injectAuthToken(page, SEED_AUTH_SUB);
-  await seedTestState(SEED_AUTH_SUB, { preset: 'onboarded' });
-  await page.route(`${API_BASE}/schedule/plan/status**`, route =>
-    route.fulfill({ status: 200, json: { planned: false } })
-  );
-  await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-  await page.route(`${API_BASE}/schedule/period**`, route => {
-    const start = new URL(route.request().url()).searchParams.get('start') ?? E2E_TODAY;
-    const isToday = start === E2E_TODAY;
-    return route.fulfill({
-      status: 200,
-      json: {
-        entries: [
-          {
-            entry_id: 'e2e-meal-uuid',
-            task_type: null,
-            date: start,
-            scheduled_start: `${start}T08:00:00Z`,
-            status: isToday ? 'completed' : 'planned',
-            after_anchor: 'breakfast',
-          },
-          {
-            entry_id: 'e2e-task-uuid',
-            task_type: 'task',
-            title: 'Morning stretch',
-            date: start,
-            scheduled_start: `${start}T07:00:00Z`,
-            status: isToday ? 'completed' : 'pending',
-          },
-        ],
-        carryover: [],
-      },
-    });
-  });
-  // /briefing/{weather,news,yesterday} are served by the real backend:
-  // weather + news come from fixture-backed providers when
-  // APP_EXTERNAL__FIXTURE_PATH is set (see scripts/verify.sh); yesterday is
-  // DB-only and is populated by the `onboarded` preset above.
+// Seeds an onboarded user session against the real backend. Each call generates
+// a fresh per-test sub so parallel tests cannot collide on writes — `user_id`
+// is the isolation boundary (see docs/architecture.md §9). The real backend
+// serves /users/me, /preferences/me, /schedule/plan/status, /schedule/period,
+// /my/meal-suggestions, and /briefing/* directly for this user. Returns the
+// generated sub so callers can chain additional data seeding (e.g.
+// seedScheduleEntries from helpers/seed-data.ts).
+export async function seedAuth(page: Page): Promise<{ sub: string }> {
+  const sub = generateTestSub();
+  await injectAuthToken(page, sub);
+  await seedTestState(sub, { preset: 'onboarded' });
+  return { sub };
 }

@@ -1,13 +1,24 @@
 import { test, expect, Page } from '@playwright/test';
 import { DayViewPage } from '../pages/day-view.page';
 import { API_BASE, seedAuth } from '../helpers/auth';
+import { seedScheduleEntries } from '../helpers/seed-data';
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 test.describe('Day View — Add Entry', () => {
 
   test.beforeEach(async ({ page }) => {
-    await seedAuth(page);
+    const { sub } = await seedAuth(page);
+    // Minimal seed so the schedule list (which hosts the "Add something…"
+    // trigger row) renders. Tests then exercise the add flow against the
+    // mocked /agent/task endpoint.
+    await seedScheduleEntries(sub, {
+      plan_start: '2026-03-23',
+      plan_end: '2026-03-29',
+      placed_tasks: [
+        { date: '2026-03-28', task_type: 'general', title: 'Existing task', scheduled_start: '09:00:00' },
+      ],
+    });
   });
 
   test.describe('open / close', () => {

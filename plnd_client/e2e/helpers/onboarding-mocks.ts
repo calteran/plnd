@@ -1,5 +1,5 @@
 import { Page } from '@playwright/test';
-import { API_BASE, injectAuthToken, seedTestState, SEED_ONBOARDING_SUB } from './auth';
+import { API_BASE, generateTestSub, injectAuthToken, seedTestState } from './auth';
 
 // ── Day Types ─────────────────────────────────────────────────────────────────
 
@@ -107,17 +107,19 @@ export const MOCK_PLAN_COMMITTED = {
 };
 
 // ── seedOnboarding ────────────────────────────────────────────────────────────
-// Sets up a non-onboarded user session with fixed clock 2026-03-28.
-// The user's /users/me, /preferences/me, and /dietary-restrictions responses
-// are now served by the real backend (auto-created during /auth/token exchange,
-// reconciled by /test/seed). Override individual routes after calling this for
-// test-specific data shaping.
+// Sets up a non-onboarded user session with fixed clock 2026-03-28. Each call
+// generates a fresh per-test sub so parallel tests cannot collide on writes —
+// `user_id` is the isolation boundary (see docs/architecture.md §9). The
+// real backend serves /users/me, /preferences/me, /dietary-restrictions,
+// /my/meals, and /my/dishes directly for this user. Override individual
+// routes after calling this for test-specific data shaping.
 
-export async function seedOnboarding(page: Page): Promise<void> {
+export async function seedOnboarding(page: Page): Promise<{ sub: string }> {
   await page.clock.setFixedTime('2026-03-28T00:00:00');
-  await injectAuthToken(page, SEED_ONBOARDING_SUB);
-  await seedTestState(SEED_ONBOARDING_SUB, { preset: 'new' });
-  await mockUserCatalogEmpty(page);
+  const sub = generateTestSub();
+  await injectAuthToken(page, sub);
+  await seedTestState(sub, { preset: 'new' });
+  return { sub };
 }
 
 /**
