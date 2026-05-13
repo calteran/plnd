@@ -105,12 +105,39 @@ test.describe('Day View — Task Completion Toggle', () => {
   });
 
   // ── API integration ──────────────────────────────────────────────────────
-  //
-  // The toggle currently mutates only client-side signal state — see
-  // ScheduleService.toggleItem() (no HTTP). True end-to-end coverage will
-  // arrive when toggleItem PATCHes /schedule/entries/{id}/status; tracked in
-  // a follow-up issue. Until then the DOM-behavior tests above are the
-  // critical-journey exemplar (zero page.route() per test against real
-  // seeded entries; see docs/architecture.md §9).
+
+  test.describe('API integration — toggle persists across reload', () => {
+    const PENDING_DATE = '2026-03-29';
+
+    test('toggling a task persists after navigating away and back', async ({ page }) => {
+      const dayView = new DayViewPage(page);
+      await dayView.gotoDate(PENDING_DATE);
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+
+      await expect(dayView.getTaskRowCheckbox(dayView.getTaskRows().first()))
+        .toHaveAttribute('aria-checked', 'false');
+
+      // Toggle and wait for the PATCH to settle before navigating away
+      const [patchResponse] = await Promise.all([
+        page.waitForResponse(r =>
+          r.url().includes('/schedule/entries/') && r.request().method() === 'PATCH',
+        ),
+        dayView.getTaskRowCheckbox(dayView.getTaskRows().first()).click(),
+      ]);
+      expect(patchResponse.status()).toBe(204);
+
+      // Navigate to a different date and back — forces a fresh GET /schedule/period
+      await dayView.gotoDate('2026-03-28');
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await dayView.gotoDate(PENDING_DATE);
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+
+      // Backend-persisted status must still be reflected
+      await expect(dayView.getTaskRowCheckbox(dayView.getTaskRows().first()))
+        .toHaveAttribute('aria-checked', 'true');
+      await expect(dayView.getTaskRowInner(dayView.getTaskRows().first()))
+        .toHaveClass(/done/);
+    });
+  });
 
 });
