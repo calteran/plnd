@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { seedAuth, API_BASE, MOCK_PREFS } from '../helpers/auth';
+import { mockUserCatalogEmpty } from '../helpers/onboarding-mocks';
 
 // Fixed seed: 3-day horizon Mon 2026-03-30 → Wed 2026-04-01
 // Override default_plan_length_days → 3 so the wizard computes the same horizon
@@ -44,15 +45,7 @@ async function seedWizard(page: Page): Promise<void> {
   await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
     route.fulfill({ json: { carryover: [] } })
   );
-  // plan-meals-step calls userMealsService.load() and userDishesService.load() on init;
-  // mock to empty arrays so the unauthenticated synthetic token never hits the real backend
-  // (real 401 would trigger authErrorInterceptor → logout → /login redirect).
-  await page.route(`${API_BASE}/my/meals`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-  await page.route(`${API_BASE}/my/dishes`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
+  await mockUserCatalogEmpty(page);
   // Step 3 auto-generates via agent on first entry when no meals are stored.
   await page.route(`${API_BASE}/agent/meal-plan`, route =>
     route.fulfill({ status: 200, json: { week: '2026-03-30', meals: STEP3_AGENT_MEALS } })
