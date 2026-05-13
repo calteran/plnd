@@ -1,31 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { API_BASE, seedAuth } from '../helpers/auth';
+import { seedAuth } from '../helpers/auth';
+import { seedDietaryRestrictions } from '../helpers/seed-data';
 
-// All tests seed auth via addInitScript and intercept the dietary-restrictions API,
-// so they are independent of the Docker API image version.
+// Per docs/architecture.md §9.7, dietary-restriction CRUD flows through the
+// real backend in e2e — no page.route() interceptors. Tests that need a
+// pre-existing restriction (edit, delete, list) seed it via the
+// seedDietaryRestrictions helper, which posts to /dietary-restrictions before
+// the page loads.
 
-const DR_URL = `${API_BASE}/dietary-restrictions`;
-
-const MOCK_RESTRICTIONS = [
-  {
-    restriction_id: 'uuid-1',
-    user_id: 'e2e-test-uuid',
-    restriction_type: 'allergy',
-    name: 'peanuts',
-    notes: null,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z'
-  },
-  {
-    restriction_id: 'uuid-2',
-    user_id: 'e2e-test-uuid',
-    restriction_type: 'intolerance',
-    name: 'lactose',
-    notes: 'mild',
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '2026-01-01T00:00:00Z'
-  }
-];
+const SEED_PEANUTS = { restriction_type: 'allergy', name: 'peanuts' } as const;
+const SEED_LACTOSE = { restriction_type: 'intolerance', name: 'lactose', notes: 'mild' } as const;
 
 test.describe('Dietary Restrictions', () => {
   test('unauthenticated /dietary-restrictions visit redirects to /login', async ({ page }) => {
@@ -34,15 +18,8 @@ test.describe('Dietary Restrictions', () => {
   });
 
   test('list renders restriction names', async ({ page }) => {
-    await seedAuth(page);
-
-    await page.route(`${DR_URL}`, async route => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 200, json: MOCK_RESTRICTIONS });
-      } else {
-        await route.continue();
-      }
-    });
+    const { sub } = await seedAuth(page);
+    await seedDietaryRestrictions(sub, [SEED_PEANUTS, SEED_LACTOSE]);
 
     await page.goto('/dietary-restrictions');
 
@@ -54,28 +31,8 @@ test.describe('Dietary Restrictions', () => {
   });
 
   test('add restriction shows success and new item', async ({ page }) => {
-    const newItem = {
-      restriction_id: 'uuid-3',
-      user_id: 'e2e-test-uuid',
-      restriction_type: 'preference',
-      name: 'vegan',
-      notes: 'plant-based only',
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z'
-    };
-
-    await seedAuth(page);
-
-    await page.route(`${DR_URL}`, async route => {
-      const method = route.request().method();
-      if (method === 'GET') {
-        await route.fulfill({ status: 200, json: MOCK_RESTRICTIONS });
-      } else if (method === 'POST') {
-        await route.fulfill({ status: 201, json: newItem });
-      } else {
-        await route.continue();
-      }
-    });
+    const { sub } = await seedAuth(page);
+    await seedDietaryRestrictions(sub, [SEED_PEANUTS, SEED_LACTOSE]);
 
     await page.goto('/dietary-restrictions');
     await expect(page.locator('.restriction-item').first()).toBeVisible({ timeout: 5_000 });
@@ -87,33 +44,21 @@ test.describe('Dietary Restrictions', () => {
     await page.getByRole('button', { name: 'Add Restriction' }).click();
     await expect(page.locator('.status-success')).toHaveText('Restriction added.', { timeout: 10_000 });
     await expect(page.locator('body')).toContainText('vegan');
+    await expect(page.locator('body')).toContainText('plant-based only');
   });
 
   test('edit notes shows success and updated notes', async ({ page }) => {
-    const updated = { ...MOCK_RESTRICTIONS[1], notes: 'severe' };
-
-    await seedAuth(page);
-
-    await page.route(`${DR_URL}`, async route => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 200, json: MOCK_RESTRICTIONS });
-      } else {
-        await route.continue();
-      }
-    });
-
-    await page.route(`${DR_URL}/uuid-2`, async route => {
-      if (route.request().method() === 'PATCH') {
-        await route.fulfill({ status: 200, json: updated });
-      } else {
-        await route.continue();
-      }
-    });
+    const { sub } = await seedAuth(page);
+    // Seed two restrictions; we'll edit the lactose (intolerance) item.
+    await seedDietaryRestrictions(sub, [SEED_PEANUTS, SEED_LACTOSE]);
 
     await page.goto('/dietary-restrictions');
     await expect(page.locator('.restriction-item').first()).toBeVisible({ timeout: 5_000 });
 
-    // Click the Edit button for the lactose item (second restriction-item)
+    // Items are grouped by restriction_type in the order
+    // [allergy, intolerance, preference, cultural_religious] (see
+    // RESTRICTION_TYPES in plnd_client/src/app/core/models/dietary-restriction.ts),
+    // so .restriction-item nth(0)=peanuts (allergy), nth(1)=lactose (intolerance).
     const items = page.locator('.restriction-item');
     await items.nth(1).getByRole('button', { name: 'Edit' }).click();
 
@@ -127,23 +72,8 @@ test.describe('Dietary Restrictions', () => {
   });
 
   test('delete restriction removes item from list', async ({ page }) => {
-    await seedAuth(page);
-
-    await page.route(`${DR_URL}`, async route => {
-      if (route.request().method() === 'GET') {
-        await route.fulfill({ status: 200, json: MOCK_RESTRICTIONS });
-      } else {
-        await route.continue();
-      }
-    });
-
-    await page.route(`${DR_URL}/uuid-1`, async route => {
-      if (route.request().method() === 'DELETE') {
-        await route.fulfill({ status: 204 });
-      } else {
-        await route.continue();
-      }
-    });
+    const { sub } = await seedAuth(page);
+    await seedDietaryRestrictions(sub, [SEED_PEANUTS, SEED_LACTOSE]);
 
     await page.goto('/dietary-restrictions');
     await expect(page.locator('.restriction-item').first()).toBeVisible({ timeout: 5_000 });
