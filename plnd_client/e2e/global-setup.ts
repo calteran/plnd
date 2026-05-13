@@ -27,19 +27,22 @@ async function waitForApi(url: string): Promise<boolean> {
 }
 
 export default async function globalSetup(): Promise<void> {
-  // Both `just verify` and standalone playwright runs converge on the same
-  // docker-compose services — `docker compose up -d --wait` is idempotent when
-  // they're already healthy, so this is a true no-op in the verify case.
-  // `doppler run` injects DB_PASSWORD so the postgres container starts.
-  // `--wait` blocks until each service's compose healthcheck passes; no
-  // additional probe needed for db or mock-oauth-server.
+  // CI workflow brings up its own mock-oauth-server + plnd_api and waits for
+  // them before invoking playwright. Skip infra management here — CI runners
+  // don't have doppler/docker-compose set up the way local dev does.
+  if (process.env.CI) return;
+
+  // Local runs (standalone `npx playwright test` or `just verify`): bring up
+  // the docker-compose services. `doppler run` injects DB_PASSWORD so the
+  // postgres container starts; `--wait` blocks until each service's compose
+  // healthcheck passes. Idempotent — already-running services are a no-op.
   const repoRoot = path.resolve(__dirname, '..', '..');
   execSync('doppler run -- docker compose up -d --wait db mock-oauth-server', {
     cwd: repoRoot,
     stdio: 'inherit',
   });
 
-  // plnd_api lifecycle is not managed by playwright — verify.sh starts it,
+  // plnd_api isn't a docker-compose service — verify.sh starts it natively,
   // standalone runs need `just api` or `just dev`. Probe with a short retry to
   // tolerate "API just booted" and fail fast with an actionable message when
   // it really isn't running.
