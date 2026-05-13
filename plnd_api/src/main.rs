@@ -143,10 +143,9 @@ async fn main() {
         .expect("invalid CORS origin in auth.frontend_origin");
 
     // Construct external providers
-    let nutrition_usda: Arc<dyn plnd_data::providers::NutritionProvider> =
-        Arc::new(UsdaFdcProvider::new(
-            &config.external_providers.usda_fdc_api_key,
-        ));
+    let nutrition_usda: Arc<dyn plnd_data::providers::NutritionProvider> = Arc::new(
+        UsdaFdcProvider::new(&config.external_providers.usda_fdc_api_key),
+    );
     let off_basic_auth = if config.external_providers.off_basic_auth_user.is_empty() {
         None
     } else {
@@ -155,11 +154,9 @@ async fn main() {
             config.external_providers.off_basic_auth_password.clone(),
         ))
     };
-    let nutrition_off: Arc<dyn plnd_data::providers::NutritionProvider> =
-        Arc::new(OpenFoodFactsProvider::new(
-            &config.external_providers.off_base_url,
-            off_basic_auth,
-        ));
+    let nutrition_off: Arc<dyn plnd_data::providers::NutritionProvider> = Arc::new(
+        OpenFoodFactsProvider::new(&config.external_providers.off_base_url, off_basic_auth),
+    );
     let recipe_mdb = Arc::new(TheMealDbProvider::new(
         &config.external_providers.themealdb_api_key,
     ));
@@ -198,12 +195,8 @@ async fn main() {
         nutrition_usda.clone(),
         nutrition_off.clone(),
     );
-    let provider_search = ProviderSearchService::new(
-        search_nutrition,
-        vec![recipe_mdb],
-        vec![],
-        search_cache,
-    );
+    let provider_search =
+        ProviderSearchService::new(search_nutrition, vec![recipe_mdb], vec![], search_cache);
 
     let (weather_provider, news_provider) = build_briefing_providers(&config.external_providers);
     let briefing = BriefingState::new(weather_provider, news_provider);
@@ -531,7 +524,10 @@ fn build_nutrition_providers(
         };
         return vec![
             Arc::new(make("usda_fdc", "nutrition/usda_fdc/search.json")),
-            Arc::new(make("openfoodfacts", "nutrition/open_food_facts/search.json")),
+            Arc::new(make(
+                "openfoodfacts",
+                "nutrition/open_food_facts/search.json",
+            )),
         ];
     }
     vec![usda, off]

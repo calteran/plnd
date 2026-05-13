@@ -154,11 +154,13 @@ test.describe('Catalog Library — API Contract', () => {
         return { step: 'search', searchStatus: searchRes.status, searchBody };
       }
 
-      const hit = (searchBody.external as Array<{
-        external_id: string;
-        name: string;
-        description: string | null;
-      }>).find((r) => r.external_id === '1750340');
+      const hit = (
+        searchBody.external as {
+          external_id: string;
+          name: string;
+          description: string | null;
+        }[]
+      ).find((r) => r.external_id === '1750340');
       if (!hit) {
         return { step: 'search', searchStatus: searchRes.status, searchBody };
       }
