@@ -1,89 +1,74 @@
 import { test, expect, Page } from '@playwright/test';
 import {
-  API_BASE, MOCK_USER_NEW, MOCK_USER_ONBOARDED, MOCK_PREFS,
+  API_BASE,
+  generateTestSub,
   injectAuthToken,
+  seedAuth,
+  seedTestState,
 } from '../helpers/auth';
 import {
-  MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS,
-  MOCK_TEMPLATE_MORNING_WALK, MOCK_PLACED_TASKS, MOCK_MEAL_PLAN,
-  MOCK_DIETARY_RESTRICTION_ALLERGY,
-  MOCK_PLAN_COMMITTED,
+  MOCK_PLACED_TASKS,
+  MOCK_MEAL_PLAN,
   seedOnboarding,
 } from '../helpers/onboarding-mocks';
+import { seedDayType, seedDayTypeMeal } from '../helpers/seed-data';
+
+// ── Mock policy ────────────────────────────────────────────────────────────────
+//
+// Per docs/architecture.md §9.7, only LLM/agent endpoints may be mocked. Every
+// `page.route()` call below targets `/agent/*` (place-tasks, meal-plan). All
+// user data, configuration, and schedule state flow through the real backend
+// via the seed helpers in ../helpers/seed-data.ts and the /test/seed endpoint.
 
 // ── Spoke completion helpers ──────────────────────────────────────────────────
 
 async function completeAccountSpoke(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/users/me`, route => {
-    if (route.request().method() === 'PATCH') {
-      route.fulfill({ status: 200, json: { ...MOCK_USER_NEW, display_name: 'Test' } });
-    } else {
-      route.fulfill({ status: 200, json: MOCK_USER_NEW });
-    }
-  });
   await page.locator('.section-card').first().click();
   await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
+  await page.locator('#displayName').fill('Test');
   await page.locator('.btn-continue').click();
   await expect(page).toHaveURL(/\/onboarding$/);
 }
 
-async function completeTasksSpoke(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/day-types`, async route => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] });
-    } else {
-      await route.fulfill({ status: 201, json: MOCK_DAY_TYPE_WEEKDAYS });
-    }
+// Seeds two pre-existing day types (Weekdays + Weekends) so the day-types substep
+// finds them in ngOnInit and renders the two-card layout the tests expect.
+async function seedWeekdaysWeekends(sub: string): Promise<void> {
+  const weekdays = await seedDayType(sub, {
+    name: 'Weekdays',
+    days_bitmask: 62, // Mon–Fri: bits 1–5
+    wake_time: '07:00',
+    sleep_time: '22:00',
   });
-  // PUT /day-types/:id — ngOnInit now loads existing day types (GET above returns types with IDs),
-  // so save() calls update() instead of create() for already-persisted records.
-  await page.route(`${API_BASE}/day-types/*`, async route => {
-    const method = route.request().method();
-    if (method === 'DELETE') {
-      await route.fulfill({ status: 204, body: '' });
-    } else if (route.request().url().includes('st-weekends-uuid')) {
-      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKENDS });
-    } else {
-      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKDAYS });
-    }
+  const weekends = await seedDayType(sub, {
+    name: 'Weekends',
+    days_bitmask: 65, // Sat+Sun: bits 0+6
+    wake_time: '08:00',
+    sleep_time: '23:00',
   });
-  await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
-    const method = route.request().method();
-    if (method === 'GET') {
-      await route.fulfill({ status: 200, json: [] });
-    } else if (method === 'POST') {
-      await route.fulfill({ status: 201, json: {
-        id: 'mock-meal-uuid', day_type_id: 'mock-dt-uuid', user_id: 'test',
-        name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 30,
-        sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
-      }});
-    } else if (method === 'DELETE') {
-      await route.fulfill({ status: 204, body: '' });
-    }
-  });
-  await page.route(`${API_BASE}/routines`, route => {
-    if (route.request().method() === 'POST') {
-      route.fulfill({ status: 201, json: MOCK_TEMPLATE_MORNING_WALK });
-    } else {
-      route.fulfill({ status: 200, json: [] });
-    }
-  });
-  await page.route(`${API_BASE}/agent/place-tasks`, route =>
-    route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
-  );
+  // Three meals per day type so task-placement-review renders meal dividers.
+  for (const dt of [weekdays, weekends]) {
+    await seedDayTypeMeal(sub, dt.id, { name: 'Breakfast', preferred_time: '08:00', sort_order: 0 });
+    await seedDayTypeMeal(sub, dt.id, { name: 'Lunch', preferred_time: '12:00', sort_order: 1 });
+    await seedDayTypeMeal(sub, dt.id, { name: 'Dinner', preferred_time: '18:00', sort_order: 2 });
+  }
+}
 
+// Drives Tasks spoke from hub through Planning Prefs → Schedule Types → Routines & Tasks
+// → Task Placement Review → back to hub. Caller must have already mocked /agent/place-tasks
+// (the only LLM endpoint here) and seeded any required pre-existing day types.
+async function completeTasksSpoke(page: Page): Promise<void> {
   await page.locator('.section-card').nth(1).click();
   await expect(page.locator('.spoke-title')).toHaveText('Tasks & Routines');
 
-  // Step 1: Planning Prefs
+  // Step 1: Planning Prefs — accept defaults
   await expect(page.locator('.planning-prefs')).toBeVisible();
   await page.locator('.btn-continue').click();
 
-  // Step 2: Schedule Types
+  // Step 2: Schedule Types — accept seeded Weekdays/Weekends as-is
   await expect(page.locator('.day-types-substep')).toBeVisible();
   await page.locator('.day-types-substep .save-btn').click();
 
-  // Step 3: Routines & Tasks
+  // Step 3: Routines & Tasks — no inputs needed (real backend persists empty list)
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
   await page.locator('.routines-tasks-substep .save-btn').click();
 
@@ -96,7 +81,6 @@ async function completeTasksSpoke(page: Page): Promise<void> {
 
 // Navigates to tasks spoke and completes the Planning Prefs substep.
 // Page must be at /onboarding after seedOnboarding.
-// Caller is responsible for registering the /day-types route before calling this.
 async function landAtScheduleTypes(page: Page): Promise<void> {
   await page.locator('.section-card').nth(1).click();
   await expect(page.locator('.planning-prefs')).toBeVisible();
@@ -104,64 +88,17 @@ async function landAtScheduleTypes(page: Page): Promise<void> {
   await expect(page.locator('.day-types-substep')).toBeVisible();
 }
 
-// Drives from hub to the Routines & Tasks substep.
-// Caller must have already set up the /routines route.
-// This helper registers /day-types itself.
+// Drives from hub to the Routines & Tasks substep. Caller must have seeded
+// Weekdays/Weekends day types beforehand for the substep to render.
 async function landAtRoutinesTasks(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/day-types`, async route => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] });
-    } else {
-      await route.fulfill({ status: 201, json: MOCK_DAY_TYPE_WEEKDAYS });
-    }
-  });
-  await page.route(`${API_BASE}/day-types/*`, async route => {
-    const method = route.request().method();
-    if (method === 'DELETE') {
-      await route.fulfill({ status: 204, body: '' });
-    } else if (route.request().url().includes('st-weekends-uuid')) {
-      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKENDS });
-    } else {
-      await route.fulfill({ status: 200, json: MOCK_DAY_TYPE_WEEKDAYS });
-    }
-  });
-  await page.route(`${API_BASE}/day-types/**/meals**`, async route => {
-    const method = route.request().method();
-    if (method === 'GET') {
-      // Return 3 meals so ngOnInit populates card.meals — save() will delete then re-create
-      // them, and the resulting DayTypeResponse.meals lets task-placement render .meal-divider.
-      await route.fulfill({ status: 200, json: [
-        { id: 'mock-meal-1', day_type_id: 'mock-dt-uuid', user_id: 'test', name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-        { id: 'mock-meal-2', day_type_id: 'mock-dt-uuid', user_id: 'test', name: 'Lunch',     preferred_time: '12:00:00', tolerance_minutes: 30, sort_order: 1, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-        { id: 'mock-meal-3', day_type_id: 'mock-dt-uuid', user_id: 'test', name: 'Dinner',    preferred_time: '18:00:00', tolerance_minutes: 30, sort_order: 2, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-      ] });
-    } else if (method === 'POST') {
-      await route.fulfill({ status: 201, json: {
-        id: 'mock-meal-uuid', day_type_id: 'mock-dt-uuid', user_id: 'test',
-        name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 30,
-        sort_order: 0, created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
-      }});
-    } else if (method === 'DELETE') {
-      await route.fulfill({ status: 204, body: '' });
-    }
-  });
   await landAtScheduleTypes(page);
   await page.locator('.day-types-substep .save-btn').click();
   await expect(page.locator('.routines-tasks-substep')).toBeVisible();
 }
 
 // Drives to Task Placement Review with one task added ("Morning run").
-// Does NOT mock /agent/place-tasks — each test does this individually.
+// Caller must mock /agent/place-tasks before calling.
 async function landAtTaskPlacement(page: Page): Promise<void> {
-  // Register the POST-handling mock before any click so the request is intercepted correctly.
-  await page.route(`${API_BASE}/routines`, route => {
-    if (route.request().method() === 'POST') {
-      route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning run', task_type: 'general' } });
-    } else {
-      route.fulfill({ status: 200, json: [] });
-    }
-  });
-
   await landAtRoutinesTasks(page);
 
   await page.locator('[aria-label="Task name"]').fill('Morning run');
@@ -172,8 +109,8 @@ async function landAtTaskPlacement(page: Page): Promise<void> {
   await expect(page.locator('.placement-review')).toBeVisible();
 }
 
-// Lands on Dietary Restrictions substep (planningPrefsComplete=true after Tasks spoke;
-// meal-times step was removed — food now starts directly at restrictions).
+// Lands on Dietary Restrictions substep. planningPrefsComplete=true after Tasks
+// spoke runs, so Food starts directly at restrictions.
 async function landAtDietaryRestrictions(page: Page): Promise<void> {
   await completeTasksSpoke(page);
 
@@ -183,9 +120,6 @@ async function landAtDietaryRestrictions(page: Page): Promise<void> {
 }
 
 async function landAtDietaryPreferences(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/my/ingredient-prefs`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
   await landAtDietaryRestrictions(page);
   await page.locator('.btn-continue').click();
   await expect(page.locator('.prefs-substep')).toBeVisible();
@@ -196,30 +130,13 @@ async function landAtMealPlanReview(page: Page): Promise<void> {
   await page.locator('.btn-continue').click();
 }
 
-async function mockDayView(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/schedule/plan/status**`, route =>
-    route.fulfill({ status: 200, json: { planned: false } })
-  );
-  await page.route(`${API_BASE}/schedule/period**`, route =>
-    route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
-  );
-  await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-}
-
+// Drives Food spoke from hub through Restrictions → Preferences → Meal Plan Review
+// → back to hub. Caller must have already mocked /agent/meal-plan (the only LLM
+// endpoint here) and run completeTasksSpoke (so planningPrefsComplete=true).
 async function completeFoodSpoke(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/my/ingredient-prefs`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-  await page.route(`${API_BASE}/agent/meal-plan`, route =>
-    route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
-  );
-
   await page.locator('.section-card').nth(2).click();
   await expect(page.locator('.spoke-title')).toHaveText('Food & Meals');
 
-  // planningPrefsComplete=true after Tasks, so Food starts at Dietary Restrictions (step 1)
   // Step 1: Dietary Restrictions
   await expect(page.locator('.restrictions-substep')).toBeVisible();
   await page.locator('.btn-continue').click();
@@ -228,7 +145,7 @@ async function completeFoodSpoke(page: Page): Promise<void> {
   await expect(page.locator('.prefs-substep')).toBeVisible();
   await page.locator('.btn-continue').click();
 
-  // Step 4: Meal Plan Review — wait for generation then save
+  // Step 3: Meal Plan Review — wait for /agent/meal-plan response then save
   await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
   await page.locator('.btn-continue').click();
 
@@ -242,66 +159,26 @@ test.describe('Onboarding', () => {
   });
 
   test('authenticated new user lands on onboarding hub', async ({ page }) => {
-    await page.route(`${API_BASE}/users/me`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
-    );
-    await page.route(`${API_BASE}/dietary-restrictions`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-    );
-
-    await injectAuthToken(page);
+    await seedOnboarding(page);
     await page.goto('/onboarding');
     await expect(page).toHaveURL(/\/onboarding/);
     await expect(page.locator('h1')).toHaveText('Welcome to PLND!');
   });
 
   test('authenticated returning user navigating to /onboarding redirects to /today', async ({ page }) => {
-    await page.route(`${API_BASE}/users/me`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_ONBOARDED) })
-    );
-    await page.route(`${API_BASE}/preferences/me`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
-    );
-    await page.route(`${API_BASE}/schedule/plan/status**`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
-    );
-    await page.route(`${API_BASE}/schedule/period**`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ entries: [], carryover: [] }) })
-    );
-    await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-    );
-
-    await injectAuthToken(page);
+    await seedAuth(page);
     await page.goto('/onboarding');
     await expect(page).toHaveURL(/\/day\//);
   });
 
   test('non-onboarded user navigating to /today is redirected to /onboarding', async ({ page }) => {
-    await page.route(`${API_BASE}/users/me`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
-    );
-    await page.route(`${API_BASE}/dietary-restrictions`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-    );
-
-    await injectAuthToken(page);
+    await seedOnboarding(page);
     await page.goto('/today');
     await expect(page).toHaveURL(/\/onboarding/);
   });
 
   test('new user can navigate to /onboarding/account child route', async ({ page }) => {
-    await page.route(`${API_BASE}/users/me`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_USER_NEW) })
-    );
-    await page.route(`${API_BASE}/preferences/me`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_PREFS) })
-    );
-    await page.route(`${API_BASE}/dietary-restrictions`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) })
-    );
-
-    await injectAuthToken(page);
+    await seedOnboarding(page);
     await page.goto('/onboarding/account');
     await expect(page).toHaveURL(/\/onboarding\/account/);
     await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
@@ -354,22 +231,12 @@ test.describe('Onboarding', () => {
     });
 
     test('account section card shows ✓ done badge after account spoke completes', async ({ page }) => {
-      // Mock account save endpoints
-      await page.route(`${API_BASE}/users/me`, route => {
-        if (route.request().method() === 'PATCH') {
-          route.fulfill({ status: 200, json: { ...MOCK_USER_NEW, display_name: 'Test' } });
-        } else {
-          route.fulfill({ status: 200, json: MOCK_USER_NEW });
-        }
-      });
-
-      // Navigate to account, save, return to hub
+      // Navigate to account, save (PATCH /users/me hits real backend), return to hub.
       await page.goto('/onboarding/account');
       await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
       await page.locator('#displayName').fill('Test');
       await page.locator('.btn-continue').click();
 
-      // Hub should show account card as done
       await expect(page).toHaveURL(/\/onboarding$/);
       const accountCard = page.locator('.section-card').first();
       await expect(accountCard.locator('.card-badge.badge--done')).toContainText('✓ done');
@@ -379,9 +246,6 @@ test.describe('Onboarding', () => {
   test.describe('Hub skip modal', () => {
     test.beforeEach(async ({ page }) => {
       await seedOnboarding(page);
-      await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
-        route.fulfill({ status: 200, body: '' })
-      );
       await page.goto('/onboarding');
       await expect(page.locator('h1')).toHaveText('Welcome to PLND!');
     });
@@ -413,7 +277,6 @@ test.describe('Onboarding', () => {
     });
 
     test('"Skip for now" calls complete-onboarding and navigates to /day/2026-03-28', async ({ page }) => {
-      await mockDayView(page);
       await page.locator('.btn-skip').click();
       await page.locator('.btn-gray-primary').click();
       await expect(page).toHaveURL(/\/day\/2026-03-28/);
@@ -422,7 +285,14 @@ test.describe('Onboarding', () => {
 
   test.describe('Hub stats banner and commit plan', () => {
     test('stats banner appears with stat labels when all 3 sections complete', async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
+      );
       await page.goto('/onboarding');
 
       await completeAccountSpoke(page);
@@ -439,7 +309,14 @@ test.describe('Onboarding', () => {
     });
 
     test('Approve Plan → is amber/enabled when all 3 sections complete', async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
+      );
       await page.goto('/onboarding');
 
       await completeAccountSpoke(page);
@@ -452,14 +329,14 @@ test.describe('Onboarding', () => {
     });
 
     test('commit plan: POST /schedule/plan + complete-onboarding → navigates to /day/plan-start', async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/schedule/plan`, route =>
-        route.fulfill({ status: 200, json: MOCK_PLAN_COMMITTED })
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
       );
-      await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
-        route.fulfill({ status: 200, body: '' })
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
       );
-      await mockDayView(page);
       await page.goto('/onboarding');
 
       await completeAccountSpoke(page);
@@ -471,15 +348,25 @@ test.describe('Onboarding', () => {
     });
 
     test('POST /schedule/plan 500 → error banner shown; CTA re-enables', async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/schedule/plan`, route =>
-        route.fulfill({ status: 500, body: 'Internal Server Error' })
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
       );
       await page.goto('/onboarding');
 
       await completeAccountSpoke(page);
       await completeTasksSpoke(page);
       await completeFoodSpoke(page);
+
+      // Force the commit POST to fail. This is the test's contract — not a generic
+      // mock — so we keep it as a page.route() override on the real endpoint.
+      await page.route(`${API_BASE}/schedule/plan`, route =>
+        route.fulfill({ status: 500, body: 'Internal Server Error' })
+      );
 
       await page.locator('.btn-cta.btn--accent').click();
 
@@ -493,13 +380,6 @@ test.describe('Onboarding', () => {
   test.describe('Account spoke', () => {
     test.beforeEach(async ({ page }) => {
       await seedOnboarding(page);
-      await page.route(`${API_BASE}/users/me`, route => {
-        if (route.request().method() === 'PATCH') {
-          route.fulfill({ status: 200, json: { ...MOCK_USER_NEW, display_name: 'Test User' } });
-        } else {
-          route.fulfill({ status: 200, json: MOCK_USER_NEW });
-        }
-      });
       await page.goto('/onboarding/account');
       await expect(page.locator('.spoke-title')).toHaveText('Account Settings');
     });
@@ -509,7 +389,9 @@ test.describe('Onboarding', () => {
     });
 
     test('email is shown as static text from user data', async ({ page }) => {
-      await expect(page.locator('.email-display')).toHaveText(MOCK_USER_NEW.email);
+      // Real backend issues `${sub}@mock.plnd` for newly-minted users (see
+      // plnd_api/src/routes/auth.rs). Match that shape rather than a fixture string.
+      await expect(page.locator('.email-display')).toHaveText(/@mock\.plnd$/);
     });
 
     test('SMS input is hidden until SMS toggle is switched on', async ({ page }) => {
@@ -538,7 +420,11 @@ test.describe('Onboarding', () => {
     });
 
     test('skipped on Food after Tasks spoke completed planning prefs', async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
 
       await page.goto('/onboarding');
       await completeTasksSpoke(page);
@@ -550,18 +436,8 @@ test.describe('Onboarding', () => {
     });
 
     test('shown on first entry into Food spoke; skipped on Tasks entered after', async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/day-types`, route =>
-        route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
-      );
-      // ngOnInit fetches listMeals for each loaded day type; without this mock the
-      // synthetic JWT reaches the real server → 401 → auth logout → substep disappears.
-      await page.route(`${API_BASE}/day-types/**/meals**`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
-      await page.route(`${API_BASE}/routines`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
 
       await page.goto('/onboarding/food');
       await expect(page.locator('.planning-prefs')).toBeVisible();
@@ -581,15 +457,8 @@ test.describe('Onboarding', () => {
 
   test.describe('Tasks spoke — Day Types', () => {
     test.beforeEach(async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/day-types`, route =>
-        route.fulfill({ status: 200, json: [MOCK_DAY_TYPE_WEEKDAYS, MOCK_DAY_TYPE_WEEKENDS] })
-      );
-      // ngOnInit calls listMeals for each server-loaded day type; without this mock the
-      // synthetic JWT hits the real server → 401 → auth logout → substep disappears.
-      await page.route(`${API_BASE}/day-types/**/meals**`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
       await page.goto('/onboarding');
       await landAtScheduleTypes(page);
     });
@@ -655,28 +524,13 @@ test.describe('Onboarding', () => {
 
   test.describe('Tasks spoke — Routines & Tasks', () => {
     test.beforeEach(async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/routines`, route => {
-        if (route.request().method() === 'POST') {
-          route.fulfill({ status: 201, json: MOCK_TEMPLATE_MORNING_WALK });
-        } else {
-          route.fulfill({ status: 200, json: [] });
-        }
-      });
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
       await page.goto('/onboarding');
       await landAtRoutinesTasks(page);
     });
 
     test('add routine via form: name + recurrence chip appears', async ({ page }) => {
-      // Override the POST mock to return a template matching what the form submitted.
-      await page.route(`${API_BASE}/routines`, route => {
-        if (route.request().method() === 'POST') {
-          route.fulfill({ status: 201, json: { ...MOCK_TEMPLATE_MORNING_WALK, title: 'Morning yoga' } });
-        } else {
-          route.fulfill({ status: 200, json: [] });
-        }
-      });
-
       await page.locator('[aria-label="Routine name"]').fill('Morning yoga');
       await page.locator('.add-btn').first().click();
 
@@ -716,7 +570,8 @@ test.describe('Onboarding', () => {
 
   test.describe('Tasks spoke — Task Placement Review', () => {
     test('loading state shown while POST /agent/place-tasks completes', async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
       await page.route(`${API_BASE}/agent/place-tasks`, async route => {
         await new Promise(r => setTimeout(r, 200));
         route.fulfill({ status: 200, json: MOCK_PLACED_TASKS });
@@ -729,7 +584,8 @@ test.describe('Onboarding', () => {
     });
 
     test('AI-placed tasks visible in day cards with meal dividers', async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
       await page.route(`${API_BASE}/agent/place-tasks`, route =>
         route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
       );
@@ -745,7 +601,8 @@ test.describe('Onboarding', () => {
     });
 
     test('tap Edit → change energy → Save updates the task row', async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
       await page.route(`${API_BASE}/agent/place-tasks`, route =>
         route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
       );
@@ -764,7 +621,8 @@ test.describe('Onboarding', () => {
     });
 
     test('Save & Return to Hub marks Tasks complete and navigates to hub', async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
       await page.route(`${API_BASE}/agent/place-tasks`, route =>
         route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
       );
@@ -781,14 +639,11 @@ test.describe('Onboarding', () => {
 
   test.describe('Food spoke — Dietary Restrictions', () => {
     test.beforeEach(async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/dietary-restrictions`, route => {
-        if (route.request().method() === 'POST') {
-          route.fulfill({ status: 201, json: MOCK_DIETARY_RESTRICTION_ALLERGY });
-        } else {
-          route.fulfill({ status: 200, json: [] });
-        }
-      });
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
       await page.goto('/onboarding');
       await landAtDietaryRestrictions(page);
       await expect(page.locator('.restrictions-substep')).toBeVisible();
@@ -828,7 +683,11 @@ test.describe('Onboarding', () => {
 
   test.describe('Food spoke — Dietary Preferences', () => {
     test.beforeEach(async ({ page }) => {
-      await seedOnboarding(page);
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
       await page.goto('/onboarding');
       await landAtDietaryPreferences(page);
     });
@@ -849,11 +708,12 @@ test.describe('Onboarding', () => {
   });
 
   test.describe('Food spoke — Meal Plan Review', () => {
-    test.beforeEach(async ({ page }) => {
-      await seedOnboarding(page);
-    });
-
     test('Save & Continue disabled during generation; enabled after plan loads', async ({ page }) => {
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
       await page.route(`${API_BASE}/agent/meal-plan`, async route => {
         await new Promise(r => setTimeout(r, 300));
         route.fulfill({ status: 200, json: MOCK_MEAL_PLAN });
@@ -869,6 +729,11 @@ test.describe('Onboarding', () => {
     });
 
     test('Save & Continue → navigates to hub with Food marked complete', async ({ page }) => {
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
       await page.route(`${API_BASE}/agent/meal-plan`, route =>
         route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
       );
@@ -890,14 +755,14 @@ test.describe('Onboarding', () => {
 
   test.describe('Full happy path', () => {
     test('complete all 3 sections → stats banner → Approve Plan → /day/plan-start', async ({ page }) => {
-      await seedOnboarding(page);
-      await page.route(`${API_BASE}/schedule/plan`, route =>
-        route.fulfill({ status: 200, json: MOCK_PLAN_COMMITTED })
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
       );
-      await page.route(`${API_BASE}/users/me/complete-onboarding`, route =>
-        route.fulfill({ status: 200, body: '' })
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
       );
-      await mockDayView(page);
 
       await page.goto('/onboarding');
 
@@ -916,22 +781,9 @@ test.describe('Onboarding', () => {
   test.describe('Guard: already-onboarded user', () => {
     test('onboarded user visiting /onboarding/tasks redirects to /today', async ({ page }) => {
       await page.clock.setFixedTime('2026-03-28T00:00:00');
-      await injectAuthToken(page);
-      await page.route(`${API_BASE}/users/me`, route =>
-        route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
-      );
-      await page.route(`${API_BASE}/preferences/me`, route =>
-        route.fulfill({ status: 200, json: MOCK_PREFS })
-      );
-      await page.route(`${API_BASE}/schedule/plan/status**`, route =>
-        route.fulfill({ status: 200, json: { planned: false } })
-      );
-      await page.route(`${API_BASE}/schedule/period**`, route =>
-        route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
-      );
-      await page.route(`${API_BASE}/my/meal-suggestions**`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
+      const sub = generateTestSub();
+      await injectAuthToken(page, sub);
+      await seedTestState(sub, { preset: 'onboarded' });
 
       await page.goto('/onboarding/tasks');
       await expect(page).toHaveURL(/\/day\//);

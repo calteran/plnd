@@ -156,3 +156,233 @@ function stripStatus(e: ScheduleEntryInput): Omit<ScheduleEntryInput, 'status'> 
   delete rest.status;
   return rest;
 }
+
+// ── Internal: shared API call helper ─────────────────────────────────────────
+
+async function callApi(
+  sub: string,
+  method: 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  path: string,
+  body?: unknown,
+  helperName = 'callApi',
+): Promise<Response> {
+  const token = await mintTestToken(sub);
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '<no body>');
+    throw new Error(
+      `${helperName}: ${method} ${path} returned ${res.status}. Body: ${text.slice(0, 200)}`,
+    );
+  }
+  return res;
+}
+
+// ── seedRoutines ─────────────────────────────────────────────────────────────
+
+export interface RoutineInput {
+  task_type: string;
+  title: string;
+  recurrence_rule: string;
+  recurrence_tag?: string;
+  time_window_start?: string;
+  time_window_end?: string;
+  duration_minutes?: number;
+  energy_required?: 'low' | 'medium' | 'high';
+  is_anchor?: boolean;
+  task_ref_id?: string;
+  task_ref_type?: string;
+}
+
+export interface SeededRoutine {
+  routine_id: string;
+  task_type: string;
+  title: string;
+  recurrence_rule: string;
+}
+
+export async function seedRoutines(sub: string, routines: RoutineInput[]): Promise<SeededRoutine[]> {
+  const results: SeededRoutine[] = [];
+  for (const r of routines) {
+    const res = await callApi(sub, 'POST', '/routines', r, 'seedRoutines');
+    results.push((await res.json()) as SeededRoutine);
+  }
+  return results;
+}
+
+// ── seedDietaryRestrictions ──────────────────────────────────────────────────
+
+export interface DietaryRestrictionInput {
+  restriction_type: 'allergy' | 'intolerance' | 'preference' | 'cultural_religious';
+  name: string;
+  notes?: string;
+}
+
+export interface SeededDietaryRestriction {
+  restriction_id: string;
+  name: string;
+  restriction_type: string;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function seedDietaryRestrictions(
+  sub: string,
+  restrictions: DietaryRestrictionInput[],
+): Promise<SeededDietaryRestriction[]> {
+  const results: SeededDietaryRestriction[] = [];
+  for (const r of restrictions) {
+    const res = await callApi(sub, 'POST', '/dietary-restrictions', r, 'seedDietaryRestrictions');
+    results.push((await res.json()) as SeededDietaryRestriction);
+  }
+  return results;
+}
+
+// ── seedDayType + seedDayTypeMeal ────────────────────────────────────────────
+
+export interface DayTypeInput {
+  name: string;
+  /** Bitmask of weekdays: bit 0=Sunday, bit 1=Monday, …, bit 6=Saturday. */
+  days_bitmask: number;
+  /** 'HH:MM' or 'HH:MM:SS'. */
+  wake_time: string;
+  /** 'HH:MM' or 'HH:MM:SS'. */
+  sleep_time: string;
+  is_cycle?: boolean;
+  cycle_length?: number;
+  anchor_date?: string;
+  cycle_bitmask?: number;
+}
+
+export interface SeededDayType {
+  id: string;
+  name: string;
+  days_bitmask: number;
+}
+
+export async function seedDayType(sub: string, dayType: DayTypeInput): Promise<SeededDayType> {
+  const body = { is_cycle: false, ...dayType };
+  const res = await callApi(sub, 'POST', '/day-types', body, 'seedDayType');
+  return (await res.json()) as SeededDayType;
+}
+
+export interface MealPatternInput {
+  /** Slot name, e.g. 'breakfast', 'lunch', 'dinner', 'snack'. */
+  name: string;
+  /** 'HH:MM' or 'HH:MM:SS' UTC. */
+  preferred_time: string;
+  tolerance_minutes?: number;
+  sort_order: number;
+}
+
+export interface SeededMealPattern {
+  id: string;
+  name: string;
+  preferred_time: string;
+  tolerance_minutes: number;
+  sort_order: number;
+}
+
+export async function seedDayTypeMeal(
+  sub: string,
+  dayTypeId: string,
+  meal: MealPatternInput,
+): Promise<SeededMealPattern> {
+  const res = await callApi(
+    sub,
+    'POST',
+    `/day-types/${dayTypeId}/meals`,
+    meal,
+    'seedDayTypeMeal',
+  );
+  return (await res.json()) as SeededMealPattern;
+}
+
+// ── upsertIngredientPreference ───────────────────────────────────────────────
+
+export interface IngredientPreferenceInput {
+  /** −2 = refuse, −1 = tolerate, 0 = neutral, +1 = enjoy, +2 = strongly prefer. */
+  preference_score: -2 | -1 | 0 | 1 | 2;
+  notes?: string;
+}
+
+export async function upsertIngredientPreference(
+  sub: string,
+  ingredientId: string,
+  prefs: IngredientPreferenceInput,
+): Promise<void> {
+  await callApi(
+    sub,
+    'PUT',
+    `/my/ingredient-prefs/${ingredientId}`,
+    prefs,
+    'upsertIngredientPreference',
+  );
+}
+
+// ── patchPreferences ─────────────────────────────────────────────────────────
+
+export interface PreferencesPatch {
+  /** 0 = Sunday, 1 = Monday, …, 6 = Saturday. */
+  week_start_day?: number;
+  /** Days before plan_start to surface the planning task. */
+  planning_trigger_offset?: number;
+  default_plan_length_days?: number;
+  /** 'HH:MM' or 'HH:MM:SS'. */
+  planning_time?: string;
+}
+
+/**
+ * Setup helper for tests that need a non-default user-preferences shape before
+ * navigating into the page-under-test. For tests that *exercise* the patch
+ * endpoint itself (settings.e2e.ts), drive the request inside the test rather
+ * than calling this helper.
+ */
+export async function patchPreferences(sub: string, prefs: PreferencesPatch): Promise<void> {
+  await callApi(sub, 'PATCH', '/preferences/me', prefs, 'patchPreferences');
+}
+
+// ── seedDish ─────────────────────────────────────────────────────────────────
+
+export interface DishInput {
+  /** Provide either catalog_dish_id OR name (the API rejects neither). */
+  catalog_dish_id?: string;
+  name?: string;
+  instructions?: string;
+  prep_time_minutes?: number;
+  cook_time_minutes?: number;
+}
+
+export interface SeededDish {
+  user_dish_pref_id: string;
+  name: string;
+}
+
+export async function seedDish(sub: string, dish: DishInput): Promise<SeededDish> {
+  const res = await callApi(sub, 'POST', '/my/dishes', dish, 'seedDish');
+  return (await res.json()) as SeededDish;
+}
+
+// ── seedUserMeal ─────────────────────────────────────────────────────────────
+
+export interface UserMealInput {
+  /** Provide either catalog_meal_id OR name (the API rejects neither). */
+  catalog_meal_id?: string;
+  name?: string;
+  description?: string;
+}
+
+export interface SeededUserMeal {
+  user_meal_pref_id: string;
+  name: string;
+}
+
+export async function seedUserMeal(sub: string, meal: UserMealInput): Promise<SeededUserMeal> {
+  const res = await callApi(sub, 'POST', '/my/meals', meal, 'seedUserMeal');
+  return (await res.json()) as SeededUserMeal;
+}

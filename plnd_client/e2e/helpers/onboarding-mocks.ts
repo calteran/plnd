@@ -1,43 +1,16 @@
 import { Page } from '@playwright/test';
-import { API_BASE, generateTestSub, injectAuthToken, seedTestState } from './auth';
+import { generateTestSub, injectAuthToken, seedTestState } from './auth';
 
-// ── Day Types ─────────────────────────────────────────────────────────────────
+// ── Agent fixtures (LLM endpoints) ────────────────────────────────────────────
+//
+// The remaining exports here are response bodies for the two agent endpoints
+// that e2e tests are still permitted to mock per docs/architecture.md §9.7:
+//   * POST /agent/place-tasks  — task placement substep
+//   * POST /agent/meal-plan    — meal plan generation substep
+// All non-agent endpoints (day-types, routines, dietary restrictions, etc.)
+// flow through the real backend via seed helpers in ./seed-data.ts.
 
-export const MOCK_DAY_TYPE_WEEKDAYS = {
-  id: 'st-weekdays-uuid',
-  name: 'Weekdays',
-  days_bitmask: 62,
-  wake_time: '07:00:00',
-  sleep_time: '22:00:00',
-  is_cycle: false,
-  cycle_length: null,
-  anchor_date: null,
-};
-
-export const MOCK_DAY_TYPE_WEEKENDS = {
-  id: 'st-weekends-uuid',
-  name: 'Weekends',
-  days_bitmask: 65,
-  wake_time: '08:00:00',
-  sleep_time: '23:00:00',
-  is_cycle: false,
-  cycle_length: null,
-  anchor_date: null,
-};
-
-// ── Routines ──────────────────────────────────────────────────────────────────
-
-export const MOCK_TEMPLATE_MORNING_WALK = {
-  routine_id: 'tmpl-morning-walk-uuid',
-  task_type: 'general',
-  title: 'Morning walk',
-  recurrence_tag: 'daily',
-  recurrence_rule: 'FREQ=DAILY',
-  created_at: '2026-01-01T00:00:00Z',
-  updated_at: '2026-01-01T00:00:00Z',
-};
-
-// ── Task Placement ────────────────────────────────────────────────────────────
+// ── Task Placement (POST /agent/place-tasks) ──────────────────────────────────
 
 export const MOCK_PLACED_TASKS = [
   {
@@ -58,7 +31,11 @@ export const MOCK_PLACED_TASKS = [
   },
 ];
 
-// ── Meal Plan ─────────────────────────────────────────────────────────────────
+// ── Meal Plan (POST /agent/meal-plan) ─────────────────────────────────────────
+//
+// Uses real UUID strings for meal_ref.id so the downstream POST /schedule/plan
+// commit (which serializes task_ref_id: Option<Uuid> in plnd_api) parses
+// successfully against the real backend during the full happy-path tests.
 
 export const MOCK_MEAL_PLAN = {
   plan_start: '2026-03-28',
@@ -66,44 +43,18 @@ export const MOCK_MEAL_PLAN = {
     {
       date: '2026-03-28',
       meal_name: 'breakfast',
-      meal_ref: { id: 'meal-oatmeal-uuid', type: 'catalog' },
+      meal_ref: { id: '11111111-1111-4111-8111-111111111111', type: 'catalog' },
       title: 'Oatmeal',
       estimated: true,
     },
     {
       date: '2026-03-28',
       meal_name: 'lunch',
-      meal_ref: { id: 'meal-salad-uuid', type: 'catalog' },
+      meal_ref: { id: '22222222-2222-4222-8222-222222222222', type: 'catalog' },
       title: 'Salad',
       estimated: true,
     },
   ],
-};
-
-// ── Meal Habits ───────────────────────────────────────────────────────────────
-
-export const MOCK_MEAL_HABIT = {
-  id: 'habit-oatmeal-uuid',
-  meal_name: 'Oatmeal',
-  slot: 'breakfast',
-  recurrence_rule: 'FREQ=DAILY',
-};
-
-// ── Dietary Restrictions ──────────────────────────────────────────────────────
-
-export const MOCK_DIETARY_RESTRICTION_ALLERGY = {
-  restriction_id: 'restriction-peanuts-uuid',
-  name: 'Peanuts',
-  restriction_type: 'allergy',
-  notes: null,
-  created_at: '2026-01-01T00:00:00Z',
-};
-
-// ── Plan commit ───────────────────────────────────────────────────────────────
-
-export const MOCK_PLAN_COMMITTED = {
-  committed: 3,
-  planning_task_status: 'done',
 };
 
 // ── seedOnboarding ────────────────────────────────────────────────────────────
@@ -111,8 +62,8 @@ export const MOCK_PLAN_COMMITTED = {
 // generates a fresh per-test sub so parallel tests cannot collide on writes —
 // `user_id` is the isolation boundary (see docs/architecture.md §9). The
 // real backend serves /users/me, /preferences/me, /dietary-restrictions,
-// /my/meals, and /my/dishes directly for this user. Override individual
-// routes after calling this for test-specific data shaping.
+// /day-types, /routines, /my/* etc. directly for this user. Returns the
+// generated sub so callers can chain seed helpers from ./seed-data.ts.
 
 export async function seedOnboarding(page: Page): Promise<{ sub: string }> {
   await page.clock.setFixedTime('2026-03-28T00:00:00');
@@ -122,24 +73,3 @@ export async function seedOnboarding(page: Page): Promise<{ sub: string }> {
   return { sub };
 }
 
-/**
- * Mock GET /my/meals and GET /my/dishes to empty arrays.
- *
- * plan-meals-step (used by the planning wizard step 3 and onboarding food
- * spoke) calls `userMealsService.load()` and `userDishesService.load()` on
- * init to drive blocked-item personalization in the meal-plan loader.
- * Without these mocks, the synthetic test token hits the real backend,
- * returns 401, and `authErrorInterceptor` triggers a session_expired
- * redirect — which silently breaks downstream test assertions.
- *
- * Call from every test helper that navigates to a route that mounts
- * plan-meals-step.
- */
-export async function mockUserCatalogEmpty(page: Page): Promise<void> {
-  await page.route(`${API_BASE}/my/meals`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-  await page.route(`${API_BASE}/my/dishes`, route =>
-    route.fulfill({ status: 200, json: [] })
-  );
-}

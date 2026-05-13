@@ -1,13 +1,17 @@
 import { test, expect, Page } from '@playwright/test';
-import { API_BASE, MOCK_USER_ONBOARDED, seedAuth } from '../helpers/auth';
+import { seedAuth } from '../helpers/auth';
 import { ProfilePage } from '../pages/profile.page';
 
-// All tests seed auth via addInitScript (sets localStorage before Angular bootstraps)
-// and use Playwright route interception to mock the users API, so these tests
-// are independent of the Docker API image version.
+// Per docs/architecture.md §9.7, all user-data flows hit the real backend in
+// e2e — there are no page.route() interceptors here. Each test gets its own
+// freshly-minted user via seedAuth (preset='onboarded'), which sets
+// display_name='Test User' on the real DB row. The profile reads/writes
+// exercise GET /users/me and PATCH /users/me end-to-end.
 //
-// Tests that verify form pre-population navigate through /today first so that the
-// UserService signal is populated before ProfileComponent initialises.
+// Tests that verify form pre-population navigate through /today first so that
+// the UserService signal is populated before ProfileComponent initialises.
+
+const SEEDED_DISPLAY_NAME = 'Test User'; // matches preset='onboarded' in plnd_api/src/routes/test_seed.rs
 
 async function goToProfile(page: Page): Promise<ProfilePage> {
   await page.goto('/today');
@@ -32,20 +36,24 @@ test.describe('Profile', () => {
   });
 
   test('read-only section displays email address, member since, and last login', async ({ page }) => {
-    await seedAuth(page);
-    // last_login: null verifies the "Never" rendering path. The real backend
-    // sets last_login on every token exchange, so this test mocks /users/me
-    // locally to keep the null-rendering assertion meaningful. Replaced by
-    // per-test DB isolation in chunk 4 (#775).
-    await page.route(`${API_BASE}/users/me`, route =>
-      route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED })
-    );
+    const { sub } = await seedAuth(page);
     const profile = await goToProfile(page);
 
-    await expect(profile.getEmailRow()).toHaveText(MOCK_USER_ONBOARDED.email);
-    // created_at is '2026-01-01T00:00:00Z' — verify the year is rendered
-    await expect(profile.getMemberSinceRow()).toContainText('2026');
-    // last_login is null — component renders 'Never'
+    // mock-oauth-server users get an email of `<sub>@mock.plnd` (see
+    // plnd_api/src/routes/auth.rs ~L62). The sub returned by seedAuth is the
+    // OIDC subject; since /auth/token finds-or-creates by sub, that's also the
+    // email's local-part.
+    await expect(profile.getEmailRow()).toHaveText(`${sub}@mock.plnd`);
+
+    // Member since reflects the row's created_at (today, in the test's locale).
+    const today = new Date();
+    await expect(profile.getMemberSinceRow()).toContainText(String(today.getFullYear()));
+
+    // For freshly-created users, the `find_by_provider`/`find_by_email` paths
+    // in /auth/token don't fire on creation, so last_login stays null and the
+    // component renders 'Never'. The "formatted date" branch is exercised
+    // implicitly by every subsequent token exchange in the production flow
+    // and by component-level unit tests.
     await expect(profile.getLastLoginRow()).toHaveText('Never');
   });
 
@@ -53,27 +61,18 @@ test.describe('Profile', () => {
     await seedAuth(page);
     const profile = await goToProfile(page);
 
-    await expect(profile.getDisplayNameInput()).toHaveValue(MOCK_USER_ONBOARDED.display_name!);
+    await expect(profile.getDisplayNameInput()).toHaveValue(SEEDED_DISPLAY_NAME);
   });
 
   test('editing display name and clicking Save shows a success message', async ({ page }) => {
     await seedAuth(page);
     const profile = await goToProfile(page);
 
-    let patchBody: Record<string, string> | undefined;
-    await page.route(`${API_BASE}/users/me`, async (route) => {
-      if (route.request().method() === 'PATCH') {
-        patchBody = route.request().postDataJSON();
-        await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
-      } else {
-        await route.fallback();
-      }
-    });
-
     await profile.getDisplayNameInput().fill('Updated Name');
     await profile.getSaveButton().click();
     await expect(profile.getSuccessMessage()).toHaveText('Profile updated.', { timeout: 5_000 });
-    expect(patchBody).toMatchObject({ display_name: 'Updated Name' });
+    // Real backend echoes the patched value back; the form should now hold it.
+    await expect(profile.getDisplayNameInput()).toHaveValue('Updated Name');
   });
 
   test('avatar URL field accepts a valid URL and save succeeds', async ({ page }) => {
@@ -83,57 +82,30 @@ test.describe('Profile', () => {
     await profile.getAvatarUrlInput().fill('https://example.com/avatar.jpg');
     await profile.getSaveButton().click();
     await expect(profile.getSuccessMessage()).toHaveText('Profile updated.', { timeout: 5_000 });
+    await expect(profile.getAvatarUrlInput()).toHaveValue('https://example.com/avatar.jpg');
   });
 
   test('invalid avatar URL prevents save', async ({ page }) => {
     await seedAuth(page);
     const profile = await goToProfile(page);
 
-    let patchCalled = false;
-    await page.route(`${API_BASE}/users/me`, async (route) => {
-      if (route.request().method() === 'PATCH') {
-        patchCalled = true;
-        await route.fulfill({ status: 200, json: MOCK_USER_ONBOARDED });
-      } else {
-        await route.fallback();
-      }
-    });
-
     // 'not-a-url' has no dot, so it fails the bare-domain heuristic — Angular's pattern
-    // validator marks the form invalid, disabling the Save button.
+    // validator marks the form invalid, disabling the Save button. No PATCH is issued
+    // because the button is disabled.
     await profile.getAvatarUrlInput().fill('not-a-url');
     await expect(profile.getSaveButton()).toBeDisabled();
     await expect(profile.getSuccessMessage()).not.toBeVisible();
-    expect(patchCalled).toBe(false);
-  });
-
-  test('save failure shows an error message', async ({ page }) => {
-    await seedAuth(page);
-    const profile = await goToProfile(page);
-
-    await page.route(`${API_BASE}/users/me`, async (route) => {
-      if (route.request().method() === 'PATCH') {
-        await route.fulfill({ status: 500 });
-      } else {
-        await route.fallback();
-      }
-    });
-
-    await profile.getDisplayNameInput().fill('Updated Name');
-    await profile.getSaveButton().click();
-    await expect(profile.getErrorMessage()).toHaveText('Failed to save. Please try again.', { timeout: 5_000 });
   });
 
   test('Cancel button discards unsaved changes and restores original values', async ({ page }) => {
     await seedAuth(page);
     const profile = await goToProfile(page);
 
-    const original = MOCK_USER_ONBOARDED.display_name!;
     await profile.getDisplayNameInput().fill('Temporary Change');
     await expect(profile.getDisplayNameInput()).toHaveValue('Temporary Change');
 
     await profile.getCancelButton().click();
-    await expect(profile.getDisplayNameInput()).toHaveValue(original);
+    await expect(profile.getDisplayNameInput()).toHaveValue(SEEDED_DISPLAY_NAME);
   });
 
   test('Back button navigates away from the profile page', async ({ page }) => {

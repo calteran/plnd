@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { API_BASE, MOCK_PREFS, seedAuth } from '../helpers/auth';
+import { seedAuth } from '../helpers/auth';
 import { SettingsPage } from '../pages/settings.page';
 
-// All tests seed auth via addInitScript (sets localStorage before Angular bootstraps)
-// and use Playwright route interception to mock the preferences API, so these tests
-// are independent of the Docker API image version.
-
-const PREFS_URL = `${API_BASE}/preferences/me`;
+// Per docs/architecture.md §9.7, all preferences flow through the real
+// backend in e2e — no page.route() interceptors. Each test gets a fresh user
+// via seedAuth, and the schema defaults (week_start_day=1, planning_trigger_offset=0,
+// default_plan_length_days=7) come from migration 0015_planning_preferences.sql.
+// PATCH /preferences/me is exercised end-to-end.
 
 test.describe('Settings', () => {
   test('unauthenticated /settings visit redirects to /login', async ({ page }) => {
@@ -37,18 +37,8 @@ test.describe('Settings', () => {
     await expect(page.locator('#weekStartDay')).toBeVisible();
   });
 
-  test('change "Week starts on" and save shows success message and sends correct payload', async ({ page }) => {
+  test('change "Week starts on" and save shows success message and persists value', async ({ page }) => {
     await seedAuth(page);
-
-    let capturedBody: Record<string, unknown> | null = null;
-    await page.route(PREFS_URL, async route => {
-      if (route.request().method() === 'PATCH') {
-        capturedBody = route.request().postDataJSON() as Record<string, unknown>;
-        await route.fulfill({ status: 200, json: { ...MOCK_PREFS, week_start_day: 0 } });
-      } else {
-        await route.fallback();
-      }
-    });
 
     const settings = new SettingsPage(page);
     await settings.goto();
@@ -56,21 +46,18 @@ test.describe('Settings', () => {
 
     await settings.getWeekStartSelect().selectOption({ label: 'Sunday' });
     await settings.getSaveButton().click();
-
     await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
-    expect(capturedBody).toMatchObject({ week_start_day: 0 });
+
+    // Round-trip: the real backend echoed week_start_day=0 (Sunday) and the
+    // form re-binds to the persisted value.
+    const selectedLabel = await settings.getWeekStartSelect().evaluate(
+      (el: HTMLSelectElement) => el.options[el.selectedIndex]?.text ?? ''
+    );
+    expect(selectedLabel).toBe('Sunday');
   });
 
   test('change "Plan horizon length" and save shows success message', async ({ page }) => {
     await seedAuth(page);
-
-    await page.route(PREFS_URL, async route => {
-      if (route.request().method() === 'PATCH') {
-        await route.fulfill({ status: 200, json: { ...MOCK_PREFS, default_plan_length_days: 14 } });
-      } else {
-        await route.fallback();
-      }
-    });
 
     const settings = new SettingsPage(page);
     await settings.goto();
@@ -80,18 +67,11 @@ test.describe('Settings', () => {
     await settings.getSaveButton().click();
 
     await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
+    await expect(settings.getPlanLengthInput()).toHaveValue('14');
   });
 
   test('change "Planning reminder" and save shows success message', async ({ page }) => {
     await seedAuth(page);
-
-    await page.route(PREFS_URL, async route => {
-      if (route.request().method() === 'PATCH') {
-        await route.fulfill({ status: 200, json: { ...MOCK_PREFS, planning_trigger_offset: -3 } });
-      } else {
-        await route.fallback();
-      }
-    });
 
     const settings = new SettingsPage(page);
     await settings.goto();
@@ -101,20 +81,11 @@ test.describe('Settings', () => {
     await settings.getSaveButton().click();
 
     await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
+    await expect(settings.getPlanningTriggerInput()).toHaveValue('-3');
   });
 
   test('saving with invalid plan horizon (0) shows a validation error without calling the API', async ({ page }) => {
     await seedAuth(page);
-
-    let patchCalled = false;
-    await page.route(PREFS_URL, async route => {
-      if (route.request().method() === 'PATCH') {
-        patchCalled = true;
-        await route.fulfill({ status: 200, json: MOCK_PREFS });
-      } else {
-        await route.fallback();
-      }
-    });
 
     const settings = new SettingsPage(page);
     await settings.goto();
@@ -123,21 +94,13 @@ test.describe('Settings', () => {
     await settings.getPlanLengthInput().fill('0');
     await settings.getSaveButton().click();
 
+    // Client-side validation surfaces the error; the success message must not appear.
     await expect(settings.getErrorMessage()).toBeVisible({ timeout: 5_000 });
-    expect(patchCalled).toBe(false);
+    await expect(settings.getSuccessMessage()).not.toBeVisible();
   });
 
   test('saved settings persist after navigating away and back', async ({ page }) => {
     await seedAuth(page);
-
-    // Intercept PATCH; GET falls through to seedAuth's handler (MOCK_PREFS week_start_day: 1)
-    await page.route(PREFS_URL, async route => {
-      if (route.request().method() === 'PATCH') {
-        await route.fulfill({ status: 200, json: { ...MOCK_PREFS, week_start_day: 0 } });
-      } else {
-        await route.fallback();
-      }
-    });
 
     const settings = new SettingsPage(page);
     await settings.goto();
