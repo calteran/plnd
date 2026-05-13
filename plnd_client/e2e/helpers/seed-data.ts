@@ -53,6 +53,7 @@ interface SchedulePeriodEntry {
   title?: string;
   date: string;
   status: string;
+  after_anchor?: string;
 }
 
 /**
@@ -133,11 +134,14 @@ export async function seedScheduleEntries(
   for (const wanted of [...entries, ...placedTasks]) {
     if (!wanted.status || wanted.status === 'planned') continue;
     const found = period.entries.find(
-      e => e.date === wanted.date && (e.title ?? null) === (wanted.title ?? null),
+      e =>
+        e.date === wanted.date &&
+        (e.title ?? null) === (wanted.title ?? null) &&
+        (e.after_anchor ?? null) === (wanted.after_anchor ?? null),
     );
     if (!found) {
       throw new Error(
-        `seedScheduleEntries: could not find committed entry for (date=${wanted.date}, title=${wanted.title}) to PATCH status. Got ${period.entries.length} entries back.`,
+        `seedScheduleEntries: could not find committed entry for (date=${wanted.date}, title=${wanted.title}, after_anchor=${wanted.after_anchor}) to PATCH status. Got ${period.entries.length} entries back.`,
       );
     }
     const patchRes = await fetch(`${API_BASE}/schedule/entries/${found.entry_id}/status`, {
