@@ -192,6 +192,7 @@ jobs:
           APP_DATABASE__URL=postgres://plnd:plnd_dev@localhost/plnd_dev \
           APP_AUTH__OIDC_INTERNAL_ISSUER_URL=http://localhost:8080/plnd-dev \
           APP_AUTH__FRONTEND_ORIGIN=http://localhost:4200 \
+          APP_EXTERNAL__FIXTURE_PATH=${{ github.workspace }}/plnd_data/fixtures \
           ../target/debug/plnd_api &
           timeout 30s bash -c 'until curl -sf http://localhost:3000/health; do sleep 1; done'
 
