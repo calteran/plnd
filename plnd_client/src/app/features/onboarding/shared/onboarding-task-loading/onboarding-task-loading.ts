@@ -1,5 +1,7 @@
 import { Component, OnInit, OnDestroy, input, signal } from '@angular/core';
 
+import { detectReducedMotion } from '../../../../core/utils/browser-utils';
+
 export interface MessagePart {
   text: string;
   isTag?: boolean;
@@ -209,7 +211,7 @@ export class OnboardingTaskLoadingComponent implements OnInit, OnDestroy {
 
   protected readonly messages      = signal<ChatMessage[]>([]);
   protected readonly showTyping    = signal(false);
-  protected readonly reducedMotion = signal<boolean>(this.detectReducedMotion());
+  protected readonly reducedMotion = signal<boolean>(detectReducedMotion());
 
   private pendingT1: ReturnType<typeof setTimeout> | null = null;
   private pendingT2: ReturnType<typeof setTimeout> | null = null;
@@ -230,15 +232,6 @@ export class OnboardingTaskLoadingComponent implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.pendingT1 !== null) clearTimeout(this.pendingT1);
     if (this.pendingT2 !== null) clearTimeout(this.pendingT2);
-  }
-
-  private detectReducedMotion(): boolean {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-    try {
-      return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    } catch {
-      return false;
-    }
   }
 
   private buildPersonalisedPool(): MessagePart[][] {
