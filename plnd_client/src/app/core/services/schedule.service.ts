@@ -121,7 +121,7 @@ function flip(status: 'pending' | 'done'): 'pending' | 'done' {
   return status === 'done' ? 'pending' : 'done';
 }
 
-function toApiStatus(status: 'pending' | 'done'): string {
+function toApiStatus(status: 'pending' | 'done'): 'completed' | 'planned' {
   return status === 'pending' ? 'completed' : 'planned';
 }
 

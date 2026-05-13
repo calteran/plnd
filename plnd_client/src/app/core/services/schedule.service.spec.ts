@@ -284,7 +284,6 @@ describe('ScheduleService', () => {
   });
 
   it('toggleItem reloads the day on PATCH error', () => {
-    svc['_date'].set('2026-04-02');
     svc.loadDay('2026-04-02');
     httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
       entries: [{
