@@ -455,8 +455,8 @@ impl From<Vec<ScheduleEntry>> for CarryoverApiResponse {
 }
 
 /// API response wrapper for `plnd_data::models::PlannedMealEntry`.
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-pub struct PlannedMealEntryDto {
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct PlannedMealEntryResponse {
     pub meal_entry_id: Uuid,
     pub schedule_entry_id: Uuid,
     pub meal_ref_id: Uuid,
@@ -464,7 +464,7 @@ pub struct PlannedMealEntryDto {
     pub title: Option<String>,
 }
 
-impl From<PlannedMealEntry> for PlannedMealEntryDto {
+impl From<PlannedMealEntry> for PlannedMealEntryResponse {
     fn from(e: PlannedMealEntry) -> Self {
         Self {
             meal_entry_id: e.meal_entry_id,
@@ -481,7 +481,7 @@ impl From<PlannedMealEntry> for PlannedMealEntryDto {
 pub struct SchedulePeriodApiResponse {
     pub entries: Vec<ScheduleEntryResponse>,
     pub carryover: Vec<ScheduleEntryResponse>,
-    pub planned_meals: Vec<PlannedMealEntryDto>,
+    pub planned_meals: Vec<PlannedMealEntryResponse>,
 }
 
 impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
@@ -497,6 +497,7 @@ impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
                 .into_iter()
                 .map(ScheduleEntryResponse::from)
                 .collect(),
+            // TODO(Task 6): populate via MealPlanRepository fetch in route handler
             planned_meals: Vec::new(),
         }
     }
