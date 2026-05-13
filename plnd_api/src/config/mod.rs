@@ -73,6 +73,14 @@ pub fn load_config_with_path(path: &str) -> Result<AppConfig, error::ConfigError
         app_config.external_providers.themealdb_api_key = key;
     }
 
+    if let Ok(v) = std::env::var("APP_EXTERNAL__FIXTURE_PATH") {
+        app_config.external_providers.fixture_path = if v.is_empty() {
+            None
+        } else {
+            Some(std::path::PathBuf::from(v))
+        };
+    }
+
     if let Ok(v) = std::env::var("APP_LLM__FAST__PROVIDER") {
         app_config.llm.fast.provider = v;
     }

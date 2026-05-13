@@ -1,7 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import {
   API_BASE, MOCK_USER_NEW, MOCK_USER_ONBOARDED, MOCK_PREFS,
-  MOCK_BRIEFING_WEATHER, MOCK_BRIEFING_NEWS, MOCK_BRIEFING_YESTERDAY,
   injectAuthToken,
 } from '../helpers/auth';
 import {
@@ -201,15 +200,6 @@ async function mockDayView(page: Page): Promise<void> {
   await page.route(`${API_BASE}/schedule/plan/status**`, route =>
     route.fulfill({ status: 200, json: { planned: false } })
   );
-  await page.route(`${API_BASE}/briefing/weather`, route =>
-    route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
-  );
-  await page.route(`${API_BASE}/briefing/news`, route =>
-    route.fulfill({ status: 200, json: MOCK_BRIEFING_NEWS })
-  );
-  await page.route(`${API_BASE}/briefing/yesterday`, route =>
-    route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
-  );
   await page.route(`${API_BASE}/schedule/period**`, route =>
     route.fulfill({ status: 200, json: { entries: [], carryover: [] } })
   );
@@ -274,15 +264,6 @@ test.describe('Onboarding', () => {
     );
     await page.route(`${API_BASE}/schedule/plan/status**`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ planned: false }) })
-    );
-    await page.route(`${API_BASE}/briefing/weather`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_WEATHER) })
-    );
-    await page.route(`${API_BASE}/briefing/news`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_NEWS) })
-    );
-    await page.route(`${API_BASE}/briefing/yesterday`, route =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(MOCK_BRIEFING_YESTERDAY) })
     );
     await page.route(`${API_BASE}/schedule/period**`, route =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ entries: [], carryover: [] }) })
@@ -944,15 +925,6 @@ test.describe('Onboarding', () => {
       );
       await page.route(`${API_BASE}/schedule/plan/status**`, route =>
         route.fulfill({ status: 200, json: { planned: false } })
-      );
-      await page.route(`${API_BASE}/briefing/weather`, route =>
-        route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
-      );
-      await page.route(`${API_BASE}/briefing/news`, route =>
-        route.fulfill({ status: 200, json: MOCK_BRIEFING_NEWS })
-      );
-      await page.route(`${API_BASE}/briefing/yesterday`, route =>
-        route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
       );
       await page.route(`${API_BASE}/schedule/period**`, route =>
         route.fulfill({ status: 200, json: { entries: [], carryover: [] } })

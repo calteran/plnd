@@ -119,27 +119,8 @@ export const MOCK_PREFS = {
   phone_number: null,
 };
 
-export const MOCK_BRIEFING_WEATHER = {
-  temperature_c: 18,
-  condition: 'Clear',
-  high_c: 22,
-  low_c: 14,
-  precipitation_mm: 3.5,
-};
-
-export const MOCK_BRIEFING_NEWS = {
-  headlines: ['Test headline one', 'Test headline two', 'Test headline three'],
-};
-
 // Today date as fixed by page.clock.setFixedTime in e2e tests.
 const E2E_TODAY = '2026-03-28';
-
-export const MOCK_BRIEFING_YESTERDAY = {
-  tasks_done: 3,
-  tasks_total: 5,
-  meals_logged: 2,
-  meals_planned: 3,
-};
 
 // Injects a real minted JWT into localStorage before page load. Use this for
 // tests that need to bypass login but set up their own route mocks (rather
@@ -216,13 +197,8 @@ export async function seedAuth(page: Page) {
       },
     });
   });
-  await page.route(`${API_BASE}/briefing/weather`, route =>
-    route.fulfill({ status: 200, json: MOCK_BRIEFING_WEATHER })
-  );
-  await page.route(`${API_BASE}/briefing/news`, route =>
-    route.fulfill({ status: 200, json: MOCK_BRIEFING_NEWS })
-  );
-  await page.route(`${API_BASE}/briefing/yesterday`, route =>
-    route.fulfill({ status: 200, json: MOCK_BRIEFING_YESTERDAY })
-  );
+  // /briefing/{weather,news,yesterday} are served by the real backend:
+  // weather + news come from fixture-backed providers when
+  // APP_EXTERNAL__FIXTURE_PATH is set (see scripts/verify.sh); yesterday is
+  // DB-only and is populated by the `onboarded` preset above.
 }

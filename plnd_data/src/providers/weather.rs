@@ -43,22 +43,22 @@ pub fn weather_code_to_condition(code: u32) -> &'static str {
 // ── Internal serde types ──────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
-struct OpenMeteoResponse {
-    current: OpenMeteoCurrentData,
-    daily: OpenMeteoDailyData,
+pub(crate) struct OpenMeteoResponse {
+    pub(crate) current: OpenMeteoCurrentData,
+    pub(crate) daily: OpenMeteoDailyData,
 }
 
 #[derive(Deserialize)]
-struct OpenMeteoCurrentData {
-    temperature_2m: f64,
-    precipitation: f64,
-    weather_code: u32,
+pub(crate) struct OpenMeteoCurrentData {
+    pub(crate) temperature_2m: f64,
+    pub(crate) precipitation: f64,
+    pub(crate) weather_code: u32,
 }
 
 #[derive(Deserialize)]
-struct OpenMeteoDailyData {
-    temperature_2m_max: Vec<f64>,
-    temperature_2m_min: Vec<f64>,
+pub(crate) struct OpenMeteoDailyData {
+    pub(crate) temperature_2m_max: Vec<f64>,
+    pub(crate) temperature_2m_min: Vec<f64>,
 }
 
 // ── OpenMeteoProvider ─────────────────────────────────────────────────────────

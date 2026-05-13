@@ -185,7 +185,11 @@ cd "$PROJECT_ROOT/plnd_api"
 # zombied api process is killed manually.
 # APP_DATABASE__URL, APP_AUTH__OIDC_INTERNAL_ISSUER_URL, APP_AUTH__FRONTEND_ORIGIN
 # all come from Doppler — no inline overrides needed.
-doppler run -- ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- 9>&- &
+# APP_EXTERNAL__FIXTURE_PATH switches the briefing providers to file-backed
+# stubs so e2e never hits Open-Meteo or live RSS feeds. The flag is honored
+# only in debug builds (#[cfg(debug_assertions)]); release binaries ignore it.
+APP_EXTERNAL__FIXTURE_PATH="$PROJECT_ROOT/plnd_data/fixtures" \
+    doppler run -- ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- 9>&- &
 API_PID=$!
 cd "$PROJECT_ROOT"
 
