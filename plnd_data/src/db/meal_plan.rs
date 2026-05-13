@@ -13,7 +13,10 @@ const PREFIXED_COLUMNS: &str = "pme.meal_entry_id, pme.user_id, pme.schedule_ent
                                 pme.meal_ref_id, pme.meal_ref_type, pme.title, \
                                 pme.created_at, pme.updated_at";
 
-#[tracing::instrument(skip(pool), fields(table = "planned_meal_entries", op = "list_for_date"))]
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "planned_meal_entries", op = "list_for_date")
+)]
 pub async fn list_for_date(
     pool: &PgPool,
     user_id: Uuid,
@@ -32,15 +35,24 @@ pub async fn list_for_date(
     .map_err(DatabaseError::from)
 }
 
+/// Insert a batch of planned-meal-entry rows.
+///
+/// The `executor` parameter accepts either a `&PgPool` (for standalone calls
+/// from the repository layer) or `&mut Transaction<'_, Postgres>` (for use
+/// inside a larger transactional unit such as `schedule::commit_plan`). This
+/// keeps the SQL in one place rather than duplicating it across call sites.
 #[tracing::instrument(
-    skip(pool, entries),
+    skip(executor, entries),
     fields(table = "planned_meal_entries", op = "insert_many")
 )]
-pub async fn insert_many(
-    pool: &PgPool,
+pub async fn insert_many<'e, E>(
+    executor: E,
     user_id: Uuid,
     entries: &[PlannedMealEntryInput],
-) -> Result<Vec<PlannedMealEntry>, DatabaseError> {
+) -> Result<Vec<PlannedMealEntry>, DatabaseError>
+where
+    E: sqlx::PgExecutor<'e>,
+{
     if entries.is_empty() {
         return Ok(Vec::new());
     }
@@ -62,7 +74,7 @@ pub async fn insert_many(
     .bind(&meal_ref_ids)
     .bind(&meal_ref_types)
     .bind(&titles)
-    .fetch_all(pool)
+    .fetch_all(executor)
     .await
     .map_err(DatabaseError::from)
 }
