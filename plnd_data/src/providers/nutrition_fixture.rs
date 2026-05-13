@@ -25,16 +25,15 @@ impl FixtureNutritionProvider {
         source: impl Into<String>,
         search_path: PathBuf,
     ) -> Result<Self, ExternalProviderError> {
-        let search_path_buf = search_path;
-        if !search_path_buf.is_file() {
+        if !search_path.is_file() {
             return Err(ExternalProviderError::ConfigurationError(format!(
                 "fixture search file not found: {}",
-                search_path_buf.display()
+                search_path.display()
             )));
         }
         Ok(Self {
             source: source.into(),
-            search_path: search_path_buf,
+            search_path,
         })
     }
 }
@@ -64,6 +63,11 @@ impl NutritionProvider for FixtureNutritionProvider {
             .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))
     }
 
+    #[tracing::instrument(
+        name = "provider::nutrition_fixture::get_ingredient_by_id",
+        skip(self),
+        fields(provider = "nutrition_fixture", source = %self.source, external_id = %_external_id)
+    )]
     async fn get_ingredient_by_id(
         &self,
         _external_id: &str,
@@ -80,13 +84,17 @@ mod tests {
         {"external_id": "1750340", "name": "APPLE, RAW", "description": "Fruits and Fruit Juices", "thumbnail_url": null}
     ]"#;
 
-    #[tokio::test]
-    async fn search_ingredients_reads_fixture_from_file() {
+    fn fixture_provider() -> (tempfile::TempDir, FixtureNutritionProvider) {
         let tmp = tempfile::tempdir().unwrap();
         let path = tmp.path().join("search.json");
         std::fs::write(&path, SEARCH_JSON).unwrap();
-
         let provider = FixtureNutritionProvider::new("usda_fdc", path).unwrap();
+        (tmp, provider)
+    }
+
+    #[tokio::test]
+    async fn search_ingredients_reads_fixture_from_file() {
+        let (_tmp, provider) = fixture_provider();
         let results = provider
             .search_ingredients(&SearchQuery::new("apple"))
             .await
@@ -103,11 +111,7 @@ mod tests {
 
     #[tokio::test]
     async fn search_ignores_query_returns_all_fixture_results() {
-        let tmp = tempfile::tempdir().unwrap();
-        let path = tmp.path().join("search.json");
-        std::fs::write(&path, SEARCH_JSON).unwrap();
-
-        let provider = FixtureNutritionProvider::new("usda_fdc", path).unwrap();
+        let (_tmp, provider) = fixture_provider();
         let results = provider
             .search_ingredients(&SearchQuery::new("completely different query"))
             .await
@@ -118,11 +122,7 @@ mod tests {
 
     #[tokio::test]
     async fn get_ingredient_by_id_returns_none() {
-        let tmp = tempfile::tempdir().unwrap();
-        let path = tmp.path().join("search.json");
-        std::fs::write(&path, SEARCH_JSON).unwrap();
-
-        let provider = FixtureNutritionProvider::new("usda_fdc", path).unwrap();
+        let (_tmp, provider) = fixture_provider();
         let result = provider.get_ingredient_by_id("1750340").await.unwrap();
         assert!(result.is_none());
     }
