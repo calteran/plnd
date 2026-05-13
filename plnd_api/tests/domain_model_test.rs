@@ -427,7 +427,7 @@ fn test_generic_task_serde_round_trip() {
 }
 
 #[test]
-fn test_routine_serde_with_task_ref_type() {
+fn test_routine_serde_round_trip() {
     let json = r#"{
         "routine_id": "00000000-0000-0000-0000-000000000017",
         "user_id": "00000000-0000-0000-0000-000000000099",
@@ -440,14 +440,12 @@ fn test_routine_serde_with_task_ref_type() {
         "duration_minutes": 20,
         "energy_required": "low",
         "is_anchor": true,
-        "task_ref_id": "00000000-0000-0000-0000-000000000005",
-        "task_ref_type": "user_exercise",
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;
     let routine: Routine = serde_json::from_str(json).expect("deserialize failed");
     assert!(routine.is_anchor);
-    assert_eq!(routine.task_ref_type.as_deref(), Some("user_exercise"));
+    assert_eq!(routine.task_type, "exercise");
     assert_eq!(routine.recurrence_tag.as_deref(), Some("daily"));
 }
 
@@ -458,8 +456,6 @@ fn test_schedule_entry_serde_with_after_anchor() {
         "user_id": "00000000-0000-0000-0000-000000000099",
         "routine_id": null,
         "task_type": "work",
-        "task_ref_id": null,
-        "task_ref_type": null,
         "date": "2026-03-15",
         "scheduled_start": "2026-03-15T09:00:00Z",
         "scheduled_end": "2026-03-15T11:00:00Z",
