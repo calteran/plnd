@@ -9,7 +9,9 @@ use crate::models::{
     CarryoverDecision, CommitPlanInput, DayType, MealPatternEntry, OpenSlot, ScheduleEntry,
     day_type_applies_to,
 };
-use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
+use crate::query_types::{
+    CommittedEntry, PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
+};
 
 const ENTRY_COLS: &str =
     "entry_id, user_id, routine_id, task_type, task_ref_id, task_ref_type, title,
@@ -113,6 +115,14 @@ pub async fn update_entry_status(
     Ok(())
 }
 
+#[derive(sqlx::FromRow)]
+struct InsertedRow {
+    entry_id: Uuid,
+    title: Option<String>,
+    date: NaiveDate,
+    after_anchor: Option<String>,
+}
+
 #[tracing::instrument(
     skip(pool, req),
     fields(table = "schedule_entries", op = "commit_plan")
@@ -204,10 +214,8 @@ pub async fn commit_plan(
         one_shot_vals.push(entry.one_shot.unwrap_or(false));
     }
 
-    let committed = task_types.len() as i64;
-
-    if !task_types.is_empty() {
-        sqlx::query(
+    let entries: Vec<CommittedEntry> = if !task_types.is_empty() {
+        sqlx::query_as::<_, InsertedRow>(
             "INSERT INTO schedule_entries
                (user_id, task_type, task_ref_id, task_ref_type, title,
                 date, scheduled_start, status, after_anchor,
@@ -215,7 +223,8 @@ pub async fn commit_plan(
              SELECT $1, unnest($2::text[]), unnest($3::uuid[]), unnest($4::text[]),
                     unnest($5::text[]), unnest($6::date[]), unnest($7::timestamptz[]),
                     'planned', unnest($8::text[]),
-                    unnest($9::int4[]), unnest($10::text[]), unnest($11::bool[])",
+                    unnest($9::int4[]), unnest($10::text[]), unnest($11::bool[])
+             RETURNING entry_id, title, date, after_anchor",
         )
         .bind(user_id)
         .bind(&task_types)
@@ -228,10 +237,21 @@ pub async fn commit_plan(
         .bind(&duration_minutes_vals)
         .bind(&energy_required_vals)
         .bind(&one_shot_vals)
-        .execute(&mut *tx)
+        .fetch_all(&mut *tx)
         .await
-        .map_err(DatabaseError::from)?;
-    }
+        .map_err(DatabaseError::from)?
+        .into_iter()
+        .map(|r| CommittedEntry {
+            entry_id: r.entry_id,
+            title: r.title,
+            date: r.date,
+            after_anchor: r.after_anchor,
+        })
+        .collect()
+    } else {
+        Vec::new()
+    };
+    let committed = entries.len() as i64;
 
     // Mark planning task as completed
     sqlx::query(
@@ -301,6 +321,7 @@ pub async fn commit_plan(
 
     Ok(PostSchedulePlanResponse {
         committed,
+        entries,
         planning_task_status: "completed".to_string(),
     })
 }

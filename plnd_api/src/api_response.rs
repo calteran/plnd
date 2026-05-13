@@ -498,11 +498,20 @@ impl From<PlanStatusResponse> for PlanStatusApiResponse {
     }
 }
 
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct CommittedEntryRef {
+    pub entry_id: Uuid,
+    pub title: Option<String>,
+    pub date: NaiveDate,
+    pub after_anchor: Option<String>,
+}
+
 /// API response wrapper for `plnd_data::query_types::PostSchedulePlanResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct PostSchedulePlanApiResponse {
     pub committed: i64,
     pub planning_task_status: String,
+    pub entries: Vec<CommittedEntryRef>,
 }
 
 impl From<PostSchedulePlanResponse> for PostSchedulePlanApiResponse {
@@ -510,6 +519,16 @@ impl From<PostSchedulePlanResponse> for PostSchedulePlanApiResponse {
         Self {
             committed: r.committed,
             planning_task_status: r.planning_task_status,
+            entries: r
+                .entries
+                .into_iter()
+                .map(|e| CommittedEntryRef {
+                    entry_id: e.entry_id,
+                    title: e.title,
+                    date: e.date,
+                    after_anchor: e.after_anchor,
+                })
+                .collect(),
         }
     }
 }

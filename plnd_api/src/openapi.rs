@@ -170,6 +170,7 @@ impl Modify for BearerSecurityAddon {
         CarryoverApiResponse,
         SchedulePeriodApiResponse,
         PlanStatusApiResponse,
+        CommittedEntryRef,
         PostSchedulePlanApiResponse,
         PostSchedulePlanRequest,
         PlanEntryRequest,

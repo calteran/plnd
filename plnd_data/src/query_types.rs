@@ -1,4 +1,6 @@
+use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::models::ScheduleEntry;
 
@@ -20,8 +22,17 @@ pub struct PlanStatusResponse {
     pub entry_count: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommittedEntry {
+    pub entry_id: Uuid,
+    pub title: Option<String>,
+    pub date: NaiveDate,
+    pub after_anchor: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct PostSchedulePlanResponse {
     pub committed: i64,
     pub planning_task_status: String,
+    pub entries: Vec<CommittedEntry>,
 }
