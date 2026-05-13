@@ -1,12 +1,13 @@
 import { test, expect, Page } from '@playwright/test';
-import { seedAuth, API_BASE, MOCK_PREFS } from '../helpers/auth';
-import { mockUserCatalogEmpty } from '../helpers/onboarding-mocks';
+import { seedAuth, API_BASE } from '../helpers/auth';
+import { patchPreferences } from '../helpers/seed-data';
 
 // Fixed seed: 3-day horizon Mon 2026-03-30 → Wed 2026-04-01
-// Override default_plan_length_days → 3 so the wizard computes the same horizon
+// seedAuth provisions an onboarded user with default prefs (week_start_day=1)
+// and the "Everyday" day type with breakfast/lunch/dinner. We then patch
+// preferences to default_plan_length_days=3 so the wizard computes the same
+// horizon used by the test fixtures.
 // currentStep: 3 → wizard opens directly on the Meals step
-
-const MOCK_PREFS_3DAY = { ...MOCK_PREFS, default_plan_length_days: 3 };
 
 // Agent meal fixtures for the 3-day horizon
 const STEP3_MEAL_DAYS = ['2026-03-30', '2026-03-31', '2026-04-01'];
@@ -16,37 +17,11 @@ const STEP3_AGENT_MEALS = STEP3_MEAL_DAYS.flatMap(date =>
   }))
 );
 
-const MOCK_DAY_TYPES = [
-  { id: 'dt-default', user_id: 'test', name: 'Default', days_bitmask: 127,
-    wake_time: '07:00:00', sleep_time: '23:00:00',
-    is_cycle: false, cycle_length: null, anchor_date: null, created_at: '2026-01-01T00:00:00Z' },
-];
-
-const MOCK_DAY_TYPE_MEALS = [
-  { id: 'mp1', user_id: 'test', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp2', user_id: 'test', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp3', user_id: 'test', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-];
-
-async function seedWizard(page: Page): Promise<void> {
-  await seedAuth(page);
-  await page.route(url => url.href.includes('/day-types') && !url.href.includes('/meals'), route =>
-    route.fulfill({ status: 200, json: MOCK_DAY_TYPES })
-  );
-  await page.route(url => url.href.includes('/day-types/') && url.href.includes('/meals'), route =>
-    route.fulfill({ status: 200, json: MOCK_DAY_TYPE_MEALS })
-  );
-  await page.route(`${API_BASE}/preferences/me`, route =>
-    route.fulfill({ status: 200, json: MOCK_PREFS_3DAY })
-  );
-  await page.route(`${API_BASE}/tasks/weekly-plan**`, route =>
-    route.fulfill({ status: 200, json: { task_id: 'test-planning-task' } })
-  );
-  await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
-    route.fulfill({ json: { carryover: [] } })
-  );
-  await mockUserCatalogEmpty(page);
+async function seedWizard(page: Page): Promise<{ sub: string }> {
+  const { sub } = await seedAuth(page);
+  await patchPreferences(sub, { default_plan_length_days: 3 });
   // Step 3 auto-generates via agent on first entry when no meals are stored.
+  // Mock policy: agent endpoints are the only thing we still mock.
   await page.route(`${API_BASE}/agent/meal-plan`, route =>
     route.fulfill({ status: 200, json: { week: '2026-03-30', meals: STEP3_AGENT_MEALS } })
   );
@@ -57,9 +32,10 @@ async function seedWizard(page: Page): Promise<void> {
   await page.route(`${API_BASE}/agent/meal-plan/suggest`, route =>
     route.fulfill({ status: 200, json: { date: '2026-03-30', meal_name: 'breakfast', meal_ref: null, title: 'Suggested meal' } })
   );
+  return { sub };
 }
 
-async function seedStep3(page: Page): Promise<void> {
+async function seedStep3(page: Page): Promise<{ sub: string }> {
   await page.addInitScript(() => {
     localStorage.setItem('plnd:plan-draft', JSON.stringify({
       schemaVersion: 2,
@@ -73,7 +49,7 @@ async function seedStep3(page: Page): Promise<void> {
       savedAt: '2026-03-29T00:00:00.000Z',
     }));
   });
-  await seedWizard(page);
+  return seedWizard(page);
 }
 
 test.describe('Planning Wizard — Step 3: Meals Planning', () => {

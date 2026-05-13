@@ -1,9 +1,9 @@
 import { test, expect, Page } from '@playwright/test';
 import { seedAuth, API_BASE } from '../helpers/auth';
-import { mockUserCatalogEmpty } from '../helpers/onboarding-mocks';
 
 // Fixed seed: 7-day horizon Mon 2026-03-30 → Sun 2026-04-05
-// MOCK_PREFS (from seedAuth): week_start_day=1, default_plan_length_days=7
+// seedAuth defaults: week_start_day=1, default_plan_length_days=7, plus the
+// "Everyday" day type with breakfast/lunch/dinner meal patterns.
 // currentStep: 5 or 6 → wizard opens directly on Day Review or Confirmation
 
 const MOCK_TASKS = [
@@ -11,41 +11,19 @@ const MOCK_TASKS = [
   { title: 'Read book',   energy: 'low',  date: '2026-03-30', task_type: 'general' },
 ];
 
-const MOCK_DAY_TYPES = [
-  { id: 'dt-default', user_id: 'test', name: 'Default', days_bitmask: 127,
-    wake_time: '07:00:00', sleep_time: '23:00:00',
-    is_cycle: false, cycle_length: null, anchor_date: null, created_at: '2026-01-01T00:00:00Z' },
-];
-
-const MOCK_DAY_TYPE_MEALS = [
-  { id: 'mp1', user_id: 'test', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp2', user_id: 'test', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp3', user_id: 'test', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-];
-
-async function seedWizard(page: Page): Promise<void> {
-  await seedAuth(page);
-  await page.route(url => url.href.includes('/day-types') && !url.href.includes('/meals'), route =>
-    route.fulfill({ status: 200, json: MOCK_DAY_TYPES })
-  );
-  await page.route(url => url.href.includes('/day-types/') && url.href.includes('/meals'), route =>
-    route.fulfill({ status: 200, json: MOCK_DAY_TYPE_MEALS })
-  );
-  await page.route(`${API_BASE}/tasks/weekly-plan**`, route =>
-    route.fulfill({ status: 200, json: { task_id: 'test-planning-task' } })
-  );
-  await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
-    route.fulfill({ json: { carryover: [] } })
-  );
-  await mockUserCatalogEmpty(page);
+async function seedWizard(page: Page): Promise<{ sub: string }> {
+  const { sub } = await seedAuth(page);
   // Step 3 auto-generates via agent on first entry when no meals are stored.
-  // Return empty meals list so skeleton resolves immediately without stalling navigation.
+  // Mock policy: agent endpoints are the only thing we still mock. Return an
+  // empty meals list so the skeleton resolves immediately without stalling
+  // navigation through the wizard.
   await page.route(`${API_BASE}/agent/meal-plan`, route =>
     route.fulfill({ status: 200, json: { week: '2026-03-30', meals: [] } })
   );
+  return { sub };
 }
 
-async function seedStep5DayReview(page: Page): Promise<void> {
+async function seedStep5DayReview(page: Page): Promise<{ sub: string }> {
   await page.addInitScript((tasks) => {
     localStorage.setItem('plnd:plan-draft', JSON.stringify({
       schemaVersion: 2,
@@ -59,10 +37,10 @@ async function seedStep5DayReview(page: Page): Promise<void> {
       savedAt: '2026-03-29T00:00:00.000Z',
     }));
   }, MOCK_TASKS);
-  await seedWizard(page);
+  return seedWizard(page);
 }
 
-async function seedStep6Confirm(page: Page): Promise<void> {
+async function seedStep6Confirm(page: Page): Promise<{ sub: string }> {
   await page.addInitScript((tasks) => {
     localStorage.setItem('plnd:plan-draft', JSON.stringify({
       schemaVersion: 2,
@@ -76,7 +54,7 @@ async function seedStep6Confirm(page: Page): Promise<void> {
       savedAt: '2026-03-29T00:00:00.000Z',
     }));
   }, MOCK_TASKS);
-  await seedWizard(page);
+  return seedWizard(page);
 }
 
 // ── Step 5 — Day Review ───────────────────────────────────────────────────────
@@ -189,10 +167,9 @@ test.describe('Planning Wizard — Step 6: Confirmation', () => {
 
   test.describe('Finish — success', () => {
     test('clicking Finish triggers POST /schedule/plan and redirects to /day/:date', async ({ page }) => {
-      await page.route(`${API_BASE}/schedule/plan`, route =>
-        route.fulfill({ status: 200, json: {} })
-      );
-
+      // Real backend serves POST /schedule/plan; the seeded onboarded user has
+      // a planning task created on demand by /tasks/weekly-plan, so commit
+      // succeeds without any mocks.
       const submitRequest = page.waitForRequest(req =>
         req.url().includes('/schedule/plan') && req.method() === 'POST'
       );
@@ -205,6 +182,11 @@ test.describe('Planning Wizard — Step 6: Confirmation', () => {
   });
 
   // ── Finish — error ─────────────────────────────────────────────────────────
+  // Edge-case error path: the real backend cannot be coerced into a 500 on
+  // demand, so we keep an explicit 500-response mock for POST /schedule/plan
+  // here. This is a deliberate exception to the de-mock policy — the test's
+  // purpose is to verify the UI's error-handling, not the backend's success
+  // path.
 
   test.describe('Finish — error', () => {
     test.beforeEach(async ({ page }) => {

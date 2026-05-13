@@ -1,46 +1,23 @@
 import { test, expect, Page } from '@playwright/test';
-import { seedAuth, injectAuthToken, API_BASE, MOCK_USER_NEW } from '../helpers/auth';
-import { mockUserCatalogEmpty } from '../helpers/onboarding-mocks';
+import { seedAuth, API_BASE } from '../helpers/auth';
+import { seedOnboarding } from '../helpers/onboarding-mocks';
+import { seedScheduleEntries } from '../helpers/seed-data';
 
 // Fixed date: 2026-03-28 (Saturday)
-// MOCK_PREFS: week_start_day=1 (Monday), default_plan_length_days=7
+// seedAuth provisions an onboarded user with default prefs (week_start_day=1
+// Monday, default_plan_length_days=7) and the "Everyday" day type with
+// breakfast/lunch/dinner meal patterns.
 // → plan_start = 2026-03-30, plan_end = 2026-04-05
 
-const MOCK_DAY_TYPES = [
-  { id: 'dt-default', user_id: 'test', name: 'Default', days_bitmask: 127,
-    wake_time: '07:00:00', sleep_time: '23:00:00',
-    is_cycle: false, cycle_length: null, anchor_date: null, created_at: '2026-01-01T00:00:00Z' },
-];
-
-const MOCK_DAY_TYPE_MEALS = [
-  { id: 'mp1', user_id: 'test', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp2', user_id: 'test', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-  { id: 'mp3', user_id: 'test', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, day_type_id: 'dt-default', created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' },
-];
-
-async function seedWizard(page: Page): Promise<void> {
-  await seedAuth(page);
-  await page.route(url => url.href.includes('/day-types') && !url.href.includes('/meals'), route =>
-    route.fulfill({ status: 200, json: MOCK_DAY_TYPES })
-  );
-  await page.route(url => url.href.includes('/day-types/') && url.href.includes('/meals'), route =>
-    route.fulfill({ status: 200, json: MOCK_DAY_TYPE_MEALS })
-  );
-  await page.route(`${API_BASE}/tasks/weekly-plan**`, route =>
-    route.fulfill({ status: 200, json: { task_id: 'test-planning-task' } })
-  );
-  await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
-    route.fulfill({
-      status: 200,
-      json: { carryover: [] },
-    })
-  );
-  await mockUserCatalogEmpty(page);
-  // Step 3 (Meals) auto-generates via the agent when no meals are stored.
-  // Return an empty meals list so the skeleton resolves immediately without stalling navigation.
+async function seedWizard(page: Page): Promise<{ sub: string }> {
+  const { sub } = await seedAuth(page);
+  // Step 3 (Meals) auto-generates via the agent when no meals are stored. Mock
+  // the agent endpoint so the skeleton resolves immediately without an LLM call
+  // (mock policy: agent endpoints are the only thing we still mock).
   await page.route(`${API_BASE}/agent/meal-plan`, route =>
     route.fulfill({ status: 200, json: { week: '2026-03-30', meals: [] } })
   );
+  return { sub };
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -56,18 +33,10 @@ test.describe('Planning Wizard', () => {
     });
 
     test('authenticated non-onboarded user is redirected to /onboarding', async ({ page }) => {
-      await injectAuthToken(page);
-      await page.route(`${API_BASE}/users/me`, route =>
-        route.fulfill({ status: 200, json: MOCK_USER_NEW })
-      );
-      // Onboarding components fetch these on load; mock them so the synthetic
-      // token does not trigger a real 401 → session_expired redirect.
-      await page.route(`${API_BASE}/dietary-restrictions`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
-      await page.route(`${API_BASE}/meal-pattern**`, route =>
-        route.fulfill({ status: 200, json: [] })
-      );
+      // seedOnboarding provisions a fresh, non-onboarded user against the real
+      // backend. /dietary-restrictions and /meal-pattern return empty for a new
+      // user, so no route mocks are needed.
+      await seedOnboarding(page);
 
       await page.goto('/plan/week');
       await expect(page).toHaveURL(/\/onboarding/);
@@ -166,48 +135,51 @@ test.describe('Planning Wizard', () => {
   // ── Step 1 — Carryover Review ─────────────────────────────────────────────
 
   test.describe('Step 1 — Carryover Review', () => {
-    // Mock carryover entries from the previous week (2026-03-21 → 2026-03-23)
-    const MOCK_CARRYOVER = [
-      {
-        entry_id: 'co-1',
-        task_type: 'general',
-        title: 'Morning run',
-        date: '2026-03-21',
-        scheduled_start: '07:00:00',
-        status: 'incomplete',
-      },
-      {
-        // No title — component should fall back to task_type
-        entry_id: 'co-2',
-        task_type: 'habit',
-        date: '2026-03-22',
-        scheduled_start: '09:00:00',
-        status: 'incomplete',
-      },
-      {
-        entry_id: 'co-3',
-        task_type: 'general',
-        title: 'Read book',
-        date: '2026-03-23',
-        scheduled_start: '20:00:00',
-        status: 'incomplete',
-      },
-    ];
+    // Carryover entries are seeded into the previous week (2026-03-21 → 03-23)
+    // by driving POST /tasks/weekly-plan + POST /schedule/plan against the real
+    // backend. The /schedule/plan/carryover endpoint then returns them when the
+    // wizard loads with plan_start=2026-03-30. Entries must be one_shot=false
+    // so the window-close pass during commit_plan does not skip them.
+    //
+    // Note: task_type='medication' (rather than 'habit' as in the original
+    // mock) because VALID_TASK_TYPES does not include 'habit'. The Step 1
+    // "title falls back to task_type" test asserts on this literal text.
 
-    async function seedWizardWithCarryover(page: Page): Promise<void> {
-      await seedWizard(page);
-      // Override carryover route (LIFO — this handler runs before seedWizard's empty mock)
-      await page.route(`${API_BASE}/schedule/plan/carryover**`, route =>
-        route.fulfill({
-          status: 200,
-          json: { carryover: MOCK_CARRYOVER },
-        })
-      );
+    async function seedWizardWithCarryover(page: Page): Promise<{ sub: string }> {
+      const { sub } = await seedWizard(page);
+      await seedScheduleEntries(sub, {
+        plan_start: '2026-03-21',
+        plan_end: '2026-03-23',
+        placed_tasks: [
+          {
+            date: '2026-03-21',
+            task_type: 'general',
+            title: 'Morning run',
+            scheduled_start: '07:00:00',
+            one_shot: false,
+          },
+          {
+            // No title — component should fall back to task_type
+            date: '2026-03-22',
+            task_type: 'medication',
+            scheduled_start: '09:00:00',
+            one_shot: false,
+          },
+          {
+            date: '2026-03-23',
+            task_type: 'general',
+            title: 'Read book',
+            scheduled_start: '20:00:00',
+            one_shot: false,
+          },
+        ],
+      });
+      return { sub };
     }
 
     test('wizard auto-skips to step 2 when no carryover items', async ({ page }) => {
       await page.clock.setFixedTime('2026-03-28T00:00:00');
-      await seedWizard(page); // returns carryover: []
+      await seedWizard(page); // no schedule entries → empty carryover
       await page.goto('/plan/week');
       await expect(page.locator('.planning-wizard')).toBeVisible();
       // Step 1 is skipped entirely — wizard opens on step 2 (Tasks)
@@ -232,7 +204,7 @@ test.describe('Planning Wizard', () => {
         await expect(items.nth(0).locator('.item-date')).toContainText('Mar 21');
 
         // Item without title falls back to task_type (no titlecase transform on this element)
-        await expect(items.nth(1).locator('.item-title')).toHaveText('habit');
+        await expect(items.nth(1).locator('.item-title')).toHaveText('medication');
 
         // Third item
         await expect(items.nth(2).locator('.item-title')).toHaveText('Read book');
