@@ -5,17 +5,17 @@ use crate::api_response::{
     CarryoverApiResponse, CatalogDishIngredientResponse, CatalogIngredientResponse,
     CatalogMealDishResponse, CommittedEntryRef, DayTypeResponse, DietaryRestrictionResponse,
     DishDetailApiResponse, MealDetailApiResponse, MealPatternEntryResponse, MealSuggestionResponse,
-    PlanStatusApiResponse, PostSchedulePlanApiResponse, RoutineResponse, ScheduleEntryResponse,
-    SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
+    PlanStatusApiResponse, PlannedMealEntryDto, PostSchedulePlanApiResponse, RoutineResponse,
+    ScheduleEntryResponse, SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
     UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealPatternEntryRequest, FailedSlot,
-    MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealPlanRequest,
-    MealPlanResponse, MealPlanState, MealRef, MealSuggestRequest, Nutrition, NutritionSummary,
-    PatchEntryStatusRequest, PlaceTasksEntry, PlaceTasksRequest, PlanEntryRequest,
-    PostSchedulePlanRequest, ReadyStatus, SlotRef, TaskEntryRequest, TaskEntryResponse,
-    UpdateMealPatternEntryRequest,
+    MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealEntryRequest,
+    MealPlanRequest, MealPlanResponse, MealPlanState, MealRef, MealSuggestRequest, Nutrition,
+    NutritionSummary, PatchEntryStatusRequest, PlaceTasksEntry, PlaceTasksRequest,
+    PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef, TaskEntryRequest,
+    TaskEntryResponse, UpdateMealPatternEntryRequest,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
@@ -180,6 +180,8 @@ impl Modify for BearerSecurityAddon {
         PostSchedulePlanApiResponse,
         PostSchedulePlanRequest,
         PlanEntryRequest,
+        MealEntryRequest,
+        PlannedMealEntryDto,
         CarryoverDecision,
         PatchEntryStatusRequest,
         RoutineResponse,

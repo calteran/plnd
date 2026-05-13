@@ -1,8 +1,8 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish, DayType,
-    DietaryRestriction, MealPatternEntry, MealSuggestion, Routine, ScheduleEntry, Task, User,
-    UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
+    DietaryRestriction, MealPatternEntry, MealSuggestion, PlannedMealEntry, Routine, ScheduleEntry,
+    Task, User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
 };
 use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
@@ -396,8 +396,6 @@ pub struct ScheduleEntryResponse {
     pub user_id: Uuid,
     pub routine_id: Option<Uuid>,
     pub task_type: Option<String>,
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
     pub title: Option<String>,
     pub date: NaiveDate,
     pub scheduled_start: Option<DateTime<Utc>>,
@@ -421,8 +419,6 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
             user_id: e.user_id,
             routine_id: e.routine_id,
             task_type: e.task_type,
-            task_ref_id: e.task_ref_id,
-            task_ref_type: e.task_ref_type,
             title: e.title,
             date: e.date,
             scheduled_start: e.scheduled_start,
@@ -458,11 +454,34 @@ impl From<Vec<ScheduleEntry>> for CarryoverApiResponse {
     }
 }
 
+/// API response wrapper for `plnd_data::models::PlannedMealEntry`.
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct PlannedMealEntryDto {
+    pub meal_entry_id: Uuid,
+    pub schedule_entry_id: Uuid,
+    pub meal_ref_id: Uuid,
+    pub meal_ref_type: String,
+    pub title: Option<String>,
+}
+
+impl From<PlannedMealEntry> for PlannedMealEntryDto {
+    fn from(e: PlannedMealEntry) -> Self {
+        Self {
+            meal_entry_id: e.meal_entry_id,
+            schedule_entry_id: e.schedule_entry_id,
+            meal_ref_id: e.meal_ref_id,
+            meal_ref_type: e.meal_ref_type,
+            title: e.title,
+        }
+    }
+}
+
 /// API response wrapper for `plnd_data::query_types::SchedulePeriodResponse`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct SchedulePeriodApiResponse {
     pub entries: Vec<ScheduleEntryResponse>,
     pub carryover: Vec<ScheduleEntryResponse>,
+    pub planned_meals: Vec<PlannedMealEntryDto>,
 }
 
 impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
@@ -478,6 +497,7 @@ impl From<SchedulePeriodResponse> for SchedulePeriodApiResponse {
                 .into_iter()
                 .map(ScheduleEntryResponse::from)
                 .collect(),
+            planned_meals: Vec::new(),
         }
     }
 }
@@ -584,8 +604,6 @@ pub struct RoutineResponse {
     pub duration_minutes: Option<i32>,
     pub energy_required: String,
     pub is_anchor: bool,
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -604,8 +622,6 @@ impl From<Routine> for RoutineResponse {
             duration_minutes: t.duration_minutes,
             energy_required: t.energy_required,
             is_anchor: t.is_anchor,
-            task_ref_id: t.task_ref_id,
-            task_ref_type: t.task_ref_type,
             created_at: t.created_at,
             updated_at: t.updated_at,
         }

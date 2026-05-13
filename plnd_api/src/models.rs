@@ -78,8 +78,6 @@ pub struct PlanEntryRequest {
     pub date: NaiveDate,
     #[serde(default)]
     pub task_type: Option<String>,
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
     pub title: Option<String>,
     /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"; omit for slot tasks (after_anchor)
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
@@ -89,6 +87,17 @@ pub struct PlanEntryRequest {
     pub energy_required: Option<String>,
     #[serde(default)]
     pub one_shot: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct MealEntryRequest {
+    pub date: NaiveDate,
+    /// Meal name within the day-type's meal list (e.g. "breakfast").
+    pub meal_name: String,
+    pub meal_ref_id: Uuid,
+    /// One of: "user_meal" | "catalog_meal" | "user_dish" | "catalog_dish".
+    pub meal_ref_type: String,
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -118,6 +127,9 @@ pub struct PostSchedulePlanRequest {
     /// AI-placed one-off tasks from the Task Placement Review step.
     #[serde(default)]
     pub placed_tasks: Vec<PlanEntryRequest>,
+    /// Approved meal entries staged for commit; persisted into `planned_meal_entries`.
+    #[serde(default)]
+    pub meal_entries: Vec<MealEntryRequest>,
 }
 
 // ---------------------------------------------------------------------------
