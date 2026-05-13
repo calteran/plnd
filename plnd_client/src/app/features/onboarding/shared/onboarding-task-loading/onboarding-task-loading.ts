@@ -50,7 +50,7 @@ export const EASTER_EGG_EVERY      = 15;
 export const MAX_PERSONALISED_NAMES = 5;
 
 @Component({
-  selector: 'app-onboarding-loading-screen',
+  selector: 'app-onboarding-task-loading',
   standalone: true,
   template: `
     <div class="loading-screen">
@@ -192,7 +192,7 @@ export const MAX_PERSONALISED_NAMES = 5;
     }
   `],
 })
-export class OnboardingLoadingScreenComponent implements OnInit, OnDestroy {
+export class OnboardingTaskLoadingComponent implements OnInit, OnDestroy {
   readonly taskCount    = input.required<number>();
   readonly routineCount = input.required<number>();
   readonly taskNames    = input.required<string[]>();

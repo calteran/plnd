@@ -1,20 +1,20 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import {
-  OnboardingLoadingScreenComponent,
+  OnboardingTaskLoadingComponent,
   MAX_KEEP,
   MAX_DELAY_MS,
   MIN_DELAY_MS,
-} from './onboarding-loading-screen';
+} from './onboarding-task-loading';
 
-describe('OnboardingLoadingScreenComponent', () => {
-  let fixture: ComponentFixture<OnboardingLoadingScreenComponent>;
+describe('OnboardingTaskLoadingComponent', () => {
+  let fixture: ComponentFixture<OnboardingTaskLoadingComponent>;
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [OnboardingLoadingScreenComponent],
+      imports: [OnboardingTaskLoadingComponent],
     }).compileComponents();
 
-    fixture = TestBed.createComponent(OnboardingLoadingScreenComponent);
+    fixture = TestBed.createComponent(OnboardingTaskLoadingComponent);
     fixture.componentRef.setInput('taskCount', 3);
     fixture.componentRef.setInput('routineCount', 2);
     fixture.componentRef.setInput('taskNames', ['Morning walk', 'Deep work']);
