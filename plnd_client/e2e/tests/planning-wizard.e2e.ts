@@ -34,6 +34,15 @@ async function seedWizard(page: Page): Promise<void> {
       json: { carryover: [] },
     })
   );
+  // plan-meals-step calls userMealsService.load() / userDishesService.load() on init;
+  // mock to empty arrays so the synthetic token never triggers a real 401 →
+  // session_expired redirect.
+  await page.route(`${API_BASE}/my/meals`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
+  await page.route(`${API_BASE}/my/dishes`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
   // Step 3 (Meals) auto-generates via the agent when no meals are stored.
   // Return an empty meals list so the skeleton resolves immediately without stalling navigation.
   await page.route(`${API_BASE}/agent/meal-plan`, route =>

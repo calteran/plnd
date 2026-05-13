@@ -1,9 +1,12 @@
 import { Component, DestroyRef, OnInit, computed, inject, input, signal, ViewChild, ElementRef } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { MealPlannerAgentService } from '../../../../core/services/meal-planner-agent.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
+import { UserMealsService } from '../../../../core/services/user-meals.service';
+import { UserDishesService } from '../../../../core/services/user-dishes.service';
+import { MealPlanLoadingComponent } from '../../../onboarding/shared/meal-plan-loading/meal-plan-loading';
 import { formatDayName, formatDayDate, daysInRange } from '../../utils/date-format.utils';
 import { FailedSlot, MealPlanResponse, MealSlot, PlannedMeal } from '../../../../core/models/week-plan';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
@@ -11,9 +14,24 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 @Component({
   selector: 'app-plan-meals-step',
   standalone: true,
-  imports: [],
+  imports: [MealPlanLoadingComponent],
   template: `
     <div class="plan-meals-wrapper">
+
+      @if (isGenerating()) {
+        <app-meal-plan-loading
+          [slotsByDay]="loaderSlotsByDay()"
+          [blockedNames]="blockedNames()"
+          (cancelClick)="cancelGeneration()" />
+      } @else if (cancelled()) {
+        <div class="cancel-card" role="alert">
+          <p class="cancel-msg">Generation cancelled.</p>
+          <div class="cancel-actions">
+            <button type="button" class="btn-cancel-secondary" (click)="dismissCancellation()">Skip — I'll plan manually</button>
+            <button type="button" class="btn-cancel-primary" (click)="retryGeneration()">Try again</button>
+          </div>
+        </div>
+      } @else {
 
       @if (firstRun()) {
         <div class="first-run-callout">
@@ -78,14 +96,9 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
                  [class.approved-g]="isApproved(day, entry.name)"
                  [class.skipped-g]="isSkipped(day, entry.name)"
                  [class.gc-editing]="isCellEditing(day, entry.name)"
-                 [class.gc-loading]="isGenerating() && !getMeal(day, entry.name)"
                  [class.gc-failed]="isFailedSlot(day, entry.name)">
 
-              @if (isGenerating() && !getMeal(day, entry.name)) {
-                <!-- Skeleton shimmer while auto-generating -->
-                <div class="gc-skeleton"></div>
-
-              } @else if (isSkipped(day, entry.name)) {
+              @if (isSkipped(day, entry.name)) {
                 <span class="gc-text skip-t">— skipped</span>
                 <div class="gc-actions">
                   <button class="gc-undo" type="button"
@@ -139,6 +152,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
         }
 
       </div>
+      }
     </div>
   `,
   styles: [`
@@ -268,23 +282,37 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .gc.approved-g  { border-color: var(--color-accent-border); background: var(--color-accent-light); }
     .gc.skipped-g   { background: var(--color-surface-base); opacity: 0.45; }
     .gc.gc-editing  { border-color: var(--color-accent-border); box-shadow: 0 0 0 2px var(--color-accent-light); }
-    .gc.gc-loading  { overflow: hidden; }
     .gc.gc-na { background: var(--color-surface-base); opacity: 0.2; border-style: dashed; }
     .gc.gc-failed { border-color: var(--color-warning-border); background: var(--color-warning-light); }
 
-    /* ── Skeleton shimmer ── */
-    .gc-skeleton {
-      position: absolute; inset: 0; border-radius: 6px;
-      background: linear-gradient(90deg,
-        var(--color-surface-base) 25%,
-        var(--color-surface-warm) 50%,
-        var(--color-surface-base) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.4s ease-in-out infinite;
+    /* ── Cancellation card (shown when user cancels in-flight generation) ── */
+    .cancel-card {
+      background: var(--color-surface-warm);
+      border: 1px solid var(--color-accent-border);
+      border-radius: 12px;
+      padding: 24px 24px 18px;
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: center;
     }
-    @keyframes shimmer {
-      0%   { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
+    .cancel-msg {
+      font-size: 14px; color: var(--color-text-primary);
+      margin: 0 0 14px; line-height: 1.5;
+    }
+    .cancel-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+    .btn-cancel-secondary,
+    .btn-cancel-primary {
+      border-radius: 7px; padding: 7px 14px;
+      font-size: 13px; cursor: pointer;
+    }
+    .btn-cancel-secondary {
+      background: transparent;
+      border: 1px solid var(--color-border-row);
+      color: var(--color-text-muted);
+    }
+    .btn-cancel-primary {
+      background: var(--color-accent-border); border: none;
+      color: #fff; font-weight: 600;
     }
 
     /* Skip / clear corner button */
@@ -369,6 +397,8 @@ export class PlanMealsStepComponent implements OnInit {
   private readonly weekPlanService         = inject(WeekPlanService);
   private readonly mealPlannerAgentService = inject(MealPlannerAgentService);
   private readonly dayTypesMealsService    = inject(DayTypesMealsService);
+  private readonly userMealsService        = inject(UserMealsService);
+  private readonly userDishesService       = inject(UserDishesService);
   private readonly destroyRef              = inject(DestroyRef);
 
   @ViewChild('mealInput') private mealInput?: ElementRef<HTMLInputElement>;
@@ -416,7 +446,21 @@ export class PlanMealsStepComponent implements OnInit {
   readonly showRefreshModal = signal(false);
   readonly errorMessage     = signal<string | null>(null);
   readonly failedSlots      = signal<FailedSlot[]>([]);
+  readonly cancelled        = signal(false);
   private  totalPlannedCount = signal(0);
+  private  generationSub: Subscription | null = null;
+
+  readonly blockedNames = computed(() => [
+    ...this.userMealsService.meals().filter(m => m.is_blocked).map(m => m.name),
+    ...this.userDishesService.dishes().filter(d => d.is_blocked).map(d => d.name),
+  ]);
+
+  readonly loaderSlotsByDay = computed(() =>
+    this.horizonDays().map(day => ({
+      day,
+      slots: this.slotsForDate(day).map(s => s.name),
+    })),
+  );
   readonly partialBannerMsg  = computed(() => {
     const failed = this.failedSlots();
     if (failed.length === 0) return null;
@@ -438,36 +482,61 @@ export class PlanMealsStepComponent implements OnInit {
     if (!this.getMealsForDate()) {
       this.dayTypesMealsService.load();
     }
+    this.userMealsService.load();
+    this.userDishesService.load();
     const meals  = this.weekPlanService.scheduledMeals();
     const hasAny = this.horizonDays().some(d => Object.keys(meals[d] ?? {}).length > 0);
     if (!hasAny) {
-      const start = this.planStart();
-      const end   = this.planEnd();
-      this.runAgentPlan(
-        this.mealPlannerAgentService.generateWeek(
-          (start && end) ? start : this.weekPlanService.planStart(),
-          this.weekPlanService.currentState(),
-        ),
-      );
+      this.startGeneration();
     }
+  }
+
+  private startGeneration(): void {
+    const start = this.planStart();
+    const end   = this.planEnd();
+    this.runAgentPlan(
+      this.mealPlannerAgentService.generateWeek(
+        (start && end) ? start : this.weekPlanService.planStart(),
+        this.weekPlanService.currentState(),
+      ),
+    );
   }
 
   private runAgentPlan(obs$: Observable<MealPlanResponse>): void {
     this.errorMessage.set(null);
     this.failedSlots.set([]);
     this.totalPlannedCount.set(0);
+    this.cancelled.set(false);
     this.weekPlanService.setGenerating(true);
-    obs$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+    this.generationSub?.unsubscribe();
+    this.generationSub = obs$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: resp => {
         this.weekPlanService.applyAgentMeals(resp.meals);
         this.totalPlannedCount.set(resp.meals.length + (resp.failed_slots?.length ?? 0));
         this.failedSlots.set(resp.failed_slots ?? []);
+        this.generationSub = null;
       },
       error: () => {
         this.weekPlanService.setGenerating(false);
         this.errorMessage.set("Couldn't generate meal plan — please try again.");
+        this.generationSub = null;
       },
     });
+  }
+
+  cancelGeneration(): void {
+    this.generationSub?.unsubscribe();
+    this.generationSub = null;
+    this.weekPlanService.setGenerating(false);
+    this.cancelled.set(true);
+  }
+
+  dismissCancellation(): void {
+    this.cancelled.set(false);
+  }
+
+  retryGeneration(): void {
+    this.startGeneration();
   }
 
   // ── Formatters ────────────────────────────────────────────

@@ -140,4 +140,13 @@ export async function seedOnboarding(page: Page): Promise<void> {
   await page.route(`${API_BASE}/meal-pattern**`, route =>
     route.fulfill({ status: 200, json: MOCK_MEAL_PATTERN })
   );
+  // plan-meals-step loads user meal/dish preferences on init (for blocked-item
+  // personalization in the loader); mock to empty arrays for the same reason —
+  // a real 401 here would cascade into a session_expired redirect.
+  await page.route(`${API_BASE}/my/meals`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
+  await page.route(`${API_BASE}/my/dishes`, route =>
+    route.fulfill({ status: 200, json: [] })
+  );
 }
