@@ -142,7 +142,7 @@ describe('OnboardingStateService', () => {
         recurrence_rule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
         time_window_start: '07:00', time_window_end: '08:00',
         duration_minutes: 30, energy_required: 'medium',
-        is_anchor: false, task_ref_id: null, task_ref_type: null,
+        is_anchor: false,
         created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
       },
     ];
@@ -159,14 +159,14 @@ describe('OnboardingStateService', () => {
         routine_id: 'a', user_id: 'u1', task_type: 'general', title: 'A',
         recurrence_tag: 'daily', recurrence_rule: 'FREQ=DAILY',
         time_window_start: null, time_window_end: null, duration_minutes: null,
-        energy_required: 'low', is_anchor: false, task_ref_id: null, task_ref_type: null,
+        energy_required: 'low', is_anchor: false,
         created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
       },
       {
         routine_id: 'b', user_id: 'u1', task_type: 'general', title: 'B',
         recurrence_tag: 'daily', recurrence_rule: 'FREQ=DAILY',
         time_window_start: null, time_window_end: null, duration_minutes: null,
-        energy_required: 'low', is_anchor: false, task_ref_id: null, task_ref_type: null,
+        energy_required: 'low', is_anchor: false,
         created_at: '2026-04-22T00:00:00Z', updated_at: '2026-04-22T00:00:00Z',
       },
     ]);
