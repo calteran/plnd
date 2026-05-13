@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Subject, of, switchMap, map, catchError } from 'rxjs';
@@ -8,8 +8,9 @@ import { ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {
-  private readonly http    = inject(HttpClient);
-  private readonly apiBase = inject(ConfigService).getConfig().api.baseUrl;
+  private readonly http       = inject(HttpClient);
+  private readonly apiBase    = inject(ConfigService).getConfig().api.baseUrl;
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly _items        = signal<ScheduleItem[]>([]);
   private readonly _loading      = signal(false);
@@ -75,6 +76,7 @@ export class ScheduleService {
 
     this.http
       .patch(`${this.apiBase}/schedule/entries/${id}/status`, { status: toApiStatus(currentStatus) })
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({ error: () => this.loadDay(this._date()) });
   }
 
@@ -86,6 +88,7 @@ export class ScheduleService {
     );
     this.http
       .patch(`${this.apiBase}/schedule/entries/${id}/status`, { status: 'skipped' })
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({ error: () => this.loadDay(this._date()) });
   }
 
