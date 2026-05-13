@@ -34,7 +34,7 @@ export class ScheduleService {
             map(resp => ({ resp, error: false as const })),
             catchError(() =>
               of({
-                resp: { entries: [], carryover: [] } satisfies SchedulePeriodResponse,
+                resp: { entries: [], carryover: [], planned_meals: [] } satisfies SchedulePeriodResponse,
                 error: true as const,
               }),
             ),
