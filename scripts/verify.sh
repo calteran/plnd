@@ -180,9 +180,12 @@ cd "$PROJECT_ROOT/plnd_api"
 # Close fd 3 (FIFO write-end) in the API subprocess so the reader can see
 # EOF once the main script closes fd 3.  Without this, the API process keeps
 # the write-end open and `wait "$READER_PID"` hangs indefinitely.
+# Close fd 9 (the flock) so an interrupted verify can't leave the api holding
+# the lock — every subsequent verify run would block on `flock` until the
+# zombied api process is killed manually.
 # APP_DATABASE__URL, APP_AUTH__OIDC_INTERNAL_ISSUER_URL, APP_AUTH__FRONTEND_ORIGIN
 # all come from Doppler — no inline overrides needed.
-doppler run -- ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- &
+doppler run -- ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- 9>&- &
 API_PID=$!
 cd "$PROJECT_ROOT"
 
@@ -197,7 +200,7 @@ wait_for_api() {
 }
 run_sync "api healthy" "$PROJECT_ROOT" wait_for_api
 
-run_sync "e2e tests" "$PROJECT_ROOT/plnd_client" bash -c "CI=true npm run e2e:ci"
+run_sync "e2e tests" "$PROJECT_ROOT/plnd_client" bash -c "PLAYWRIGHT_STRICT=true npm run e2e:ci"
 
 # ── Final gate: collect all background job results ─────────────────────────────
 wait_all
