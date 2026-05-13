@@ -214,7 +214,8 @@ seed:
 # Feed URLs must match config/api/default.toml news_feed_urls.
 refresh-fixtures:
     @echo "→ Capturing real upstream responses into plnd_data/fixtures/ ..."
-    @mkdir -p plnd_data/fixtures/open-meteo plnd_data/fixtures/rss
+    @mkdir -p plnd_data/fixtures/open-meteo
+    @rm -rf plnd_data/fixtures/rss && mkdir -p plnd_data/fixtures/rss
     curl -fsSL 'https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&current=temperature_2m,precipitation,weather_code&daily=temperature_2m_max,temperature_2m_min&forecast_days=1' \
         -o plnd_data/fixtures/open-meteo/forecast.json
     curl -fsSL 'https://xkcd.com/rss.xml' -o plnd_data/fixtures/rss/xkcd.xml
