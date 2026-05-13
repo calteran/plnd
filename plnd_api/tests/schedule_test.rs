@@ -7,26 +7,6 @@ use plnd_data::query_types::{
 };
 
 #[test]
-fn test_plan_entry_request_serde_meal_anchor() {
-    // Meal anchor entries omit task_type (None), and use after_anchor for slot
-    let json = r#"{
-        "date": "2026-03-24",
-        "task_ref_id": "00000000-0000-0000-0000-000000000001",
-        "task_ref_type": "user_meal",
-        "scheduled_start": "08:00",
-        "after_anchor": "breakfast"
-    }"#;
-    let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
-    assert_eq!(req.task_type, None);
-    assert_eq!(
-        req.scheduled_start,
-        Some(NaiveTime::from_hms_opt(8, 0, 0).unwrap())
-    );
-    assert_eq!(req.after_anchor, Some("breakfast".to_string()));
-    assert!(req.title.is_none());
-}
-
-#[test]
 fn test_plan_entry_request_general_task_with_title() {
     let json = r#"{
         "date": "2026-03-24",
@@ -37,7 +17,10 @@ fn test_plan_entry_request_general_task_with_title() {
     let req: PlanEntryRequest = serde_json::from_str(json).unwrap();
     assert_eq!(req.task_type, Some("general".to_string()));
     assert_eq!(req.title, Some("Morning walk".to_string()));
-    assert!(req.task_ref_id.is_none());
+    assert_eq!(
+        req.scheduled_start,
+        Some(NaiveTime::from_hms_opt(7, 0, 0).unwrap())
+    );
 }
 
 #[test]
@@ -56,6 +39,41 @@ fn test_post_schedule_plan_request_serde() {
     );
     assert_eq!(req.replace, Some(true));
     assert!(req.entries.is_empty());
+}
+
+#[test]
+fn test_post_schedule_plan_request_with_meal_entries() {
+    let json = r#"{
+        "plan_start": "2026-03-24",
+        "plan_end": "2026-03-30",
+        "planning_task_id": "00000000-0000-0000-0000-000000000002",
+        "entries": [],
+        "meal_entries": [
+            {
+                "date": "2026-03-24",
+                "meal_name": "breakfast",
+                "meal_ref_id": "00000000-0000-0000-0000-000000000001",
+                "meal_ref_type": "user_meal",
+                "title": "Yogurt and granola"
+            }
+        ]
+    }"#;
+    let req: PostSchedulePlanRequest = serde_json::from_str(json).unwrap();
+    assert_eq!(req.meal_entries.len(), 1);
+    assert_eq!(req.meal_entries[0].meal_name, "breakfast");
+    assert_eq!(req.meal_entries[0].meal_ref_type, "user_meal");
+}
+
+#[test]
+fn test_post_schedule_plan_request_meal_entries_defaults_empty() {
+    let json = r#"{
+        "plan_start": "2026-03-24",
+        "plan_end": "2026-03-30",
+        "planning_task_id": "00000000-0000-0000-0000-000000000002",
+        "entries": []
+    }"#;
+    let req: PostSchedulePlanRequest = serde_json::from_str(json).unwrap();
+    assert!(req.meal_entries.is_empty());
 }
 
 #[test]

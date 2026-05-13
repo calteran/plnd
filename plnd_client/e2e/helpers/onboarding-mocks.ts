@@ -34,8 +34,9 @@ export const MOCK_PLACED_TASKS = [
 // ── Meal Plan (POST /agent/meal-plan) ─────────────────────────────────────────
 //
 // Uses real UUID strings for meal_ref.id so the downstream POST /schedule/plan
-// commit (which serializes task_ref_id: Option<Uuid> in plnd_api) parses
-// successfully against the real backend during the full happy-path tests.
+// commit (which forwards meal refs into the meal_entries field on
+// PostSchedulePlanRequest) parses successfully against the real backend during
+// the full happy-path tests.
 
 export const MOCK_MEAL_PLAN = {
   plan_start: '2026-03-28',

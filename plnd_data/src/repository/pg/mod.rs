@@ -4,6 +4,7 @@ pub mod day_type;
 pub mod exercise;
 pub mod meal;
 pub mod meal_pattern;
+pub mod meal_plan;
 pub mod meal_search;
 pub mod meal_suggestion;
 pub mod memory;

@@ -14,8 +14,6 @@ export interface Routine {
   duration_minutes: number | null;
   energy_required: EnergyLevel;
   is_anchor: boolean;
-  task_ref_id: string | null;
-  task_ref_type: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -30,8 +28,6 @@ export interface CreateRoutineRequest {
   duration_minutes?: number;
   energy_required?: EnergyLevel;
   is_anchor?: boolean;
-  task_ref_id?: string;
-  task_ref_type?: string;
 }
 
 export interface UpdateRoutineRequest {
@@ -43,8 +39,6 @@ export interface UpdateRoutineRequest {
   duration_minutes?: number;
   energy_required?: EnergyLevel;
   is_anchor?: boolean;
-  task_ref_id?: string;
-  task_ref_type?: string;
 }
 
 const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];

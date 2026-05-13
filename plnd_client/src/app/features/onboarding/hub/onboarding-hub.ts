@@ -13,6 +13,7 @@ import {
   PostSchedulePlanResponse,
   PlanEntryRequest,
 } from '../../../core/models/week-plan';
+import type { MealEntryRequest } from '../../../core/models/planned-meal-entry';
 
 interface HubSection {
   id: SectionId | 'exercise';
@@ -565,23 +566,36 @@ export class OnboardingHubComponent {
     this.commitError.set(false);
 
     const mealPlan = this.onboardingState.mealPlan();
-    const entries: PlanEntryRequest[] = (mealPlan?.meals ?? []).map(m => ({
-      date: m.date,
-      // task_type omitted — meal anchor entries have no task_type
-      task_ref_id: m.meal_ref?.id,
-      task_ref_type: m.meal_ref?.type,
-      title: m.meal_ref ? undefined : m.title,
-      scheduled_start: preferredTimeHHMM(
-        mealsForDate(m.date, this.onboardingState.dayTypes()).find(e => e.name === m.meal_name)?.preferred_time ?? '12:00:00'
-      ),
-      after_anchor: m.meal_name,
-    }));
+    const entries: PlanEntryRequest[] = [];
+    const mealEntries: MealEntryRequest[] = [];
+    for (const m of mealPlan?.meals ?? []) {
+      const preferred = mealsForDate(m.date, this.onboardingState.dayTypes())
+        .find(e => e.name === m.meal_name)?.preferred_time ?? '12:00:00';
+      entries.push({
+        date: m.date,
+        title: m.meal_ref ? undefined : m.title,
+        scheduled_start: preferredTimeHHMM(preferred),
+        after_anchor: m.meal_name,
+      });
+      if (m.meal_ref) {
+        mealEntries.push({
+          date: m.date,
+          meal_name: m.meal_name,
+          meal_ref_id: m.meal_ref.id,
+          // Wizard only authors meals; dishes are not yet a UI concept.
+          // If a future surface emits a dish-typed MealRef, expand this mapping.
+          meal_ref_type: m.meal_ref.type === 'catalog' ? 'catalog_meal' : 'user_meal',
+          title: m.title,
+        });
+      }
+    }
 
     const body: PostSchedulePlanRequest = {
       plan_start: period.start,
       plan_end: period.end,
       planning_task_id: NIL_UUID,
       entries,
+      meal_entries: mealEntries,
       placed_tasks: this.onboardingState.placedTasks(),
     };
 

@@ -129,12 +129,11 @@ pub async fn create_user_task(
         scheduled_at.map(|t| t + Duration::minutes(duration_minutes as i64));
     sqlx::query(
         "INSERT INTO schedule_entries
-           (user_id, task_type, task_ref_id, title, date, scheduled_start, scheduled_end,
+           (user_id, task_type, title, date, scheduled_start, scheduled_end,
             after_anchor, status, one_shot)
-         VALUES ($1, 'general', $2, $3, $4, $5, $6, $7, 'planned', $8)",
+         VALUES ($1, 'general', $2, $3, $4, $5, $6, 'planned', $7)",
     )
     .bind(user_id)
-    .bind(task.task_id)
     .bind(title)
     .bind(date)
     .bind(scheduled_at)
@@ -346,12 +345,15 @@ mod tests {
         .await
         .expect("create_user_task failed");
 
+        // task_ref_id was dropped from schedule_entries in migration 0043;
+        // identify the row by (user_id, title) — unique within this test.
         let (scheduled_start, after_anchor): (Option<DateTime<Utc>>, Option<String>) =
             sqlx::query_as(
                 "SELECT scheduled_start, after_anchor FROM schedule_entries
-                 WHERE task_ref_id = $1",
+                 WHERE user_id = $1 AND title = $2",
             )
-            .bind(task.task_id)
+            .bind(uid)
+            .bind(task.title.as_str())
             .fetch_one(&pool)
             .await
             .expect("schedule_entries row not found");
@@ -378,13 +380,16 @@ mod tests {
 
         assert!(task.one_shot, "one_shot must be persisted and returned");
 
-        // Verify one_shot=true was written to schedule_entries as well
-        let se_one_shot: bool =
-            sqlx::query_scalar("SELECT one_shot FROM schedule_entries WHERE task_ref_id = $1")
-                .bind(task.task_id)
-                .fetch_one(&pool)
-                .await
-                .expect("schedule_entries row not found");
+        // Verify one_shot=true was written to schedule_entries as well.
+        // task_ref_id was dropped in migration 0043; look up by (user_id, title).
+        let se_one_shot: bool = sqlx::query_scalar(
+            "SELECT one_shot FROM schedule_entries WHERE user_id = $1 AND title = $2",
+        )
+        .bind(uid)
+        .bind(task.title.as_str())
+        .fetch_one(&pool)
+        .await
+        .expect("schedule_entries row not found");
 
         assert!(
             se_one_shot,
@@ -407,13 +412,16 @@ mod tests {
 
         assert!(!not_one_shot.one_shot, "one_shot=false must roundtrip too");
 
-        // Verify one_shot=false was written to schedule_entries
-        let se_not_one_shot: bool =
-            sqlx::query_scalar("SELECT one_shot FROM schedule_entries WHERE task_ref_id = $1")
-                .bind(not_one_shot.task_id)
-                .fetch_one(&pool)
-                .await
-                .expect("schedule_entries row for false task not found");
+        // Verify one_shot=false was written to schedule_entries.
+        // task_ref_id was dropped in migration 0043; look up by (user_id, title).
+        let se_not_one_shot: bool = sqlx::query_scalar(
+            "SELECT one_shot FROM schedule_entries WHERE user_id = $1 AND title = $2",
+        )
+        .bind(uid)
+        .bind(not_one_shot.title.as_str())
+        .fetch_one(&pool)
+        .await
+        .expect("schedule_entries row for false task not found");
 
         assert!(
             !se_not_one_shot,

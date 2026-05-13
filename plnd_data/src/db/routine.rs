@@ -11,7 +11,7 @@ pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<Routine>,
     sqlx::query_as::<_, Routine>(
         "SELECT routine_id, user_id, task_type, title, recurrence_tag, recurrence_rule,
             time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
-            task_ref_id, task_ref_type, created_at, updated_at
+            created_at, updated_at
          FROM routines WHERE user_id = $1 ORDER BY created_at ASC",
     )
     .bind(user_id)
@@ -35,18 +35,16 @@ pub async fn create(
     duration_minutes: Option<i32>,
     energy_required: &str,
     is_anchor: bool,
-    task_ref_id: Option<Uuid>,
-    task_ref_type: Option<&str>,
 ) -> Result<Routine, DatabaseError> {
     sqlx::query_as::<_, Routine>(
         "INSERT INTO routines (
             user_id, task_type, title, recurrence_tag, recurrence_rule,
             time_window_start, time_window_end, duration_minutes,
-            energy_required, is_anchor, task_ref_id, task_ref_type
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            energy_required, is_anchor
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING routine_id, user_id, task_type, title, recurrence_tag, recurrence_rule,
             time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
-            task_ref_id, task_ref_type, created_at, updated_at",
+            created_at, updated_at",
     )
     .bind(user_id)
     .bind(task_type)
@@ -58,8 +56,6 @@ pub async fn create(
     .bind(duration_minutes)
     .bind(energy_required)
     .bind(is_anchor)
-    .bind(task_ref_id)
-    .bind(task_ref_type)
     .fetch_one(pool)
     .await
     .map_err(DatabaseError::from)
@@ -92,19 +88,16 @@ pub async fn update(
     duration_minutes: Option<i32>,
     energy_required: &str,
     is_anchor: bool,
-    task_ref_id: Option<Uuid>,
-    task_ref_type: Option<&str>,
 ) -> Result<Option<Routine>, DatabaseError> {
     sqlx::query_as::<_, Routine>(
         "UPDATE routines
          SET title = $3, recurrence_tag = $4, recurrence_rule = $5,
              time_window_start = $6, time_window_end = $7, duration_minutes = $8,
-             energy_required = $9, is_anchor = $10, task_ref_id = $11,
-             task_ref_type = $12, updated_at = NOW()
+             energy_required = $9, is_anchor = $10, updated_at = NOW()
          WHERE routine_id = $1 AND user_id = $2
          RETURNING routine_id, user_id, task_type, title, recurrence_tag, recurrence_rule,
              time_window_start, time_window_end, duration_minutes, energy_required, is_anchor,
-             task_ref_id, task_ref_type, created_at, updated_at",
+             created_at, updated_at",
     )
     .bind(routine_id)
     .bind(user_id)
@@ -116,8 +109,6 @@ pub async fn update(
     .bind(duration_minutes)
     .bind(energy_required)
     .bind(is_anchor)
-    .bind(task_ref_id)
-    .bind(task_ref_type)
     .fetch_optional(pool)
     .await
     .map_err(DatabaseError::from)
@@ -175,8 +166,6 @@ mod tests {
             Some(30),
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .expect("create failed");
@@ -209,8 +198,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .expect("monthly routine should be accepted");
@@ -234,8 +221,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .expect("weekly routine should be accepted");
@@ -260,8 +245,6 @@ mod tests {
             None,
             "low",
             false,
-            None,
-            None,
         )
         .await
         .expect("yearly routine should be accepted");
@@ -286,8 +269,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -303,8 +284,6 @@ mod tests {
             None,
             "low",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -333,8 +312,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -369,8 +346,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -387,8 +362,6 @@ mod tests {
             None,
             "high",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -417,8 +390,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -441,8 +412,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -460,8 +429,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();
@@ -488,8 +455,6 @@ mod tests {
             None,
             "medium",
             false,
-            None,
-            None,
         )
         .await
         .unwrap();

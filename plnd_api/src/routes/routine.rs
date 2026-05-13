@@ -35,8 +35,6 @@ pub struct UpdateRoutineRequest {
     pub energy_required: Option<String>,
     /// Defaults to false if omitted.
     pub is_anchor: Option<bool>,
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
@@ -54,8 +52,6 @@ pub struct CreateRoutineRequest {
     pub energy_required: Option<String>,
     /// Defaults to false if omitted.
     pub is_anchor: Option<bool>,
-    pub task_ref_id: Option<Uuid>,
-    pub task_ref_type: Option<String>,
 }
 
 #[utoipa::path(
@@ -138,8 +134,6 @@ pub async fn create_routine(
             body.duration_minutes,
             energy,
             body.is_anchor.unwrap_or(false),
-            body.task_ref_id,
-            body.task_ref_type.as_deref(),
         )
         .await
         .map(|t| (StatusCode::CREATED, Json(RoutineResponse::from(t))))
@@ -242,8 +236,6 @@ pub async fn update_routine(
             body.duration_minutes,
             energy,
             body.is_anchor.unwrap_or(false),
-            body.task_ref_id,
-            body.task_ref_type.as_deref(),
         )
         .await
         .map_err(|e| match e {

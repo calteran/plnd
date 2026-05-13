@@ -24,6 +24,11 @@ pub const VALID_PRIORITY_LEVELS: &[&str] = &["low", "normal", "high"];
 
 pub const VALID_RECURRENCE_TYPES: &[&str] = &["daily", "weekdays", "weekly", "monthly", "yearly"];
 
+/// Valid `meal_ref_type` discriminator values for `planned_meal_entries`.
+/// Enforced by DB CHECK constraint (migration 0043).
+pub const VALID_MEAL_REF_TYPES: &[&str] =
+    &["user_meal", "catalog_meal", "user_dish", "catalog_dish"];
+
 /// Soft occasion hints for dishes and meals — not DB-validated; used for UI autocomplete.
 pub const SUGGESTED_OCCASION_TAGS: &[&str] = &[
     "breakfast-friendly",

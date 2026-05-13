@@ -195,8 +195,6 @@ export interface RoutineInput {
   duration_minutes?: number;
   energy_required?: 'low' | 'medium' | 'high';
   is_anchor?: boolean;
-  task_ref_id?: string;
-  task_ref_type?: string;
 }
 
 export interface SeededRoutine {

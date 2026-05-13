@@ -506,24 +506,31 @@ describe('OnboardingHubComponent', () => {
     expect(body.plan_end).toBe('2026-05-14');
     expect(body.planning_task_id).toBe('00000000-0000-0000-0000-000000000000');
     expect(body.placed_tasks).toEqual([placedTask]);
+    // Anchor entries carry only scheduling metadata — meal-content fields
+    // (meal_ref_*, title-for-ref) live on meal_entries.
     expect(body.entries).toEqual([
       {
         date: '2026-05-01',
-        // task_type omitted — meal anchor entries have no task_type
-        task_ref_id: 'meal-abc',
-        task_ref_type: 'catalog',
         title: undefined,
         scheduled_start: '08:00',
         after_anchor: 'breakfast',
       },
       {
         date: '2026-05-02',
-        // task_type omitted — meal anchor entries have no task_type
-        task_ref_id: undefined,
-        task_ref_type: undefined,
         title: 'Salad',
         scheduled_start: '12:00',
         after_anchor: 'lunch',
+      },
+    ]);
+    // meal_entries only emitted for slots with a meal_ref; the title-only
+    // entry (mealNoRef) is not duplicated here.
+    expect(body.meal_entries).toEqual([
+      {
+        date: '2026-05-01',
+        meal_name: 'breakfast',
+        meal_ref_id: 'meal-abc',
+        meal_ref_type: 'catalog_meal',
+        title: undefined,
       },
     ]);
 

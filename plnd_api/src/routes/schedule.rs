@@ -4,10 +4,12 @@ use crate::api_response::{
 };
 use crate::auth::jwt::Claims;
 use crate::models::{
-    CarryoverDecision as HttpCarryoverDecision, PatchEntryStatusRequest, PlanEntryRequest,
-    PostSchedulePlanRequest,
+    CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryStatusRequest,
+    PlanEntryRequest, PostSchedulePlanRequest,
 };
-use crate::routes::domain_constants::{VALID_ENERGY_LEVELS, VALID_TASK_TYPES};
+use crate::routes::domain_constants::{
+    VALID_ENERGY_LEVELS, VALID_MEAL_REF_TYPES, VALID_TASK_TYPES,
+};
 use crate::state::AppState;
 use axum::{
     Json,
@@ -16,7 +18,9 @@ use axum::{
 };
 use chrono::NaiveDate;
 use plnd_data::Error;
-use plnd_data::models::{CarryoverDecision, CommitPlanInput, PlanEntryInput};
+use plnd_data::models::{
+    CarryoverDecision, CommitPlanInput, PlanEntryInput, PlannedMealEntryStaging,
+};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -51,8 +55,6 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
     Ok(PlanEntryInput {
         date: e.date,
         task_type: e.task_type,
-        task_ref_id: e.task_ref_id,
-        task_ref_type: e.task_ref_type,
         title: e.title,
         scheduled_start: e.scheduled_start,
         after_anchor: e.after_anchor,
@@ -62,6 +64,23 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             .transpose()?,
         energy_required: e.energy_required,
         one_shot: e.one_shot,
+    })
+}
+
+// ---------------------------------------------------------------------------
+// Meal-entry mapping helper — used to stage `meal_entries` for commit_plan.
+// ---------------------------------------------------------------------------
+
+fn map_meal_entry(e: MealEntryRequest) -> Result<PlannedMealEntryStaging, StatusCode> {
+    if !VALID_MEAL_REF_TYPES.contains(&e.meal_ref_type.as_str()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    Ok(PlannedMealEntryStaging {
+        date: e.date,
+        meal_name: e.meal_name,
+        meal_ref_id: e.meal_ref_id,
+        meal_ref_type: e.meal_ref_type,
+        title: e.title,
     })
 }
 
@@ -97,20 +116,32 @@ pub async fn get_period(
     }
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
 
-    state
+    let map_err = |e: Error, op: &'static str| match e {
+        Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+        e => {
+            tracing::error!(error = %e, op, "get_period error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    };
+
+    let period = state
         .repos
         .schedule
         .get_period(user_id, params.start, params.end)
         .await
-        .map(SchedulePeriodApiResponse::from)
-        .map(Json)
-        .map_err(|e| match e {
-            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
-            e => {
-                tracing::error!(error = %e, "get_period error");
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        })
+        .map_err(|e| map_err(e, "get_period"))?;
+
+    let planned_meals = state
+        .repos
+        .meal_plan
+        .list_for_period(user_id, params.start, params.end)
+        .await
+        .map_err(|e| map_err(e, "meal_plan::list_for_period"))?;
+
+    Ok(Json(SchedulePeriodApiResponse::from_parts(
+        period,
+        planned_meals,
+    )))
 }
 
 #[utoipa::path(
@@ -235,6 +266,13 @@ pub async fn post_plan(
         .collect::<Result<Vec<_>, _>>()?;
     entries.extend(placed);
 
+    // Map approved meal entries (paired to schedule_entries inside commit_plan).
+    let meal_entries = body
+        .meal_entries
+        .into_iter()
+        .map(map_meal_entry)
+        .collect::<Result<Vec<_>, _>>()?;
+
     let carryover_decisions: HashMap<Uuid, CarryoverDecision> = body
         .carryover_decisions
         .into_iter()
@@ -253,6 +291,7 @@ pub async fn post_plan(
         plan_end: body.plan_end,
         planning_task_id: body.planning_task_id,
         entries,
+        meal_entries,
         replace: body.replace.unwrap_or(false),
         carryover_decisions,
         drop_reasons: body.carryover_drop_reasons,
@@ -336,8 +375,6 @@ mod tests {
         PlanEntryRequest {
             date: date(2026, 4, 27),
             task_type: Some("work".to_string()),
-            task_ref_id: None,
-            task_ref_type: None,
             title: Some("Test".to_string()),
             scheduled_start: None,
             after_anchor: None,
@@ -406,5 +443,38 @@ mod tests {
         let e = base_entry();
         let result = map_entry(e).unwrap();
         assert_eq!(result.one_shot, None);
+    }
+
+    fn base_meal_entry() -> MealEntryRequest {
+        MealEntryRequest {
+            date: date(2026, 4, 27),
+            meal_name: "breakfast".to_string(),
+            meal_ref_id: Uuid::new_v4(),
+            meal_ref_type: "user_meal".to_string(),
+            title: Some("Oatmeal".to_string()),
+        }
+    }
+
+    #[test]
+    fn map_meal_entry_accepts_valid_ref_types() {
+        for ref_type in &["user_meal", "catalog_meal", "user_dish", "catalog_dish"] {
+            let e = MealEntryRequest {
+                meal_ref_type: (*ref_type).to_string(),
+                ..base_meal_entry()
+            };
+            assert!(
+                map_meal_entry(e).is_ok(),
+                "meal_ref_type '{ref_type}' must be accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn map_meal_entry_rejects_invalid_ref_type() {
+        let e = MealEntryRequest {
+            meal_ref_type: "bogus".to_string(),
+            ..base_meal_entry()
+        };
+        assert_eq!(map_meal_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
     }
 }

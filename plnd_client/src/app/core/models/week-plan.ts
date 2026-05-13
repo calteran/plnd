@@ -1,3 +1,7 @@
+import type { MealEntryRequest, PlannedMealEntryDto } from './planned-meal-entry';
+
+export type { MealRefType } from './planned-meal-entry';
+
 export type CarryoverDecision = 'carry' | 'defer' | 'drop';
 
 export const DROP_REASONS = ['Changed priority', 'No longer needed', 'Too difficult', 'Not ready'] as const;
@@ -83,8 +87,6 @@ export interface PlannedTask {
   duration?: number;
   energy: EnergyLevel;
   task_type?: string;
-  task_ref_id?: string;
-  task_ref_type?: string;
   scheduled_start?: string; // "HH:MM"
   one_shot?: boolean;
 }
@@ -107,8 +109,6 @@ export interface PlanDraftShape {
 export interface ScheduleEntryDto {
   entry_id: string;
   task_type: string | null;    // null for meal anchor entries
-  task_ref_id?: string;
-  task_ref_type?: string;
   title?: string;
   date: string;
   scheduled_start: string;
@@ -121,6 +121,7 @@ export interface ScheduleEntryDto {
 export interface SchedulePeriodResponse {
   entries: ScheduleEntryDto[];
   carryover: ScheduleEntryDto[];
+  planned_meals: PlannedMealEntryDto[];
 }
 
 export interface CarryoverApiResponse {
@@ -135,8 +136,6 @@ export interface PlanStatusResponse {
 export interface PlanEntryRequest {
   date: string;
   task_type?: string;           // omit for meal anchor entries
-  task_ref_id?: string;
-  task_ref_type?: string;
   title?: string;
   scheduled_start: string; // "HH:MM"
   after_anchor?: string;
@@ -188,6 +187,7 @@ export interface PostSchedulePlanRequest {
   /** Optional reasons for 'drop' decisions. entry_id → reason string */
   carryover_drop_reasons?: Record<string, DropReason>;
   placed_tasks?: PlanEntryRequest[];
+  meal_entries: MealEntryRequest[];
 }
 
 export interface PostSchedulePlanResponse {

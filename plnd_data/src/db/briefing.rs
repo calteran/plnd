@@ -102,8 +102,6 @@ mod tests {
                 PlanEntryInput {
                     date: yesterday,
                     task_type: Some("work".to_string()),
-                    task_ref_id: None,
-                    task_ref_type: None,
                     title: Some("Morning work".to_string()),
                     scheduled_start: Some(nine),
                     after_anchor: None,
@@ -114,8 +112,6 @@ mod tests {
                 PlanEntryInput {
                     date: yesterday,
                     task_type: Some("work".to_string()),
-                    task_ref_id: None,
-                    task_ref_type: None,
                     title: Some("Afternoon work".to_string()),
                     scheduled_start: Some(ten),
                     after_anchor: None,
@@ -126,8 +122,6 @@ mod tests {
                 PlanEntryInput {
                     date: yesterday,
                     task_type: None, // meal anchor
-                    task_ref_id: None,
-                    task_ref_type: None,
                     title: Some("Lunch".to_string()),
                     scheduled_start: Some(noon),
                     after_anchor: None,
@@ -136,6 +130,7 @@ mod tests {
                     one_shot: None,
                 },
             ],
+            meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
             drop_reasons: HashMap::new(),
