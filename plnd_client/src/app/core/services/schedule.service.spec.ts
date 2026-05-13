@@ -223,6 +223,8 @@ describe('ScheduleService', () => {
     const task = svc.scheduleItems()[0] as ScheduleTask;
     expect(task.status).toBe('pending');
     svc.toggleItem('t3');
+    httpMock.expectOne(r => r.url.includes('/schedule/entries/t3/status'))
+      .flush(null, { status: 204, statusText: 'No Content' });
     expect((svc.scheduleItems()[0] as ScheduleTask).status).toBe('done');
   });
 
@@ -239,8 +241,76 @@ describe('ScheduleService', () => {
       ]
     }]);
     svc.toggleItem('t-dm2');
+    httpMock.expectOne(r => r.url.includes('/schedule/entries/t-dm2/status'))
+      .flush(null, { status: 204, statusText: 'No Content' });
     const meal = svc.scheduleItems()[0] as MealAnchor;
     expect(meal.duringMealTasks[0].status).toBe('done');
+  });
+
+  it('toggleItem PATCHes /schedule/entries/:id/status with completed when flipping pending to done', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'tp1', task_type: 'general', title: 'Stretch',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+      }],
+      carryover: [],
+    });
+
+    svc.toggleItem('tp1');
+
+    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/tp1/status');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ status: 'completed' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  it('toggleItem PATCHes with planned when flipping done to pending', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'tp2', task_type: 'general', title: 'Stretch',
+        status: 'completed', date: '2026-04-02', scheduled_start: null,
+      }],
+      carryover: [],
+    });
+
+    svc.toggleItem('tp2');
+
+    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/tp2/status');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ status: 'planned' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+  });
+
+  it('toggleItem reloads the day on PATCH error', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [{
+        entry_id: 'tp3', task_type: 'general', title: 'Stretch',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+      }],
+      carryover: [],
+    });
+
+    svc.toggleItem('tp3');
+
+    httpMock.expectOne(r => r.url.includes('/schedule/entries/tp3/status'))
+      .flush('error', { status: 500, statusText: 'Internal Server Error' });
+
+    const reload = httpMock.expectOne(r => r.url.includes('/schedule/period'));
+    expect(reload.request.params.get('start')).toBe('2026-04-02');
+    reload.flush({ entries: [], carryover: [] });
+  });
+
+  it('toggleItem does not issue a PATCH when id is not found', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period'))
+      .flush({ entries: [], carryover: [] });
+
+    svc.toggleItem('nonexistent-id');
+
+    expect(httpMock.match(r => r.url.includes('/schedule/entries/')).length).toBe(0);
   });
 
   it('addItem appends a ScheduleTask to scheduleItems', () => {

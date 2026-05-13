@@ -7,6 +7,9 @@ import { seedScheduleEntries } from '../helpers/seed-data';
 
 test.describe('Day View — Task Completion Toggle', () => {
 
+  const PENDING_DATE = '2026-03-29';
+  const TODAY_DATE   = '2026-03-28';
+
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime('2026-03-28T00:00:00');
     const { sub } = await seedAuth(page);
@@ -23,8 +26,6 @@ test.describe('Day View — Task Completion Toggle', () => {
   // ── Incomplete → complete ────────────────────────────────────────────────
 
   test.describe('marking an incomplete task as complete', () => {
-    // Use a non-today date so mock data returns all tasks as pending.
-    const PENDING_DATE = '2026-03-29';
 
     test('clicking the checkbox sets aria-checked to true', async ({ page }) => {
       const dayView = new DayViewPage(page);
@@ -65,8 +66,6 @@ test.describe('Day View — Task Completion Toggle', () => {
   // ── Complete → incomplete ────────────────────────────────────────────────
 
   test.describe('marking a complete task as incomplete', () => {
-    // Today's date (2026-03-28) — mock data returns top-level tasks as done.
-    const TODAY_DATE = '2026-03-28';
 
     test('clicking the checkbox sets aria-checked to false', async ({ page }) => {
       const dayView = new DayViewPage(page);
@@ -105,12 +104,39 @@ test.describe('Day View — Task Completion Toggle', () => {
   });
 
   // ── API integration ──────────────────────────────────────────────────────
-  //
-  // The toggle currently mutates only client-side signal state — see
-  // ScheduleService.toggleItem() (no HTTP). True end-to-end coverage will
-  // arrive when toggleItem PATCHes /schedule/entries/{id}/status; tracked in
-  // a follow-up issue. Until then the DOM-behavior tests above are the
-  // critical-journey exemplar (zero page.route() per test against real
-  // seeded entries; see docs/architecture.md §9).
+
+  test.describe('API integration — toggle persists across reload', () => {
+
+    test('toggling a task persists after navigating away and back', async ({ page }) => {
+      const dayView = new DayViewPage(page);
+      await dayView.gotoDate(PENDING_DATE);
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+
+      await expect(dayView.getTaskRowCheckbox(dayView.getTaskRows().first()))
+        .toHaveAttribute('aria-checked', 'false');
+
+      // Toggle and wait for the PATCH to settle before navigating away
+      const [patchResponse] = await Promise.all([
+        page.waitForResponse(
+          r => r.url().includes('/schedule/entries/') && r.request().method() === 'PATCH',
+          { timeout: 5_000 },
+        ),
+        dayView.getTaskRowCheckbox(dayView.getTaskRows().first()).click(),
+      ]);
+      expect(patchResponse.status()).toBe(204);
+
+      // Navigate to a different date and back — forces a fresh GET /schedule/period
+      await dayView.gotoDate(TODAY_DATE);
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await dayView.gotoDate(PENDING_DATE);
+      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+
+      // Backend-persisted status must still be reflected
+      await expect(dayView.getTaskRowCheckbox(dayView.getTaskRows().first()))
+        .toHaveAttribute('aria-checked', 'true');
+      await expect(dayView.getTaskRowInner(dayView.getTaskRows().first()))
+        .toHaveClass(/done/);
+    });
+  });
 
 });
