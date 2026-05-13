@@ -178,6 +178,9 @@ async fn main() {
     // The seed is idempotent — safe to run on every startup.
     {
         let seed_url = config.database.url.clone();
+        // The seed always uses live providers — fixture_path only affects the search
+        // fan-out. The seed is idempotent and fails gracefully, so a missing API key
+        // or network error produces a non-fatal warning, not a startup failure.
         let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::providers::NutritionProvider>> =
             vec![nutrition_usda.clone(), nutrition_off.clone()];
         let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::providers::RecipeProvider>> =
@@ -505,6 +508,9 @@ fn build_briefing_providers(
 /// implementations that replay captured search results from disk — used by
 /// e2e to keep tests deterministic and offline. Otherwise (and always in
 /// release builds) returns the real USDA FDC + Open Food Facts providers.
+///
+/// The live providers are passed in rather than constructed here because they
+/// are also used by the catalog seed task running concurrently.
 fn build_nutrition_providers(
     external: &plnd_api::config::settings::ExternalProvidersConfig,
     usda: Arc<dyn plnd_data::providers::NutritionProvider>,
