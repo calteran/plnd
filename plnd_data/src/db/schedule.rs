@@ -536,9 +536,24 @@ mod tests {
         let resp = commit_plan(&pool, uid, &req).await.unwrap();
         assert_eq!(resp.committed, 3);
         assert_eq!(resp.planning_task_status, "completed");
+        assert_eq!(resp.entries.len(), 3);
+        for e in &resp.entries {
+            assert_ne!(e.entry_id, Uuid::nil(), "entry_id must be a real UUID");
+            assert_eq!(e.title.as_deref(), Some("Test task"));
+            assert!(e.after_anchor.is_none());
+        }
 
         let period = get_period(&pool, uid, start, end).await.unwrap();
         assert_eq!(period.entries.len(), 3);
+        // Cross-validate: every returned entry_id exists in the committed period
+        let period_ids: Vec<Uuid> = period.entries.iter().map(|e| e.entry_id).collect();
+        for e in &resp.entries {
+            assert!(
+                period_ids.contains(&e.entry_id),
+                "entry_id {} from commit response not found in period",
+                e.entry_id
+            );
+        }
     }
 
     #[sqlx::test(migrations = "./migrations")]

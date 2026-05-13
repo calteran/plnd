@@ -79,10 +79,12 @@ fn test_post_schedule_plan_response_serde() {
     let resp = PostSchedulePlanResponse {
         committed: 14,
         planning_task_status: "completed".to_string(),
+        entries: vec![],
     };
     let json = serde_json::to_string(&resp).unwrap();
     assert!(json.contains("14"));
     assert!(json.contains("completed"));
+    assert!(json.contains("\"entries\":[]"));
 }
 
 #[test]
