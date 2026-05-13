@@ -14,7 +14,18 @@ pub struct IngestIngredientInput {
     pub occasion_tags: Vec<String>,
 }
 
+pub struct ContributeIngredientInput {
+    pub name: String,
+    pub contributed_by_user_id: Uuid,
+    pub allergens: Vec<String>,
+    pub occasion_tags: Vec<String>,
+}
+
 #[async_trait]
 pub trait CatalogIngestRepository: Send + Sync {
     async fn ingest_ingredient(&self, input: IngestIngredientInput) -> Result<Uuid, crate::Error>;
+    async fn contribute_ingredient(
+        &self,
+        input: ContributeIngredientInput,
+    ) -> Result<Uuid, crate::Error>;
 }

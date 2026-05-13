@@ -386,3 +386,23 @@ export async function seedUserMeal(sub: string, meal: UserMealInput): Promise<Se
   const res = await callApi(sub, 'POST', '/my/meals', meal, 'seedUserMeal');
   return (await res.json()) as SeededUserMeal;
 }
+
+// ── seedCatalogIngredient ────────────────────────────────────────────────────
+
+export interface SeededCatalogIngredient {
+  ingredient_id: string;
+}
+
+export async function seedCatalogIngredient(
+  sub: string,
+  name: string,
+): Promise<SeededCatalogIngredient> {
+  const res = await callApi(
+    sub,
+    'POST',
+    '/catalog/ingredients',
+    { name },
+    'seedCatalogIngredient',
+  );
+  return (await res.json()) as SeededCatalogIngredient;
+}

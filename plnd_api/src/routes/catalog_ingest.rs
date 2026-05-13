@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::auth::jwt::Claims;
 use crate::state::AppState;
-use plnd_data::repository::catalog_ingest::IngestIngredientInput;
+use plnd_data::repository::catalog_ingest::{ContributeIngredientInput, IngestIngredientInput};
 
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct IngestIngredientBody {
@@ -66,5 +66,58 @@ pub async fn ingest_ingredient(
         Json(IngestIngredientResponse {
             catalog_ingredient_id: id,
         }),
+    ))
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct ContributeIngredientBody {
+    pub name: String,
+    pub allergens: Option<Vec<String>>,
+    pub occasion_tags: Option<Vec<String>>,
+}
+
+#[derive(Serialize, utoipa::ToSchema)]
+pub struct ContributeIngredientResponse {
+    pub ingredient_id: Uuid,
+}
+
+#[utoipa::path(
+    post,
+    path = "/catalog/ingredients",
+    tag = "Catalog",
+    request_body = ContributeIngredientBody,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "User-contributed ingredient created", body = ContributeIngredientResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 422, description = "Empty or whitespace-only name"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[tracing::instrument(skip(state, body), fields(user_id = %claims.sub))]
+pub async fn contribute_ingredient(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(body): Json<ContributeIngredientBody>,
+) -> Result<(StatusCode, Json<ContributeIngredientResponse>), StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let name = body.name.trim();
+    if name.is_empty() {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    let id = state
+        .repos
+        .catalog_ingest
+        .contribute_ingredient(ContributeIngredientInput {
+            name: name.to_string(),
+            contributed_by_user_id: user_id,
+            allergens: body.allergens.unwrap_or_default(),
+            occasion_tags: body.occasion_tags.unwrap_or_default(),
+        })
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    Ok((
+        StatusCode::CREATED,
+        Json(ContributeIngredientResponse { ingredient_id: id }),
     ))
 }

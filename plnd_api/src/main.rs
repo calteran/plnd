@@ -300,6 +300,10 @@ async fn main() {
         .route("/search/exercises", get(search::search_exercises_handler))
         // Catalog detail (read-only, auth required)
         .route(
+            "/catalog/ingredients",
+            post(catalog_ingest::contribute_ingredient),
+        )
+        .route(
             "/catalog/ingredients/ingest",
             post(catalog_ingest::ingest_ingredient),
         )

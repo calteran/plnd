@@ -57,6 +57,35 @@ pub async fn ingest_ingredient(
     .map(|(id,)| id)
 }
 
+pub struct ContributeIngredientParams<'a> {
+    pub name: &'a str,
+    pub contributed_by_user_id: Uuid,
+    pub allergens: &'a [String],
+    pub occasion_tags: &'a [String],
+}
+
+#[tracing::instrument(
+    skip(pool, params),
+    fields(table = "catalog_ingredients", op = "contribute_ingredient")
+)]
+pub async fn contribute_ingredient(
+    pool: &PgPool,
+    params: ContributeIngredientParams<'_>,
+) -> Result<Uuid, DatabaseError> {
+    sqlx::query_as::<_, (Uuid,)>(
+        "INSERT INTO catalog_ingredients (name, allergens, occasion_tags, contributed_by_user_id) \
+         VALUES ($1, $2, $3, $4) RETURNING ingredient_id",
+    )
+    .bind(params.name)
+    .bind(params.allergens)
+    .bind(params.occasion_tags)
+    .bind(params.contributed_by_user_id)
+    .fetch_one(pool)
+    .await
+    .map_err(DatabaseError::from)
+    .map(|(id,)| id)
+}
+
 #[cfg(test)]
 pub struct IngestMealParams<'a> {
     pub name: &'a str,
@@ -103,6 +132,51 @@ pub async fn ingest_meal(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::users;
+
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn contribute_ingredient_inserts_user_attributed_row(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        let ingredient_id = contribute_ingredient(
+            &pool,
+            ContributeIngredientParams {
+                name: "User-Contributed Tomato",
+                contributed_by_user_id: uid,
+                allergens: &[],
+                occasion_tags: &[],
+            },
+        )
+        .await
+        .expect("contribute_ingredient failed");
+
+        let row: (Uuid, String, Option<String>, Option<String>, Option<Uuid>) = sqlx::query_as(
+            "SELECT ingredient_id, name, external_source, external_id, contributed_by_user_id \
+             FROM catalog_ingredients WHERE ingredient_id = $1",
+        )
+        .bind(ingredient_id)
+        .fetch_one(&pool)
+        .await
+        .expect("row not found");
+
+        assert_eq!(row.0, ingredient_id);
+        assert_eq!(row.1, "User-Contributed Tomato");
+        assert!(row.2.is_none(), "external_source must be NULL for path 3");
+        assert!(row.3.is_none(), "external_id must be NULL for path 3");
+        assert_eq!(row.4, Some(uid));
+    }
 
     #[sqlx::test(migrations = "./migrations")]
     async fn ingest_meal_returns_meal_id(pool: PgPool) {
