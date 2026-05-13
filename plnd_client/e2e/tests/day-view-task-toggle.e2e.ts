@@ -126,7 +126,7 @@ test.describe('Day View — Task Completion Toggle', () => {
       expect(patchResponse.status()).toBe(204);
 
       // Navigate to a different date and back — forces a fresh GET /schedule/period
-      await dayView.gotoDate('2026-03-28');
+      await dayView.gotoDate(TODAY_DATE);
       await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
       await dayView.gotoDate(PENDING_DATE);
       await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
