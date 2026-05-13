@@ -48,26 +48,30 @@ export interface SeedScheduleOptions {
   placed_tasks?: ScheduleEntryInput[];
 }
 
-interface SchedulePeriodEntry {
+interface CommittedPlanEntry {
   entry_id: string;
-  title?: string;
+  title: string | null;
   date: string;
-  status: string;
-  after_anchor?: string;
+  after_anchor: string | null;
+}
+
+interface CommitPlanResult {
+  committed: number;
+  planning_task_status: string;
+  entries: CommittedPlanEntry[];
 }
 
 /**
  * Seeds schedule entries for the authenticated test user by driving the real
- * backend through three public endpoints:
+ * backend through public API endpoints:
  *
- *   1. POST /tasks/weekly-plan?plan_start=… → creates the planning task (real
- *      schedule_repo write) and returns its task_id.
+ *   1. POST /tasks/weekly-plan?plan_start=… → creates the planning task and
+ *      returns its task_id.
  *   2. POST /schedule/plan with planning_task_id + entries + placed_tasks →
- *      commits entries to the DB (real schedule_repo write). All entries
- *      default to status='planned'.
- *   3. (Optional) For any entry with a non-default `status`, GET
- *      /schedule/period to discover entry IDs by (title, date), then PATCH
- *      /schedule/entries/{id}/status per entry.
+ *      commits entries to the DB. All entries default to status='planned'.
+ *      The response includes entry IDs for every committed entry.
+ *   3. (Optional) For any entry with a non-default `status`, PATCH
+ *      /schedule/entries/{id}/status using the IDs from the commit response.
  *
  * Caller is responsible for picking a plan_start that aligns with their test
  * expectations (the planning week is typically Monday-anchored).
@@ -113,27 +117,16 @@ export async function seedScheduleEntries(
       `seedScheduleEntries: POST /schedule/plan returned ${commitRes.status}. Body: ${text.slice(0, 200)}`,
     );
   }
+  const commitResult = (await commitRes.json()) as CommitPlanResult;
 
   const wantsStatusChange = [...entries, ...placedTasks].some(
     e => e.status && e.status !== 'planned',
   );
   if (!wantsStatusChange) return;
 
-  const periodRes = await fetch(
-    `${API_BASE}/schedule/period?start=${opts.plan_start}&end=${opts.plan_end}`,
-    { headers: auth },
-  );
-  if (!periodRes.ok) {
-    const text = await periodRes.text().catch(() => '<no body>');
-    throw new Error(
-      `seedScheduleEntries: GET /schedule/period returned ${periodRes.status}. Body: ${text.slice(0, 200)}`,
-    );
-  }
-  const period = (await periodRes.json()) as { entries: SchedulePeriodEntry[] };
-
   for (const wanted of [...entries, ...placedTasks]) {
     if (!wanted.status || wanted.status === 'planned') continue;
-    const found = period.entries.find(
+    const found = commitResult.entries.find(
       e =>
         e.date === wanted.date &&
         (e.title ?? null) === (wanted.title ?? null) &&
@@ -141,7 +134,7 @@ export async function seedScheduleEntries(
     );
     if (!found) {
       throw new Error(
-        `seedScheduleEntries: could not find committed entry for (date=${wanted.date}, title=${wanted.title}, after_anchor=${wanted.after_anchor}) to PATCH status. Got ${period.entries.length} entries back.`,
+        `seedScheduleEntries: could not find committed entry for (date=${wanted.date}, title=${wanted.title}, after_anchor=${wanted.after_anchor}) in commit response. Got ${commitResult.entries.length} entries back.`,
       );
     }
     const patchRes = await fetch(`${API_BASE}/schedule/entries/${found.entry_id}/status`, {
