@@ -197,6 +197,116 @@ fn meal_to_dish(meal: MdbMeal) -> ExternalDish {
     }
 }
 
+/// Parse a raw TheMealDB API meal JSON object into an [`ExternalDish`].
+///
+/// Used by the debug-only [`TheMealDbFixtureProvider`] so that fixtures apply
+/// the same `parse_measure` logic as the live provider, eliminating
+/// fixture-vs-live divergence for ingredient quantities and units.
+pub fn parse_meal_json(value: serde_json::Value) -> Result<ExternalDish, serde_json::Error> {
+    let meal: MdbMeal = serde_json::from_value(value)?;
+    Ok(meal_to_dish(meal))
+}
+
+// ---------------------------------------------------------------------------
+// Fixture-backed provider (debug builds only)
+// ---------------------------------------------------------------------------
+
+/// Fixture-backed `RecipeProvider` for e2e tests.
+///
+/// Reads `search.json` (`HashMap<term, Vec<SearchResult>>`) for search and
+/// `lookup.json` (`HashMap<idMeal, raw TheMealDB meal JSON>`) for lookups.
+/// Ingredient quantities/units are parsed at load time by [`parse_meal_json`],
+/// guaranteeing the same output as the live [`TheMealDbProvider`].
+#[cfg(debug_assertions)]
+#[derive(Debug)]
+pub struct TheMealDbFixtureProvider {
+    search_path: std::path::PathBuf,
+    lookup_path: std::path::PathBuf,
+}
+
+#[cfg(debug_assertions)]
+impl TheMealDbFixtureProvider {
+    pub fn new(
+        search_path: std::path::PathBuf,
+        lookup_path: std::path::PathBuf,
+    ) -> Result<Self, ExternalProviderError> {
+        if !search_path.is_file() {
+            return Err(ExternalProviderError::ConfigurationError(format!(
+                "fixture search file not found: {}",
+                search_path.display()
+            )));
+        }
+        if !lookup_path.is_file() {
+            return Err(ExternalProviderError::ConfigurationError(format!(
+                "fixture lookup file not found: {}",
+                lookup_path.display()
+            )));
+        }
+        Ok(Self {
+            search_path,
+            lookup_path,
+        })
+    }
+}
+
+#[cfg(debug_assertions)]
+#[async_trait]
+impl RecipeProvider for TheMealDbFixtureProvider {
+    fn source_name(&self) -> &str {
+        "themealdb"
+    }
+
+    #[tracing::instrument(
+        name = "provider::themealdb_fixture::search_dishes",
+        skip(self),
+        fields(provider = "themealdb_fixture")
+    )]
+    async fn search_dishes(
+        &self,
+        query: &SearchQuery,
+    ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+        let bytes = std::fs::read(&self.search_path).map_err(|e| {
+            ExternalProviderError::ConfigurationError(format!(
+                "failed to read fixture {}: {e}",
+                self.search_path.display()
+            ))
+        })?;
+        let by_query: HashMap<String, Vec<SearchResult>> = serde_json::from_slice(&bytes)
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
+        let mut results = by_query
+            .get(&query.query.to_lowercase())
+            .cloned()
+            .unwrap_or_default();
+        results.truncate(query.limit as usize);
+        Ok(results)
+    }
+
+    #[tracing::instrument(
+        name = "provider::themealdb_fixture::get_dish_by_id",
+        skip(self),
+        fields(provider = "themealdb_fixture", external_id = %external_id)
+    )]
+    async fn get_dish_by_id(
+        &self,
+        external_id: &str,
+    ) -> Result<Option<ExternalDish>, ExternalProviderError> {
+        let bytes = std::fs::read(&self.lookup_path).map_err(|e| {
+            ExternalProviderError::ConfigurationError(format!(
+                "failed to read fixture {}: {e}",
+                self.lookup_path.display()
+            ))
+        })?;
+        let lookup: HashMap<String, serde_json::Value> = serde_json::from_slice(&bytes)
+            .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
+        match lookup.get(external_id) {
+            None => Ok(None),
+            Some(v) => parse_meal_json(v.clone())
+                .map(Some)
+                .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string())),
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // RecipeProvider impl
 // ---------------------------------------------------------------------------
@@ -403,5 +513,96 @@ mod tests {
         let json = r#"{"meals": null}"#;
         let resp: MdbSearchResponse = serde_json::from_str(json).expect("deserialize");
         assert!(resp.meals.is_none());
+    }
+
+    #[test]
+    fn parse_meal_json_maps_ingredients_with_correct_quantity_and_unit() {
+        use rust_decimal::prelude::FromStr;
+        let json = serde_json::json!({
+            "idMeal": "52795", "strMeal": "Chicken Handi",
+            "strCategory": "Chicken", "strInstructions": "Cook it.",
+            "strMealThumb": serde_json::Value::Null,
+            "strIngredient1": "Chicken", "strMeasure1": "1.2 kg",
+            "strIngredient2": "Onion",   "strMeasure2": "5 thinly sliced",
+            "strIngredient3": "",        "strMeasure3": ""
+        });
+        let dish = parse_meal_json(json).expect("should parse");
+        assert_eq!(dish.ingredients.len(), 2);
+        assert_eq!(dish.ingredients[0].quantity, Decimal::from_str("1.2").unwrap());
+        assert_eq!(dish.ingredients[0].unit, "kg");
+        assert_eq!(dish.ingredients[1].quantity, Decimal::from(5u32));
+        assert_eq!(dish.ingredients[1].unit, "thinly sliced");
+    }
+
+    #[test]
+    fn parse_meal_json_returns_error_for_non_object_value() {
+        assert!(parse_meal_json(serde_json::json!("not an object")).is_err());
+    }
+
+    #[cfg(debug_assertions)]
+    mod fixture_tests {
+        use super::*;
+        use rust_decimal::prelude::FromStr;
+        use std::path::PathBuf;
+
+        fn write_fixtures(dir: &std::path::Path) -> (PathBuf, PathBuf) {
+            let search = dir.join("search.json");
+            let lookup = dir.join("lookup.json");
+            std::fs::write(
+                &search,
+                r#"{"chicken": [{"external_id":"52795","name":"Chicken Handi","description":"Chicken","thumbnail_url":null}]}"#,
+            )
+            .unwrap();
+            std::fs::write(
+                &lookup,
+                r#"{
+                    "52795": {"idMeal":"52795","strMeal":"Chicken Handi","strCategory":"Chicken",
+                              "strInstructions":"Cook it.","strMealThumb":null,
+                              "strIngredient1":"Chicken","strMeasure1":"1.2 kg",
+                              "strIngredient2":"","strMeasure2":""}
+                }"#,
+            )
+            .unwrap();
+            (search, lookup)
+        }
+
+        #[tokio::test]
+        async fn search_dishes_returns_results_for_known_term() {
+            let tmp = tempfile::tempdir().unwrap();
+            let (s, l) = write_fixtures(tmp.path());
+            let p = TheMealDbFixtureProvider::new(s, l).unwrap();
+            let results = p.search_dishes(&SearchQuery::new("chicken")).await.unwrap();
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].external_id, "52795");
+        }
+
+        #[tokio::test]
+        async fn get_dish_by_id_parses_measures_via_parse_meal_json() {
+            let tmp = tempfile::tempdir().unwrap();
+            let (s, l) = write_fixtures(tmp.path());
+            let p = TheMealDbFixtureProvider::new(s, l).unwrap();
+            let dish = p.get_dish_by_id("52795").await.unwrap().expect("found");
+            assert_eq!(dish.ingredients[0].quantity, Decimal::from_str("1.2").unwrap());
+            assert_eq!(dish.ingredients[0].unit, "kg");
+        }
+
+        #[tokio::test]
+        async fn get_dish_by_id_returns_none_for_unknown_id() {
+            let tmp = tempfile::tempdir().unwrap();
+            let (s, l) = write_fixtures(tmp.path());
+            let p = TheMealDbFixtureProvider::new(s, l).unwrap();
+            assert!(p.get_dish_by_id("unknown").await.unwrap().is_none());
+        }
+
+        #[test]
+        fn new_returns_error_when_search_path_missing() {
+            let tmp = tempfile::tempdir().unwrap();
+            let lookup = tmp.path().join("lookup.json");
+            std::fs::write(&lookup, "{}").unwrap();
+            let err =
+                TheMealDbFixtureProvider::new(PathBuf::from("/no/search.json"), lookup)
+                    .unwrap_err();
+            assert!(matches!(err, ExternalProviderError::ConfigurationError(_)));
+        }
     }
 }
