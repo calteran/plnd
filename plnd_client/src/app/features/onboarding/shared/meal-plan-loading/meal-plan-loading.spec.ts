@@ -115,18 +115,77 @@ describe('MealPlanLoadingComponent', () => {
     const fixture = setUp();
     fixture.detectChanges();
 
-    const spiralStage = fixture.nativeElement.querySelector('.mode-stage.spiral') as HTMLElement;
-    const dropStage   = fixture.nativeElement.querySelector('.mode-stage.drop')   as HTMLElement;
-    expect(spiralStage.classList.contains('active')).toBeTrue();
-    expect(dropStage.classList.contains('active')).toBeFalse();
+    const stage = fixture.nativeElement.querySelector('.stage') as HTMLElement;
+    expect(stage.getAttribute('data-mode')).toBe('spiral');
 
     tick(MODE_DURATION_MS + 50);
     fixture.detectChanges();
-    expect(spiralStage.classList.contains('active')).toBeFalse();
-    expect(dropStage.classList.contains('active')).toBeTrue();
+    expect(stage.getAttribute('data-mode')).toBe('drop');
+
+    tick(MODE_DURATION_MS + 50);
+    fixture.detectChanges();
+    expect(stage.getAttribute('data-mode')).toBe('spiral');
 
     teardown(fixture);
   }));
+
+  describe('drop-mode coordinates', () => {
+    it('emits drop particles with left% in the 40-60 safe zone', fakeAsync(() => {
+      const fixture = setUp();
+      fixture.detectChanges();
+
+      // Switch to drop mode and emit several particles.
+      tick(MODE_DURATION_MS + 50);
+      fixture.detectChanges();
+      tick(FOOD_INTERVAL_MS * 5);
+      fixture.detectChanges();
+
+      const dropFood = fixture.nativeElement.querySelectorAll('.drop-particle.food') as NodeListOf<HTMLElement>;
+      expect(dropFood.length).toBeGreaterThan(0);
+
+      for (const el of Array.from(dropFood)) {
+        const leftPct = parseFloat(el.style.left.replace('%', ''));
+        expect(leftPct).toBeGreaterThanOrEqual(40);
+        expect(leftPct).toBeLessThanOrEqual(60);
+      }
+
+      teardown(fixture);
+    }));
+
+    it('attaches a --start-x px offset to each drop particle for the curved path', fakeAsync(() => {
+      const fixture = setUp();
+      fixture.detectChanges();
+
+      tick(MODE_DURATION_MS + 50);
+      fixture.detectChanges();
+      tick(FOOD_INTERVAL_MS * 3);
+      fixture.detectChanges();
+
+      const dropParticle = fixture.nativeElement.querySelector('.drop-particle.food') as HTMLElement | null;
+      expect(dropParticle).not.toBeNull();
+
+      // --start-x is set inline as a px length (positive or negative).
+      const startX = dropParticle!.style.getPropertyValue('--start-x').trim();
+      expect(startX).toMatch(/^-?\d+(\.\d+)?px$/);
+
+      teardown(fixture);
+    }));
+
+    it('does not attach drop-coords to spiral-mode particles', fakeAsync(() => {
+      const fixture = setUp();
+      fixture.detectChanges();
+      tick(FOOD_INTERVAL_MS + 50);
+      fixture.detectChanges();
+
+      const spiralFood = fixture.nativeElement.querySelector('.particle.food') as HTMLElement | null;
+      expect(spiralFood).not.toBeNull();
+      // Spiral particles use --angle, not --start-x or left%.
+      expect(spiralFood!.style.getPropertyValue('--start-x').trim()).toBe('');
+      expect(spiralFood!.style.left).toBe('');
+
+      teardown(fixture);
+    }));
+  });
 
   it('removes particles after PARTICLE_LIFETIME_MS', fakeAsync(() => {
     const fixture = setUp();

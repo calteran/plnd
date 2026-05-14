@@ -17,6 +17,8 @@ interface Particle {
   kind: 'food' | 'text';
   text: string;
   angle: number;        // perimeter entry angle (deg) — spiral mode only
+  startX?: number;      // drop mode: starting horizontal % [5, 95]
+  targetX?: number;     // drop mode: landing horizontal % [40, 60]
   delayMs: number;      // animation delay so staggered particles look natural
 }
 
@@ -46,6 +48,10 @@ export const MODE_DURATION_MS     = 10_000;
 export const STATIC_CAPTION_MS    = 4000;
 export const MAX_PARTICLES        = 16;
 
+// Stage width in px — used to convert drop-mode startX/targetX from % to px
+// offsets for the dropAndDrift keyframe's translateX. Matches .stage width.
+export const STAGE_WIDTH_PX       = 360;
+
 const PERIMETER_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
 
 function dayLabel(iso: string): string {
@@ -61,34 +67,84 @@ function dayLabel(iso: string): string {
       <p class="heading">Planning this week's meals</p>
 
       @if (reducedMotion()) {
-        <!-- Static fallback: still bowl + single rotating caption (no animation) -->
+        <!-- Static fallback: bowl shape only (no animated ingredients) + rotating caption -->
         <div class="static-stage">
-          <div class="bowl-base"></div>
+          <div class="bowl-base">
+            <svg width="140" height="140" viewBox="0 0 120 120" aria-hidden="true">
+              <g transform="translate(60 60) scale(1 0.906) translate(-60 -60)">
+                <circle cx="60" cy="60" r="54" fill="#7c2d12"/>
+                <circle cx="60" cy="60" r="50" fill="#b45309"/>
+                <circle cx="60" cy="60" r="44" fill="#ecfccb"/>
+                <path d="M 16 60 A 44 44 0 0 0 104 60 L 104 66 A 44 44 0 0 1 16 66 Z" fill="#365314" opacity="0.14"/>
+              </g>
+            </svg>
+          </div>
         </div>
         <p class="static-caption" role="status" aria-live="polite" aria-label="Planning progress">
           {{ staticCaption() }}
         </p>
       } @else {
-        <div class="stage">
-          <div class="mode-stage spiral" [class.active]="mode() === 'spiral'">
-            <div class="bowl-base"></div>
-            <div class="bowl-sweep"></div>
-            @for (p of spiralParticles(); track p.id) {
-              <span
-                [class]="p.kind === 'food' ? 'particle food' : 'particle text'"
-                [style.--angle.deg]="p.angle"
-                [style.animation-delay.ms]="p.delayMs">{{ p.text }}</span>
-            }
+        <div class="stage" [attr.data-mode]="mode()">
+          <div class="bowl-base">
+            <!-- Steam wisps rising above the bowl -->
+            <svg class="steam s1" viewBox="0 0 14 26" aria-hidden="true">
+              <path d="M7 24 C 1 18, 13 12, 7 7 C 3 3, 11 1, 7 0"/>
+            </svg>
+            <svg class="steam s2" viewBox="0 0 14 26" aria-hidden="true">
+              <path d="M7 24 C 1 18, 13 12, 7 7 C 3 3, 11 1, 7 0"/>
+            </svg>
+            <svg class="steam s3" viewBox="0 0 14 26" aria-hidden="true">
+              <path d="M7 24 C 1 18, 13 12, 7 7 C 3 3, 11 1, 7 0"/>
+            </svg>
+
+            <!-- Bowl + swirling ingredients -->
+            <svg width="140" height="140" viewBox="0 0 120 120" aria-hidden="true">
+              <g transform="translate(60 60) scale(1 0.906) translate(-60 -60)">
+                <!-- Structure: exterior → rim band → contents → crescent shadow -->
+                <circle cx="60" cy="60" r="54" fill="#7c2d12"/>
+                <circle cx="60" cy="60" r="50" fill="#b45309"/>
+                <circle cx="60" cy="60" r="44" fill="#ecfccb"/>
+                <path d="M 16 60 A 44 44 0 0 0 104 60 L 104 66 A 44 44 0 0 1 16 66 Z" fill="#365314" opacity="0.14"/>
+
+                <!-- Carrots (3, 13s cycle) -->
+                <rect class="ing" x="58" y="58" width="10" height="3.5" rx="1.5" fill="#ea580c" style="--start: 10deg; --dur: 13s; --del: 0s;"/>
+                <rect class="ing" x="58" y="58" width="9"  height="3.5" rx="1.5" fill="#ea580c" style="--start: 130deg; --dur: 13s; --del: -4.3s;"/>
+                <rect class="ing" x="58" y="58" width="8"  height="3.5" rx="1.5" fill="#ea580c" style="--start: 250deg; --dur: 13s; --del: -8.6s;"/>
+
+                <!-- Peas (4, 11s cycle) -->
+                <circle class="ing" cx="60" cy="60" r="2.8" fill="#65a30d" style="--start: 45deg; --dur: 11s; --del: 0s;"/>
+                <circle class="ing" cx="60" cy="60" r="2.8" fill="#65a30d" style="--start: 135deg; --dur: 11s; --del: -2.7s;"/>
+                <circle class="ing" cx="60" cy="60" r="2.8" fill="#65a30d" style="--start: 225deg; --dur: 11s; --del: -5.5s;"/>
+                <circle class="ing" cx="60" cy="60" r="2.5" fill="#65a30d" style="--start: 315deg; --dur: 11s; --del: -8.2s;"/>
+
+                <!-- Noodle squiggles (2, 16s cycle) -->
+                <path class="ing" d="M 60 60 q 6 -4 12 0 t 12 0" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.85" style="--start: 75deg; --dur: 16s; --del: 0s;"/>
+                <path class="ing" d="M 60 60 q 6 -4 12 0 t 12 0" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.7"  style="--start: 255deg; --dur: 16s; --del: -8s;"/>
+
+                <!-- Herb specks (3, 9s cycle) -->
+                <circle class="ing" cx="60" cy="60" r="1.4" fill="#15803d" style="--start: 90deg; --dur: 9s; --del: 0s;"/>
+                <circle class="ing" cx="60" cy="60" r="1.4" fill="#15803d" style="--start: 210deg; --dur: 9s; --del: -3s;"/>
+                <circle class="ing" cx="60" cy="60" r="1.4" fill="#15803d" style="--start: 330deg; --dur: 9s; --del: -6s;"/>
+              </g>
+            </svg>
           </div>
-          <div class="mode-stage drop" [class.active]="mode() === 'drop'">
-            <div class="plate"></div>
-            @for (p of dropParticles(); track p.id) {
-              <span
-                [class]="p.kind === 'food' ? 'drop-particle food' : 'drop-particle text'"
-                [style.left.%]="p.angle"
-                [style.animation-delay.ms]="p.delayMs">{{ p.text }}</span>
-            }
-          </div>
+
+          <!-- Spiral particles (orbit the bowl from the perimeter) -->
+          @for (p of spiralParticles(); track p.id) {
+            <span
+              [class]="p.kind === 'food' ? 'particle food' : 'particle text'"
+              [style.--angle.deg]="p.angle"
+              [style.animation-delay.ms]="p.delayMs">{{ p.text }}</span>
+          }
+
+          <!-- Drop particles (arc inward from any horizontal start, land inside bowl) -->
+          @for (p of dropParticles(); track p.id) {
+            <span
+              [class]="p.kind === 'food' ? 'drop-particle food' : 'drop-particle text'"
+              [style.left.%]="p.targetX"
+              [style.--start-x.px]="dropOffsetPx(p)"
+              [style.animation-delay.ms]="p.delayMs">{{ p.text }}</span>
+          }
         </div>
         <p class="aria-only" role="status" aria-live="polite" aria-label="Planning progress">
           {{ lastTextParticle() }}
@@ -132,46 +188,64 @@ function dayLabel(iso: string): string {
       max-width: 100%;
       height: 240px;
     }
+    .stage {
+      display: flex; align-items: center; justify-content: center;
+    }
     .static-stage {
       display: flex; align-items: center; justify-content: center;
     }
 
-    .mode-stage {
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      opacity: 0;
-      transition: opacity 0.9s ease-in-out;
-      z-index: 1;
-    }
-    .mode-stage.active { opacity: 1; }
-
-    /* ── Bowl (CSS placeholder; SVG follow-up #768) ── */
+    /* ── Bowl wrapper (holds inline SVG + steam wisps) ── */
     .bowl-base {
-      width: 110px; height: 110px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 50% 35%,
-        var(--color-accent-light, #fde68a) 0%,
-        var(--color-accent, #d97706) 80%);
-      box-shadow:
-        inset 0 -8px 16px rgba(0,0,0,0.22),
-        0 4px 18px rgba(217,119,6,0.3);
       position: relative;
+      width: 140px;
+      height: 140px;
       z-index: 1;
     }
-    .bowl-sweep {
-      position: absolute;
-      width: 94px; height: 94px;
-      border-radius: 50%;
-      background: conic-gradient(from 0deg,
-        rgba(255,255,255,0) 0%,
-        rgba(255,255,255,0.55) 18%,
-        rgba(255,255,255,0) 35%);
-      animation: stir 2.4s linear infinite;
-      mix-blend-mode: overlay;
-      z-index: 2;
-      pointer-events: none;
+    .bowl-base svg { display: block; }
+
+    /* ── Swirling ingredients inside the bowl SVG ── */
+    .ing {
+      transform-box: view-box;
+      transform-origin: 60px 60px;
+      animation: ing-spiral var(--dur, 12s) linear infinite;
+      animation-delay: var(--del, 0s);
+      opacity: 0;
     }
-    @keyframes stir { to { transform: rotate(360deg); } }
+    @keyframes ing-spiral {
+      0%   { transform: rotate(var(--start)) translate(36px) rotate(calc(-1 * var(--start))) scale(0.5); opacity: 0; }
+      10%  { transform: rotate(calc(var(--start) +  54deg)) translate(34px) rotate(calc(-1 * (var(--start) +  54deg))) scale(1);   opacity: 1; }
+      85%  { transform: rotate(calc(var(--start) + 459deg)) translate(6px)  rotate(calc(-1 * (var(--start) + 459deg))) scale(1);   opacity: 1; }
+      100% { transform: rotate(calc(var(--start) + 540deg)) translate(0px)  rotate(calc(-1 * (var(--start) + 540deg))) scale(0.3); opacity: 0; }
+    }
+
+    /* ── Steam wisps ── */
+    .steam {
+      position: absolute;
+      left: 50%;
+      top: -14px;
+      width: 14px;
+      height: 26px;
+      transform: translateX(-50%);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+    .steam path {
+      stroke: var(--color-accent-dark, #b45309);
+      stroke-width: 2.5;
+      fill: none;
+      stroke-linecap: round;
+      opacity: 0.55;
+    }
+    .steam.s1 { animation: rise 3.2s ease-out infinite; }
+    .steam.s2 { animation: rise 3.2s ease-out 1.0s infinite; left: 38%; }
+    .steam.s3 { animation: rise 3.2s ease-out 2.0s infinite; left: 62%; }
+    @keyframes rise {
+      0%   { transform: translate(-50%, 10px) scale(0.7); opacity: 0; }
+      30%  { opacity: 0.65; }
+      100% { transform: translate(-50%, -36px) scale(1.1); opacity: 0; }
+    }
 
     /* ── Spiral particles ── */
     .particle {
@@ -204,24 +278,11 @@ function dayLabel(iso: string): string {
       100% { transform: rotate(calc(var(--angle) + 540deg)) translate(0) rotate(calc(-1 * var(--angle) - 540deg)) scale(0.3); opacity: 0; }
     }
 
-    /* ── Plate (CSS placeholder; SVG follow-up #768) ── */
-    .plate {
-      position: absolute;
-      bottom: 30px;
-      width: 220px; height: 22px;
-      border-radius: 50%;
-      background: radial-gradient(ellipse at 50% 35%,
-        var(--color-surface-warm, #fef3c7) 0%,
-        var(--color-accent-warm, #fbbf24) 80%);
-      box-shadow: 0 4px 14px rgba(217, 119, 6, 0.3);
-      z-index: 1;
-    }
-
-    /* ── Drop particles ── */
+    /* ── Drop particles (curved fall into the bowl) ── */
     .drop-particle {
       position: absolute;
       top: 0;
-      animation: dropFall 3.4s ease-in forwards;
+      animation: dropAndDrift 3.6s ease-in forwards;
       opacity: 0;
       z-index: 3;
     }
@@ -243,11 +304,12 @@ function dayLabel(iso: string): string {
       white-space: nowrap;
       transform-origin: center;
     }
-    @keyframes dropFall {
-      0%   { transform: translateY(-30px) scale(0.6); opacity: 0; }
+    @keyframes dropAndDrift {
+      0%   { transform: translate(var(--start-x, 0px), -30px) scale(0.6); opacity: 0; }
       18%  { opacity: 1; }
-      82%  { transform: translateY(160px) scale(1);   opacity: 1; }
-      100% { transform: translateY(180px) scale(0.4); opacity: 0; }
+      60%  { transform: translate(calc(var(--start-x, 0px) * 0.22), 55px) scale(0.95); opacity: 1; }
+      82%  { transform: translate(0, 95px) scale(1); opacity: 1; }
+      100% { transform: translate(0, 125px) scale(0.3); opacity: 0; }
     }
 
     /* ── Static fallback caption (reduced motion) ── */
@@ -284,10 +346,10 @@ function dayLabel(iso: string): string {
     .cancel-link:hover { color: var(--color-accent-dark, #92400e); }
 
     @media (prefers-reduced-motion: reduce) {
-      .bowl-sweep,
+      .ing,
+      .steam,
       .particle,
-      .drop-particle,
-      .mode-stage { animation: none !important; transition: none !important; }
+      .drop-particle { animation: none !important; transition: none !important; }
     }
   `],
 })
@@ -352,6 +414,16 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
     this.particleRemovers = [];
   }
 
+  /**
+   * Convert a drop particle's startX/targetX (both in % of stage width) into the px
+   * offset used by `--start-x` in the `dropAndDrift` keyframe. Falls back to 0 if either
+   * field is missing (defensive — should never happen for drop-mode particles).
+   */
+  protected dropOffsetPx(p: Particle): number {
+    if (p.startX === undefined || p.targetX === undefined) return 0;
+    return ((p.startX - p.targetX) * STAGE_WIDTH_PX) / 100;
+  }
+
   private emitFoodParticle(): void {
     const text  = FOOD_EMOJI[Math.floor(Math.random() * FOOD_EMOJI.length)];
     const angle = PERIMETER_ANGLES[Math.floor(Math.random() * PERIMETER_ANGLES.length)];
@@ -359,7 +431,8 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
       id: this.nextParticleId++,
       kind: 'food',
       text,
-      angle: this.mode() === 'spiral' ? angle : 30 + Math.random() * 40, // % horizontal pos in drop mode
+      angle,
+      ...this.dropCoords(),
       delayMs: 0,
     });
   }
@@ -372,10 +445,24 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
       id: this.nextParticleId++,
       kind: 'text',
       text,
-      angle: this.mode() === 'spiral' ? angle : 30 + Math.random() * 40,
+      angle,
+      ...this.dropCoords(),
       delayMs: 0,
     });
     this.lastTextParticle.set(text);
+  }
+
+  /**
+   * Generate drop-mode coordinates: startX is any horizontal start (5-95% of stage),
+   * targetX is the safe landing zone inside the bowl interior (40-60%). Returns
+   * undefined fields for spiral mode so the Particle type stays clean.
+   */
+  private dropCoords(): { startX?: number; targetX?: number } {
+    if (this.mode() !== 'drop') return {};
+    return {
+      startX:  5  + Math.random() * 90,
+      targetX: 40 + Math.random() * 20,
+    };
   }
 
   /**
