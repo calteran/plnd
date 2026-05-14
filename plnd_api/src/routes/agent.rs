@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::auth::jwt::Claims;
 use crate::models::{
     FailedSlot, MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealPlanRequest,
-    MealPlanResponse, MealRef, MealSuggestRequest, PlaceTasksEntry, PlaceTasksRequest,
-    TaskEntryRequest, TaskEntryResponse,
+    MealPlanResponse, MealRef, MealSuggestRequest, NutritionSummary, PlaceTasksEntry,
+    PlaceTasksRequest, TaskEntryRequest, TaskEntryResponse,
 };
 use crate::scheduling::{
     constrained_dates_for_rule, day_type_applies_to, has_floating_instance_in_window,
@@ -690,13 +690,47 @@ pub async fn post_meal_plan(
     }
 
     let meals: Vec<MealEntry> = locked_entries.into_iter().chain(chosen).collect();
+    let nutrition_summary = aggregate_nutrition(&meals);
 
     Ok(Json(MealPlanResponse {
         plan_start,
         meals,
-        nutrition_summary: None, // per-slot aggregation tracked in #758
+        nutrition_summary,
         failed_slots: failed,
     }))
+}
+
+fn aggregate_nutrition(meals: &[MealEntry]) -> Option<NutritionSummary> {
+    let mut total_kcal = 0.0_f64;
+    let mut total_protein = 0.0_f64;
+    let mut count = 0usize;
+    let mut dates_with_data: std::collections::HashSet<chrono::NaiveDate> =
+        std::collections::HashSet::new();
+
+    for m in meals {
+        if let Some(n) = &m.estimated_nutrition {
+            total_kcal += n.kcal;
+            total_protein += n.protein_g;
+            count += 1;
+            dates_with_data.insert(m.date);
+        }
+    }
+
+    if count == 0 {
+        return None;
+    }
+
+    let count_f = count as f64;
+    let mut flags: Vec<String> = Vec::new();
+    if dates_with_data.len() < 3 {
+        flags.push("< 3 days have nutrition data".to_string());
+    }
+
+    Some(NutritionSummary {
+        avg_kcal: Some(total_kcal / count_f),
+        avg_protein: Some(total_protein / count_f),
+        flags,
+    })
 }
 
 /// POST /agent/meal-plan/rebalance — rebalance an in-progress week plan via the AI agent.
@@ -1244,7 +1278,9 @@ pub async fn post_place_tasks(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::{ActionTaken, MealEntry, MealRef, TaskEntryRequest, TaskEntryResponse};
+    use crate::models::{
+        ActionTaken, MealEntry, MealRef, Nutrition, TaskEntryRequest, TaskEntryResponse,
+    };
     use chrono::NaiveDate;
     use uuid::Uuid;
 
@@ -2233,5 +2269,138 @@ mod tests {
         assert_eq!(failed.len(), 1);
         assert_eq!(chosen[0].meal_name, "breakfast");
         assert_eq!(failed[0].meal_name, "lunch");
+    }
+
+    // ---- aggregate_nutrition helpers ----
+
+    fn make_entry(date: &str, kcal: f64, protein_g: f64) -> MealEntry {
+        MealEntry {
+            date: chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap(),
+            meal_name: "lunch".to_string(),
+            meal_ref: MealRef {
+                meal_type: "catalog".to_string(),
+                id: Uuid::new_v4(),
+            },
+            estimated_nutrition: Some(Nutrition {
+                kcal,
+                protein_g,
+                carbs_g: 0.0,
+                fat_g: 0.0,
+            }),
+        }
+    }
+
+    fn make_entry_no_nut(date: &str) -> MealEntry {
+        MealEntry {
+            date: chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap(),
+            meal_name: "lunch".to_string(),
+            meal_ref: MealRef {
+                meal_type: "catalog".to_string(),
+                id: Uuid::new_v4(),
+            },
+            estimated_nutrition: None,
+        }
+    }
+
+    #[test]
+    fn aggregate_nutrition_empty_returns_none() {
+        assert!(aggregate_nutrition(&[]).is_none());
+    }
+
+    #[test]
+    fn aggregate_nutrition_all_none_returns_none() {
+        let meals = vec![
+            make_entry_no_nut("2026-05-01"),
+            make_entry_no_nut("2026-05-02"),
+            make_entry_no_nut("2026-05-03"),
+        ];
+        assert!(aggregate_nutrition(&meals).is_none());
+    }
+
+    #[test]
+    fn aggregate_nutrition_single_entry_produces_correct_average() {
+        let meals = vec![make_entry("2026-05-01", 600.0, 30.0)];
+        let s = aggregate_nutrition(&meals).expect("expected Some");
+        assert!((s.avg_kcal.unwrap() - 600.0).abs() < 1e-9);
+        assert!((s.avg_protein.unwrap() - 30.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn aggregate_nutrition_single_day_has_flag() {
+        let meals = vec![make_entry("2026-05-01", 600.0, 30.0)];
+        let s = aggregate_nutrition(&meals).unwrap();
+        assert_eq!(s.flags, vec!["< 3 days have nutrition data"]);
+    }
+
+    #[test]
+    fn aggregate_nutrition_two_distinct_days_has_flag() {
+        let meals = vec![
+            make_entry("2026-05-01", 400.0, 20.0),
+            make_entry("2026-05-02", 600.0, 40.0),
+        ];
+        let s = aggregate_nutrition(&meals).unwrap();
+        assert_eq!(s.flags, vec!["< 3 days have nutrition data"]);
+    }
+
+    #[test]
+    fn aggregate_nutrition_three_days_no_flag() {
+        let meals = vec![
+            make_entry("2026-05-01", 400.0, 20.0),
+            make_entry("2026-05-02", 600.0, 30.0),
+            make_entry("2026-05-03", 500.0, 25.0),
+        ];
+        let s = aggregate_nutrition(&meals).unwrap();
+        assert!(s.flags.is_empty(), "expected no flags, got {:?}", s.flags);
+    }
+
+    #[test]
+    fn aggregate_nutrition_four_days_no_flag() {
+        let meals = vec![
+            make_entry("2026-05-01", 400.0, 20.0),
+            make_entry("2026-05-02", 600.0, 30.0),
+            make_entry("2026-05-03", 500.0, 25.0),
+            make_entry("2026-05-04", 700.0, 35.0),
+        ];
+        let s = aggregate_nutrition(&meals).unwrap();
+        assert!(s.flags.is_empty(), "expected no flags, got {:?}", s.flags);
+    }
+
+    #[test]
+    fn aggregate_nutrition_correct_average_math() {
+        let meals = vec![
+            make_entry("2026-05-01", 300.0, 10.0),
+            make_entry("2026-05-02", 700.0, 30.0),
+        ];
+        let s = aggregate_nutrition(&meals).unwrap();
+        assert!((s.avg_kcal.unwrap() - 500.0).abs() < 1e-9);
+        assert!((s.avg_protein.unwrap() - 20.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn aggregate_nutrition_none_entries_excluded_from_average() {
+        let meals = vec![
+            make_entry("2026-05-01", 600.0, 30.0),
+            make_entry_no_nut("2026-05-01"),
+            make_entry_no_nut("2026-05-02"),
+            make_entry("2026-05-03", 400.0, 20.0),
+            make_entry_no_nut("2026-05-04"),
+        ];
+        let s = aggregate_nutrition(&meals).unwrap();
+        assert!((s.avg_kcal.unwrap() - 500.0).abs() < 1e-9);
+        assert!((s.avg_protein.unwrap() - 25.0).abs() < 1e-9);
+        assert_eq!(s.flags, vec!["< 3 days have nutrition data"]);
+    }
+
+    #[test]
+    fn aggregate_nutrition_same_day_multiple_entries_count_as_one_day() {
+        let meals = vec![
+            make_entry("2026-05-01", 100.0, 10.0),
+            make_entry("2026-05-01", 200.0, 20.0),
+            make_entry("2026-05-01", 300.0, 30.0),
+        ];
+        let s = aggregate_nutrition(&meals).unwrap();
+        assert!((s.avg_kcal.unwrap() - 200.0).abs() < 1e-9);
+        assert!((s.avg_protein.unwrap() - 20.0).abs() < 1e-9);
+        assert_eq!(s.flags, vec!["< 3 days have nutrition data"]);
     }
 }
