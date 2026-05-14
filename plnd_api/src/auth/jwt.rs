@@ -3,15 +3,21 @@ use chrono::{Duration, Utc};
 use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use veil::Redact;
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Redact, Serialize, Deserialize, Clone)]
+#[redact(all)]
 pub struct Claims {
+    #[redact(skip)]
     pub sub: String, // Subject (user ID)
     pub email: String,
     pub name: Option<String>,
     pub picture: Option<String>,
-    pub exp: usize,  // Expiration time
-    pub iat: usize,  // Issued at
+    #[redact(skip)]
+    pub exp: usize, // Expiration time
+    #[redact(skip)]
+    pub iat: usize, // Issued at
+    #[redact(skip)]
     pub jti: String, // JWT ID
 }
 
@@ -72,5 +78,34 @@ impl JwtService {
     /// Returns the configured token lifetime in seconds.
     pub fn expiration(&self) -> u64 {
         self.expiration
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn claims_debug_redacts_pii() {
+        let claims = Claims {
+            sub: "user-uuid-12345".to_string(),
+            email: "secret@example.com".to_string(),
+            name: Some("Jane Doe".to_string()),
+            picture: Some("https://example.com/photo.jpg".to_string()),
+            exp: 1234567890,
+            iat: 1234560000,
+            jti: "jwt-id-abc".to_string(),
+        };
+        let debug = format!("{:?}", claims);
+
+        assert!(
+            !debug.contains("secret@example.com"),
+            "email leaked: {debug}"
+        );
+        assert!(!debug.contains("Jane Doe"), "name leaked: {debug}");
+        assert!(!debug.contains("photo.jpg"), "picture leaked: {debug}");
+
+        assert!(debug.contains("user-uuid-12345"), "sub missing: {debug}");
+        assert!(debug.contains("jwt-id-abc"), "jti missing: {debug}");
     }
 }

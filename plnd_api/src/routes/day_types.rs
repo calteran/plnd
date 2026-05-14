@@ -217,7 +217,7 @@ async fn check_cycle_group_consistent(
         (status = 401, description = "Unauthorized"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn list_day_types(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -248,7 +248,7 @@ pub async fn list_day_types(
         (status = 422, description = "Validation error or bitmask overlap"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn create_day_type(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -321,7 +321,7 @@ pub async fn create_day_type(
         (status = 422, description = "Validation error or bitmask overlap"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn update_day_type(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -395,7 +395,7 @@ pub async fn update_day_type(
         (status = 422, description = "Cannot delete the last day type"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn delete_day_type(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

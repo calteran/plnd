@@ -8,8 +8,10 @@ use axum::{
 };
 use std::sync::Arc;
 use uuid::Uuid;
+use veil::Redact;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
+#[derive(Redact, serde::Deserialize, serde::Serialize, utoipa::ToSchema)]
+#[redact(all)]
 pub struct UpdateProfileRequest {
     pub display_name: Option<String>,
     pub avatar_url: Option<String>,
@@ -26,7 +28,7 @@ pub struct UpdateProfileRequest {
         (status = 404, description = "User not found"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn get_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -55,7 +57,7 @@ pub async fn get_me(
         (status = 422, description = "Validation error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn patch_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -103,7 +105,7 @@ pub async fn patch_me(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_complete_onboarding(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -132,7 +134,7 @@ pub async fn post_complete_onboarding(
         (status = 404, description = "User not found"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn delete_me(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -153,5 +155,22 @@ pub async fn delete_me(
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(StatusCode::NOT_FOUND)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn update_profile_request_debug_redacts_pii() {
+        let req = UpdateProfileRequest {
+            display_name: Some("Jane Doe".to_string()),
+            avatar_url: Some("https://example.com/photo.jpg".to_string()),
+        };
+        let debug = format!("{:?}", req);
+
+        assert!(!debug.contains("Jane Doe"), "display_name leaked: {debug}");
+        assert!(!debug.contains("photo.jpg"), "avatar_url leaked: {debug}");
     }
 }

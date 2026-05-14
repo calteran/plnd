@@ -25,7 +25,7 @@ use plnd_data::repository::user_meal_pref::AddDishParams;
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -61,7 +61,7 @@ pub async fn list(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn get_detail(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -104,7 +104,7 @@ pub struct CreateMealBody {
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn create(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -180,7 +180,7 @@ pub struct PatchMealBody {
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn patch(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -259,7 +259,7 @@ pub async fn patch(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -306,7 +306,7 @@ pub struct AddDishBody {
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn add_dish(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -357,7 +357,7 @@ pub async fn add_dish(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn remove_dish(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

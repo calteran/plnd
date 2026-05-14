@@ -295,7 +295,7 @@ fn build_review_meal_plan_ctx(
         (status = 500, description = "LLM provider failure or infrastructure error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_task(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -415,7 +415,7 @@ where
         (status = 500, description = "Failed to resolve open slots"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_meal_plan(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -719,7 +719,7 @@ pub async fn post_meal_plan(
         (status = 500, description = "LLM provider failure or infrastructure error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_meal_plan_rebalance(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -787,7 +787,7 @@ pub async fn post_meal_plan_rebalance(
         (status = 500, description = "LLM provider failure or infrastructure error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_meal_plan_suggest(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -852,7 +852,7 @@ pub async fn post_meal_plan_suggest(
         (status = 500, description = "LLM provider failure or infrastructure error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_meal_plan_resolve(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -1173,7 +1173,7 @@ fn anchor_context_block(ctx: &AnchorContext) -> String {
         (status = 500, description = "LLM provider failure or infrastructure error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_place_tasks(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

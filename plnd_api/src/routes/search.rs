@@ -110,7 +110,7 @@ pub struct ExerciseSearchResponse {
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn search_ingredients_handler(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -170,7 +170,7 @@ pub async fn search_ingredients_handler(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn search_dishes_handler(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

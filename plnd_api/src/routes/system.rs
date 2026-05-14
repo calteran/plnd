@@ -32,7 +32,7 @@ pub async fn health_check() -> &'static str {
         (status = 503, description = "A dependency is unavailable"),
     )
 )]
-#[tracing::instrument(skip(state))]
+#[tracing::instrument(skip_all)]
 pub async fn readiness_check(
     State(state): State<Arc<AppState>>,
 ) -> Result<Json<ReadyStatus>, StatusCode> {

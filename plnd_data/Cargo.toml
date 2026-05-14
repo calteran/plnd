@@ -21,6 +21,7 @@ tokio = { version = "1", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 tracing = "0.1"
 uuid = { version = "1", features = ["v4", "serde"] }
+veil = "0.3.0"
 
 [dev-dependencies]
 sqlx = { version = "0.8", features = ["macros"] }
