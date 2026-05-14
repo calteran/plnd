@@ -39,7 +39,7 @@ use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
 #[cfg(debug_assertions)]
 use plnd_data::providers::{
-    FixtureNewsProvider, FixtureNutritionProvider, FixtureRecipeProvider, FixtureWeatherProvider,
+    FixtureNewsProvider, FixtureNutritionProvider, FixtureWeatherProvider, TheMealDbFixtureProvider,
 };
 use plnd_data::providers::{
     NewsProvider, OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider,
@@ -556,8 +556,8 @@ fn build_recipe_providers(
         );
         let search_path = fixture_root.join("recipe/themealdb/search.json");
         let lookup_path = fixture_root.join("recipe/themealdb/lookup.json");
-        let provider = FixtureRecipeProvider::new("themealdb", search_path, lookup_path)
-            .unwrap_or_else(|e| {
+        let provider =
+            TheMealDbFixtureProvider::new(search_path, lookup_path).unwrap_or_else(|e| {
                 tracing::error!(error = %e, "failed to load recipe fixture");
                 std::process::exit(1);
             });
