@@ -119,3 +119,25 @@ pub async fn contribute_ingredient(
         Json(ContributeIngredientResponse { ingredient_id: id }),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    #[test]
+    fn ingest_response_serializes_ingredient_id_field() {
+        let ingredient_id = Uuid::new_v4();
+        let resp = IngestIngredientResponse { ingredient_id };
+        let v = serde_json::to_value(&resp).expect("serialize");
+        assert_eq!(v, serde_json::json!({ "ingredient_id": ingredient_id }));
+    }
+
+    #[test]
+    fn contribute_response_serializes_ingredient_id_field() {
+        let ingredient_id = Uuid::new_v4();
+        let resp = ContributeIngredientResponse { ingredient_id };
+        let v = serde_json::to_value(&resp).expect("serialize");
+        assert_eq!(v, serde_json::json!({ "ingredient_id": ingredient_id }));
+    }
+}
