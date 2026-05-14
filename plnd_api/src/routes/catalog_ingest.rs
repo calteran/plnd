@@ -103,7 +103,8 @@ pub async fn contribute_ingredient(
     if name.is_empty() {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
-    if name.chars().count() > 200 {
+    const MAX_NAME_LEN: usize = 200;
+    if name.chars().count() > MAX_NAME_LEN {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     let id = state
