@@ -29,7 +29,7 @@ pub struct UpsertIngredientPrefBody {
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn list(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -66,7 +66,7 @@ pub async fn list(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn upsert(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -107,7 +107,7 @@ pub async fn upsert(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn delete(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

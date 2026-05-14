@@ -74,7 +74,7 @@ impl ResolvedSeed {
     }
 }
 
-#[tracing::instrument(skip(state, body), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_seed(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

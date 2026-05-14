@@ -4,21 +4,29 @@ use serde::Deserialize;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use veil::Redact;
 
 const JWKS_TTL: Duration = Duration::from_secs(3600); // 1 hour
 
 /// Claims extracted from an OIDC ID token issued by the IdP.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Redact, Deserialize, Clone)]
+#[redact(all)]
 pub struct IdTokenClaims {
+    #[redact(skip)]
     pub sub: String,
     pub email: Option<String>,
     pub name: Option<String>,
     pub picture: Option<String>,
+    #[redact(skip)]
     pub email_verified: Option<bool>,
     /// `aud` may be a single string or a JSON array of strings.
+    #[redact(skip)]
     pub aud: serde_json::Value,
+    #[redact(skip)]
     pub iss: String,
+    #[redact(skip)]
     pub exp: usize,
+    #[redact(skip)]
     pub iat: usize,
 }
 
@@ -154,5 +162,36 @@ impl JwksCache {
             .map_err(|e| AuthError::JwksError(format!("ID token validation failed: {}", e)))?;
 
         Ok(token_data.claims)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn id_token_claims_debug_redacts_pii() {
+        let claims = IdTokenClaims {
+            sub: "user-uuid-12345".to_string(),
+            email: Some("secret@example.com".to_string()),
+            name: Some("Jane Doe".to_string()),
+            picture: Some("https://example.com/photo.jpg".to_string()),
+            email_verified: Some(true),
+            aud: serde_json::json!("my-audience"),
+            iss: "https://idp.example.com".to_string(),
+            exp: 1234567890,
+            iat: 1234560000,
+        };
+        let debug = format!("{:?}", claims);
+
+        assert!(
+            !debug.contains("secret@example.com"),
+            "email leaked: {debug}"
+        );
+        assert!(!debug.contains("Jane Doe"), "name leaked: {debug}");
+        assert!(!debug.contains("photo.jpg"), "picture leaked: {debug}");
+
+        assert!(debug.contains("user-uuid-12345"), "sub missing: {debug}");
+        assert!(debug.contains("idp.example.com"), "iss missing: {debug}");
     }
 }

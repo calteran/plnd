@@ -863,7 +863,8 @@ Any UI action that triggers an LLM-backed agent call **must** surface visible lo
 
 **Health data sensitivity.** Dietary restrictions, allergens, medication schedules, and energy patterns are health-adjacent. The system applies strict access controls:
 - No data leaves the user's account without explicit action (no analytics SDK, no third-party telemetry on user content).
-- Logs scrub PII; structured logs use field names, not free-text dumps.
+- PII-bearing types redact themselves when formatted for logs. Their debug representation masks identifying fields (email, display name, avatar URL, raw ID-token contents) while leaving non-identifying fields visible (subject UUID, timestamps, token IDs). New PII fields added later default to redacted unless explicitly opted out.
+- Request-handling spans never auto-capture handler arguments. Each span declares its visible fields explicitly, so a newly-added PII-bearing argument cannot silently leak through a default `Debug` formatter. A CI guard rejects any route handler that omits this discipline.
 - External provider calls (USDA, etc.) send queries (e.g., a search term) but never user identifiers.
 
 ### 9.2 Observability

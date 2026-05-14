@@ -33,7 +33,7 @@ pub struct SuggestionsQuery {
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn get_suggestions(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

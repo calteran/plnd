@@ -24,7 +24,7 @@ const DEFAULT_TOLERANCE_MINUTES: i32 = 60;
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Day type not found or not owned by user"),
     ))]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn list_meal_pattern(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -71,7 +71,7 @@ pub async fn list_meal_pattern(
         (status = 409, description = "Duplicate name or sort_order for this day type"),
         (status = 422, description = "Validation error"),
     ))]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn create_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -136,7 +136,7 @@ pub async fn create_meal_pattern_entry(
         (status = 409, description = "Duplicate name or sort_order for this day type"),
         (status = 422, description = "No fields provided or validation error"),
     ))]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn update_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -215,7 +215,7 @@ pub async fn update_meal_pattern_entry(
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Not found"),
     ))]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn delete_meal_pattern_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

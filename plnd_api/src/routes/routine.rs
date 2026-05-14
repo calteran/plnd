@@ -64,7 +64,7 @@ pub struct CreateRoutineRequest {
         (status = 401, description = "Unauthorized"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn list_routines(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -94,7 +94,7 @@ pub async fn list_routines(
         (status = 422, description = "Invalid task_type, recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn create_routine(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -159,7 +159,7 @@ pub async fn create_routine(
         (status = 404, description = "Routine not found or not owned by current user"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn delete_routine(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -198,7 +198,7 @@ pub async fn delete_routine(
         (status = 422, description = "Invalid recurrence, energy_required, recurrence_rule format, or empty title"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn update_routine(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

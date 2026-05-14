@@ -126,12 +126,27 @@ ts-deps:
     cd plnd_client && npm run check-licenses
     cd plnd_client && npm run check-circular
 
+# Verify no handler in plnd_api/src/routes/ uses tracing::instrument(skip(...))
+# without skip_all — guards against PII leaking via the Extension<Claims> arg
+# (see issue #803). All route handlers must use skip_all + explicit fields(...).
+check-tracing-skip:
+    @if grep -rEn 'tracing::instrument\([[:space:]]*skip\(' plnd_api/src/routes/ ; then \
+        echo "" ; \
+        echo "✗ Found tracing::instrument(skip(...)) in plnd_api/src/routes/." ; \
+        echo "  Use skip_all with explicit fields(...) to avoid leaking PII-bearing" ; \
+        echo "  args like Extension<Claims> into tracing spans. See issue #803." ; \
+        exit 1 ; \
+    else \
+        echo "✓ No unsafe skip() patterns in plnd_api/src/routes/" ; \
+    fi
+
 # Combined quality check (all quality gates, no tests)
 check:
     just fmt
     just clippy
     just deny
     just machete
+    just check-tracing-skip
     just ts-lint
     just ts-deps
 

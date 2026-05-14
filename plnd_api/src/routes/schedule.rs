@@ -105,7 +105,7 @@ fn map_meal_entry(e: MealEntryRequest) -> Result<PlannedMealEntryStaging, Status
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn get_period(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -159,7 +159,7 @@ pub async fn get_period(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn get_plan_carryover(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -200,7 +200,7 @@ pub async fn get_plan_carryover(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn get_plan_status(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -240,7 +240,7 @@ pub async fn get_plan_status(
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn post_plan(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
@@ -331,7 +331,7 @@ const VALID_STATUSES: &[&str] = &["planned", "in_progress", "completed", "skippe
         (status = 500, description = "Internal server error"),
     )
 )]
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn patch_entry_status(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,

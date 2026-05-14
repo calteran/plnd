@@ -149,6 +149,7 @@ echo "◆ Starting verification..."
 run_job "cargo fmt"     "$PROJECT_ROOT" cargo fmt --check
 run_job "cargo deny"    "$PROJECT_ROOT" cargo deny check
 run_job "cargo machete" "$PROJECT_ROOT" cargo machete
+run_job "tracing-skip"  "$PROJECT_ROOT" just check-tracing-skip
 
 # ── TypeScript setup — install deps synchronously so all TS jobs can fork cleanly
 run_sync "npm ci" "$PROJECT_ROOT/plnd_client" npm ci

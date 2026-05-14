@@ -7,9 +7,11 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use veil::Redact;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Redact, Deserialize, Serialize)]
 pub struct TokenExchangeRequest {
+    #[redact]
     pub id_token: String,
     /// The IdP provider name: "mock" | "google" | "apple"
     pub provider: String,
@@ -178,11 +180,31 @@ pub async fn token_exchange(
 /// The middleware has already validated the token and inserted Claims into
 /// request extensions. We use the JTI from Claims to mark the session revoked,
 /// so subsequent requests with the same JWT are rejected by the middleware.
-#[tracing::instrument(skip(state), fields(user_id = %claims.sub))]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
 pub async fn logout(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
 ) -> StatusCode {
     let _ = state.session.revoke_session(&claims.jti).await;
     StatusCode::NO_CONTENT
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn token_exchange_request_debug_redacts_id_token() {
+        let req = TokenExchangeRequest {
+            id_token: "eyJhbGc.SECRET_PAYLOAD.sig".to_string(),
+            provider: "mock".to_string(),
+        };
+        let debug = format!("{:?}", req);
+
+        assert!(
+            !debug.contains("SECRET_PAYLOAD"),
+            "id_token leaked: {debug}"
+        );
+        assert!(debug.contains("mock"), "provider missing: {debug}");
+    }
 }
