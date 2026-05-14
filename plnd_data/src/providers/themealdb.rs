@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use async_trait::async_trait;
 use reqwest::Client;
@@ -220,16 +221,13 @@ pub fn parse_meal_json(value: serde_json::Value) -> Result<ExternalDish, serde_j
 #[cfg(debug_assertions)]
 #[derive(Debug)]
 pub struct TheMealDbFixtureProvider {
-    search_path: std::path::PathBuf,
-    lookup_path: std::path::PathBuf,
+    search_path: PathBuf,
+    lookup_path: PathBuf,
 }
 
 #[cfg(debug_assertions)]
 impl TheMealDbFixtureProvider {
-    pub fn new(
-        search_path: std::path::PathBuf,
-        lookup_path: std::path::PathBuf,
-    ) -> Result<Self, ExternalProviderError> {
+    pub fn new(search_path: PathBuf, lookup_path: PathBuf) -> Result<Self, ExternalProviderError> {
         if !search_path.is_file() {
             return Err(ExternalProviderError::ConfigurationError(format!(
                 "fixture search file not found: {}",
@@ -296,11 +294,11 @@ impl RecipeProvider for TheMealDbFixtureProvider {
                 self.lookup_path.display()
             ))
         })?;
-        let lookup: HashMap<String, serde_json::Value> = serde_json::from_slice(&bytes)
+        let mut lookup: HashMap<String, serde_json::Value> = serde_json::from_slice(&bytes)
             .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
-        match lookup.get(external_id) {
+        match lookup.remove(external_id) {
             None => Ok(None),
-            Some(v) => parse_meal_json(v.clone())
+            Some(v) => parse_meal_json(v)
                 .map(Some)
                 .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string())),
         }
@@ -527,6 +525,9 @@ mod tests {
             "strIngredient3": "",        "strMeasure3": ""
         });
         let dish = parse_meal_json(json).expect("should parse");
+        assert_eq!(dish.external_id, "52795");
+        assert_eq!(dish.name, "Chicken Handi");
+        assert_eq!(dish.occasion_tags, vec!["dinner"]);
         assert_eq!(dish.ingredients.len(), 2);
         assert_eq!(
             dish.ingredients[0].quantity,
