@@ -556,11 +556,12 @@ fn build_recipe_providers(
         );
         let search_path = fixture_root.join("recipe/themealdb/search.json");
         let lookup_path = fixture_root.join("recipe/themealdb/lookup.json");
-        let provider = FixtureRecipeProvider::new("themealdb", search_path, lookup_path)
-            .unwrap_or_else(|e| {
-                tracing::error!(error = %e, "failed to load recipe fixture");
-                std::process::exit(1);
-            });
+        let provider =
+            plnd_data::providers::TheMealDbFixtureProvider::new(search_path, lookup_path)
+                .unwrap_or_else(|e| {
+                    tracing::error!(error = %e, "failed to load recipe fixture");
+                    std::process::exit(1);
+                });
         return vec![Arc::new(provider)];
     }
     vec![mdb]

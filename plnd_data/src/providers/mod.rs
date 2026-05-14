@@ -34,6 +34,8 @@ pub use recipe::RecipeProvider;
 #[cfg(debug_assertions)]
 pub use recipe_fixture::FixtureRecipeProvider;
 pub use themealdb::TheMealDbProvider;
+#[cfg(debug_assertions)]
+pub use themealdb::TheMealDbFixtureProvider;
 pub use usda_fdc::UsdaFdcProvider;
 pub use weather::{OpenMeteoProvider, WeatherData, WeatherProvider};
 
