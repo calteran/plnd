@@ -701,33 +701,34 @@ pub async fn post_meal_plan(
 }
 
 fn aggregate_nutrition(meals: &[MealEntry]) -> Option<NutritionSummary> {
-    let contributing: Vec<&crate::models::Nutrition> = meals
-        .iter()
-        .filter_map(|m| m.estimated_nutrition.as_ref())
-        .collect();
+    let mut total_kcal = 0.0_f64;
+    let mut total_protein = 0.0_f64;
+    let mut count = 0usize;
+    let mut dates_with_data: std::collections::HashSet<chrono::NaiveDate> =
+        std::collections::HashSet::new();
 
-    if contributing.is_empty() {
+    for m in meals {
+        if let Some(n) = &m.estimated_nutrition {
+            total_kcal += n.kcal;
+            total_protein += n.protein_g;
+            count += 1;
+            dates_with_data.insert(m.date);
+        }
+    }
+
+    if count == 0 {
         return None;
     }
 
-    let count = contributing.len() as f64;
-    let avg_kcal = contributing.iter().map(|n| n.kcal).sum::<f64>() / count;
-    let avg_protein = contributing.iter().map(|n| n.protein_g).sum::<f64>() / count;
-
-    let dates_with_data: std::collections::HashSet<chrono::NaiveDate> = meals
-        .iter()
-        .filter(|m| m.estimated_nutrition.is_some())
-        .map(|m| m.date)
-        .collect();
-
+    let count_f = count as f64;
     let mut flags: Vec<String> = Vec::new();
     if dates_with_data.len() < 3 {
         flags.push("< 3 days have nutrition data".to_string());
     }
 
     Some(NutritionSummary {
-        avg_kcal: Some(avg_kcal),
-        avg_protein: Some(avg_protein),
+        avg_kcal: Some(total_kcal / count_f),
+        avg_protein: Some(total_protein / count_f),
         flags,
     })
 }
