@@ -119,3 +119,44 @@ pub async fn contribute_ingredient(
         Json(ContributeIngredientResponse { ingredient_id: id }),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{ContributeIngredientResponse, IngestIngredientResponse};
+    use serde_json::to_value;
+    use uuid::Uuid;
+
+    #[test]
+    fn ingest_response_serializes_ingredient_id_field() {
+        let resp = IngestIngredientResponse {
+            ingredient_id: Uuid::new_v4(),
+        };
+        let v = to_value(&resp).expect("serialize");
+        let obj = v.as_object().expect("should be a JSON object");
+        assert!(
+            obj.contains_key("ingredient_id"),
+            "response JSON must contain 'ingredient_id'"
+        );
+        assert!(
+            !obj.contains_key("catalog_ingredient_id"),
+            "response JSON must not use old field name 'catalog_ingredient_id'"
+        );
+    }
+
+    #[test]
+    fn contribute_response_serializes_ingredient_id_field() {
+        let resp = ContributeIngredientResponse {
+            ingredient_id: Uuid::new_v4(),
+        };
+        let v = to_value(&resp).expect("serialize");
+        let obj = v.as_object().expect("should be a JSON object");
+        assert!(
+            obj.contains_key("ingredient_id"),
+            "response JSON must contain 'ingredient_id'"
+        );
+        assert!(
+            !obj.contains_key("catalog_ingredient_id"),
+            "response JSON must not use old field name 'catalog_ingredient_id'"
+        );
+    }
+}
