@@ -226,6 +226,29 @@ test.describe('Catalog Library — API Contract', () => {
     );
   });
 
+  test('POST /catalog/ingredients with name > 200 chars returns 422', async ({ page }) => {
+    await seedAuthAndNavigate(page);
+    const longName = 'a'.repeat(201);
+
+    const result = await page.evaluate(
+      async ({ apiBase, name }) => {
+        const token = localStorage.getItem('auth_token') ?? '';
+        const res = await fetch(`${apiBase}/catalog/ingredients`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name }),
+        });
+        return { status: res.status };
+      },
+      { apiBase: API_BASE, name: longName },
+    );
+
+    expect(result.status).toBe(422);
+  });
+
   test('POST /my/meals with name returns the correct UserMealPref shape', async ({ page }) => {
     await seedAuthAndNavigate(page);
 

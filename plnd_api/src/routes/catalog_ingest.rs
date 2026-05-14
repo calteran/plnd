@@ -88,7 +88,7 @@ pub struct ContributeIngredientResponse {
     responses(
         (status = 201, description = "User-contributed ingredient created", body = ContributeIngredientResponse),
         (status = 401, description = "Unauthorized"),
-        (status = 422, description = "Empty or whitespace-only name"),
+        (status = 422, description = "Name is empty, whitespace-only, or exceeds 200 characters"),
         (status = 500, description = "Internal server error"),
     )
 )]
@@ -101,6 +101,9 @@ pub async fn contribute_ingredient(
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
     let name = body.name.trim();
     if name.is_empty() {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+    if name.chars().count() > 200 {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
     let id = state
