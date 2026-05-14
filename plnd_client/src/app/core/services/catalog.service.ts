@@ -19,6 +19,21 @@ export interface IngredientSearchResponse {
   providers_from_cache: string[];
 }
 
+export interface IngestIngredientBody {
+  external_source: string;
+  external_id: string;
+  name: string;
+  description?: string;
+  serving_size_g?: number;
+  nutrition?: unknown;
+  allergens?: string[];
+  occasion_tags?: string[];
+}
+
+export interface IngestIngredientResponse {
+  ingredient_id: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CatalogService {
   private readonly http = inject(HttpClient);
@@ -45,8 +60,8 @@ export class CatalogService {
     return this.http.get(`${this.apiBase}/catalog/meals/${id}`);
   }
 
-  ingestIngredient(body: unknown): Observable<{ ingredient_id: string }> {
-    return this.http.post<{ ingredient_id: string }>(
+  ingestIngredient(body: IngestIngredientBody): Observable<IngestIngredientResponse> {
+    return this.http.post<IngestIngredientResponse>(
       `${this.apiBase}/catalog/ingredients/ingest`,
       body
     );

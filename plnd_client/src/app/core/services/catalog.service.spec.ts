@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { CatalogService, IngredientSearchResponse, LocalIngredientResult } from './catalog.service';
+import { CatalogService, IngestIngredientResponse, IngredientSearchResponse, LocalIngredientResult } from './catalog.service';
 
 describe('CatalogService', () => {
   let service: CatalogService;
@@ -59,7 +59,7 @@ describe('CatalogService', () => {
   it('ingestIngredient() makes POST /catalog/ingredients/ingest', () => {
     const body = { external_source: 'usda_fdc', external_id: '123', name: 'Oats' };
     const mockResponse = { ingredient_id: 'uuid-123' };
-    let result: { ingredient_id: string } | undefined;
+    let result: IngestIngredientResponse | undefined;
     service.ingestIngredient(body).subscribe(r => (result = r));
 
     const req = httpMock.expectOne(r => r.url.endsWith('/catalog/ingredients/ingest') && r.method === 'POST');
