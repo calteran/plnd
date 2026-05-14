@@ -236,59 +236,14 @@ echo "${off_lookup_acc}" | jq '.' > "${off_dir}/lookup.json"
 
 # ── TheMealDB ─────────────────────────────────────────────────────────────────
 # Search: https://www.themealdb.com/api/json/v1/<key>/search.php?s=<term>
-#   (returns the full meal records, so the lookup pass can dedupe locally
-#   without re-hitting the API.)
-# Detail: https://www.themealdb.com/api/json/v1/<key>/lookup.php?i=<id>
+#
+# search.json: HashMap<term, Vec<SearchResult>> — same shape as dtos::SearchResult.
+# lookup.json: HashMap<idMeal, raw TheMealDB meal object> — parsed at load time by
+#   TheMealDbFixtureProvider via parse_meal_json(), which applies the same
+#   parse_measure() and category_to_occasion_tags() logic as the live provider.
 echo "→ TheMealDB: capturing search.json and lookup.json"
 mdb_search_acc='{}'  # keyed by lowercased query term
 mdb_lookup_acc='{}'  # keyed by idMeal
-
-# Mirrors plnd_data/src/providers/themealdb.rs::meal_to_dish:
-#   - servings is hardcoded to 4 (TheMealDB does not return a servings field).
-#   - occasion_tags maps strCategory through the same lookup as
-#     category_to_occasion_tags (themealdb.rs:57-70); unknown categories yield
-#     an empty array.
-#
-# KNOWN LIMITATION: live `parse_measure` (themealdb.rs:74-131) parses each
-# strMeasure into (quantity: Decimal, unit: String) — e.g. "1 cup" → (1, "cup"),
-# "250g" → (250, "g"), "1/2" → (0.5, "serving"). Porting that parser to jq is
-# nontrivial, so the fixture currently emits quantity: "1" + unit: <raw measure>.
-# This divergence is tracked in https://github.com/calteran/plnd/issues/812.
-build_mdb_dish='. as $m
-| def category_to_occasion_tags(c):
-    if c == "Breakfast" then ["breakfast-friendly"]
-    elif c == "Dessert" then ["dessert"]
-    elif c == "Side" then ["side-dish"]
-    elif c == "Starter" then ["starter"]
-    elif c == "Vegan" then ["vegan"]
-    elif c == "Vegetarian" then ["vegetarian"]
-    elif c == "Seafood" then ["seafood"]
-    elif (c == "Pasta" or c == "Pork" or c == "Beef" or c == "Chicken" or c == "Lamb" or c == "Goat" or c == "Miscellaneous") then ["dinner"]
-    else []
-    end;
-{
-    external_id: ($m.idMeal // ""),
-    name: ($m.strMeal // ""),
-    instructions: ($m.strInstructions // null),
-    prep_time_minutes: null,
-    cook_time_minutes: null,
-    servings: "4",
-    allergens: [],
-    occasion_tags: category_to_occasion_tags($m.strCategory // ""),
-    nutrition: null,
-    ingredients: [
-        range(1; 21) as $i
-        | {
-            name: ($m["strIngredient" + ($i|tostring)] // ""),
-            external_ingredient_id: null,
-            quantity: "1",
-            unit: ($m["strMeasure" + ($i|tostring)] // ""),
-            preparation_note: null,
-            is_optional: false
-        }
-        | select(.name != null and .name != "")
-    ]
-}'
 
 for term in "${DISH_TERMS[@]}"; do
     encoded="$(urlencode_term "${term}")"
@@ -303,11 +258,11 @@ for term in "${DISH_TERMS[@]}"; do
     term_lower="$(printf '%s' "${term}" | tr '[:upper:]' '[:lower:]')"
     mdb_search_acc="$(jq --arg key "${term_lower}" --argjson new "${normalized}" '. + {($key): $new}' <<<"${mdb_search_acc}")"
 
-    entries="$(jq --argjson empty '{}' "
-        reduce (.meals[]? // empty) as \$m (\$empty;
-            . + ({(\$m.idMeal): (\$m | ${build_mdb_dish})})
+    entries="$(jq --argjson empty '{}' '
+        reduce (.meals[]? // empty) as $m ($empty;
+            . + {($m.idMeal): $m}
         )
-    " <<<"${raw}")"
+    ' <<<"${raw}")"
     mdb_lookup_acc="$(jq --argjson new "${entries}" '. * $new' <<<"${mdb_lookup_acc}")"
 done
 
