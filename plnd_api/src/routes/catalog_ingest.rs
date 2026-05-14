@@ -25,7 +25,7 @@ pub struct IngestIngredientBody {
 
 #[derive(Serialize, utoipa::ToSchema)]
 pub struct IngestIngredientResponse {
-    pub catalog_ingredient_id: Uuid,
+    pub ingredient_id: Uuid,
 }
 
 #[utoipa::path(
@@ -63,9 +63,7 @@ pub async fn ingest_ingredient(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
     Ok((
         StatusCode::CREATED,
-        Json(IngestIngredientResponse {
-            catalog_ingredient_id: id,
-        }),
+        Json(IngestIngredientResponse { ingredient_id: id }),
     ))
 }
 

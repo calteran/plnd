@@ -45,8 +45,8 @@ export class CatalogService {
     return this.http.get(`${this.apiBase}/catalog/meals/${id}`);
   }
 
-  ingestIngredient(body: unknown): Observable<{ catalog_ingredient_id: string }> {
-    return this.http.post<{ catalog_ingredient_id: string }>(
+  ingestIngredient(body: unknown): Observable<{ ingredient_id: string }> {
+    return this.http.post<{ ingredient_id: string }>(
       `${this.apiBase}/catalog/ingredients/ingest`,
       body
     );

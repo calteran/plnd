@@ -183,7 +183,7 @@ test.describe('Catalog Library — API Contract', () => {
 
       // Step 3: Upsert a preference against the newly-ingested ingredient.
       const prefRes = await fetch(
-        `${apiBase}/my/ingredient-prefs/${ingestBody.catalog_ingredient_id}`,
+        `${apiBase}/my/ingredient-prefs/${ingestBody.ingredient_id}`,
         {
           method: 'PUT',
           headers: jsonHeaders,
@@ -197,7 +197,7 @@ test.describe('Catalog Library — API Contract', () => {
         searchStatus: searchRes.status,
         externalCount: searchBody.external.length,
         ingestStatus: ingestRes.status,
-        catalogIngredientId: ingestBody.catalog_ingredient_id,
+        catalogIngredientId: ingestBody.ingredient_id,
         prefStatus: prefRes.status,
         prefBody,
       };

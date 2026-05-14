@@ -58,15 +58,15 @@ describe('CatalogService', () => {
 
   it('ingestIngredient() makes POST /catalog/ingredients/ingest', () => {
     const body = { external_source: 'usda_fdc', external_id: '123', name: 'Oats' };
-    const mockResponse = { catalog_ingredient_id: 'uuid-123' };
-    let result: { catalog_ingredient_id: string } | undefined;
+    const mockResponse = { ingredient_id: 'uuid-123' };
+    let result: { ingredient_id: string } | undefined;
     service.ingestIngredient(body).subscribe(r => (result = r));
 
     const req = httpMock.expectOne(r => r.url.endsWith('/catalog/ingredients/ingest') && r.method === 'POST');
     expect(req.request.body).toEqual(body);
     req.flush(mockResponse);
 
-    expect(result?.catalog_ingredient_id).toBe('uuid-123');
+    expect(result?.ingredient_id).toBe('uuid-123');
   });
 
   it('searchIngredients() makes GET /search/ingredients with q and limit params', () => {
