@@ -211,7 +211,8 @@ seed:
 # Refresh captured upstream fixtures used by debug builds when
 # APP_EXTERNAL__FIXTURE_PATH is set (e.g. the e2e leg of `just verify`).
 # Run this when an upstream response shape changes or fixtures go stale.
-# Feed URLs must match config/api/default.toml news_feed_urls.
+# Briefing feed URLs must match config/api/default.toml news_feed_urls.
+# Catalog refresh requires APP_EXTERNAL__USDA_FDC_API_KEY (via Doppler).
 refresh-fixtures:
     @echo "→ Capturing real upstream responses into plnd_data/fixtures/ ..."
     @mkdir -p plnd_data/fixtures/open-meteo
@@ -222,6 +223,7 @@ refresh-fixtures:
     curl -fsSL 'https://news.ycombinator.com/rss' -o plnd_data/fixtures/rss/hn.xml
     curl -fsSL 'https://en.wikipedia.org/w/api.php?action=featuredfeed&feed=featured&feedformat=atom' \
         -o plnd_data/fixtures/rss/wikipedia.xml
+    doppler run -- scripts/refresh-catalog-fixtures.sh
     @echo "✅ Done. Review the diff (git diff plnd_data/fixtures/) and commit if intentional."
 
 # Clean build artifacts

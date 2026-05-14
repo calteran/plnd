@@ -62,6 +62,10 @@ test.describe('Planning Wizard', () => {
       await seedWizard(page);
       await page.goto('/plan/week');
       await expect(page.locator('.planning-wizard')).toBeVisible();
+      // Wait for the step 1 → step 2 auto-skip to settle before any
+      // interaction; without this, a Next click can race the auto-skip and
+      // be lost or interpreted against the wrong active step.
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
     });
 
     test('Step 2 pill is active on first load (step 1 auto-skipped when no carryover)', async ({ page }) => {
@@ -98,6 +102,8 @@ test.describe('Planning Wizard', () => {
       await seedWizard(page);
       await page.goto('/plan/week');
       await expect(page.locator('.planning-wizard')).toBeVisible();
+      // See Progress-indicator-pills beforeEach for rationale.
+      await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('2');
     });
 
     test('Step 2 has no Previous button (step 1 is disabled)', async ({ page }) => {
