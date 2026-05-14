@@ -528,7 +528,10 @@ mod tests {
         });
         let dish = parse_meal_json(json).expect("should parse");
         assert_eq!(dish.ingredients.len(), 2);
-        assert_eq!(dish.ingredients[0].quantity, Decimal::from_str("1.2").unwrap());
+        assert_eq!(
+            dish.ingredients[0].quantity,
+            Decimal::from_str("1.2").unwrap()
+        );
         assert_eq!(dish.ingredients[0].unit, "kg");
         assert_eq!(dish.ingredients[1].quantity, Decimal::from(5u32));
         assert_eq!(dish.ingredients[1].unit, "thinly sliced");
@@ -582,7 +585,10 @@ mod tests {
             let (s, l) = write_fixtures(tmp.path());
             let p = TheMealDbFixtureProvider::new(s, l).unwrap();
             let dish = p.get_dish_by_id("52795").await.unwrap().expect("found");
-            assert_eq!(dish.ingredients[0].quantity, Decimal::from_str("1.2").unwrap());
+            assert_eq!(
+                dish.ingredients[0].quantity,
+                Decimal::from_str("1.2").unwrap()
+            );
             assert_eq!(dish.ingredients[0].unit, "kg");
         }
 
@@ -599,9 +605,8 @@ mod tests {
             let tmp = tempfile::tempdir().unwrap();
             let lookup = tmp.path().join("lookup.json");
             std::fs::write(&lookup, "{}").unwrap();
-            let err =
-                TheMealDbFixtureProvider::new(PathBuf::from("/no/search.json"), lookup)
-                    .unwrap_err();
+            let err = TheMealDbFixtureProvider::new(PathBuf::from("/no/search.json"), lookup)
+                .unwrap_err();
             assert!(matches!(err, ExternalProviderError::ConfigurationError(_)));
         }
     }
