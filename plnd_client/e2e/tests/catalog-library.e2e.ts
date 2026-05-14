@@ -226,6 +226,75 @@ test.describe('Catalog Library — API Contract', () => {
     );
   });
 
+  // Path 1 — local catalog hit → preference. The verify stack runs plnd_seed
+  // at API startup against APP_EXTERNAL__FIXTURE_PATH, idempotently inserting
+  // INGREDIENT_TERMS (oats, banana, chicken breast, …) into catalog_ingredients.
+  // Searching for one of those terms is guaranteed to return a `local[]` hit
+  // without any per-test pre-seeding step.
+  // Closes https://github.com/calteran/plnd/issues/798
+  test('path-1: local catalog hit → ingredient-pref upsert returns correct shape', async ({
+    page,
+  }) => {
+    await seedAuthAndNavigate(page);
+
+    const result = await page.evaluate(async (apiBase) => {
+      const token = localStorage.getItem('auth_token') ?? '';
+      const authHeader = { Authorization: `Bearer ${token}` };
+      const jsonHeaders = { ...authHeader, 'Content-Type': 'application/json' };
+
+      // Step 1: search for a term plnd_seed populates at startup.
+      const searchRes = await fetch(`${apiBase}/search/ingredients?q=oats`, {
+        headers: authHeader,
+      });
+      const searchBody = await searchRes.json();
+      if (searchRes.status !== 200 || !searchBody.local?.length) {
+        return { step: 'search', searchStatus: searchRes.status, searchBody };
+      }
+      const hit = (
+        searchBody.local as {
+          ingredient_id: string;
+          name: string;
+        }[]
+      )[0];
+
+      // Step 2: upsert a preference against the local hit.
+      const prefRes = await fetch(`${apiBase}/my/ingredient-prefs/${hit.ingredient_id}`, {
+        method: 'PUT',
+        headers: jsonHeaders,
+        body: JSON.stringify({ preference_score: 2, notes: 'path-1 e2e' }),
+      });
+      const prefBody = await prefRes.json();
+
+      return {
+        step: 'done',
+        searchStatus: searchRes.status,
+        localCount: searchBody.local.length,
+        ingredientId: hit.ingredient_id,
+        prefStatus: prefRes.status,
+        prefBody,
+      };
+    }, API_BASE);
+
+    expect(result.step, `stopped at ${result.step}`).toBe('done');
+    expect(result.searchStatus).toBe(200);
+    expect(result.localCount).toBeGreaterThan(0);
+    expect(result.ingredientId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    expect(result.prefStatus).toBe(200);
+    expect(result.prefBody).toMatchObject({
+      catalog_ingredient_id: result.ingredientId,
+      preference_score: 2,
+      notes: 'path-1 e2e',
+    });
+    expect(result.prefBody.user_ingredient_pref_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    expect(result.prefBody.user_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+  });
+
   test('POST /catalog/ingredients with name > 200 chars returns 422', async ({ page }) => {
     await seedAuthAndNavigate(page);
     const longName = 'a'.repeat(201);
