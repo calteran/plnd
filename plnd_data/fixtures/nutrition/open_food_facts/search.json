@@ -1,8 +1,162 @@
-[
-  {
-    "external_id": "3017620425035",
-    "name": "Nutella",
-    "description": "Spreads",
-    "thumbnail_url": null
-  }
-]
+{
+  "oats": [
+    {
+      "external_id": "0016000264694",
+      "name": "Crunchy Oats 'n Honey Granola Bars",
+      "description": "Nature Valley",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/001/600/026/4694/front_en.244.100.jpg"
+    },
+    {
+      "external_id": "7394376620157",
+      "name": "Barista edition oat drink",
+      "description": "Oatly!",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/739/437/662/0157/front_en.5.100.jpg"
+    },
+    {
+      "external_id": "0016000275263",
+      "name": "Toasted Whole Grain Oat Cereal",
+      "description": "Cheerios",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/001/600/027/5263/front_en.67.100.jpg"
+    }
+  ],
+  "banana": [
+    {
+      "external_id": "0856088003736",
+      "name": "Rise & Shine Mix Strawberry Banana Blend",
+      "description": "Seven Sundays",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/085/608/800/3736/front_en.40.100.jpg"
+    },
+    {
+      "external_id": "0602652419317",
+      "name": "Breakfast Protein Bars",
+      "description": "KIND",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/060/265/241/9317/front_en.52.100.jpg"
+    },
+    {
+      "external_id": "0818290011794",
+      "name": "Greek Yogurt Strawberry Banana",
+      "description": "Chobani",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/081/829/001/1794/front_en.96.100.jpg"
+    }
+  ],
+  "chicken breast": [
+    {
+      "external_id": "20048402",
+      "name": "Chicken breast cured, cooked, baked",
+      "description": "Dulano",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/000/002/004/8402/front_en.144.100.jpg"
+    },
+    {
+      "external_id": "0096619488827",
+      "name": "Chunk Chicken Breast",
+      "description": "Kirkland Signature",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/009/661/948/8827/front_en.421.100.jpg"
+    },
+    {
+      "external_id": "0196633951786",
+      "name": "Lightly Breaded Chicken Breast Chunks",
+      "description": "Kirkland",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/019/663/395/1786/front_en.174.100.jpg"
+    }
+  ],
+  "brown rice": [
+    {
+      "external_id": "0748404287947",
+      "name": "Organic Quinoa & Brown Rice with Garlic",
+      "description": "Seeds of Change",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/074/840/428/7947/front_en.290.100.jpg"
+    },
+    {
+      "external_id": "0708953628134",
+      "name": "MILLET & BROWN RICE RAMEN NOODLES",
+      "description": "LOTUS FOODS",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/070/895/362/8134/front_en.68.100.jpg"
+    },
+    {
+      "external_id": "0073416000148",
+      "name": "Brown Rice Cakes Lightly Salted",
+      "description": "Lundberg Family Farms",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/007/341/600/0148/front_en.53.100.jpg"
+    }
+  ],
+  "broccoli": [
+    {
+      "external_id": "0042272008117",
+      "name": "BOWLS BROCCOLI & CHEDDAR BAKE",
+      "description": "Amy's",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/004/227/200/8117/front_en.34.100.jpg"
+    },
+    {
+      "external_id": "0014500021830",
+      "name": "Broccoli Florets",
+      "description": "Birds Eye",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/001/450/002/1830/front_en.43.100.jpg"
+    },
+    {
+      "external_id": "0041000022432",
+      "name": "ALFREDO BROCCOLI Fettuccine & Broccoli in a Parmesan & Romano Cheese Flavored Sauce",
+      "description": "Knorr",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/004/100/002/2432/front_en.21.100.jpg"
+    }
+  ],
+  "milk": [
+    {
+      "external_id": "6111266962187",
+      "name": "Lait",
+      "description": "Jaouda",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/611/126/696/2187/front_fr.56.100.jpg"
+    },
+    {
+      "external_id": "6111242106949",
+      "name": "Jben",
+      "description": "Jaouda",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/611/124/210/6949/front_fr.77.100.jpg"
+    },
+    {
+      "external_id": "6111242101180",
+      "name": "uht jaouda 1L",
+      "description": "Jaouda",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/611/124/210/1180/front_fr.79.100.jpg"
+    }
+  ],
+  "egg": [
+    {
+      "external_id": "3180054547007",
+      "name": "Boudin à l'ancienne aux pommes du verger",
+      "description": "Bahier",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/318/005/454/7007/front_fr.60.100.jpg"
+    },
+    {
+      "external_id": "3178530402353",
+      "name": "Petites Madeleines",
+      "description": "St Michel",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/317/853/040/2353/front_en.78.100.jpg"
+    },
+    {
+      "external_id": "0861745000010",
+      "name": "Pasture-Raised Eggs",
+      "description": "Vital Farms",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/086/174/500/0010/front_en.72.100.jpg"
+    }
+  ],
+  "olive oil": [
+    {
+      "external_id": "6191509900671",
+      "name": "EXTRA VIRGIN OLIVE OIL",
+      "description": "TERRA DELYSSA",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/619/150/990/0671/front_en.11.100.jpg"
+    },
+    {
+      "external_id": "4056489166856",
+      "name": "Olivenöl",
+      "description": "Primadonna",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/405/648/916/6856/front_en.31.100.jpg"
+    },
+    {
+      "external_id": "0070303022160",
+      "name": "SARDINE FILLETS in 100% OLIVE OIL",
+      "description": "SEASON",
+      "thumbnail_url": "https://images.openfoodfacts.net/images/products/007/030/302/2160/front_en.173.100.jpg"
+    }
+  ]
+}

@@ -10,6 +10,8 @@ pub mod nutrition;
 pub mod nutrition_fixture;
 pub mod open_food_facts;
 pub mod recipe;
+#[cfg(debug_assertions)]
+pub mod recipe_fixture;
 pub mod themealdb;
 pub mod usda_fdc;
 pub mod weather;
@@ -29,6 +31,8 @@ pub use nutrition::NutritionProvider;
 pub use nutrition_fixture::FixtureNutritionProvider;
 pub use open_food_facts::OpenFoodFactsProvider;
 pub use recipe::RecipeProvider;
+#[cfg(debug_assertions)]
+pub use recipe_fixture::FixtureRecipeProvider;
 pub use themealdb::TheMealDbProvider;
 pub use usda_fdc::UsdaFdcProvider;
 pub use weather::{OpenMeteoProvider, WeatherData, WeatherProvider};

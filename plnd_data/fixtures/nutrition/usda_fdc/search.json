@@ -1,8 +1,182 @@
-[
-  {
-    "external_id": "1750340",
-    "name": "APPLE, RAW",
-    "description": "Fruits and Fruit Juices",
-    "thumbnail_url": null
-  }
-]
+{
+  "oats": [
+    {
+      "external_id": "2020713",
+      "name": "OATS",
+      "description": "Cereal",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2014676",
+      "name": "OATS",
+      "description": "Cereal",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2705412",
+      "name": "Oat milk",
+      "description": "Plant-based milk",
+      "thumbnail_url": null
+    }
+  ],
+  "banana": [
+    {
+      "external_id": "2012128",
+      "name": "BANANA",
+      "description": "Nut & Seed Butters",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2011468",
+      "name": "BANANA",
+      "description": "Wholesome Snacks",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "173945",
+      "name": "Bananas, dehydrated, or banana powder",
+      "description": "Fruits and Fruit Juices",
+      "thumbnail_url": null
+    }
+  ],
+  "chicken breast": [
+    {
+      "external_id": "2187885",
+      "name": "CHICKEN BREAST",
+      "description": "Poultry, Chicken & Turkey",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2092152",
+      "name": "CHICKEN BREAST",
+      "description": "Pepperoni, Salami & Cold Cuts",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2125872",
+      "name": "CHICKEN BREAST",
+      "description": "Cooked & Prepared",
+      "thumbnail_url": null
+    }
+  ],
+  "brown rice": [
+    {
+      "external_id": "360294",
+      "name": "BROWN RICE",
+      "description": "Rice",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2431690",
+      "name": "BROWN RICE",
+      "description": "Rice",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2393132",
+      "name": "BROWN RICE",
+      "description": "Rice",
+      "thumbnail_url": null
+    }
+  ],
+  "broccoli": [
+    {
+      "external_id": "2549992",
+      "name": "BROCCOLI",
+      "description": "Frozen Vegetables",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2384291",
+      "name": "BROCCOLI",
+      "description": "Frozen Vegetables",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "1935906",
+      "name": "BROCCOLI",
+      "description": "Pre-Packaged Fruit & Vegetables",
+      "thumbnail_url": null
+    }
+  ],
+  "milk": [
+    {
+      "external_id": "2476573",
+      "name": "MILK",
+      "description": "Milk",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2062196",
+      "name": "MILK",
+      "description": "Milk",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2501185",
+      "name": "MILK",
+      "description": "Milk",
+      "thumbnail_url": null
+    }
+  ],
+  "egg": [
+    {
+      "external_id": "2575290",
+      "name": "EGG",
+      "description": "Candy",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2171141",
+      "name": "EGG",
+      "description": "Candy",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2677671",
+      "name": "EGG",
+      "description": "Eggs & Egg Substitutes",
+      "thumbnail_url": null
+    }
+  ],
+  "olive oil": [
+    {
+      "external_id": "2710186",
+      "name": "Olive oil",
+      "description": "Salad dressings and vegetable oils",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "1905976",
+      "name": "OLIVE OIL",
+      "description": "Vegetable & Cooking Oils",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2073857",
+      "name": "OLIVE OIL",
+      "description": "Salad Dressing & Mayonnaise",
+      "thumbnail_url": null
+    }
+  ],
+  "apple": [
+    {
+      "external_id": "2117388",
+      "name": "APPLE",
+      "description": "Fruit & Vegetable Juice, Nectars & Fruit Drinks",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "454004",
+      "name": "APPLE",
+      "description": "Pre-Packaged Fruit & Vegetables",
+      "thumbnail_url": null
+    },
+    {
+      "external_id": "2124902",
+      "name": "APPLE",
+      "description": "Pre-Packaged Fruit & Vegetables",
+      "thumbnail_url": null
+    }
+  ]
+}

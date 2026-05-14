@@ -154,13 +154,17 @@ test.describe('Catalog Library — API Contract', () => {
         return { step: 'search', searchStatus: searchRes.status, searchBody };
       }
 
+      // Pick the first external result. Under fixtures, /search/ingredients?q=apple
+      // returns only USDA hits ("apple" is captured for USDA only — see
+      // refresh-catalog-fixtures.sh USDA_ONLY_TERMS), so the hardcoded
+      // external_source: 'usda_fdc' below is always correct.
       const hit = (
         searchBody.external as {
           external_id: string;
           name: string;
           description: string | null;
         }[]
-      ).find((r) => r.external_id === '1750340');
+      )[0];
       if (!hit) {
         return { step: 'search', searchStatus: searchRes.status, searchBody };
       }

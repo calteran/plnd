@@ -1,0 +1,601 @@
+{
+  "0014500021830": {
+    "external_id": "0014500021830",
+    "name": "Broccoli Florets",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 36.144578313253,
+      "protein_g": 2.40963855421687,
+      "carbohydrates_g": 4.81927710843374,
+      "fat_g": 0,
+      "fiber_g": 2.40963855421687,
+      "sugar_g": 1.20481927710843,
+      "sodium_mg": 24.0963855421687,
+      "potassium_mg": 204.819277108434,
+      "calcium_mg": 48.1927710843374,
+      "iron_mg": 0.72289156626506,
+      "vitamin_c_mg": 4.81927710843374,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 0,
+      "cholesterol_mg": 0
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "0016000264694": {
+    "external_id": "0016000264694",
+    "name": "Oats 'N Honey Granola Bars",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 452.380952380952,
+      "protein_g": 7.14285714285714,
+      "carbohydrates_g": 69.0476190476191,
+      "fat_g": 16.6666666666667,
+      "fiber_g": 4.76190476190476,
+      "sugar_g": 26.1904761904762,
+      "sodium_mg": 333.333333333333,
+      "potassium_mg": null,
+      "calcium_mg": null,
+      "iron_mg": 2.14285714285714,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 2.38095238095238,
+      "cholesterol_mg": null
+    },
+    "allergens": [
+      "gluten",
+      "soybeans"
+    ],
+    "occasion_tags": []
+  },
+  "0016000275263": {
+    "external_id": "0016000275263",
+    "name": "Toasted Whole Grain Oat Cereal",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 358.974358974359,
+      "protein_g": 12.8205128205128,
+      "carbohydrates_g": 74.3589743589744,
+      "fat_g": 6.41025641025641,
+      "fiber_g": 10.2564102564103,
+      "sugar_g": 5.12820512820513,
+      "sodium_mg": 487.179487179487,
+      "potassium_mg": 641.025641025641,
+      "calcium_mg": 333.333333333333,
+      "iron_mg": 32.3076923076923,
+      "vitamin_c_mg": 25.6410256410256,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 1.28205128205128,
+      "cholesterol_mg": 0
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "0041000022432": {
+    "external_id": "0041000022432",
+    "name": "ALFREDO BROCCOLI Fettuccine & Broccoli in a Parmesan & Romano Cheese Flavored Sauce",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 182.539682539683,
+      "protein_g": 6.74603174603175,
+      "carbohydrates_g": 36.9047619047619,
+      "fat_g": 1.38888888888889,
+      "fiber_g": 1.26984126984127,
+      "sugar_g": 1.89007936507937,
+      "sodium_mg": 0.402380952380952,
+      "potassium_mg": null,
+      "calcium_mg": 0.037698412698412696,
+      "iron_mg": 1.2810898637670298,
+      "vitamin_c_mg": 0,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 1.25753968253968,
+      "cholesterol_mg": 6.35
+    },
+    "allergens": [
+      "gluten",
+      "milk",
+      "soybeans"
+    ],
+    "occasion_tags": []
+  },
+  "0042272008117": {
+    "external_id": "0042272008117",
+    "name": "BOWLS BROCCOLI & CHEDDAR BAKE",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 171.003717472119,
+      "protein_g": 6.69144981412639,
+      "carbohydrates_g": 18.9591078066914,
+      "fat_g": 7.43494423791822,
+      "fiber_g": null,
+      "sugar_g": 1.85873605947955,
+      "sodium_mg": 275.09293680297395,
+      "potassium_mg": 159.85130111524202,
+      "calcium_mg": 156.133828996283,
+      "iron_mg": 0.483271375464684,
+      "vitamin_c_mg": 0,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 4.08921933085502,
+      "cholesterol_mg": 20.4460966542751
+    },
+    "allergens": [
+      "milk",
+      "soybeans"
+    ],
+    "occasion_tags": []
+  },
+  "0070303022160": {
+    "external_id": "0070303022160",
+    "name": "SARDINE FILLETS in 100% OLIVE OIL",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 235.294117647059,
+      "protein_g": 23.5294117647059,
+      "carbohydrates_g": 0,
+      "fat_g": 14.1176470588235,
+      "fiber_g": 0,
+      "sugar_g": 0,
+      "sodium_mg": 0.4,
+      "potassium_mg": null,
+      "calcium_mg": null,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 3.52941176470588,
+      "cholesterol_mg": 65.8823529411765
+    },
+    "allergens": [
+      "fish"
+    ],
+    "occasion_tags": []
+  },
+  "0073416000148": {
+    "external_id": "0073416000148",
+    "name": "Brown Rice Cakes Lightly Salted",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 378.378378378378,
+      "protein_g": 6.25,
+      "carbohydrates_g": 87.5,
+      "fat_g": 3.125,
+      "fiber_g": 6.25,
+      "sugar_g": 0,
+      "sodium_mg": 156.25,
+      "potassium_mg": 250,
+      "calcium_mg": 0,
+      "iron_mg": 1.08108108108108,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 0,
+      "cholesterol_mg": 0
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "0096619488827": {
+    "external_id": "0096619488827",
+    "name": "Chunk Chicken Breast",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 42.2535211267606,
+      "protein_g": 23.2142857142857,
+      "carbohydrates_g": 0,
+      "fat_g": 1.78571428571429,
+      "fiber_g": 0,
+      "sugar_g": 0,
+      "sodium_mg": 482.142857142857,
+      "potassium_mg": 125,
+      "calcium_mg": 0,
+      "iron_mg": 0,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 0,
+      "cholesterol_mg": 80.3571428571429
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "0196633951786": {
+    "external_id": "0196633951786",
+    "name": "Lightly Breaded Chicken Breast Chunks",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 166.666666666667,
+      "protein_g": 19.047619047619,
+      "carbohydrates_g": 10.7142857142857,
+      "fat_g": 7.14285714285714,
+      "fiber_g": 0,
+      "sugar_g": 1.19047619047619,
+      "sodium_mg": 630.9523809523811,
+      "potassium_mg": 259.52380952381,
+      "calcium_mg": 9.52380952380952,
+      "iron_mg": 0.8333333333333329,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 1.19047619047619,
+      "cholesterol_mg": 53.571428571428605
+    },
+    "allergens": [
+      "celery",
+      "eggs",
+      "gluten",
+      "milk",
+      "soybeans"
+    ],
+    "occasion_tags": []
+  },
+  "0602652419317": {
+    "external_id": "0602652419317",
+    "name": "Breakfast Protein Bars",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 440,
+      "protein_g": 16,
+      "carbohydrates_g": 54,
+      "fat_g": 20,
+      "fiber_g": 6,
+      "sugar_g": 18,
+      "sodium_mg": 250,
+      "potassium_mg": 248,
+      "calcium_mg": 78,
+      "iron_mg": 4,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 4,
+      "cholesterol_mg": 0
+    },
+    "allergens": [
+      "gluten",
+      "peanuts",
+      "soybeans"
+    ],
+    "occasion_tags": []
+  },
+  "0708953628134": {
+    "external_id": "0708953628134",
+    "name": "Millet & brown rice ramen noodles",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 342.857142857143,
+      "protein_g": 11.4285714285714,
+      "carbohydrates_g": 65.7142857142857,
+      "fat_g": 4.28571428571429,
+      "fiber_g": 5.71428571428571,
+      "sugar_g": 0,
+      "sodium_mg": 0,
+      "potassium_mg": 482.857142857143,
+      "calcium_mg": 74.2857142857143,
+      "iron_mg": 2.8571428571428603,
+      "vitamin_c_mg": 0,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 0,
+      "cholesterol_mg": 0
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "0748404287947": {
+    "external_id": "0748404287947",
+    "name": "Organic Quinoa & Brown Rice with Garlic",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 170.833333333333,
+      "protein_g": 8,
+      "carbohydrates_g": 85,
+      "fat_g": 8,
+      "fiber_g": 8,
+      "sugar_g": 1,
+      "sodium_mg": 580,
+      "potassium_mg": 290,
+      "calcium_mg": 20,
+      "iron_mg": 0.916666666666667,
+      "vitamin_c_mg": 0,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 1,
+      "cholesterol_mg": 0
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "0818290011794": {
+    "external_id": "0818290011794",
+    "name": "Greek Yogurt Strawberry Banana",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 72.463768115942,
+      "protein_g": 4.83091787439614,
+      "carbohydrates_g": 8.21256038647343,
+      "fat_g": 1.69082125603865,
+      "fiber_g": 0.483091787439614,
+      "sugar_g": 7.2463768115942,
+      "sodium_mg": 45.8937198067633,
+      "potassium_mg": 159.420289855072,
+      "calcium_mg": 101.449275362319,
+      "iron_mg": 0,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 1.20772946859903,
+      "cholesterol_mg": 9.66183574879227
+    },
+    "allergens": [
+      "milk"
+    ],
+    "occasion_tags": []
+  },
+  "0856088003736": {
+    "external_id": "0856088003736",
+    "name": "Rise & Shine Mix Strawberry Banana Blend",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 566.666666666667,
+      "protein_g": 5.01,
+      "carbohydrates_g": 9,
+      "fat_g": 15,
+      "fiber_g": 3.99,
+      "sugar_g": 3.99,
+      "sodium_mg": 0,
+      "potassium_mg": 210,
+      "calcium_mg": 40,
+      "iron_mg": 3.33333333333333,
+      "vitamin_c_mg": 0,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 5.01,
+      "cholesterol_mg": 0
+    },
+    "allergens": [
+      "banana",
+      "nuts"
+    ],
+    "occasion_tags": []
+  },
+  "0861745000010": {
+    "external_id": "0861745000010",
+    "name": "Pasture-Raised Eggs",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 140,
+      "protein_g": 12,
+      "carbohydrates_g": 0,
+      "fat_g": 10,
+      "fiber_g": null,
+      "sugar_g": null,
+      "sodium_mg": 140,
+      "potassium_mg": 140,
+      "calcium_mg": 60,
+      "iron_mg": 1.8,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 3.2,
+      "cholesterol_mg": 370
+    },
+    "allergens": [
+      "eggs"
+    ],
+    "occasion_tags": []
+  },
+  "20048402": {
+    "external_id": "20048402",
+    "name": "Chicken breast cured, cooked, baked",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 107,
+      "protein_g": 20,
+      "carbohydrates_g": 2,
+      "fat_g": 2,
+      "fiber_g": 0,
+      "sugar_g": 1.8,
+      "sodium_mg": 1.9,
+      "potassium_mg": null,
+      "calcium_mg": null,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 0.8,
+      "cholesterol_mg": null
+    },
+    "allergens": [
+      "eggs",
+      "gluten",
+      "milk",
+      "soybeans"
+    ],
+    "occasion_tags": []
+  },
+  "3178530402353": {
+    "external_id": "3178530402353",
+    "name": "Petites Madeleines",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 420,
+      "protein_g": 5.8,
+      "carbohydrates_g": 54,
+      "fat_g": 21,
+      "fiber_g": 1.5,
+      "sugar_g": 23,
+      "sodium_mg": 288,
+      "potassium_mg": null,
+      "calcium_mg": 0,
+      "iron_mg": 0,
+      "vitamin_c_mg": 0,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 2.1,
+      "cholesterol_mg": 65
+    },
+    "allergens": [
+      "eggs",
+      "gluten",
+      "milk",
+      "soybeans"
+    ],
+    "occasion_tags": []
+  },
+  "3180054547007": {
+    "external_id": "3180054547007",
+    "name": "Boudin à l'ancienne aux pommes du verger",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 247,
+      "protein_g": 10,
+      "carbohydrates_g": 5.7,
+      "fat_g": 20,
+      "fiber_g": null,
+      "sugar_g": 4.7,
+      "sodium_mg": 520,
+      "potassium_mg": null,
+      "calcium_mg": null,
+      "iron_mg": 14,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 7.8,
+      "cholesterol_mg": null
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "4056489166856": {
+    "external_id": "4056489166856",
+    "name": "Olivenöl",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 824,
+      "protein_g": 0,
+      "carbohydrates_g": 0,
+      "fat_g": 91.6,
+      "fiber_g": 0,
+      "sugar_g": 0,
+      "sodium_mg": 0,
+      "potassium_mg": null,
+      "calcium_mg": null,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 14.3,
+      "cholesterol_mg": null
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "6111242101180": {
+    "external_id": "6111242101180",
+    "name": "uht jaouda 1L",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 58,
+      "protein_g": 3,
+      "carbohydrates_g": 4.8,
+      "fat_g": 3,
+      "fiber_g": null,
+      "sugar_g": 0,
+      "sodium_mg": 0,
+      "potassium_mg": null,
+      "calcium_mg": 120,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 0,
+      "cholesterol_mg": null
+    },
+    "allergens": [
+      "milk"
+    ],
+    "occasion_tags": []
+  },
+  "6111242106949": {
+    "external_id": "6111242106949",
+    "name": "Jben",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 235,
+      "protein_g": 8,
+      "carbohydrates_g": 3.5,
+      "fat_g": 21,
+      "fiber_g": 0,
+      "sugar_g": 0,
+      "sodium_mg": 184,
+      "potassium_mg": null,
+      "calcium_mg": null,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 15,
+      "cholesterol_mg": null
+    },
+    "allergens": [
+      "milk"
+    ],
+    "occasion_tags": []
+  },
+  "6111266962187": {
+    "external_id": "6111266962187",
+    "name": "Lait",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 45,
+      "protein_g": 3.1,
+      "carbohydrates_g": 4.9,
+      "fat_g": 1.5,
+      "fiber_g": null,
+      "sugar_g": 0,
+      "sodium_mg": 90,
+      "potassium_mg": null,
+      "calcium_mg": 122,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 1,
+      "cholesterol_mg": null
+    },
+    "allergens": [
+      "milk"
+    ],
+    "occasion_tags": []
+  },
+  "6191509900671": {
+    "external_id": "6191509900671",
+    "name": "EXTRA VIRGIN OLIVE OIL",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 821,
+      "protein_g": 0,
+      "carbohydrates_g": 0,
+      "fat_g": 91,
+      "fiber_g": 0,
+      "sugar_g": 0,
+      "sodium_mg": 0,
+      "potassium_mg": 0,
+      "calcium_mg": 0,
+      "iron_mg": 0,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 19,
+      "cholesterol_mg": 0
+    },
+    "allergens": [],
+    "occasion_tags": []
+  },
+  "7394376620157": {
+    "external_id": "7394376620157",
+    "name": "Barista edition oat drink",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 61,
+      "protein_g": 1.1,
+      "carbohydrates_g": 7.1,
+      "fat_g": 3,
+      "fiber_g": 0.8,
+      "sugar_g": 3.4,
+      "sodium_mg": 40,
+      "potassium_mg": null,
+      "calcium_mg": 120,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 0.3,
+      "cholesterol_mg": null
+    },
+    "allergens": [
+      "gluten"
+    ],
+    "occasion_tags": []
+  }
+}

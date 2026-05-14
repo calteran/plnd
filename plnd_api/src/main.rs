@@ -38,7 +38,9 @@ use plnd_api::routes::{
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
 #[cfg(debug_assertions)]
-use plnd_data::providers::{FixtureNewsProvider, FixtureNutritionProvider, FixtureWeatherProvider};
+use plnd_data::providers::{
+    FixtureNewsProvider, FixtureNutritionProvider, FixtureRecipeProvider, FixtureWeatherProvider,
+};
 use plnd_data::providers::{
     NewsProvider, OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider,
     UsdaFdcProvider, WeatherProvider,
@@ -171,17 +173,26 @@ async fn main() {
     tracing::info!(base_url = %config.external_providers.off_base_url, "Open Food Facts provider: ready");
     tracing::info!("TheMealDB provider: ready");
 
+    // Build the catalog providers once, then share between the seed task and the
+    // search service. When `fixture_path` is set, both paths read from
+    // disk-captured fixtures so the catalog is populated identically to a live
+    // boot — used by `just verify` and CI to avoid burning USDA/OFF/TheMealDB
+    // quota.
+    let catalog_nutrition = build_nutrition_providers(
+        &config.external_providers,
+        nutrition_usda.clone(),
+        nutrition_off.clone(),
+    );
+    let catalog_recipe = build_recipe_providers(&config.external_providers, recipe_mdb.clone());
+
     // Seed catalog tables in the background so the server binds immediately.
-    // The seed is idempotent — safe to run on every startup.
+    // The seed is idempotent — safe to run on every startup. It fails gracefully:
+    // a missing API key or network error produces a non-fatal warning, not a
+    // startup failure.
     {
         let seed_url = config.database.url.clone();
-        // The seed always uses live providers — fixture_path only affects the search
-        // fan-out. The seed is idempotent and fails gracefully, so a missing API key
-        // or network error produces a non-fatal warning, not a startup failure.
-        let seed_nutrition: Vec<std::sync::Arc<dyn plnd_data::providers::NutritionProvider>> =
-            vec![nutrition_usda.clone(), nutrition_off.clone()];
-        let seed_recipe: Vec<std::sync::Arc<dyn plnd_data::providers::RecipeProvider>> =
-            vec![recipe_mdb.clone()];
+        let seed_nutrition = catalog_nutrition.clone();
+        let seed_recipe = catalog_recipe.clone();
         tokio::spawn(async move {
             if let Err(e) = plnd_seed::run_seed(&seed_url, 3, &seed_nutrition, &seed_recipe).await {
                 tracing::warn!(error = %e, "catalog seed failed (non-fatal)");
@@ -190,13 +201,8 @@ async fn main() {
     }
 
     let search_cache = SearchCache::new(config.external_providers.search_cache_ttl_hours);
-    let search_nutrition = build_nutrition_providers(
-        &config.external_providers,
-        nutrition_usda.clone(),
-        nutrition_off.clone(),
-    );
     let provider_search =
-        ProviderSearchService::new(search_nutrition, vec![recipe_mdb], vec![], search_cache);
+        ProviderSearchService::new(catalog_nutrition, catalog_recipe, vec![], search_cache);
 
     let (weather_provider, news_provider) = build_briefing_providers(&config.external_providers);
     let briefing = BriefingState::new(weather_provider, news_provider);
@@ -513,22 +519,49 @@ fn build_nutrition_providers(
     if let Some(fixture_root) = &external.fixture_path {
         tracing::warn!(
             path = %fixture_root.display(),
-            "USING FIXTURE NUTRITION PROVIDERS for /search/ingredients — debug builds only; never enable in prod"
+            "USING FIXTURE NUTRITION PROVIDERS for catalog seed + /search/ingredients — debug builds only; never enable in prod"
         );
-        let make = |source: &str, rel: &str| {
-            let path = fixture_root.join(rel);
-            FixtureNutritionProvider::new(source.to_string(), path).unwrap_or_else(|e| {
-                tracing::error!(error = %e, "failed to load nutrition fixture");
-                std::process::exit(1);
-            })
+        let make = |source: &str, dir: &str| {
+            let search_path = fixture_root.join(dir).join("search.json");
+            let lookup_path = fixture_root.join(dir).join("lookup.json");
+            FixtureNutritionProvider::new(source.to_string(), search_path, lookup_path)
+                .unwrap_or_else(|e| {
+                    tracing::error!(error = %e, "failed to load nutrition fixture");
+                    std::process::exit(1);
+                })
         };
         return vec![
-            Arc::new(make("usda_fdc", "nutrition/usda_fdc/search.json")),
-            Arc::new(make(
-                "openfoodfacts",
-                "nutrition/open_food_facts/search.json",
-            )),
+            Arc::new(make("usda_fdc", "nutrition/usda_fdc")),
+            Arc::new(make("openfoodfacts", "nutrition/open_food_facts")),
         ];
     }
     vec![usda, off]
+}
+
+/// Constructs the recipe providers for the catalog seed + search service.
+///
+/// In debug builds, if `external.fixture_path` is set, returns file-backed
+/// implementations that replay captured search + lookup results from disk —
+/// used by e2e to keep tests deterministic and offline. Otherwise (and always
+/// in release builds) returns the real TheMealDB provider.
+fn build_recipe_providers(
+    external: &plnd_api::config::settings::ExternalProvidersConfig,
+    mdb: Arc<dyn plnd_data::providers::RecipeProvider>,
+) -> Vec<Arc<dyn plnd_data::providers::RecipeProvider>> {
+    #[cfg(debug_assertions)]
+    if let Some(fixture_root) = &external.fixture_path {
+        tracing::warn!(
+            path = %fixture_root.display(),
+            "USING FIXTURE RECIPE PROVIDERS for catalog seed + /search/dishes — debug builds only; never enable in prod"
+        );
+        let search_path = fixture_root.join("recipe/themealdb/search.json");
+        let lookup_path = fixture_root.join("recipe/themealdb/lookup.json");
+        let provider = FixtureRecipeProvider::new("themealdb", search_path, lookup_path)
+            .unwrap_or_else(|e| {
+                tracing::error!(error = %e, "failed to load recipe fixture");
+                std::process::exit(1);
+            });
+        return vec![Arc::new(provider)];
+    }
+    vec![mdb]
 }
