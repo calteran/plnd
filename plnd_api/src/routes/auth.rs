@@ -10,10 +10,11 @@ use std::sync::Arc;
 use veil::Redact;
 
 #[derive(Redact, Deserialize, Serialize)]
+#[redact(all)]
 pub struct TokenExchangeRequest {
-    #[redact]
     pub id_token: String,
     /// The IdP provider name: "mock" | "google" | "apple"
+    #[redact(skip)]
     pub provider: String,
 }
 

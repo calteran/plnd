@@ -63,7 +63,7 @@ jobs:
 
       - name: Tracing – no unsafe skip() in route handlers (issue #803)
         run: |
-          if grep -rEn 'tracing::instrument\([[:space:]]*skip\(' plnd_api/src/routes/ ; then
+          if grep -rEn 'tracing::instrument\([^)]*skip\(' plnd_api/src/routes/ ; then
             echo "::error::Found tracing::instrument(skip(...)) in plnd_api/src/routes/. Use skip_all with explicit fields(...) to avoid leaking PII-bearing args like Extension<Claims> into tracing spans. See issue #803."
             exit 1
           fi

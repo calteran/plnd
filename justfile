@@ -130,7 +130,7 @@ ts-deps:
 # without skip_all — guards against PII leaking via the Extension<Claims> arg
 # (see issue #803). All route handlers must use skip_all + explicit fields(...).
 check-tracing-skip:
-    @if grep -rEn 'tracing::instrument\([[:space:]]*skip\(' plnd_api/src/routes/ ; then \
+    @if grep -rEn 'tracing::instrument\([^)]*skip\(' plnd_api/src/routes/ ; then \
         echo "" ; \
         echo "✗ Found tracing::instrument(skip(...)) in plnd_api/src/routes/." ; \
         echo "  Use skip_all with explicit fields(...) to avoid leaking PII-bearing" ; \
