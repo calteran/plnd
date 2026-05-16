@@ -238,11 +238,11 @@ Each day type carries:
 
 - **Wake time** — the wall-clock time the day's implicit start-of-day anchor sits at on dates of this type.
 - **Sleep time** — the wall-clock time the day's implicit end-of-day anchor sits at.
-- **Meals** — an ordered list of meal entries (name, `preferred_time`, `tolerance_minutes`, `sort_order`). Each entry defines a meal anchor on dates of this type (§4.7) and the time zone within which that meal is undisplaced (§4.6). The meal list may be empty — a day type with zero meals has no meal anchors and matches §4.6's empty-list semantics.
+- **Meals** — an ordered list of meal entries (name, `preferred_time`, `tolerance_minutes`, `sort_order`) that serves as the **template** for the date's meal anchors. The active day type's meal template generates the date's meal anchor instances at materialization (§4.6); once materialized, the date's instances are independent of the template. The template may be empty — a day type with zero meal entries materializes dates with zero anchors and matches §4.6's empty-list semantics.
 
 Meal entries are **independent across day types**. Two day types with same-named meals ("Breakfast" on Weekdays at 08:00, "Breakfast" on Weekends at 10:00) carry no structural relationship — the duplicate name is incidental, not a join. Cross-day-type continuity ("the user's *breakfasts*, regardless of day type") is reasoned about by the agent via fuzzy text matching against meal names, consistent with how §3.5 memory inference works elsewhere. The data model intentionally does not encode this linkage, because requiring users to maintain a shared meal vocabulary across day types is friction the redesign is meant to remove.
 
-A user expresses "weekend brunch later than weekday breakfast" by giving the *Weekend* day type its own meal entry (named "Brunch" or "Breakfast" — the user's call) at the desired time. There is no override layer; pattern variance across day types emerges from the day-type definitions themselves.
+A user expresses "weekend brunch later than weekday breakfast" by giving the *Weekend* day type its own meal entry (named "Brunch" or "Breakfast" — the user's call) at the desired time. Recurring variance across day types emerges from the day-type definitions themselves; one-off variance for a specific date is captured at the per-date instance layer (§4.6).
 
 #### Days that cross midnight
 
@@ -272,8 +272,8 @@ Within a user, day types are mutually exclusive: every calendar date resolves to
 
 #### Relationship to other concepts
 
-- **Anchors (§4.7).** The day's anchors come from the active day type: wake time becomes the implicit start-of-day anchor; sleep time becomes the implicit end-of-day anchor; each meal entry on the day type becomes a meal anchor in `sort_order`.
-- **Meals (§4.6).** A meal's `preferred_time` and `tolerance_minutes` live directly on the day type's meal entry — no override resolution layer. The active day type for the date supplies the effective values.
+- **Anchors (§4.7).** The day's wake time becomes the implicit start-of-day anchor; the day's sleep time becomes the implicit end-of-day anchor; both derive directly from the active day type. Meal anchors come from the date's **materialized meal anchor instances** — generated from the active day type's meal template at the date's materialization (§4.6) and user-editable per date thereafter.
+- **Meals (§4.6).** Each meal entry on a day type carries `preferred_time` and `tolerance_minutes` as **template values**. The active day type's meal template generates the date's meal anchor instances at materialization; once materialized, each instance carries its own effective `preferred_time` and `tolerance_minutes`, which the user can adjust independently per date.
 - **Memory (§3.5).** The agent observes the user's actual rhythm over time and can propose updates to wake/sleep times or to individual meal `preferred_time` values on the relevant day type.
 
 Daily rhythm is set during onboarding and adjustable at any time afterward.
@@ -323,28 +323,29 @@ Routines apply only to tasks. **Meals do not use the routine model** — they ha
 
 Meals are a **separate domain** from tasks. They have their own data structures, their own lifecycle, and their own UI surface.
 
-A user has, **for each day type**, an ordered list of named meals. The default day type is seeded with `breakfast → lunch → dinner`; users can fully reconfigure that list and add additional day types with whatever meal lists fit (snacks, brunch, late-night meal, a totally different cultural rhythm, an empty list, etc.). Meal lists are set during onboarding and adjustable afterward. Each meal entry lives on its day type — there is no global meal pattern shared across day types, and no override layer (§4.3).
+A user has, **for each day type**, an ordered list of named meals. The default day type is seeded with `breakfast → lunch → dinner`; users can fully reconfigure that list and add additional day types with whatever meal lists fit (snacks, brunch, late-night meal, a totally different cultural rhythm, an empty list, etc.). Meal lists are set during onboarding and adjustable afterward. Each meal entry lives on its day type as a **template** entry. The day type's meal template generates the date's **meal anchor instances** at materialization (see *Per-date meal anchor instances* below); once materialized, instances are user-editable independently of the template.
 
 #### Two independent axes: anchors and advance planning
 
 Meals carry two independent axes that together determine how the system surfaces meal content. Both are evaluated against **the active day type for the date**:
 
-- **Anchor presence** (data axis). Whether the active day type's meal list contains any entries. When non-empty, those entries become **meal anchors** in the day's sequence (§4.7) and define **slot boundaries** (§4.8). When empty, the day has no meal anchors at all; the slot model still works on the remaining anchor sources (start-of-day, end-of-day, and any scheduled tasks). Different day types may resolve to different anchor presence — a user with meals on *Weekdays* and an empty list on *Rest day* lands in different cells of the table below depending on which day is being planned.
+- **Anchor presence** (data axis). Whether the date's **materialized meal anchor instances** contain any entries. Each date materializes its instances from the active day type's meal template on first need (planning agent or user edit); thereafter, the date's instances are independent of the template. When the date has at least one instance, those instances are **meal anchors** in the day's sequence (§4.7) and define **slot boundaries** (§4.8). When the date has zero instances — because the template was empty *or* the user removed every anchor for that date — the date has no meal anchors at all; the slot model still works on the remaining anchor sources (start-of-day, end-of-day, and any scheduled tasks). Anchor presence is a property of the date, not of the day type alone — two dates that resolve to the same day type may have different anchor presence if the user has edited one of them.
 
-- **Advance planning** (preference axis). Whether the user wants the system to propose specific dishes or meals ahead of time. Controlled by `user_preferences.advance_meal_planning_enabled` (default `true`); the flag is global, not per-day-type. **Meal planning runs only when both axes permit it for the date: the active day type has at least one meal AND the flag is `true`.** When the flag is `false` (with anchors present): the planning wizard's meals step is skipped entirely; meal-planning agent use cases (`MealPlanning`, `MealRebalance`, `MealSuggestSlot`) are not invoked; the food-preferences onboarding spoke is hidden; meal anchors in the day view render without planned-dish payload (the band shows the meal name, not an assigned meal). When anchors are absent for a date, meal planning does not run for that date regardless of the flag — there is nothing to plan against. The dietary-restrictions onboarding spoke is unaffected by either axis — restrictions remain useful as health data and for any future meal-logging feature.
+- **Advance planning** (preference axis). Whether the user wants the system to propose specific dishes or meals ahead of time. Controlled by `user_preferences.advance_meal_planning_enabled` (default `true`); the flag is global, not per-day-type. **Meal planning runs only when both axes permit it for the date: the date has at least one meal anchor instance AND the flag is `true`.** When the flag is `false` (with anchors present): the planning wizard's meals step is skipped entirely; meal-planning agent use cases (`MealPlanning`, `MealRebalance`, `MealSuggestSlot`) are not invoked; the food-preferences onboarding spoke is hidden; meal anchors in the day view render without planned-dish payload (the band shows the meal name, not an assigned meal). When anchors are absent for a date, meal planning does not run for that date regardless of the flag — there is nothing to plan against. The dietary-restrictions onboarding spoke is unaffected by either axis — restrictions remain useful as health data and for any future meal-logging feature.
 
-The two axes describe a four-corner state space, evaluated per date against the active day type:
+The two axes describe a four-corner state space, evaluated per date against the date's materialized meal anchor instances:
 
-| Anchor presence (active day type) | Advance planning flag | Behavior |
+| Anchor presence (date's instances) | Advance planning flag | Behavior |
 |-----------------------------------|-----------------------|----------|
 | ≥ 1 entry | `true` (default) | Meal planning runs. Anchors render; system proposes content. The default. |
 | ≥ 1 entry | `false` | Meal planning suppressed. Anchors render (rhythm only); content is not proposed. The user values structure without committing to a plan. |
-| 0 entries | `false` | Meal planning suppressed via both axes. No anchors render; no planning runs. Full opt-out. If the user later adds anchors to that day type, planning stays off (the flag persists the user's stated intention). |
-| 0 entries | `true` | Meal planning suppressed because no anchors exist on that day type; the flag is dormant for that date. Reached by clearing the day type's meal list without touching the flag. If meals are added back, planning resumes. |
+| 0 entries | `false` | Meal planning suppressed via both axes. No anchors render; no planning runs. Full opt-out. If the user later adds an anchor (via template edit or per-date add), planning stays off (the flag persists the user's stated intention). |
+| 0 entries | `true` | Meal planning suppressed because the date has no meal anchor instances; the flag is dormant for that date. Reached by clearing the day type's meal list (affecting all not-yet-materialized dates of that type) or by removing every instance for a specific date. If anchors are added back, planning resumes for that date. |
 
 Per §1.2 (*Honor user intention regardless of expression*), the same underlying state can be reached from multiple UX surfaces:
 
-- Editing a day type's meal list directly (e.g., deleting all entries on the default day type) collapses the anchor axis for that day type without touching the planning axis.
+- Editing a day type's meal list directly (e.g., deleting all entries on the default day type) collapses the anchor axis for any not-yet-materialized date of that type, without touching the planning axis.
+- Editing a single date's meal anchors directly (e.g., removing each instance from the day view) collapses the anchor axis for that date alone, without touching the template or the planning axis.
 - Toggling **Skip advance meal planning** in preferences flips the planning axis. A convenience follow-up offers to also clear meal lists across day types in one tap. The toggle lives near the food-preferences settings, where a user who later wants to revisit advance planning naturally finds it.
 - An **I don't want to plan meals in advance** button on the first page of the onboarding meal spoke is the same toggle, surfaced where a user first encounters the choice.
 
@@ -353,22 +354,36 @@ When a user re-enables advance meal planning, the flag flips to `true` and plann
 #### Properties of meals
 
 - **Sequential.** Meals occur in a fixed order within a day.
-- **Daily recurrence is intrinsic.** A user whose default day type has `breakfast → lunch → dinner` gets those three meals on every date that resolves to that day type. There is no per-meal recurrence rule; the *day type's meal list* recurs across the dates that day type covers.
+- **Daily recurrence is intrinsic.** A user whose default day type has `breakfast → lunch → dinner` gets those three meals on every date that resolves to that day type. There is no per-meal recurrence rule; the day type's meal template generates instances across the dates that day type covers.
 - **Dish-level recurrence is memory-driven, not structural.** "Friday is sandwich day" is a pattern the agent learns through memory, not a recurrence specification on a meal entry.
-- **Time positioning: meal windows centered on `preferred_time`.** Each meal entry on a day type carries a `preferred_time` (the wall-clock time the user typically takes this meal on dates of that type) and a `tolerance_minutes` value. Together they define the meal's **window** — `preferred_time ± tolerance_minutes` — the zone within which the meal is acceptable. `preferred_time` is established at onboarding from the user's stated habits and **adapted over time by the memory system (§3.5)** as the agent observes when meals actually occur; it is not a routinely user-facing control. The day type's meal list is the only source — there is no override layer (§4.3). The list's "ordered sequence of named meals" is *implicit* in the meals' `preferred_time` values — reordering a list means editing a `preferred_time`, and the sequence follows.
+- **Time positioning: meal windows centered on `preferred_time`.** Each meal entry on a day type carries a `preferred_time` (the wall-clock time the user typically takes this meal on dates of that type) and a `tolerance_minutes` value. Together they define the meal's **window** — `preferred_time ± tolerance_minutes` — the zone within which the meal is acceptable. `preferred_time` is established at onboarding from the user's stated habits and **adapted over time by the memory system (§3.5)** as the agent observes when meals actually occur; it is not a routinely user-facing control. The template's values are inherited by each materialized instance and can be adjusted independently per date (see *Per-date meal anchor instances* below). The "ordered sequence of named meals" is *implicit* in the meals' `preferred_time` values — within a template or within a date's instances, reordering means editing a `preferred_time`, and the sequence follows.
 - **The LLM reasons about windows, not clock minutes.** Two distinct uses:
   - *Slot budgeting:* the LLM uses **preferred-to-preferred** spacing to budget task time between adjacent meals. With breakfast at 08:00 and lunch at 12:00, the slot has roughly four hours — the LLM won't pack five hours of work into it. The user is shown "lunch" as an item in the day's flow, not "lunch at 12:00:00."
   - *Displacement detection:* the LLM uses the **full window** to decide whether a meal can stay where it belongs. Anywhere inside the window is fine; outside the window trips the flag (next bullet).
 - **Day-level placement.** Lay out the day's fixed-time anchors (start-of-day, scheduled-task anchors, end-of-day). Each meal occupies its window between adjacent anchors as long as the window fits and the day type's `sort_order` is preserved. When a window cannot fit — a scheduled task overlaps it, a neighbor's window encroaches, or both — the meal is moved to the nearest viable position that preserves `sort_order`.
 - **Displaced-meal flag.** When the meal is forced outside its window (`preferred_time ± tolerance_minutes`), it is marked `displaced`. A visible flag surfaces on the affected meal in both the planning view and the day view so the user notices the routine has been interrupted and can choose to accept it or rearrange. See §8.4 for the visual treatment.
-- **Per-date override.** Pinning a meal to a specific clock time on a specific date creates a per-date override that turns that meal, for that date only, into a fixed-time anchor. The day type's meal list is not mutated.
 - **Can host paired tasks.** A meal may have one or more tasks paired with it — tasks the user does concurrently with the meal (e.g., reading a document over lunch). See §4.4.
+
+#### Per-date meal anchor instances
+
+Each date's meal anchors are **instances** generated from the active day type's meal template. Materialization is lazy: a date's instances come into existence the first time they are needed — when the planning agent runs for that date, or when the user edits the date's anchors. Once materialized, instances are independent of the template; later changes to the day type's meal entries do not propagate to materialized dates.
+
+The user can perform four operations on a date's instances:
+
+- **Add** a new meal anchor (name and `preferred_time`, with an optional `tolerance_minutes`).
+- **Remove** an existing meal anchor. Any planned-meal content attached to the removed anchor is cascade-deleted; no tombstone is retained.
+- **Rename** an existing meal anchor on a single date.
+- **Retime** an existing meal anchor on a single date — change its `preferred_time` (and optionally `tolerance_minutes`). This subsumes the older capability of pinning a meal to a fixed clock time for a specific date.
+
+Editing a far-future date that has not yet materialized triggers materialization for that date as part of the edit. Past dates remain editable for record-keeping; past-date edits update the historical record but do not trigger any agent runs.
+
+The four operations act on the **anchor** layer. Whether the resulting anchors are filled with specific dishes is governed by the conjunction of the date's anchor presence and the `advance_meal_planning_enabled` flag (above). A user can shape the day's rhythm with per-date edits regardless of whether they have advance meal planning enabled.
 
 ### 4.7 Anchors
 
 An **anchor** is a milestone in the day's sequence around which other tasks position themselves. Anchors come from three sources:
 
-- **Every meal** in the active day type's meal list is an anchor.
+- **Every meal anchor instance** materialized for the date (§4.6) is an anchor.
 - **Every scheduled task** (a task with a fixed start time) is an anchor.
 - **Start-of-day and end-of-day** are implicit anchors. They bound the day's first and last slots, and their clock times come from the day's day type (§4.3) — the type's wake time becomes the start-of-day anchor; its sleep time becomes the end-of-day anchor (which may fall on the following calendar date for midnight-crossing day types).
 
@@ -382,7 +397,7 @@ Each slot can hold **zero or more tasks**. Floating tasks (tasks without a start
 
 Slot boundaries are **positional** — defined by anchor order, not by exact times. A slot between "breakfast" and "lunch" exists even if neither has a fixed clock time.
 
-The upper boundary of a slot is **derived, not stored**. Given a slot's lower anchor, the upper boundary is the next anchor in the day's sequence — determined by the active day type's meal `sort_order` for meal anchors, or by `scheduled_start` for task anchors in a committed schedule. The implicit start-of-day and end-of-day anchors (§4.7) bound the sequence on both ends, so every slot has a well-defined upper boundary. There is no `slot_end_anchor_id` column; persisting one would be redundant because the value is fully determined by the existing anchor ordering.
+The upper boundary of a slot is **derived, not stored**. Given a slot's lower anchor, the upper boundary is the next anchor in the day's sequence — determined by the date's meal anchor instances' `sort_order` for meal anchors, or by `scheduled_start` for task anchors in a committed schedule. The implicit start-of-day and end-of-day anchors (§4.7) bound the sequence on both ends, so every slot has a well-defined upper boundary. There is no `slot_end_anchor_id` column; persisting one would be redundant because the value is fully determined by the existing anchor ordering.
 
 ### 4.9 Planning windows
 
@@ -940,7 +955,7 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Advance meal planning.** The preference axis (`user_preferences.advance_meal_planning_enabled`, default `true`) controlling whether the system proposes specific dishes or meals ahead of time. When `false`, the planning wizard's meals step is skipped, meal-planning agent use cases are not invoked, and the food-preferences onboarding spoke is hidden. Independent of whether **meal anchors** exist; meal anchors can structure the day even with planning disabled. See [§4.6](#46-meals).
 
-**Anchor.** A milestone in the day's sequence around which tasks position themselves. Anchors come from three sources: every meal in the active day type's meal list, every scheduled task (one with a fixed start time), and the implicit start-of-day and end-of-day. Anchor *order* — not anchor *time* — defines slot boundaries. See [§4.7](#47-anchors).
+**Anchor.** A milestone in the day's sequence around which tasks position themselves. Anchors come from three sources: every meal anchor instance materialized for the date (§4.6), every scheduled task (one with a fixed start time), and the implicit start-of-day and end-of-day. Anchor *order* — not anchor *time* — defines slot boundaries. See [§4.7](#47-anchors).
 
 **Appointment.** Informal synonym for **scheduled task**. See *Scheduled task*.
 
@@ -972,11 +987,15 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **LlmProvider.** Trait abstraction over LLM backends; instances per tier (Fast / Capable). See [§5.2](#52-llmprovider-abstraction).
 
-**Meal.** A thing the user eats. Modeled as its own domain, **separate from tasks**. Each meal lives on a day type (§4.3). When the active day type has a non-empty meal list, each entry acts as both a **meal anchor** in the day's sequence (structural axis) and the host for a planned-dish payload when **advance meal planning** is enabled (content axis). Each meal carries a `preferred_time` and a `tolerance_minutes` value that together define its **meal window**. The LLM reasons about windows, not clock-minute placements. See [§4.6](#46-meals).
+**Meal.** A thing the user eats. Modeled as its own domain, **separate from tasks**. Each meal lives on a day type as a **template** entry (§4.3); the template generates per-date **meal anchor instances** at materialization (§4.6). When the date's instances are non-empty, each acts as both a **meal anchor** in the day's sequence (structural axis) and the host for a planned-dish payload when **advance meal planning** is enabled (content axis). Each meal carries a `preferred_time` and a `tolerance_minutes` value that together define its **meal window**. The LLM reasons about windows, not clock-minute placements. See [§4.6](#46-meals).
 
-**Meal anchor.** A meal in the active day type's meal list in its role as a milestone in the day's sequence (§4.7). Meal anchors define slot boundaries (§4.8) regardless of whether **advance meal planning** is enabled. See [§4.6](#46-meals) and [§4.7](#47-anchors).
+**Meal anchor.** A materialized meal anchor instance for a specific date, in its role as a milestone in the day's sequence (§4.7). The date's instances are generated from the active day type's meal anchor template at materialization (§4.6); once materialized, instances are independent of the template and editable per date. Meal anchors define slot boundaries (§4.8) regardless of whether **advance meal planning** is enabled. See [§4.6](#46-meals) and [§4.7](#47-anchors).
 
-**Meal pattern** *(deprecated → use "the day type's meal list")*. Pre-1.7 vocabulary that referred to a single global per-user ordered sequence of meals with optional per-day-type overrides. Replaced by the per-day-type meal list: each day type owns its meals directly, with no override layer. See [§4.3](#43-daily-rhythm) and [§4.6](#46-meals).
+**Meal anchor instance.** A materialized meal anchor for a specific date. Generated from the active day type's meal anchor template on first need (planning agent run or user edit). Once materialized, independent of the template; user-editable per date via add, remove, rename, and retime. See [§4.6](#46-meals).
+
+**Meal anchor template.** The ordered list of meal entries owned by a day type. Generates per-date meal anchor instances at materialization (§4.6). The template is the source of recurrence; per-date variance happens at the instance layer. See also *Meal anchor instance*; [§4.3](#43-daily-rhythm) and [§4.6](#46-meals).
+
+**Meal pattern** *(deprecated → use "the day type's meal anchor template")*. Pre-1.7 vocabulary that referred to a single global per-user ordered sequence of meals with optional per-day-type overrides. Replaced by the per-day-type **meal anchor template**, which generates per-date **meal anchor instances** at materialization; instances are user-editable independently per date. See [§4.3](#43-daily-rhythm) and [§4.6](#46-meals).
 
 **Meal window.** The acceptable time zone for a meal — `preferred_time ± tolerance_minutes`. The LLM treats the window (not a specific clock minute) as the planning fact: tasks are budgeted around the window, displacement is measured against the window's edges. The user is shown "lunch" as an item in the day's flow, not "lunch at 12:00:00." See [§4.6](#46-meals).
 
@@ -1063,3 +1082,4 @@ A log of substantive changes to this document.
 | 2026-05-08 | Robert Chambers | 1.7 — Restructured daily rhythm: each day type now owns its own ordered list of meals (name, `preferred_time`, `tolerance_minutes`, `sort_order`) alongside wake/sleep. Eliminated the global meal-pattern + per-day-type-override model — pattern variance across day types now emerges from the day-type definitions themselves, and cross-day-type continuity is reasoned about by the LLM via fuzzy text matching, not by the data model. §4.2, §4.3, §4.6, §4.7, §4.8, §10 updated; *Meal pattern* deprecated in glossary (per-meal overrides obsolete). |
 | 2026-05-13 | Claude Code | 1.8 - I had to delete several implementation & PR/Issue details from the document because I failed to follow instructions.  I was reminded *several times* not to include such details in this document but did it anyway.  This note is here to publicize my shame and ensure I don't do it again. |
 | 2026-05-13 | Robert Chambers | 1.9 — Documented the lazy-catalog model and three-path ingredient discovery flow. §3.2.1: catalog requires no pre-seeding to function; items enter via local hit, external-provider ingest, or user contribution — all three paths return an `ingredient_id` and are transparent to the user. `plnd_seed` provides background startup seeding (idempotent) and richer local data but is not a hard dependency. §3.2.3: corrected "externally seeded" framing; clarified `plnd_seed` role. §9.7: added catalog ingredient discovery subsection specifying that e2e tests must cover all three discovery paths, with fixture-based provider replay for path 2. |
+| 2026-05-16 | Robert Chambers | 1.10 — Introduced the **Template + Instance** model for meal anchors in §4.3 and §4.6. The day type's meal list is now framed as a **template** that generates per-date **meal anchor instances** at materialization (lazy on first need — planning agent run or user edit); once materialized, instances are independent of the template, and later changes to the template do not propagate to materialized dates. Added four user operations on a date's instances (add, remove, rename, retime); cascade-delete on remove; past-date edits are record-keeping only. Anchor-presence axis is now evaluated per date against the date's materialized instances rather than the active day type's meal list — two dates that resolve to the same day type may have different anchor presence if one has been edited. The conjunction rule with **advance meal planning** is preserved and applies per date. Removed the prior "no override layer" assertions in §4.3 and §4.6, and absorbed the older "per-date override for time pinning" capability into the **retime** operation. Glossary: updated *Meal*, *Meal anchor*, and *Meal pattern* (deprecated) entries; added *Meal anchor template* and *Meal anchor instance*. |
