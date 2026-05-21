@@ -502,6 +502,11 @@ pub struct PlannedMealEntryResponse {
     pub meal_ref_id: Uuid,
     pub meal_ref_type: String,
     pub title: Option<String>,
+    /// Date of the associated meal anchor instance. Populated when returned via
+    /// `/schedule/period` (list queries); null when returned from commit_plan RETURNING.
+    pub anchor_date: Option<chrono::NaiveDate>,
+    /// Name of the associated meal anchor instance (e.g. "Breakfast"). Same null rule.
+    pub anchor_name: Option<String>,
 }
 
 impl From<PlannedMealEntry> for PlannedMealEntryResponse {
@@ -512,6 +517,8 @@ impl From<PlannedMealEntry> for PlannedMealEntryResponse {
             meal_ref_id: e.meal_ref_id,
             meal_ref_type: e.meal_ref_type,
             title: e.title,
+            anchor_date: e.anchor_date,
+            anchor_name: e.anchor_name,
         }
     }
 }

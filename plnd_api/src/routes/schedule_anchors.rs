@@ -150,51 +150,27 @@ pub async fn update(
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    // Fetch first so retime can default missing fields, and so the handler
-    // surfaces 404 before issuing any writes.
-    let existing = state
+    let name_arg: Option<&str> = match body.name.as_deref().map(str::trim) {
+        Some(s) if !s.is_empty() && s.len() <= MAX_NAME_LEN => Some(s),
+        Some(_) => return Err(StatusCode::UNPROCESSABLE_ENTITY),
+        None => None,
+    };
+
+    let row = state
         .repos
         .meal_anchor_instance
-        .get_by_id(id, user_id)
+        .update(
+            id,
+            user_id,
+            name_arg,
+            body.preferred_time,
+            body.tolerance_minutes,
+        )
         .await
         .map_err(map_repo_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
-    let after_rename = if let Some(raw) = body.name {
-        let trimmed = raw.trim();
-        if trimmed.is_empty() || trimmed.len() > MAX_NAME_LEN {
-            return Err(StatusCode::UNPROCESSABLE_ENTITY);
-        }
-        state
-            .repos
-            .meal_anchor_instance
-            .rename(id, user_id, trimmed)
-            .await
-            .map_err(map_repo_error)?
-            .ok_or(StatusCode::NOT_FOUND)?
-    } else {
-        existing
-    };
-
-    let final_row = if body.preferred_time.is_some() || body.tolerance_minutes.is_some() {
-        state
-            .repos
-            .meal_anchor_instance
-            .retime(
-                id,
-                user_id,
-                body.preferred_time.unwrap_or(after_rename.preferred_time),
-                body.tolerance_minutes
-                    .unwrap_or(after_rename.tolerance_minutes),
-            )
-            .await
-            .map_err(map_repo_error)?
-            .ok_or(StatusCode::NOT_FOUND)?
-    } else {
-        after_rename
-    };
-
-    Ok(Json(MealAnchorInstanceResponse::from(final_row)))
+    Ok(Json(MealAnchorInstanceResponse::from(row)))
 }
 
 #[utoipa::path(

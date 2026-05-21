@@ -103,6 +103,26 @@ impl MealAnchorInstanceRepository for PgMealAnchorInstanceRepository {
             .map_err(Into::into)
     }
 
+    async fn update(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        name: Option<&str>,
+        preferred_time: Option<NaiveTime>,
+        tolerance_minutes: Option<i32>,
+    ) -> Result<Option<MealAnchorInstance>, crate::Error> {
+        db::update(
+            &self.pool,
+            id,
+            user_id,
+            name,
+            preferred_time,
+            tolerance_minutes,
+        )
+        .await
+        .map_err(Into::into)
+    }
+
     async fn remove(&self, id: Uuid, user_id: Uuid) -> Result<bool, crate::Error> {
         db::remove(&self.pool, id, user_id)
             .await

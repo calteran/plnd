@@ -12,6 +12,11 @@ pub struct PlannedMealEntry {
     pub title: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    /// Date of the associated meal anchor instance. Populated on list queries (JOIN on
+    /// `meal_anchor_instances`); NULL-cast in INSERT RETURNING so write paths are unchanged.
+    pub anchor_date: Option<NaiveDate>,
+    /// Name of the associated meal anchor instance (e.g. "Breakfast"). Same NULL-cast rule.
+    pub anchor_name: Option<String>,
 }
 
 #[derive(Debug, Clone)]

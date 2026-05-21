@@ -5,12 +5,16 @@ use uuid::Uuid;
 use crate::db::error::DatabaseError;
 use crate::models::{PlannedMealEntry, PlannedMealEntryInput};
 
+/// Used in INSERT RETURNING: anchor fields are NULL-cast since there is no JOIN in that context.
 const COLUMNS: &str = "meal_entry_id, user_id, meal_anchor_instance_id, meal_ref_id, \
-                       meal_ref_type, title, created_at, updated_at";
+                       meal_ref_type, title, created_at, updated_at, \
+                       NULL::date AS anchor_date, NULL::varchar AS anchor_name";
 
+/// Used in SELECT queries that JOIN meal_anchor_instances: anchor date and name are populated.
 const PREFIXED_COLUMNS: &str = "pme.meal_entry_id, pme.user_id, pme.meal_anchor_instance_id, \
                                 pme.meal_ref_id, pme.meal_ref_type, pme.title, \
-                                pme.created_at, pme.updated_at";
+                                pme.created_at, pme.updated_at, \
+                                mai.date AS anchor_date, mai.name AS anchor_name";
 
 #[tracing::instrument(
     skip(pool),

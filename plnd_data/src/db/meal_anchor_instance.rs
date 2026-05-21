@@ -247,6 +247,34 @@ pub async fn retime(
     .map_err(DatabaseError::from)
 }
 
+#[tracing::instrument(skip(pool), fields(table = "meal_anchor_instances", op = "update"))]
+pub async fn update(
+    pool: &PgPool,
+    id: Uuid,
+    user_id: Uuid,
+    name: Option<&str>,
+    preferred_time: Option<NaiveTime>,
+    tolerance_minutes: Option<i32>,
+) -> Result<Option<MealAnchorInstance>, DatabaseError> {
+    sqlx::query_as::<_, MealAnchorInstance>(&format!(
+        "UPDATE meal_anchor_instances \
+         SET name = COALESCE($3, name), \
+             preferred_time = COALESCE($4, preferred_time), \
+             tolerance_minutes = COALESCE($5, tolerance_minutes), \
+             updated_at = NOW() \
+         WHERE id = $1 AND user_id = $2 \
+         RETURNING {COLUMNS}"
+    ))
+    .bind(id)
+    .bind(user_id)
+    .bind(name)
+    .bind(preferred_time)
+    .bind(tolerance_minutes)
+    .fetch_optional(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 #[tracing::instrument(skip(pool), fields(table = "meal_anchor_instances", op = "remove"))]
 pub async fn remove(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<bool, DatabaseError> {
     sqlx::query("DELETE FROM meal_anchor_instances WHERE id = $1 AND user_id = $2")

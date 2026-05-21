@@ -22,19 +22,27 @@ pub async fn yesterday_snapshot(
     user_id: Uuid,
     date: NaiveDate,
 ) -> Result<YesterdaySnapshot, DatabaseError> {
-    // Post-#828, schedule_entries is task-only and meal anchors live in
-    // meal_anchor_instances. The `meals_logged` field has no source until
-    // #829 restores meal completion tracking on the new model — return 0
-    // for now to avoid mis-reporting.
+    // Post-#828, schedule_entries is task-only; meal anchors live in meal_anchor_instances.
+    // meals_logged has no source until #829 restores completion tracking — return 0 for now.
     sqlx::query_as::<_, YesterdaySnapshot>(
-        "SELECT
-           (SELECT COUNT(*) FROM schedule_entries
-              WHERE user_id = $1 AND date = $2)                              AS tasks_total,
-           (SELECT COUNT(*) FROM schedule_entries
-              WHERE user_id = $1 AND date = $2 AND status = 'completed')     AS tasks_done,
-           (SELECT COUNT(*) FROM meal_anchor_instances
-              WHERE user_id = $1 AND date = $2)                              AS meals_planned,
-           0::bigint                                                         AS meals_logged",
+        "WITH tasks AS (
+            SELECT
+                COUNT(*)                                      AS total,
+                COUNT(*) FILTER (WHERE status = 'completed') AS done
+            FROM schedule_entries
+            WHERE user_id = $1 AND date = $2
+         ),
+         meals AS (
+            SELECT COUNT(*) AS planned
+            FROM meal_anchor_instances
+            WHERE user_id = $1 AND date = $2
+         )
+         SELECT
+             tasks.total   AS tasks_total,
+             tasks.done    AS tasks_done,
+             meals.planned AS meals_planned,
+             0::bigint     AS meals_logged
+         FROM tasks, meals",
     )
     .bind(user_id)
     .bind(date)

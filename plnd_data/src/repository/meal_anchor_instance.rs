@@ -55,5 +55,16 @@ pub trait MealAnchorInstanceRepository: Send + Sync {
         tolerance_minutes: i32,
     ) -> Result<Option<MealAnchorInstance>, crate::Error>;
 
+    /// Update name and/or time fields in a single atomic write.
+    /// All `None` arguments leave the corresponding column unchanged (COALESCE).
+    async fn update(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        name: Option<&str>,
+        preferred_time: Option<NaiveTime>,
+        tolerance_minutes: Option<i32>,
+    ) -> Result<Option<MealAnchorInstance>, crate::Error>;
+
     async fn remove(&self, id: Uuid, user_id: Uuid) -> Result<bool, crate::Error>;
 }
