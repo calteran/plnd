@@ -1,6 +1,7 @@
 mod catalog;
 mod day_type;
 mod library;
+mod meal_anchor_instance;
 mod meal_pattern;
 mod meal_plan;
 mod open_slot;
@@ -14,6 +15,7 @@ mod user;
 pub use catalog::*;
 pub use day_type::*;
 pub use library::*;
+pub use meal_anchor_instance::*;
 pub use meal_pattern::*;
 pub use meal_plan::*;
 pub use open_slot::*;

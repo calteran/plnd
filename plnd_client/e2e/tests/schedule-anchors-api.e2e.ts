@@ -1,0 +1,159 @@
+import { test, expect } from '@playwright/test';
+import { API_BASE, mintTestToken, generateTestSub } from '../helpers/auth';
+
+// Per-date meal anchor instance CRUD — API-only e2e (issue #828).
+//
+// The UI affordance is tracked separately as #826. Until that lands these
+// tests exercise the backend via direct REST calls, which is the same shape
+// the UI will use once it's built. They run through the real auth flow and
+// the real backend (per docs/architecture.md §9.7).
+
+interface AnchorResponse {
+  id: string;
+  user_id: string;
+  date: string;
+  name: string;
+  preferred_time: string;
+  tolerance_minutes: number;
+  sort_order: number;
+  template_entry_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+async function authHeaders(sub: string): Promise<Record<string, string>> {
+  const token = await mintTestToken(sub);
+  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+function isoDate(offsetDays: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+test.describe('Schedule anchors — per-date meal anchor instances (API)', () => {
+  test('add → list shows new instance', async () => {
+    const sub = generateTestSub();
+    const headers = await authHeaders(sub);
+    const date = isoDate(7);
+
+    const addRes = await fetch(`${API_BASE}/schedule/anchors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ date, name: 'Brunch', preferred_time: '10:30' }),
+    });
+    expect(addRes.status).toBe(201);
+    const added = (await addRes.json()) as AnchorResponse;
+    expect(added.name).toBe('Brunch');
+    expect(added.preferred_time).toMatch(/^10:30/);
+    expect(added.template_entry_id).toBeNull();
+
+    const listRes = await fetch(`${API_BASE}/schedule/anchors?date=${date}`, { headers });
+    expect(listRes.status).toBe(200);
+    const list = (await listRes.json()) as AnchorResponse[];
+    const names = list.map((i) => i.name);
+    expect(names).toContain('Brunch');
+  });
+
+  test('rename via PATCH updates name only', async () => {
+    const sub = generateTestSub();
+    const headers = await authHeaders(sub);
+    const date = isoDate(7);
+
+    const addRes = await fetch(`${API_BASE}/schedule/anchors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ date, name: 'Lunch', preferred_time: '12:00' }),
+    });
+    const inst = (await addRes.json()) as AnchorResponse;
+
+    const patchRes = await fetch(`${API_BASE}/schedule/anchors/${inst.id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ name: 'Late Lunch' }),
+    });
+    expect(patchRes.status).toBe(200);
+    const renamed = (await patchRes.json()) as AnchorResponse;
+    expect(renamed.name).toBe('Late Lunch');
+    expect(renamed.preferred_time).toMatch(/^12:00/);
+  });
+
+  test('retime via PATCH updates time + tolerance', async () => {
+    const sub = generateTestSub();
+    const headers = await authHeaders(sub);
+    const date = isoDate(7);
+
+    const addRes = await fetch(`${API_BASE}/schedule/anchors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ date, name: 'Dinner', preferred_time: '18:00' }),
+    });
+    const inst = (await addRes.json()) as AnchorResponse;
+
+    const patchRes = await fetch(`${API_BASE}/schedule/anchors/${inst.id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ preferred_time: '19:30', tolerance_minutes: 45 }),
+    });
+    expect(patchRes.status).toBe(200);
+    const retimed = (await patchRes.json()) as AnchorResponse;
+    expect(retimed.preferred_time).toMatch(/^19:30/);
+    expect(retimed.tolerance_minutes).toBe(45);
+    expect(retimed.name).toBe('Dinner');
+  });
+
+  test('delete removes the instance', async () => {
+    const sub = generateTestSub();
+    const headers = await authHeaders(sub);
+    const date = isoDate(7);
+
+    const addRes = await fetch(`${API_BASE}/schedule/anchors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ date, name: 'Snack', preferred_time: '15:00' }),
+    });
+    const inst = (await addRes.json()) as AnchorResponse;
+
+    const delRes = await fetch(`${API_BASE}/schedule/anchors/${inst.id}`, {
+      method: 'DELETE',
+      headers,
+    });
+    expect(delRes.status).toBe(204);
+
+    const listRes = await fetch(`${API_BASE}/schedule/anchors?date=${date}`, { headers });
+    const list = (await listRes.json()) as AnchorResponse[];
+    expect(list.map((i) => i.id)).not.toContain(inst.id);
+  });
+
+  test('past-date add accepted', async () => {
+    const sub = generateTestSub();
+    const headers = await authHeaders(sub);
+    const date = isoDate(-1); // yesterday
+
+    const addRes = await fetch(`${API_BASE}/schedule/anchors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        date,
+        name: 'Late-night Snack',
+        preferred_time: '23:00',
+      }),
+    });
+    expect(addRes.status).toBe(201);
+  });
+
+  test('GET on untouched future date materializes (returns empty when no template applies)', async () => {
+    const sub = generateTestSub();
+    const headers = await authHeaders(sub);
+    const date = isoDate(60); // far future
+
+    const listRes = await fetch(`${API_BASE}/schedule/anchors?date=${date}`, { headers });
+    expect(listRes.status).toBe(200);
+    // New user has no day-type templates seeded, so list returns empty —
+    // but the materialization marker has been written. Subsequent reads
+    // should also be empty and not re-import a template.
+    const list = (await listRes.json()) as AnchorResponse[];
+    expect(list).toEqual([]);
+  });
+});

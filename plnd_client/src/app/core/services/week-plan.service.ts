@@ -121,38 +121,32 @@ export class WeekPlanService {
           this.scheduledTasksSignal().length === 0 &&
           Object.keys(this.scheduledMealsSignal()).length === 0
         ) {
-          const tasks: PlannedTask[] = [];
+          const tasks: PlannedTask[] = resp.entries.map(entry => ({
+            date: entry.date,
+            title: entry.title ?? entry.task_type ?? '',
+            energy: 'medium' as const,
+            task_type: entry.task_type ?? undefined,
+            scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
+          }));
+
+          // Pre-fill planned meals from the anchor-enriched planned_meals list.
+          // anchor_date and anchor_name are populated by the list query JOIN.
           const meals: Record<string, Partial<Record<MealSlot, PlannedMeal>>> = {};
-          const plannedByScheduleEntryId = new Map(
-            resp.planned_meals.map(pm => [pm.schedule_entry_id, pm] as const),
-          );
-          for (const entry of resp.entries) {
-            if (entry.task_type == null && entry.after_anchor) {
-              const slot = entry.after_anchor as MealSlot;
-              meals[entry.date] ??= {};
-              const planned = plannedByScheduleEntryId.get(entry.entry_id);
-              meals[entry.date][slot] = {
-                approvalState: 'approved',
-                mealRef: planned
-                  ? {
-                      // MealRefType narrows DB-side meal vs dish into UI-side provenance.
-                      // catalog_meal/catalog_dish → 'catalog'; user_meal/user_dish → 'user'.
-                      type: planned.meal_ref_type.startsWith('catalog') ? 'catalog' : 'user',
-                      id: planned.meal_ref_id,
-                    }
-                  : null,
-                title: entry.title ?? slot,
-              };
-            } else {
-              tasks.push({
-                date: entry.date,
-                title: entry.title ?? entry.task_type ?? '',
-                energy: 'medium',
-                task_type: entry.task_type ?? undefined,
-                scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
-              });
-            }
+          for (const pm of resp.planned_meals) {
+            if (!pm.anchor_date || !pm.anchor_name) continue;
+            const slot = pm.anchor_name as MealSlot;
+            meals[pm.anchor_date] ??= {};
+            meals[pm.anchor_date][slot] = {
+              approvalState: 'approved',
+              mealRef: {
+                // catalog_meal/catalog_dish → 'catalog'; user_meal/user_dish → 'user'.
+                type: pm.meal_ref_type.startsWith('catalog') ? 'catalog' : 'user',
+                id: pm.meal_ref_id,
+              },
+              title: pm.title ?? slot,
+            };
           }
+
           if (tasks.length) this.scheduledTasksSignal.set(tasks);
           if (Object.keys(meals).length) this.scheduledMealsSignal.set(meals);
         }

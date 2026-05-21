@@ -76,6 +76,38 @@ impl From<UserPreferences> for UserPreferencesResponse {
     }
 }
 
+/// API response wrapper for `plnd_data::models::MealAnchorInstance` (issue #828).
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct MealAnchorInstanceResponse {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub date: NaiveDate,
+    pub name: String,
+    pub preferred_time: NaiveTime,
+    pub tolerance_minutes: i32,
+    pub sort_order: i32,
+    pub template_entry_id: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<plnd_data::models::MealAnchorInstance> for MealAnchorInstanceResponse {
+    fn from(i: plnd_data::models::MealAnchorInstance) -> Self {
+        Self {
+            id: i.id,
+            user_id: i.user_id,
+            date: i.date,
+            name: i.name,
+            preferred_time: i.preferred_time,
+            tolerance_minutes: i.tolerance_minutes,
+            sort_order: i.sort_order,
+            template_entry_id: i.template_entry_id,
+            created_at: i.created_at,
+            updated_at: i.updated_at,
+        }
+    }
+}
+
 /// API response wrapper for `plnd_data::models::MealPatternEntry`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MealPatternEntryResponse {
@@ -403,7 +435,7 @@ pub struct ScheduleEntryResponse {
     pub entry_id: Uuid,
     pub user_id: Uuid,
     pub routine_id: Option<Uuid>,
-    pub task_type: Option<String>,
+    pub task_type: String,
     pub title: Option<String>,
     pub date: NaiveDate,
     pub scheduled_start: Option<DateTime<Utc>>,
@@ -412,7 +444,7 @@ pub struct ScheduleEntryResponse {
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
     pub after_anchor: Option<String>,
-    pub slot_anchor_id: Option<Uuid>,
+    pub slot_meal_anchor_id: Option<Uuid>,
     pub deviation_note: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
@@ -435,7 +467,7 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
             actual_start: e.actual_start,
             actual_end: e.actual_end,
             after_anchor: e.after_anchor,
-            slot_anchor_id: e.slot_anchor_id,
+            slot_meal_anchor_id: e.slot_meal_anchor_id,
             deviation_note: e.deviation_note,
             duration_minutes: e.duration_minutes,
             energy_required: e.energy_required,
@@ -466,20 +498,27 @@ impl From<Vec<ScheduleEntry>> for CarryoverApiResponse {
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct PlannedMealEntryResponse {
     pub meal_entry_id: Uuid,
-    pub schedule_entry_id: Uuid,
+    pub meal_anchor_instance_id: Uuid,
     pub meal_ref_id: Uuid,
     pub meal_ref_type: String,
     pub title: Option<String>,
+    /// Date of the associated meal anchor instance. Populated when returned via
+    /// `/schedule/period` (list queries); null when returned from commit_plan RETURNING.
+    pub anchor_date: Option<chrono::NaiveDate>,
+    /// Name of the associated meal anchor instance (e.g. "Breakfast"). Same null rule.
+    pub anchor_name: Option<String>,
 }
 
 impl From<PlannedMealEntry> for PlannedMealEntryResponse {
     fn from(e: PlannedMealEntry) -> Self {
         Self {
             meal_entry_id: e.meal_entry_id,
-            schedule_entry_id: e.schedule_entry_id,
+            meal_anchor_instance_id: e.meal_anchor_instance_id,
             meal_ref_id: e.meal_ref_id,
             meal_ref_type: e.meal_ref_type,
             title: e.title,
+            anchor_date: e.anchor_date,
+            anchor_name: e.anchor_name,
         }
     }
 }

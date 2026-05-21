@@ -385,6 +385,30 @@ export async function seedUserMeal(sub: string, meal: UserMealInput): Promise<Se
   return (await res.json()) as SeededUserMeal;
 }
 
+// ── seedMealAnchor ───────────────────────────────────────────────────────────
+
+export interface MealAnchorInput {
+  date: string;
+  name: string;
+  preferred_time: string;
+  tolerance_minutes?: number;
+}
+
+export interface SeededMealAnchor {
+  id: string;
+  name: string;
+  date: string;
+  preferred_time: string;
+}
+
+export async function seedMealAnchor(
+  sub: string,
+  anchor: MealAnchorInput,
+): Promise<SeededMealAnchor> {
+  const res = await callApi(sub, 'POST', '/schedule/anchors', anchor, 'seedMealAnchor');
+  return (await res.json()) as SeededMealAnchor;
+}
+
 // ── seedCatalogIngredient ────────────────────────────────────────────────────
 
 export interface SeededCatalogIngredient {

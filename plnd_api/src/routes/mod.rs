@@ -11,6 +11,7 @@ pub mod meal_suggestions;
 pub mod preferences;
 pub mod routine;
 pub mod schedule;
+pub mod schedule_anchors;
 pub mod search;
 pub mod system;
 pub mod tasks;

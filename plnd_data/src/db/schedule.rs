@@ -7,8 +7,8 @@ use uuid::Uuid;
 use crate::db::error::DatabaseError;
 use crate::db::meal_plan;
 use crate::models::{
-    CarryoverDecision, CommitPlanInput, DayType, MealPatternEntry, OpenSlot, PlannedMealEntryInput,
-    PlannedMealEntryStaging, ScheduleEntry, day_type_applies_to,
+    CarryoverDecision, CommitPlanInput, OpenSlot, PlannedMealEntryInput, PlannedMealEntryStaging,
+    ScheduleEntry,
 };
 use crate::query_types::{
     CommittedEntry, PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
@@ -16,7 +16,7 @@ use crate::query_types::{
 
 const ENTRY_COLS: &str = "entry_id, user_id, routine_id, task_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
-     after_anchor, slot_anchor_id, deviation_note,
+     after_anchor, slot_meal_anchor_id, deviation_note,
      duration_minutes, energy_required, one_shot, created_at, updated_at";
 
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_period"))]
@@ -118,7 +118,6 @@ pub async fn update_entry_status(
 #[derive(sqlx::FromRow)]
 struct InsertedRow {
     entry_id: Uuid,
-    task_type: Option<String>,
     title: Option<String>,
     date: NaiveDate,
     after_anchor: Option<String>,
@@ -187,8 +186,11 @@ pub async fn commit_plan(
         .map_err(DatabaseError::from)?;
     }
 
-    // Collect and batch-insert all new entries in a single unnest query
-    let mut task_types: Vec<Option<String>> = Vec::new();
+    // Collect and batch-insert all new task entries in a single unnest query.
+    // After #828, schedule_entries is task-only — any meal anchor entries (the
+    // legacy task_type=None shape) are silently skipped; meal anchors are
+    // owned by meal_anchor_instances and created via /schedule/anchors.
+    let mut task_types: Vec<String> = Vec::new();
     let mut titles: Vec<Option<String>> = Vec::new();
     let mut dates: Vec<NaiveDate> = Vec::new();
     let mut scheduled_starts: Vec<Option<DateTime<Utc>>> = Vec::new();
@@ -198,10 +200,13 @@ pub async fn commit_plan(
     let mut one_shot_vals: Vec<bool> = Vec::new();
 
     for entry in &req.entries {
+        let Some(task_type) = entry.task_type.clone() else {
+            continue;
+        };
         let scheduled_start = entry
             .scheduled_start
             .map(|t| entry.date.and_time(t).and_utc());
-        task_types.push(entry.task_type.clone());
+        task_types.push(task_type);
         titles.push(entry.title.clone());
         dates.push(entry.date);
         scheduled_starts.push(scheduled_start);
@@ -221,7 +226,7 @@ pub async fn commit_plan(
                     unnest($3::text[]), unnest($4::date[]), unnest($5::timestamptz[]),
                     'planned', unnest($6::text[]),
                     unnest($7::int4[]), unnest($8::text[]), unnest($9::bool[])
-             RETURNING entry_id, task_type, title, date, after_anchor",
+             RETURNING entry_id, title, date, after_anchor",
         )
         .bind(user_id)
         .bind(&task_types)
@@ -239,10 +244,10 @@ pub async fn commit_plan(
         Vec::new()
     };
 
-    // Pair meal_entries (staging) with the inserted schedule_entries rows and
+    // Pair meal_entries (staging) against existing meal_anchor_instances and
     // insert the planned_meal_entries rows in the same transaction.
     if !req.meal_entries.is_empty() {
-        pair_and_insert_meal_entries(&mut tx, user_id, &inserted_rows, &req.meal_entries).await?;
+        pair_and_insert_meal_entries(&mut tx, user_id, &req.meal_entries).await?;
     }
 
     let entries: Vec<CommittedEntry> = inserted_rows
@@ -329,52 +334,55 @@ pub async fn commit_plan(
     })
 }
 
-/// Resolve `(date, meal_name)` staging entries to the real `schedule_entry_id`s
-/// produced by the just-completed `schedule_entries` insert, then batch-insert
-/// the matched rows into `planned_meal_entries`.
+/// Resolve `(date, meal_name)` staging entries to the real
+/// `meal_anchor_instance_id`s by querying `meal_anchor_instances`, then
+/// batch-insert the matched rows into `planned_meal_entries`.
 ///
-/// Each staged meal must correspond to a meal-anchor row in `inserted` — i.e.
-/// a row whose `(date, after_anchor)` equals the staging entry's
-/// `(date, meal_name)`. Duplicate `(date, meal_name)` pairs (e.g. two snacks
-/// on the same day) are matched in insertion order via a per-key FIFO of
-/// anchor IDs.
+/// Each staged meal must correspond to a materialized meal-anchor instance
+/// matching `(user_id, date, name)`. Duplicate `(date, meal_name)` pairs
+/// would imply duplicate instance names on the same date, which the
+/// `UNIQUE (user_id, date, name)` constraint forbids.
 ///
 /// Returns an error whose message names both `date` and `meal_name` if no
-/// anchor is available for a staged meal.
+/// instance exists for a staged meal.
 async fn pair_and_insert_meal_entries(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     user_id: Uuid,
-    inserted: &[InsertedRow],
     staging: &[PlannedMealEntryStaging],
 ) -> Result<(), DatabaseError> {
-    // Index inserted meal-anchor rows by (date, meal_name). Only rows with
-    // `task_type IS NULL` are meal anchors — floating tasks that share an
-    // `after_anchor` value (e.g. a "general" task that runs after breakfast)
-    // must NOT be eligible pairing targets or the meal entry would attach to
-    // the wrong schedule_entries row. We use a HashMap of vectors so duplicate
-    // (date, meal_name) pairs are matched in order.
-    let mut anchor_index: HashMap<(NaiveDate, String), Vec<Uuid>> = HashMap::new();
-    for row in inserted {
-        if row.task_type.is_none()
-            && let Some(name) = &row.after_anchor
-        {
-            anchor_index
-                .entry((row.date, name.clone()))
-                .or_default()
-                .push(row.entry_id);
-        }
+    if staging.is_empty() {
+        return Ok(());
     }
-    // Reverse each vec so we can `pop` to consume the earliest match first.
-    for v in anchor_index.values_mut() {
-        v.reverse();
+
+    // Fan-in lookup: collect every (date, name) we need, then resolve all
+    // matching instance IDs in a single query.
+    let dates: Vec<NaiveDate> = staging.iter().map(|s| s.date).collect();
+    let names: Vec<String> = staging.iter().map(|s| s.meal_name.clone()).collect();
+
+    let rows: Vec<(NaiveDate, String, Uuid)> = sqlx::query_as(
+        "SELECT mai.date, mai.name, mai.id \
+         FROM meal_anchor_instances mai \
+         JOIN UNNEST($2::date[], $3::text[]) AS req(date, name) \
+              ON req.date = mai.date AND req.name = mai.name \
+         WHERE mai.user_id = $1",
+    )
+    .bind(user_id)
+    .bind(&dates)
+    .bind(&names)
+    .fetch_all(&mut **tx)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    let mut index: HashMap<(NaiveDate, String), Uuid> = HashMap::new();
+    for (date, name, id) in rows {
+        index.insert((date, name), id);
     }
 
     let mut planned_inputs: Vec<PlannedMealEntryInput> = Vec::with_capacity(staging.len());
     for meal in staging {
-        let key = (meal.date, meal.meal_name.clone());
-        let entry_id = anchor_index
-            .get_mut(&key)
-            .and_then(|v| v.pop())
+        let id = index
+            .get(&(meal.date, meal.meal_name.clone()))
+            .copied()
             .ok_or_else(|| {
                 DatabaseError::QueryError(format!(
                     "meal_entry references missing schedule anchor for ({}, {})",
@@ -382,28 +390,30 @@ async fn pair_and_insert_meal_entries(
                 ))
             })?;
         planned_inputs.push(PlannedMealEntryInput {
-            schedule_entry_id: entry_id,
+            meal_anchor_instance_id: id,
             meal_ref_id: meal.meal_ref_id,
             meal_ref_type: meal.meal_ref_type.clone(),
             title: meal.title.clone(),
         });
     }
 
-    // Reuse the shared insert path so the SQL lives in exactly one place.
-    // `&mut **tx` reborrows the transaction as a `PgExecutor`.
     meal_plan::insert_many(&mut **tx, user_id, &planned_inputs).await?;
     Ok(())
 }
 
 /// Returns the meal slots that are still open for `[plan_start, plan_end]`.
 ///
-/// For each date the active day type is determined (most-recently-created first;
-/// first match wins) and its pattern entries are collected. Slots present in
-/// `locked` — a list of `(date, meal_name)` pairs representing approved,
-/// skipped, and custom meals — are subtracted before returning.
+/// Per #828, slots are derived from each date's materialized
+/// `meal_anchor_instances` rather than from the day-type pattern. Dates that
+/// have not yet been materialized are lazily materialized here from the
+/// active day type's template; once materialized, the date's instance set
+/// is authoritative and the template is no longer consulted at read time.
+/// Slots present in `locked` — a list of `(date, meal_name)` pairs
+/// representing approved, skipped, and custom meals — are subtracted
+/// before returning.
 #[tracing::instrument(
     skip(pool, locked),
-    fields(table = "meal_pattern_entries", op = "resolve_open_slots")
+    fields(table = "meal_anchor_instances", op = "resolve_open_slots")
 )]
 pub async fn resolve_open_slots(
     pool: &PgPool,
@@ -412,63 +422,38 @@ pub async fn resolve_open_slots(
     plan_end: NaiveDate,
     locked: &[(NaiveDate, String)],
 ) -> Result<Vec<OpenSlot>, DatabaseError> {
-    let mut day_types: Vec<DayType> = sqlx::query_as::<_, DayType>(
-        "SELECT id, user_id, name, days_bitmask, wake_time, sleep_time, \
-                is_cycle, cycle_length, anchor_date, cycle_bitmask, created_at \
-         FROM user_day_types WHERE user_id = $1",
-    )
-    .bind(user_id)
-    .fetch_all(pool)
-    .await
-    .map_err(DatabaseError::from)?;
-
-    day_types.sort_by_key(|dt| std::cmp::Reverse(dt.created_at));
-
-    if day_types.is_empty() || plan_end < plan_start {
+    if plan_end < plan_start {
         return Ok(Vec::new());
     }
 
-    let day_type_ids: Vec<Uuid> = day_types.iter().map(|dt| dt.id).collect();
-    let meal_entries: Vec<MealPatternEntry> = sqlx::query_as::<_, MealPatternEntry>(
-        "SELECT id, day_type_id, name, preferred_time, tolerance_minutes, sort_order, created_at \
-         FROM meal_pattern_entries \
-         WHERE day_type_id = ANY($1) \
-         ORDER BY day_type_id, sort_order",
-    )
-    .bind(&day_type_ids)
-    .fetch_all(pool)
-    .await
-    .map_err(DatabaseError::from)?;
-
-    let mut meals_by_day_type: HashMap<Uuid, Vec<String>> = HashMap::new();
-    for entry in meal_entries {
-        meals_by_day_type
-            .entry(entry.day_type_id)
-            .or_default()
-            .push(entry.name);
+    // Lazy materialization: for each in-window date, ensure instances exist.
+    // `materialize` is idempotent and a no-op if the date is already
+    // materialized (whether non-empty or user-emptied).
+    let mut date = plan_start;
+    loop {
+        crate::db::meal_anchor_instance::materialize(pool, user_id, date).await?;
+        let Some(next) = date.succ_opt() else { break };
+        if next > plan_end {
+            break;
+        }
+        date = next;
     }
+
+    let instances =
+        crate::db::meal_anchor_instance::list_for_date_range(pool, user_id, plan_start, plan_end)
+            .await?;
 
     let locked_set: HashSet<(NaiveDate, &str)> =
         locked.iter().map(|(d, n)| (*d, n.as_str())).collect();
 
-    let mut result = Vec::new();
-    let mut date = plan_start;
-    while date <= plan_end {
-        if let Some(dt) = day_types.iter().find(|dt| day_type_applies_to(dt, date))
-            && let Some(meal_names) = meals_by_day_type.get(&dt.id)
-        {
-            for meal_name in meal_names {
-                if !locked_set.contains(&(date, meal_name.as_str())) {
-                    result.push(OpenSlot {
-                        date,
-                        meal_name: meal_name.clone(),
-                    });
-                }
-            }
-        }
-        let Some(next) = date.succ_opt() else { break };
-        date = next;
-    }
+    let result: Vec<OpenSlot> = instances
+        .into_iter()
+        .filter(|i| !locked_set.contains(&(i.date, i.name.as_str())))
+        .map(|i| OpenSlot {
+            date: i.date,
+            meal_name: i.name,
+        })
+        .collect();
     Ok(result)
 }
 
@@ -482,7 +467,7 @@ mod tests {
 
     use super::*;
     use crate::db::{tasks, users};
-    use crate::models::{PlanEntryInput, PlannedMealEntryStaging};
+    use crate::models::{DayType, PlanEntryInput, PlannedMealEntryStaging};
 
     async fn new_user(pool: &PgPool) -> Uuid {
         users::create(
@@ -876,30 +861,30 @@ mod tests {
         );
     }
 
+    // Post-#828: meal anchors live in `meal_anchor_instances`, not in
+    // `schedule_entries`. commit_plan silently skips any legacy
+    // task_type=None PlanEntryInput rows.
     #[sqlx::test(migrations = "./migrations")]
-    async fn commit_plan_with_meal_anchor_inserts_correctly(pool: PgPool) {
+    async fn commit_plan_silently_skips_legacy_meal_anchor_entries(pool: PgPool) {
         let uid = new_user(&pool).await;
         let start = tomorrow();
         let end = start + Duration::days(6);
         let task_id = make_planning_task(&pool, uid, start).await;
 
-        // Meal anchor entry: task_type = None (distinct from task entries)
-        let meal_entry = PlanEntryInput {
-            date: start,
-            task_type: None,
-            title: Some("Oatmeal".to_string()),
-            scheduled_start: None,
-            after_anchor: Some("breakfast".to_string()),
-            duration_minutes: None,
-            energy_required: None,
-            one_shot: None,
-        };
-
         let req = CommitPlanInput {
             plan_start: start,
             plan_end: end,
             planning_task_id: task_id,
-            entries: vec![meal_entry],
+            entries: vec![PlanEntryInput {
+                date: start,
+                task_type: None,
+                title: Some("Oatmeal".to_string()),
+                scheduled_start: None,
+                after_anchor: Some("breakfast".to_string()),
+                duration_minutes: None,
+                energy_required: None,
+                one_shot: None,
+            }],
             meal_entries: Vec::new(),
             replace: false,
             carryover_decisions: HashMap::new(),
@@ -909,39 +894,31 @@ mod tests {
         commit_plan(&pool, uid, &req).await.unwrap();
 
         let period = get_period(&pool, uid, start, end).await.unwrap();
-        assert_eq!(period.entries.len(), 1);
-        let e = &period.entries[0];
-        assert_eq!(e.task_type, None, "meal anchor has no task_type");
-        assert_eq!(e.title.as_deref(), Some("Oatmeal"), "title must roundtrip");
-        assert_eq!(
-            e.after_anchor.as_deref(),
-            Some("breakfast"),
-            "after_anchor must roundtrip"
-        );
         assert!(
-            e.scheduled_start.is_none(),
-            "meal anchor has no scheduled_start"
+            period.entries.is_empty(),
+            "legacy meal-anchor PlanEntryInput rows must not enter schedule_entries"
         );
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn commit_plan_pairs_meal_entries_to_anchors(pool: PgPool) {
+    async fn commit_plan_pairs_meal_entries_to_existing_instances(pool: PgPool) {
         let uid = new_user(&pool).await;
         let start = tomorrow();
         let end = start + Duration::days(6);
         let task_id = make_planning_task(&pool, uid, start).await;
 
-        // Meal anchor entry: task_type = None, after_anchor = meal name
-        let meal_anchor = PlanEntryInput {
-            date: start,
-            task_type: None,
-            title: Some("Oatmeal".to_string()),
-            scheduled_start: None,
-            after_anchor: Some("breakfast".to_string()),
-            duration_minutes: None,
-            energy_required: None,
-            one_shot: None,
-        };
+        // Seed the meal anchor instance the agent / user-edit flow would
+        // have created before this approval.
+        let instance = crate::db::meal_anchor_instance::add(
+            &pool,
+            uid,
+            start,
+            "breakfast",
+            NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+            60,
+        )
+        .await
+        .unwrap();
 
         let meal_ref_id = Uuid::new_v4();
         let staging = PlannedMealEntryStaging {
@@ -956,7 +933,7 @@ mod tests {
             plan_start: start,
             plan_end: end,
             planning_task_id: task_id,
-            entries: vec![meal_anchor],
+            entries: Vec::new(),
             meal_entries: vec![staging],
             replace: false,
             carryover_decisions: HashMap::new(),
@@ -965,45 +942,29 @@ mod tests {
 
         commit_plan(&pool, uid, &req).await.unwrap();
 
-        // Resolve the anchor's entry_id by joining on (date, after_anchor)
-        // and verify exactly one planned_meal_entries row points at it with
-        // the right meal_ref_id, meal_ref_type, and title.
         let row: (Uuid, Uuid, String, Option<String>) = sqlx::query_as(
-            "SELECT pme.schedule_entry_id, pme.meal_ref_id, pme.meal_ref_type, pme.title
+            "SELECT pme.meal_anchor_instance_id, pme.meal_ref_id, pme.meal_ref_type, pme.title
              FROM planned_meal_entries pme
-             JOIN schedule_entries se ON se.entry_id = pme.schedule_entry_id
-             WHERE pme.user_id = $1 AND se.date = $2 AND se.after_anchor = $3",
+             WHERE pme.user_id = $1",
         )
         .bind(uid)
-        .bind(start)
-        .bind("breakfast")
         .fetch_one(&pool)
         .await
-        .expect("expected exactly one planned_meal_entries row for the anchor");
+        .expect("expected exactly one planned_meal_entries row");
 
-        assert_eq!(row.1, meal_ref_id, "meal_ref_id must roundtrip");
-        assert_eq!(row.2, "user_meal", "meal_ref_type must roundtrip");
-        assert_eq!(
-            row.3.as_deref(),
-            Some("Oatmeal Bowl"),
-            "title must roundtrip"
-        );
-
-        let count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM planned_meal_entries WHERE user_id = $1")
-                .bind(uid)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(count, 1, "exactly one planned_meal_entries row");
+        assert_eq!(row.0, instance.id, "must link to the existing instance");
+        assert_eq!(row.1, meal_ref_id);
+        assert_eq!(row.2, "user_meal");
+        assert_eq!(row.3.as_deref(), Some("Oatmeal Bowl"));
     }
 
-    #[sqlx::test(migrations = "./migrations")]
-    async fn commit_plan_pairs_meal_entries_only_to_meal_anchors(pool: PgPool) {
-        // Regression: the pairing helper used to index every inserted row by
-        // (date, after_anchor), so a floating task whose after_anchor matched a
-        // meal anchor could collide and steal the pairing. Only rows with
-        // `task_type IS NULL` (true meal anchors) may participate.
+    // The floating-task vs meal-anchor pairing collision test that used to
+    // live here was removed in #828 — pairing now looks up
+    // `meal_anchor_instances` by (user_id, date, name), which is disjoint
+    // from `schedule_entries`, so the collision is structurally impossible.
+    #[allow(dead_code)]
+    #[cfg(any())]
+    async fn commit_plan_pairs_meal_entries_only_to_meal_anchors_removed(pool: PgPool) {
         let uid = new_user(&pool).await;
         let start = tomorrow();
         let end = start + Duration::days(6);
@@ -1116,24 +1077,13 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "./migrations")]
-    async fn commit_plan_errors_when_meal_anchor_missing(pool: PgPool) {
+    async fn commit_plan_errors_when_meal_anchor_instance_missing(pool: PgPool) {
         let uid = new_user(&pool).await;
         let start = tomorrow();
         let end = start + Duration::days(6);
         let task_id = make_planning_task(&pool, uid, start).await;
 
-        // Meal anchor for breakfast — but staging references "dinner".
-        let meal_anchor = PlanEntryInput {
-            date: start,
-            task_type: None,
-            title: Some("Oatmeal".to_string()),
-            scheduled_start: None,
-            after_anchor: Some("breakfast".to_string()),
-            duration_minutes: None,
-            energy_required: None,
-            one_shot: None,
-        };
-
+        // No instance exists for (orphan_date, "dinner").
         let orphan_date = start + Duration::days(1);
         let staging = PlannedMealEntryStaging {
             date: orphan_date,
@@ -1147,7 +1097,7 @@ mod tests {
             plan_start: start,
             plan_end: end,
             planning_task_id: task_id,
-            entries: vec![meal_anchor],
+            entries: Vec::new(),
             meal_entries: vec![staging],
             replace: false,
             carryover_decisions: HashMap::new(),
@@ -1156,7 +1106,7 @@ mod tests {
 
         let err = commit_plan(&pool, uid, &req)
             .await
-            .expect_err("missing anchor must return an error");
+            .expect_err("missing instance must return an error");
         let msg = format!("{err}");
         assert!(
             msg.contains(&orphan_date.to_string()),
@@ -1167,26 +1117,13 @@ mod tests {
             "error message should mention the meal name, got: {msg}"
         );
 
-        // Transaction must roll back: no planned_meal_entries and no
-        // schedule_entries should remain for this user.
         let planned_count: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM planned_meal_entries WHERE user_id = $1")
                 .bind(uid)
                 .fetch_one(&pool)
                 .await
                 .unwrap();
-        assert_eq!(
-            planned_count, 0,
-            "rollback must leave no planned_meal_entries"
-        );
-
-        let sched_count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM schedule_entries WHERE user_id = $1")
-                .bind(uid)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert_eq!(sched_count, 0, "rollback must leave no schedule_entries");
+        assert_eq!(planned_count, 0, "rollback leaves no planned_meal_entries");
     }
 
     // -----------------------------------------------------------------------

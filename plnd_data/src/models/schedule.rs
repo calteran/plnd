@@ -34,8 +34,8 @@ pub struct Routine {
 pub struct ScheduleEntry {
     pub entry_id: Uuid,
     pub user_id: Uuid,
-    pub routine_id: Option<Uuid>,  // null for ad-hoc entries
-    pub task_type: Option<String>, // None = meal anchor; Some(...) = task entry
+    pub routine_id: Option<Uuid>, // null for ad-hoc entries
+    pub task_type: String,        // task vocabulary post-#828 (no NULL meal anchors)
     pub title: Option<String>,
     pub date: NaiveDate,
     pub scheduled_start: Option<DateTime<Utc>>,
@@ -44,7 +44,7 @@ pub struct ScheduleEntry {
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
     pub after_anchor: Option<String>, // free-form slot label — any anchor name, unconstrained
-    pub slot_anchor_id: Option<Uuid>, // UUID of the preceding anchor schedule entry
+    pub slot_meal_anchor_id: Option<Uuid>, // FK → meal_anchor_instances(id), ON DELETE SET NULL
     pub deviation_note: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,

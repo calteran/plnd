@@ -108,14 +108,28 @@ export interface PlanDraftShape {
 
 export interface ScheduleEntryDto {
   entry_id: string;
-  task_type: string | null;    // null for meal anchor entries
+  /** null only in legacy data; the backend now always returns a non-null task_type */
+  task_type: string | null;
   title?: string;
   date: string;
   scheduled_start: string;
   status: string;
-  after_anchor?: string;      // free-form slot label
-  slot_anchor_id?: string;    // UUID of the preceding anchor entry
+  after_anchor?: string;
+  slot_meal_anchor_id?: string;
   one_shot?: boolean;
+}
+
+export interface MealAnchorInstanceDto {
+  id: string;
+  user_id: string;
+  date: string;
+  name: string;
+  preferred_time: string;
+  tolerance_minutes: number;
+  sort_order: number;
+  template_entry_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SchedulePeriodResponse {

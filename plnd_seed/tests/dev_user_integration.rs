@@ -79,8 +79,30 @@ async fn seed_dev_user_creates_expected_rows(pool: PgPool) {
             .await
             .unwrap();
     assert_eq!(
-        schedule_count, 152,
-        "expected 152 schedule_entries (38 days × 4 entries/day)"
+        schedule_count, 38,
+        "expected 38 schedule_entries (38 days × 1 exercise task/day)"
+    );
+
+    let anchor_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM meal_anchor_instances WHERE user_id = $1")
+            .bind(uid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        anchor_count, 114,
+        "expected 114 meal_anchor_instances (38 days × 3 meals/day)"
+    );
+
+    let materialization_count: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM meal_anchor_materializations WHERE user_id = $1")
+            .bind(uid)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        materialization_count, 38,
+        "expected 38 meal_anchor_materializations (one per seeded day)"
     );
 }
 

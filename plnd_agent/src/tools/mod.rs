@@ -171,6 +171,7 @@ pub(crate) fn build_tool_registry(
                 &mut registry,
                 Arc::clone(&repos.task),
                 Arc::clone(&repos.schedule),
+                Arc::clone(&repos.meal_anchor_instance),
             );
         }
         UseCase::MealRebalance => {

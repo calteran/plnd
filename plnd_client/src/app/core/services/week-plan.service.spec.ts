@@ -230,44 +230,29 @@ describe('WeekPlanService', () => {
   });
 
   describe('loadPeriod', () => {
-    it('hydrates scheduledMeals.mealRef from planned_meals keyed by schedule_entry_id', () => {
+    it('hydrates scheduledMeals.mealRef from planned_meals anchor_date/anchor_name', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const resp: SchedulePeriodResponse = {
-        entries: [
-          {
-            entry_id: 'anchor-breakfast',
-            task_type: null,
-            title: 'Eggs',
-            date: '2026-03-24',
-            scheduled_start: '2026-03-24T08:00:00Z',
-            status: 'scheduled',
-            after_anchor: 'breakfast',
-          },
-          {
-            entry_id: 'anchor-lunch',
-            task_type: null,
-            title: 'Salad',
-            date: '2026-03-24',
-            scheduled_start: '2026-03-24T12:00:00Z',
-            status: 'scheduled',
-            after_anchor: 'lunch',
-          },
-        ],
+        entries: [], // schedule_entries is task-only post-#828; anchors come from planned_meals
         carryover: [],
         planned_meals: [
           {
             meal_entry_id: 'pme-1',
-            schedule_entry_id: 'anchor-breakfast',
+            meal_anchor_instance_id: 'anchor-breakfast',
             meal_ref_id: 'u1',
             meal_ref_type: 'user_meal',
             title: 'Eggs',
+            anchor_date: '2026-03-24',
+            anchor_name: 'breakfast',
           },
           {
             meal_entry_id: 'pme-2',
-            schedule_entry_id: 'anchor-lunch',
+            meal_anchor_instance_id: 'anchor-lunch',
             meal_ref_id: 'c1',
             meal_ref_type: 'catalog_meal',
             title: 'Salad',
+            anchor_date: '2026-03-24',
+            anchor_name: 'lunch',
           },
         ],
       };
@@ -284,25 +269,17 @@ describe('WeekPlanService', () => {
     it('treats catalog_dish provenance as catalog in mealRef', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const resp: SchedulePeriodResponse = {
-        entries: [
-          {
-            entry_id: 'anchor-breakfast',
-            task_type: null,
-            title: 'Avocado toast',
-            date: '2026-03-24',
-            scheduled_start: '2026-03-24T08:00:00Z',
-            status: 'scheduled',
-            after_anchor: 'breakfast',
-          },
-        ],
+        entries: [],
         carryover: [],
         planned_meals: [
           {
             meal_entry_id: 'pme-1',
-            schedule_entry_id: 'anchor-breakfast',
+            meal_anchor_instance_id: 'anchor-breakfast',
             meal_ref_id: 'cd1',
             meal_ref_type: 'catalog_dish',
             title: 'Avocado toast',
+            anchor_date: '2026-03-24',
+            anchor_name: 'breakfast',
           },
         ],
       };
@@ -314,20 +291,10 @@ describe('WeekPlanService', () => {
       expect(breakfast?.mealRef).toEqual({ type: 'catalog', id: 'cd1' });
     });
 
-    it('sets mealRef to null when no planned_meals entry matches the anchor', () => {
+    it('does not pre-fill a slot when no planned_meals entry covers it', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const resp: SchedulePeriodResponse = {
-        entries: [
-          {
-            entry_id: 'anchor-breakfast',
-            task_type: null,
-            title: 'Pending',
-            date: '2026-03-24',
-            scheduled_start: '2026-03-24T08:00:00Z',
-            status: 'scheduled',
-            after_anchor: 'breakfast',
-          },
-        ],
+        entries: [],
         carryover: [],
         planned_meals: [],
       };
@@ -335,7 +302,8 @@ describe('WeekPlanService', () => {
       const req = httpMock.expectOne(r => r.url.includes('/schedule/period') && r.method === 'GET');
       req.flush(resp);
 
-      expect(service.scheduledMeals()['2026-03-24']?.['breakfast']?.mealRef).toBeNull();
+      // No meals were planned, so the date's slot map is not populated.
+      expect(service.scheduledMeals()['2026-03-24']).toBeUndefined();
     });
   });
 

@@ -86,6 +86,10 @@ async function landAtScheduleTypes(page: Page): Promise<void> {
   await expect(page.locator('.planning-prefs')).toBeVisible();
   await page.locator('.btn-continue').click();
   await expect(page.locator('.day-types-substep')).toBeVisible();
+  // Wait for the initial async card load to settle before callers interact with cards.
+  // Without this, a fast test can click "Switch to rotating schedule" before the day-
+  // types API response arrives and races with the mode-switch, overwriting cards().
+  await expect(page.locator('.schedule-card').first()).toBeVisible({ timeout: 5_000 });
 }
 
 // Drives from hub to the Routines & Tasks substep. Caller must have seeded

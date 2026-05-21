@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { DayViewPage } from '../pages/day-view.page';
-import { API_BASE, seedAuth } from '../helpers/auth';
-import { seedScheduleEntries } from '../helpers/seed-data';
+import { API_BASE, seedAuth, generateTestSub, injectAuthToken, seedTestState } from '../helpers/auth';
+import { seedMealAnchor, seedScheduleEntries } from '../helpers/seed-data';
 
 // ── Tests ───────────────────────────────────────────────────────────────────
 
@@ -18,12 +18,10 @@ test.describe('Day View', () => {
       // Seed entries for the planning week containing 2026-03-28. Tests that
       // exercise empty/loading/error states navigate to dates outside this
       // window or install their own /schedule/period mock to override.
+      await seedMealAnchor(sub, { date: '2026-03-28', name: 'breakfast', preferred_time: '08:00' });
       await seedScheduleEntries(sub, {
         plan_start: '2026-03-23',
         plan_end: '2026-03-29',
-        entries: [
-          { date: '2026-03-28', after_anchor: 'breakfast', scheduled_start: '08:00:00', status: 'completed' },
-        ],
         placed_tasks: [
           { date: '2026-03-28', task_type: 'general', title: 'Morning stretch', scheduled_start: '07:00:00', status: 'completed' },
         ],
@@ -121,18 +119,6 @@ test.describe('Day View', () => {
       });
     });
 
-    test.describe('Empty state', () => {
-      test('shows "Nothing planned yet" when the schedule is empty', async ({ page }) => {
-        // Navigate to a date outside the seeded planning window so the real
-        // backend returns an empty entries list — no mock required.
-        const dayView = new DayViewPage(page);
-        await dayView.gotoDate('2026-04-15');
-
-        await expect(dayView.getEmptyState()).toBeVisible({ timeout: 5_000 });
-        await expect(dayView.getEmptyState()).toContainText('Nothing planned yet');
-      });
-    });
-
     test.describe('Error state', () => {
       test('shows error message with retry button when the schedule API fails', async ({ page }) => {
         // Reason: the real backend has no path that reliably returns 500 for an
@@ -173,6 +159,26 @@ test.describe('Day View', () => {
       });
     });
 
+  });
+
+  // Empty state requires a user with NO day types: a user with a day type will
+  // always materialise meal anchors for any date, so the schedule is never empty.
+  test.describe('Empty state', () => {
+    test.beforeEach(async ({ page }) => {
+      const sub = generateTestSub();
+      await injectAuthToken(page, sub);
+      // Onboarded (so /day/:date loads), but no default day type so materialization
+      // returns zero anchors for any date — the truly-empty schedule state.
+      await seedTestState(sub, { preset: 'onboarded', default_day_type: false });
+    });
+
+    test('shows "Nothing planned yet" when the schedule is empty', async ({ page }) => {
+      const dayView = new DayViewPage(page);
+      await dayView.gotoDate('2026-04-15');
+
+      await expect(dayView.getEmptyState()).toBeVisible({ timeout: 5_000 });
+      await expect(dayView.getEmptyState()).toContainText('Nothing planned yet');
+    });
   });
 
 });

@@ -8,6 +8,21 @@ import { WritableSignal } from '@angular/core';
 
 const MOCK_CONFIG = { api: { baseUrl: 'http://localhost:3000' } };
 
+const EMPTY_PERIOD = { entries: [], carryover: [] };
+const EMPTY_ANCHORS: unknown[] = [];
+
+/** Flush both /schedule/period and /schedule/anchors for a loadDay call. */
+function flushDay(
+  httpMock: HttpTestingController,
+  entries: unknown[] = [],
+  anchors: unknown[] = [],
+): void {
+  httpMock.expectOne(r => r.url.includes('/schedule/period'))
+    .flush({ entries, carryover: [] });
+  httpMock.expectOne(r => r.url.includes('/schedule/anchors'))
+    .flush(anchors);
+}
+
 describe('ScheduleService', () => {
   let svc: ScheduleService;
   let httpMock: HttpTestingController;
@@ -35,8 +50,7 @@ describe('ScheduleService', () => {
     svc.loadDay('2026-04-02');
     expect(svc.isLoading()).toBeTrue();
 
-    httpMock.expectOne(r => r.url.includes('/schedule/period'))
-      .flush({ entries: [], carryover: [] });
+    flushDay(httpMock);
 
     expect(svc.isLoading()).toBeFalse();
   });
@@ -47,29 +61,35 @@ describe('ScheduleService', () => {
     const req = httpMock.expectOne(r => r.url.includes('/schedule/period'));
     expect(req.request.params.get('start')).toBe('2026-04-02');
     expect(req.request.params.get('end')).toBe('2026-04-02');
-    req.flush({ entries: [], carryover: [] });
+    req.flush(EMPTY_PERIOD);
+    httpMock.expectOne(r => r.url.includes('/schedule/anchors')).flush(EMPTY_ANCHORS);
+  });
+
+  it('loadDay GETs /schedule/anchors with the date param', () => {
+    svc.loadDay('2026-04-02');
+
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush(EMPTY_PERIOD);
+    const req = httpMock.expectOne(r => r.url.includes('/schedule/anchors'));
+    expect(req.request.params.get('date')).toBe('2026-04-02');
+    req.flush(EMPTY_ANCHORS);
   });
 
   it('loadDay records the requested date', () => {
     svc.loadDay('2026-04-01');
-    httpMock.expectOne(r => r.url.includes('/schedule/period'))
-      .flush({ entries: [], carryover: [] });
+    flushDay(httpMock);
     expect(svc.date()).toBe('2026-04-01');
   });
 
   it('maps a task entry to ScheduleTask', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'e1',
-        task_type: 'exercise',
-        title: 'Morning run',
-        status: 'completed',
-        date: '2026-04-02',
-        scheduled_start: '2026-04-02T07:00:00Z',
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'e1',
+      task_type: 'exercise',
+      title: 'Morning run',
+      status: 'completed',
+      date: '2026-04-02',
+      scheduled_start: '2026-04-02T07:00:00Z',
+    }]);
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(1);
@@ -82,100 +102,101 @@ describe('ScheduleService', () => {
 
   it('maps task_type work to ItemType work', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'e-work', task_type: 'work', title: 'Write report',
-        status: 'planned', date: '2026-04-02', scheduled_start: null,
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'e-work', task_type: 'work', title: 'Write report',
+      status: 'planned', date: '2026-04-02', scheduled_start: null,
+    }]);
     expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('work');
   });
 
   it('maps task_type leisure to ItemType leisure', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'e-lei', task_type: 'leisure', title: 'Read novel',
-        status: 'planned', date: '2026-04-02', scheduled_start: null,
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'e-lei', task_type: 'leisure', title: 'Read novel',
+      status: 'planned', date: '2026-04-02', scheduled_start: null,
+    }]);
     expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('leisure');
   });
 
   it('maps task_type medication to ItemType medication', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'e-med', task_type: 'medication', title: 'Take vitamins',
-        status: 'planned', date: '2026-04-02', scheduled_start: null,
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'e-med', task_type: 'medication', title: 'Take vitamins',
+      status: 'planned', date: '2026-04-02', scheduled_start: null,
+    }]);
     expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('medication');
   });
 
   it('maps unknown task_type to ItemType general', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'e-unk', task_type: 'unknown_future_type', title: 'Something new',
-        status: 'planned', date: '2026-04-02', scheduled_start: null,
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'e-unk', task_type: 'unknown_future_type', title: 'Something new',
+      status: 'planned', date: '2026-04-02', scheduled_start: null,
+    }]);
     expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('general');
   });
 
-  it('maps a meal entry to MealAnchor', () => {
+  it('maps a meal anchor instance to MealAnchor with MEAL_SLOTS name and emoji', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'm1',
-        task_type: null,
-        title: null,
-        after_anchor: 'breakfast',
-        status: 'planned',
-        date: '2026-04-02',
-        scheduled_start: '2026-04-02T08:00:00Z',
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [], [{
+      id: 'm1', user_id: 'u1', date: '2026-04-02',
+      name: 'breakfast', preferred_time: '08:00:00',
+      tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+      created_at: '2026-04-02T08:00:00Z', updated_at: '2026-04-02T08:00:00Z',
+    }]);
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(1);
     expect(isMealAnchor(items[0])).toBeTrue();
     const meal = items[0] as MealAnchor;
+    expect(meal.id).toBe('m1');
     expect(meal.name).toBe('Breakfast');
-    expect(meal.status).toBe('planned');
+    expect(meal.emoji).toBe('🥣');
+    expect(meal.status).toBe('unplanned');
   });
 
-  it('maps a user-defined meal entry by after_anchor, not title', () => {
+  it('maps a custom meal anchor by its name field', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'm9',
-        task_type: null,
-        title: 'Pancakes and eggs',
-        after_anchor: 'Brunch',
-        status: 'planned',
-        date: '2026-04-02',
-        scheduled_start: '2026-04-02T10:30:00Z',
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [], [{
+      id: 'm9', user_id: 'u1', date: '2026-04-02',
+      name: 'Brunch', preferred_time: '10:30:00',
+      tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+      created_at: '2026-04-02T10:30:00Z', updated_at: '2026-04-02T10:30:00Z',
+    }]);
 
     const items = svc.scheduleItems();
     const meal = items[0] as MealAnchor;
     expect(meal.name).toBe('Brunch');
-    expect(meal.description).toBe('Pancakes and eggs');
+    expect(meal.emoji).toBe('🍴');
   });
 
-  it('sets items to [] and clears loading on HTTP error', () => {
+  it('places anchor items before task items in scheduleItems', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(
+      httpMock,
+      [{
+        entry_id: 't1', task_type: 'exercise', title: 'Run',
+        status: 'planned', date: '2026-04-02', scheduled_start: '2026-04-02T07:00:00Z',
+      }],
+      [{
+        id: 'm1', user_id: 'u1', date: '2026-04-02',
+        name: 'breakfast', preferred_time: '08:00:00',
+        tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+        created_at: '2026-04-02T08:00:00Z', updated_at: '2026-04-02T08:00:00Z',
+      }],
+    );
+
+    const items = svc.scheduleItems();
+    expect(items.length).toBe(2);
+    expect(isMealAnchor(items[0])).toBeTrue();
+    expect(isMealAnchor(items[1])).toBeFalse();
+  });
+
+  it('sets items to [] and clears loading on HTTP error in period', () => {
     svc.loadDay('2026-04-02');
     httpMock.expectOne(r => r.url.includes('/schedule/period'))
       .flush('server error', { status: 500, statusText: 'Internal Server Error' });
+    httpMock.expectOne(r => r.url.includes('/schedule/anchors')).flush(EMPTY_ANCHORS);
 
     expect(svc.isLoading()).toBeFalse();
     expect(svc.scheduleItems()).toEqual([]);
@@ -185,11 +206,16 @@ describe('ScheduleService', () => {
     svc.loadDay('2026-04-01');
     svc.loadDay('2026-04-02');
 
-    // switchMap cancels the first request at the HTTP level; only the second is flushable
-    const reqs = httpMock.match(r => r.url.includes('/schedule/period'));
-    expect(reqs.length).toBe(2);
-    expect(reqs[0].cancelled).toBeTrue();
-    reqs[1].flush({ entries: [], carryover: [] });
+    // switchMap cancels the first forkJoin (both period + anchors for 04-01)
+    const periodReqs = httpMock.match(r => r.url.includes('/schedule/period'));
+    expect(periodReqs.length).toBe(2);
+    expect(periodReqs[0].cancelled).toBeTrue();
+    periodReqs[1].flush(EMPTY_PERIOD);
+
+    const anchorReqs = httpMock.match(r => r.url.includes('/schedule/anchors'));
+    expect(anchorReqs.length).toBe(2);
+    expect(anchorReqs[0].cancelled).toBeTrue();
+    anchorReqs[1].flush(EMPTY_ANCHORS);
 
     expect(svc.isLoading()).toBeFalse();
     expect(svc.date()).toBe('2026-04-02');
@@ -199,9 +225,13 @@ describe('ScheduleService', () => {
     svc.loadDay('2026-04-01');
     svc.loadDay('2026-04-02');
 
-    const reqs = httpMock.match(r => r.url.includes('/schedule/period'));
-    expect(reqs[0].cancelled).toBeTrue();
-    reqs[1].flush('server error', { status: 500, statusText: 'Internal Server Error' });
+    const periodReqs = httpMock.match(r => r.url.includes('/schedule/period'));
+    expect(periodReqs[0].cancelled).toBeTrue();
+    periodReqs[1].flush('server error', { status: 500, statusText: 'Internal Server Error' });
+
+    const anchorReqs = httpMock.match(r => r.url.includes('/schedule/anchors'));
+    expect(anchorReqs[0].cancelled).toBeTrue();
+    anchorReqs[1].flush(EMPTY_ANCHORS);
 
     expect(svc.isLoading()).toBeFalse();
     expect(svc.loadError()).toBe('Failed to load schedule');
@@ -209,17 +239,14 @@ describe('ScheduleService', () => {
 
   it('toggleItem flips a task from pending to done', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 't3',
-        task_type: 'general',
-        title: 'Reply to dentist email',
-        status: 'planned',
-        date: '2026-04-02',
-        scheduled_start: '2026-04-02T10:00:00Z',
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 't3',
+      task_type: 'general',
+      title: 'Reply to dentist email',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: '2026-04-02T10:00:00Z',
+    }]);
     const task = svc.scheduleItems()[0] as ScheduleTask;
     expect(task.status).toBe('pending');
     svc.toggleItem('t3');
@@ -229,10 +256,8 @@ describe('ScheduleService', () => {
   });
 
   it('toggleItem flips a during-meal task', () => {
-    // duringMealTasks come from within a MealAnchor — toggleItem must find nested tasks
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period'))
-      .flush({ entries: [], carryover: [] });
+    flushDay(httpMock);
     // Manually inject a MealAnchor with a duringMealTask to test toggle logic
     (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'm1', name: 'Breakfast', emoji: '🥣',
@@ -249,13 +274,10 @@ describe('ScheduleService', () => {
 
   it('toggleItem PATCHes /schedule/entries/:id/status with completed when flipping pending to done', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'tp1', task_type: 'general', title: 'Stretch',
-        status: 'planned', date: '2026-04-02', scheduled_start: null,
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'tp1', task_type: 'general', title: 'Stretch',
+      status: 'planned', date: '2026-04-02', scheduled_start: null,
+    }]);
 
     svc.toggleItem('tp1');
 
@@ -267,13 +289,10 @@ describe('ScheduleService', () => {
 
   it('toggleItem PATCHes with planned when flipping done to pending', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'tp2', task_type: 'general', title: 'Stretch',
-        status: 'completed', date: '2026-04-02', scheduled_start: null,
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'tp2', task_type: 'general', title: 'Stretch',
+      status: 'completed', date: '2026-04-02', scheduled_start: null,
+    }]);
 
     svc.toggleItem('tp2');
 
@@ -285,28 +304,24 @@ describe('ScheduleService', () => {
 
   it('toggleItem reloads the day on PATCH error', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
-      entries: [{
-        entry_id: 'tp3', task_type: 'general', title: 'Stretch',
-        status: 'planned', date: '2026-04-02', scheduled_start: null,
-      }],
-      carryover: [],
-    });
+    flushDay(httpMock, [{
+      entry_id: 'tp3', task_type: 'general', title: 'Stretch',
+      status: 'planned', date: '2026-04-02', scheduled_start: null,
+    }]);
 
     svc.toggleItem('tp3');
 
     httpMock.expectOne(r => r.url.includes('/schedule/entries/tp3/status'))
       .flush('error', { status: 500, statusText: 'Internal Server Error' });
 
-    const reload = httpMock.expectOne(r => r.url.includes('/schedule/period'));
-    expect(reload.request.params.get('start')).toBe('2026-04-02');
-    reload.flush({ entries: [], carryover: [] });
+    // Reload issues both requests again
+    flushDay(httpMock);
+    expect(svc.date()).toBe('2026-04-02');
   });
 
   it('toggleItem does not issue a PATCH when id is not found', () => {
     svc.loadDay('2026-04-02');
-    httpMock.expectOne(r => r.url.includes('/schedule/period'))
-      .flush({ entries: [], carryover: [] });
+    flushDay(httpMock);
 
     svc.toggleItem('nonexistent-id');
 
@@ -352,9 +367,8 @@ describe('ScheduleService', () => {
       const patchReq = httpMock.expectOne(r => r.url.includes('/schedule/entries/meal-1/status'));
       patchReq.flush('error', { status: 500, statusText: 'Internal Server Error' });
 
-      const getReq = httpMock.expectOne(r => r.url.includes('/schedule/period'));
-      expect(getReq.request.params.get('start')).toBe('2026-04-20');
-      getReq.flush({ entries: [], carryover: [] });
+      // Reload issues both requests
+      flushDay(httpMock);
     });
   });
 });

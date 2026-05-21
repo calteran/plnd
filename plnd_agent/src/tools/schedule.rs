@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, NaiveDate, Utc};
-use plnd_data::repository::{ScheduleRepository, TaskRepository};
+use plnd_data::repository::{MealAnchorInstanceRepository, ScheduleRepository, TaskRepository};
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
 
@@ -52,7 +52,10 @@ fn db_err(tool: &str, e: plnd_data::Error) -> ToolError {
 
 // ── GetDayScheduleTool ────────────────────────────────────────────────────────
 
-pub struct GetDayScheduleTool(Arc<dyn ScheduleRepository>);
+pub struct GetDayScheduleTool {
+    schedule: Arc<dyn ScheduleRepository>,
+    anchors: Arc<dyn MealAnchorInstanceRepository>,
+}
 
 #[async_trait::async_trait]
 impl Tool for GetDayScheduleTool {
@@ -95,14 +98,21 @@ impl Tool for GetDayScheduleTool {
             })?;
 
         let entries = self
-            .0
+            .schedule
             .get_day_entries(ctx.user_id, date)
             .await
             .map_err(|e| db_err(self.name(), e))?;
 
-        let task_count = entries.iter().filter(|e| e.task_type.is_some()).count();
-        let total = entries.len();
-        let summary = format!("{total} entries, {task_count} tasks between meals");
+        let anchors = self
+            .anchors
+            .list_for_date(ctx.user_id, date)
+            .await
+            .map_err(|e| db_err(self.name(), e))?;
+
+        let task_count = entries.len();
+        let anchor_count = anchors.len();
+        let summary =
+            format!("{task_count} tasks and {anchor_count} meal anchors scheduled for this date");
 
         let entry_values: Vec<serde_json::Value> = entries
             .into_iter()
@@ -114,14 +124,7 @@ impl Tool for GetDayScheduleTool {
                 );
                 obj.insert(
                     "type".to_string(),
-                    match &e.task_type {
-                        Some(t) => serde_json::Value::String(t.clone()),
-                        None => serde_json::Value::String("meal_anchor".to_string()),
-                    },
-                );
-                obj.insert(
-                    "is_anchor".to_string(),
-                    serde_json::Value::Bool(e.task_type.is_none()),
+                    serde_json::Value::String(e.task_type.clone()),
                 );
                 if let Some(start) = e.scheduled_start {
                     obj.insert(
@@ -143,9 +146,22 @@ impl Tool for GetDayScheduleTool {
             })
             .collect();
 
+        let anchor_values: Vec<serde_json::Value> = anchors
+            .into_iter()
+            .map(|a| {
+                serde_json::json!({
+                    "id": a.id.to_string(),
+                    "name": a.name,
+                    "preferred_time": a.preferred_time.format("%H:%M").to_string(),
+                    "tolerance_minutes": a.tolerance_minutes,
+                })
+            })
+            .collect();
+
         Ok(serde_json::json!({
             "date": date.to_string(),
             "entries": entry_values,
+            "meal_anchors": anchor_values,
             "summary": summary
         }))
     }
@@ -359,14 +375,18 @@ impl Tool for RequestClarificationTool {
 /// ```ignore
 /// let task_repo: Arc<dyn TaskRepository> = Arc::new(PgTaskRepository::new(pool.clone()));
 /// let schedule_repo: Arc<dyn ScheduleRepository> = Arc::new(PgScheduleRepository::new(pool));
-/// register_schedule_tools(&mut registry, task_repo, schedule_repo);
+/// register_schedule_tools(&mut registry, task_repo, schedule_repo, anchor_repo);
 /// ```
 pub fn register_schedule_tools(
     registry: &mut ToolRegistry,
     task_repo: Arc<dyn TaskRepository>,
     schedule_repo: Arc<dyn ScheduleRepository>,
+    anchor_repo: Arc<dyn MealAnchorInstanceRepository>,
 ) {
-    registry.register(Arc::new(GetDayScheduleTool(schedule_repo)));
+    registry.register(Arc::new(GetDayScheduleTool {
+        schedule: schedule_repo,
+        anchors: anchor_repo,
+    }));
     registry.register(Arc::new(CreateTaskTool(task_repo)));
     registry.register(Arc::new(RequestClarificationTool));
 }
