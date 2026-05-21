@@ -463,7 +463,7 @@ fn test_schedule_entry_serde_with_after_anchor() {
         "actual_start": null,
         "actual_end": null,
         "after_anchor": "breakfast",
-        "slot_anchor_id": null,
+        "slot_meal_anchor_id": null,
         "deviation_note": null,
         "one_shot": false,
         "created_at": "2026-01-01T00:00:00Z",
@@ -471,7 +471,7 @@ fn test_schedule_entry_serde_with_after_anchor() {
     }"#;
     let entry: ScheduleEntry = serde_json::from_str(json).expect("deserialize failed");
     assert_eq!(entry.after_anchor.as_deref(), Some("breakfast"));
-    assert!(entry.slot_anchor_id.is_none());
+    assert!(entry.slot_meal_anchor_id.is_none());
     assert!(entry.routine_id.is_none());
     assert!(entry.actual_start.is_none());
 }

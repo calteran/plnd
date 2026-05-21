@@ -4,18 +4,20 @@ use utoipa::{Modify, OpenApi};
 use crate::api_response::{
     CarryoverApiResponse, CatalogDishIngredientResponse, CatalogIngredientResponse,
     CatalogMealDishResponse, CommittedEntryRef, DayTypeResponse, DietaryRestrictionResponse,
-    DishDetailApiResponse, MealDetailApiResponse, MealPatternEntryResponse, MealSuggestionResponse,
-    PlanStatusApiResponse, PlannedMealEntryResponse, PostSchedulePlanApiResponse, RoutineResponse,
-    ScheduleEntryResponse, SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
+    DishDetailApiResponse, MealAnchorInstanceResponse, MealDetailApiResponse,
+    MealPatternEntryResponse, MealSuggestionResponse, PlanStatusApiResponse,
+    PlannedMealEntryResponse, PostSchedulePlanApiResponse, RoutineResponse, ScheduleEntryResponse,
+    SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
     UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
-    CarryoverDecision, ConversationTurn, CreateMealPatternEntryRequest, FailedSlot,
-    MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealEntryRequest,
-    MealPlanRequest, MealPlanResponse, MealPlanState, MealRef, MealSuggestRequest, Nutrition,
-    NutritionSummary, PatchEntryStatusRequest, PlaceTasksEntry, PlaceTasksRequest,
-    PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef, TaskEntryRequest,
-    TaskEntryResponse, UpdateMealPatternEntryRequest,
+    CarryoverDecision, ConversationTurn, CreateMealPatternEntryRequest,
+    CreateScheduleAnchorRequest, FailedSlot, MealAdhocResolveRequest, MealAdhocResolveResponse,
+    MealEntry, MealEntryRequest, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
+    MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryStatusRequest, PlaceTasksEntry,
+    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef,
+    TaskEntryRequest, TaskEntryResponse, UpdateMealPatternEntryRequest,
+    UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
@@ -126,6 +128,11 @@ impl Modify for BearerSecurityAddon {
         crate::routes::schedule::get_plan_status,
         crate::routes::schedule::post_plan,
         crate::routes::schedule::patch_entry_status,
+        // Schedule Anchors (per-date meal anchor instances, #828)
+        crate::routes::schedule_anchors::list_for_date,
+        crate::routes::schedule_anchors::create,
+        crate::routes::schedule_anchors::update,
+        crate::routes::schedule_anchors::delete,
         // Routines
         crate::routes::routine::list_routines,
         crate::routes::routine::create_routine,
@@ -182,6 +189,9 @@ impl Modify for BearerSecurityAddon {
         PlanEntryRequest,
         MealEntryRequest,
         PlannedMealEntryResponse,
+        MealAnchorInstanceResponse,
+        CreateScheduleAnchorRequest,
+        UpdateScheduleAnchorRequest,
         CarryoverDecision,
         PatchEntryStatusRequest,
         RoutineResponse,

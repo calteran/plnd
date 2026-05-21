@@ -70,6 +70,32 @@ pub struct UpdateMealPatternEntryRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Schedule anchors (per-date meal anchor instances, issue #828)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct ListScheduleAnchorsQuery {
+    pub date: NaiveDate,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct CreateScheduleAnchorRequest {
+    pub date: NaiveDate,
+    pub name: String,
+    #[serde(deserialize_with = "deserialize_hhmm")]
+    pub preferred_time: NaiveTime,
+    pub tolerance_minutes: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct UpdateScheduleAnchorRequest {
+    pub name: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub preferred_time: Option<NaiveTime>,
+    pub tolerance_minutes: Option<i32>,
+}
+
+// ---------------------------------------------------------------------------
 // Schedule
 // ---------------------------------------------------------------------------
 

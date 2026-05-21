@@ -22,14 +22,19 @@ pub async fn yesterday_snapshot(
     user_id: Uuid,
     date: NaiveDate,
 ) -> Result<YesterdaySnapshot, DatabaseError> {
+    // Post-#828, schedule_entries is task-only and meal anchors live in
+    // meal_anchor_instances. The `meals_logged` field has no source until
+    // #829 restores meal completion tracking on the new model — return 0
+    // for now to avoid mis-reporting.
     sqlx::query_as::<_, YesterdaySnapshot>(
         "SELECT
-           COUNT(*) FILTER (WHERE task_type IS NOT NULL)                              AS tasks_total,
-           COUNT(*) FILTER (WHERE task_type IS NOT NULL AND status = 'completed')     AS tasks_done,
-           COUNT(*) FILTER (WHERE task_type IS NULL)                                  AS meals_planned,
-           COUNT(*) FILTER (WHERE task_type IS NULL AND status = 'completed')         AS meals_logged
-         FROM schedule_entries
-         WHERE user_id = $1 AND date = $2",
+           (SELECT COUNT(*) FROM schedule_entries
+              WHERE user_id = $1 AND date = $2)                              AS tasks_total,
+           (SELECT COUNT(*) FROM schedule_entries
+              WHERE user_id = $1 AND date = $2 AND status = 'completed')     AS tasks_done,
+           (SELECT COUNT(*) FROM meal_anchor_instances
+              WHERE user_id = $1 AND date = $2)                              AS meals_planned,
+           0::bigint                                                         AS meals_logged",
     )
     .bind(user_id)
     .bind(date)
@@ -47,7 +52,7 @@ mod tests {
     use uuid::Uuid;
 
     use super::*;
-    use crate::db::{schedule, tasks, users};
+    use crate::db::{meal_anchor_instance, schedule, tasks, users};
     use crate::models::{CommitPlanInput, PlanEntryInput};
 
     async fn new_user(pool: &PgPool) -> Uuid {
@@ -119,16 +124,6 @@ mod tests {
                     energy_required: None,
                     one_shot: None,
                 },
-                PlanEntryInput {
-                    date: yesterday,
-                    task_type: None, // meal anchor
-                    title: Some("Lunch".to_string()),
-                    scheduled_start: Some(noon),
-                    after_anchor: None,
-                    duration_minutes: None,
-                    energy_required: None,
-                    one_shot: None,
-                },
             ],
             meal_entries: Vec::new(),
             replace: false,
@@ -137,7 +132,13 @@ mod tests {
         };
         schedule::commit_plan(&pool, uid, &req).await.unwrap();
 
-        // Mark one work entry and the meal as completed
+        // Add a meal anchor instance directly (post-#828 they live in their
+        // own table, not in schedule_entries).
+        meal_anchor_instance::add(&pool, uid, yesterday, "Lunch", noon, 60)
+            .await
+            .unwrap();
+
+        // Mark one work entry as completed.
         sqlx::query(
             "UPDATE schedule_entries SET status = 'completed'
              WHERE user_id = $1 AND date = $2 AND title = 'Morning work'",
@@ -148,21 +149,12 @@ mod tests {
         .await
         .unwrap();
 
-        sqlx::query(
-            "UPDATE schedule_entries SET status = 'completed'
-             WHERE user_id = $1 AND date = $2 AND title = 'Lunch'",
-        )
-        .bind(uid)
-        .bind(yesterday)
-        .execute(&pool)
-        .await
-        .unwrap();
-
         let snap = yesterday_snapshot(&pool, uid, yesterday).await.unwrap();
 
-        assert_eq!(snap.tasks_total, 2, "2 non-meal entries");
-        assert_eq!(snap.tasks_done, 1, "1 completed non-meal entry");
-        assert_eq!(snap.meals_planned, 1, "1 meal entry");
-        assert_eq!(snap.meals_logged, 1, "1 completed meal entry");
+        assert_eq!(snap.tasks_total, 2, "2 task entries");
+        assert_eq!(snap.tasks_done, 1, "1 completed task");
+        assert_eq!(snap.meals_planned, 1, "1 meal anchor instance");
+        // meals_logged stubbed to 0 until #829 restores completion tracking.
+        assert_eq!(snap.meals_logged, 0);
     }
 }

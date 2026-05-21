@@ -1,10 +1,10 @@
 import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
-import { Subject, of, switchMap, map, catchError } from 'rxjs';
+import { Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
 import { ConfigService } from './config.service';
 import { ScheduleItem, MealAnchor, ScheduleTask, isMealAnchor, parseItemType } from '../models/schedule';
-import { ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
+import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {
@@ -25,25 +25,26 @@ export class ScheduleService {
 
   constructor() {
     this._loadTrigger$.pipe(
-      switchMap(date =>
-        this.http
+      switchMap(date => forkJoin({
+        schedule: this.http
           .get<SchedulePeriodResponse>(`${this.apiBase}/schedule/period`, {
             params: { start: date, end: date },
           })
           .pipe(
-            map(resp => ({ resp, error: false as const })),
-            catchError(() =>
-              of({
-                resp: { entries: [], carryover: [], planned_meals: [] } satisfies SchedulePeriodResponse,
-                error: true as const,
-              }),
-            ),
+            map(resp => ({ data: resp, error: false as const })),
+            catchError(() => of({
+              data: { entries: [], carryover: [], planned_meals: [] } satisfies SchedulePeriodResponse,
+              error: true as const,
+            })),
           ),
-      ),
+        anchors: this.http
+          .get<MealAnchorInstanceDto[]>(`${this.apiBase}/schedule/anchors`, { params: { date } })
+          .pipe(catchError(() => of([] as MealAnchorInstanceDto[]))),
+      })),
       takeUntilDestroyed(),
-    ).subscribe(({ resp, error }) => {
-      if (error) this._error.set('Failed to load schedule');
-      this._items.set(resp.entries.map(mapEntry));
+    ).subscribe(({ schedule, anchors }) => {
+      if (schedule.error) this._error.set('Failed to load schedule');
+      this._items.set([...anchors.map(mapAnchorInstance), ...schedule.data.entries.map(mapEntry)]);
       this._loading.set(false);
     });
   }
@@ -142,36 +143,28 @@ function findItemStatus(items: ScheduleItem[], id: string): 'pending' | 'done' |
 
 // ── API → model mapping ───────────────────────────────────────────────────────
 
-// Well-known anchor labels → display name + emoji. Unknown labels fall back gracefully.
 const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
   breakfast: { name: 'Breakfast', emoji: '🥣' },
   lunch:     { name: 'Lunch',     emoji: '🥗' },
   dinner:    { name: 'Dinner',    emoji: '🍽' },
 };
 
-function mapEntry(e: ScheduleEntryDto): ScheduleItem {
-  // Meal anchor entries have task_type === null. The meal name lives on
-  // `after_anchor`; `title` is the dish description, not the slot identity,
-  // so user-defined meal names (e.g. "Brunch") must come from after_anchor.
-  if (e.task_type == null) {
-    const slot = e.after_anchor ? MEAL_SLOTS[e.after_anchor.toLowerCase()] : undefined;
-    return {
-      id:    e.entry_id,
-      name:  slot?.name ?? e.after_anchor ?? e.title ?? 'Meal',
-      emoji: slot?.emoji ?? '🍴',
-      description: e.title ?? undefined,
-      status: e.status === 'completed' ? 'done'
-            : e.status === 'planned'   ? 'planned'
-            : e.status === 'skipped'   ? 'skipped'
-            : 'unplanned',
-      duringMealTasks: [],
-    } satisfies MealAnchor;
-  }
+function mapAnchorInstance(dto: MealAnchorInstanceDto): MealAnchor {
+  const slot = MEAL_SLOTS[dto.name.toLowerCase()];
+  return {
+    id:    dto.id,
+    name:  slot?.name ?? dto.name,
+    emoji: slot?.emoji ?? '🍴',
+    status: 'unplanned',
+    duringMealTasks: [],
+  };
+}
 
+function mapEntry(e: ScheduleEntryDto): ScheduleTask {
   return {
     id:     e.entry_id,
     type:   parseItemType(e.task_type),
-    label:  e.title ?? e.task_type,
+    label:  e.title ?? e.task_type ?? 'Task',
     status: e.status === 'completed' ? 'done' : 'pending',
-  } satisfies ScheduleTask;
+  };
 }

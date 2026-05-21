@@ -6,6 +6,7 @@ pub(crate) mod catalog_details;
 pub(crate) mod catalog_ingest;
 pub(crate) mod day_type;
 pub(crate) mod dietary_restrictions;
+pub(crate) mod meal_anchor_instance;
 pub(crate) mod meal_pattern;
 pub(crate) mod meal_plan;
 pub(crate) mod meal_suggestions;

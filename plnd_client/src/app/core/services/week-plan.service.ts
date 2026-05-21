@@ -124,7 +124,7 @@ export class WeekPlanService {
           const tasks: PlannedTask[] = [];
           const meals: Record<string, Partial<Record<MealSlot, PlannedMeal>>> = {};
           const plannedByScheduleEntryId = new Map(
-            resp.planned_meals.map(pm => [pm.schedule_entry_id, pm] as const),
+            resp.planned_meals.map(pm => [pm.meal_anchor_instance_id, pm] as const),
           );
           for (const entry of resp.entries) {
             if (entry.task_type == null && entry.after_anchor) {

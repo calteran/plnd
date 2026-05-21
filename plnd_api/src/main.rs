@@ -32,8 +32,8 @@ use plnd_api::openapi::ApiDoc;
 use plnd_api::routes::test_seed;
 use plnd_api::routes::{
     agent, auth, briefing, catalog_details, catalog_ingest, day_types, dietary_restrictions,
-    meal_pattern, meal_suggestions, preferences, routine, schedule, search, system, tasks,
-    user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    meal_pattern, meal_suggestions, preferences, routine, schedule, schedule_anchors, search,
+    system, tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -375,6 +375,14 @@ async fn main() {
         .route(
             "/schedule/entries/{id}/status",
             patch(schedule::patch_entry_status),
+        )
+        .route(
+            "/schedule/anchors",
+            get(schedule_anchors::list_for_date).post(schedule_anchors::create),
+        )
+        .route(
+            "/schedule/anchors/{id}",
+            patch(schedule_anchors::update).delete(schedule_anchors::delete),
         )
         .route(
             "/routines",

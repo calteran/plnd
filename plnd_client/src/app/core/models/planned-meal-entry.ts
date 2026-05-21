@@ -2,7 +2,7 @@ export type MealRefType = 'user_meal' | 'catalog_meal' | 'user_dish' | 'catalog_
 
 export interface PlannedMealEntryDto {
   meal_entry_id: string;
-  schedule_entry_id: string;
+  meal_anchor_instance_id: string;
   meal_ref_id: string;
   meal_ref_type: MealRefType;
   title: string | null;

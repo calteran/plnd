@@ -218,7 +218,7 @@ async fn seed_schedule(tx: &mut PgConnection, user_id: Uuid) -> Result<(), SeedE
     Ok(())
 }
 
-/// Seed one day's worth of entries: morning exercise, breakfast, lunch, dinner.
+/// Seed one day's worth of entries: morning exercise task + three meal anchor instances.
 /// `status` is "completed" for past/today or "planned" for future days.
 async fn seed_day(
     tx: &mut PgConnection,
@@ -226,30 +226,53 @@ async fn seed_day(
     date: NaiveDate,
     status: &str,
 ) -> Result<(), SeedError> {
-    // (task_type: None = meal anchor, wall-clock time "HH:MM", after_anchor)
-    let entries: &[(Option<&str>, &str, Option<&str>)] = &[
-        (Some("exercise"), "07:00", None),
-        (None, "08:00", Some("breakfast")),
-        (None, "12:30", Some("lunch")),
-        (None, "18:30", Some("dinner")),
+    // One task entry: morning exercise
+    let exercise_time = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
+    let scheduled_start = date.and_time(exercise_time).and_utc();
+    sqlx::query(
+        "INSERT INTO schedule_entries
+             (entry_id, user_id, task_type, date, scheduled_start, status)
+         VALUES ($1, $2, $3, $4, $5, $6)",
+    )
+    .bind(Uuid::new_v4())
+    .bind(user_id)
+    .bind("exercise")
+    .bind(date)
+    .bind(scheduled_start)
+    .bind(status)
+    .execute(&mut *tx)
+    .await?;
+
+    // Meal anchors — belong in meal_anchor_instances, not schedule_entries.
+    // Marker ensures the day is treated as materialized.
+    sqlx::query(
+        "INSERT INTO meal_anchor_materializations (user_id, date) VALUES ($1, $2)
+         ON CONFLICT DO NOTHING",
+    )
+    .bind(user_id)
+    .bind(date)
+    .execute(&mut *tx)
+    .await?;
+
+    let meals: &[(&str, &str, i32, i32)] = &[
+        ("breakfast", "08:00:00", 60, 0),
+        ("lunch", "12:30:00", 60, 1),
+        ("dinner", "18:30:00", 60, 2),
     ];
-
-    for (task_type, hhmm, after_anchor) in entries {
-        let t = NaiveTime::parse_from_str(hhmm, "%H:%M").expect("hardcoded time strings are valid");
-        let scheduled_start = date.and_time(t).and_utc();
-
+    for (name, preferred_time, tolerance, sort_order) in meals {
         sqlx::query(
-            "INSERT INTO schedule_entries
-                 (entry_id, user_id, task_type, date, scheduled_start, status, after_anchor)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO meal_anchor_instances
+                 (id, user_id, date, name, preferred_time, tolerance_minutes, sort_order)
+             VALUES ($1, $2, $3, $4, $5::time, $6, $7)
+             ON CONFLICT (user_id, date, name) DO NOTHING",
         )
         .bind(Uuid::new_v4())
         .bind(user_id)
-        .bind(task_type)
         .bind(date)
-        .bind(scheduled_start)
-        .bind(status)
-        .bind(after_anchor)
+        .bind(name)
+        .bind(preferred_time)
+        .bind(tolerance)
+        .bind(*sort_order)
         .execute(&mut *tx)
         .await?;
     }

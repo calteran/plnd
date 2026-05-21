@@ -230,7 +230,7 @@ describe('WeekPlanService', () => {
   });
 
   describe('loadPeriod', () => {
-    it('hydrates scheduledMeals.mealRef from planned_meals keyed by schedule_entry_id', () => {
+    it('hydrates scheduledMeals.mealRef from planned_meals keyed by meal_anchor_instance_id', () => {
       service.initSession('2026-03-24', '2026-03-24');
       const resp: SchedulePeriodResponse = {
         entries: [
@@ -257,14 +257,14 @@ describe('WeekPlanService', () => {
         planned_meals: [
           {
             meal_entry_id: 'pme-1',
-            schedule_entry_id: 'anchor-breakfast',
+            meal_anchor_instance_id: 'anchor-breakfast',
             meal_ref_id: 'u1',
             meal_ref_type: 'user_meal',
             title: 'Eggs',
           },
           {
             meal_entry_id: 'pme-2',
-            schedule_entry_id: 'anchor-lunch',
+            meal_anchor_instance_id: 'anchor-lunch',
             meal_ref_id: 'c1',
             meal_ref_type: 'catalog_meal',
             title: 'Salad',
@@ -299,7 +299,7 @@ describe('WeekPlanService', () => {
         planned_meals: [
           {
             meal_entry_id: 'pme-1',
-            schedule_entry_id: 'anchor-breakfast',
+            meal_anchor_instance_id: 'anchor-breakfast',
             meal_ref_id: 'cd1',
             meal_ref_type: 'catalog_dish',
             title: 'Avocado toast',

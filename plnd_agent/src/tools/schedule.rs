@@ -100,9 +100,10 @@ impl Tool for GetDayScheduleTool {
             .await
             .map_err(|e| db_err(self.name(), e))?;
 
-        let task_count = entries.iter().filter(|e| e.task_type.is_some()).count();
         let total = entries.len();
-        let summary = format!("{total} entries, {task_count} tasks between meals");
+        // Post-#828, schedule_entries is task-only; meal anchors live in
+        // meal_anchor_instances and are surfaced via a separate tool/route.
+        let summary = format!("{total} tasks scheduled for this date");
 
         let entry_values: Vec<serde_json::Value> = entries
             .into_iter()
@@ -114,14 +115,7 @@ impl Tool for GetDayScheduleTool {
                 );
                 obj.insert(
                     "type".to_string(),
-                    match &e.task_type {
-                        Some(t) => serde_json::Value::String(t.clone()),
-                        None => serde_json::Value::String("meal_anchor".to_string()),
-                    },
-                );
-                obj.insert(
-                    "is_anchor".to_string(),
-                    serde_json::Value::Bool(e.task_type.is_none()),
+                    serde_json::Value::String(e.task_type.clone()),
                 );
                 if let Some(start) = e.scheduled_start {
                     obj.insert(
