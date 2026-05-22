@@ -17,10 +17,10 @@ pub async fn list_for_day_type(
     pool: &PgPool,
     day_type_id: Uuid,
 ) -> Result<Vec<MealPatternEntry>, DatabaseError> {
-    sqlx::query_as::<_, MealPatternEntry>(&format!(
+    sqlx::query_as::<_, MealPatternEntry>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM meal_pattern_entries \
          WHERE day_type_id = $1 ORDER BY sort_order ASC"
-    ))
+    )))
     .bind(day_type_id)
     .fetch_all(pool)
     .await
@@ -33,12 +33,12 @@ pub async fn get_by_id(
     id: Uuid,
     user_id: Uuid,
 ) -> Result<Option<MealPatternEntry>, DatabaseError> {
-    sqlx::query_as::<_, MealPatternEntry>(&format!(
+    sqlx::query_as::<_, MealPatternEntry>(sqlx::AssertSqlSafe(format!(
         "SELECT {PREFIXED_COLUMNS} \
          FROM meal_pattern_entries mpe \
          JOIN user_day_types udt ON udt.id = mpe.day_type_id \
          WHERE mpe.id = $1 AND udt.user_id = $2"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .fetch_optional(pool)
@@ -55,12 +55,12 @@ pub async fn create(
     tolerance_minutes: i32,
     sort_order: i32,
 ) -> Result<MealPatternEntry, DatabaseError> {
-    sqlx::query_as::<_, MealPatternEntry>(&format!(
+    sqlx::query_as::<_, MealPatternEntry>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO meal_pattern_entries \
              (day_type_id, name, preferred_time, tolerance_minutes, sort_order) \
          VALUES ($1, $2, $3, $4, $5) \
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(day_type_id)
     .bind(name)
     .bind(preferred_time)
@@ -81,13 +81,13 @@ pub async fn update(
     tolerance_minutes: i32,
     sort_order: i32,
 ) -> Result<Option<MealPatternEntry>, DatabaseError> {
-    sqlx::query_as::<_, MealPatternEntry>(&format!(
+    sqlx::query_as::<_, MealPatternEntry>(sqlx::AssertSqlSafe(format!(
         "UPDATE meal_pattern_entries \
          SET name = $3, preferred_time = $4, tolerance_minutes = $5, sort_order = $6 \
          WHERE id = $1 \
            AND day_type_id IN (SELECT id FROM user_day_types WHERE user_id = $2) \
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .bind(name)

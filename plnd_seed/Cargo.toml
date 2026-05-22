@@ -15,7 +15,7 @@ path = "src/bin/seed.rs"
 
 [dependencies]
 plnd_data = { path = "../plnd_data" }
-sqlx = { version = "0.8", features = ["postgres", "uuid", "runtime-tokio", "json", "rust_decimal", "chrono"] }
+sqlx = { version = "0.9", features = ["postgres", "uuid", "runtime-tokio", "json", "rust_decimal", "chrono"] }
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 serde_json = "1.0"
@@ -25,7 +25,7 @@ thiserror = "2.0"
 anyhow = "1.0"
 
 [dev-dependencies]
-sqlx = { version = "0.8", features = ["macros"] }
+sqlx = { version = "0.9", features = ["macros"] }
 
 [package.metadata.cargo-machete]
 ignored = ["rust_decimal"]  # used via sqlx rust_decimal feature for Decimal Encode/Type impls

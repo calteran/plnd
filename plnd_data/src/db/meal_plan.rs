@@ -25,12 +25,12 @@ pub async fn list_for_date(
     user_id: Uuid,
     date: NaiveDate,
 ) -> Result<Vec<PlannedMealEntry>, DatabaseError> {
-    sqlx::query_as::<_, PlannedMealEntry>(&format!(
+    sqlx::query_as::<_, PlannedMealEntry>(sqlx::AssertSqlSafe(format!(
         "SELECT {PREFIXED_COLUMNS} \
          FROM planned_meal_entries pme \
          JOIN meal_anchor_instances mai ON mai.id = pme.meal_anchor_instance_id \
          WHERE pme.user_id = $1 AND mai.date = $2"
-    ))
+    )))
     .bind(user_id)
     .bind(date)
     .fetch_all(pool)
@@ -48,12 +48,12 @@ pub async fn list_for_period(
     start: NaiveDate,
     end: NaiveDate,
 ) -> Result<Vec<PlannedMealEntry>, DatabaseError> {
-    sqlx::query_as::<_, PlannedMealEntry>(&format!(
+    sqlx::query_as::<_, PlannedMealEntry>(sqlx::AssertSqlSafe(format!(
         "SELECT {PREFIXED_COLUMNS} \
          FROM planned_meal_entries pme \
          JOIN meal_anchor_instances mai ON mai.id = pme.meal_anchor_instance_id \
          WHERE pme.user_id = $1 AND mai.date BETWEEN $2 AND $3"
-    ))
+    )))
     .bind(user_id)
     .bind(start)
     .bind(end)
@@ -89,13 +89,13 @@ where
     let meal_ref_types: Vec<String> = entries.iter().map(|e| e.meal_ref_type.clone()).collect();
     let titles: Vec<Option<String>> = entries.iter().map(|e| e.title.clone()).collect();
 
-    sqlx::query_as::<_, PlannedMealEntry>(&format!(
+    sqlx::query_as::<_, PlannedMealEntry>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO planned_meal_entries \
              (user_id, meal_anchor_instance_id, meal_ref_id, meal_ref_type, title) \
          SELECT $1, unnest($2::uuid[]), unnest($3::uuid[]), \
                 unnest($4::varchar[]), unnest($5::varchar[]) \
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(user_id)
     .bind(&instance_ids)
     .bind(&meal_ref_ids)

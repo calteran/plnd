@@ -12,9 +12,9 @@ const COLUMNS: &str = "id, user_id, name, days_bitmask, wake_time, sleep_time, \
 /// List all day types for a user, ordered by created_at ascending.
 #[tracing::instrument(skip(pool), fields(table = "user_day_types", op = "list"))]
 pub async fn list_for_user(pool: &PgPool, user_id: Uuid) -> Result<Vec<DayType>, DatabaseError> {
-    sqlx::query_as::<_, DayType>(&format!(
+    sqlx::query_as::<_, DayType>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM user_day_types WHERE user_id = $1 ORDER BY created_at ASC"
-    ))
+    )))
     .bind(user_id)
     .fetch_all(pool)
     .await
@@ -28,9 +28,9 @@ pub async fn get_by_id(
     id: Uuid,
     user_id: Uuid,
 ) -> Result<Option<DayType>, DatabaseError> {
-    sqlx::query_as::<_, DayType>(&format!(
+    sqlx::query_as::<_, DayType>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM user_day_types WHERE id = $1 AND user_id = $2"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .fetch_optional(pool)
@@ -53,13 +53,13 @@ pub async fn create(
     anchor_date: Option<NaiveDate>,
     cycle_bitmask: i32,
 ) -> Result<DayType, DatabaseError> {
-    sqlx::query_as::<_, DayType>(&format!(
+    sqlx::query_as::<_, DayType>(sqlx::AssertSqlSafe(format!(
         "INSERT INTO user_day_types
             (user_id, name, days_bitmask, wake_time, sleep_time,
              is_cycle, cycle_length, anchor_date, cycle_bitmask)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(user_id)
     .bind(name)
     .bind(days_bitmask)
@@ -91,14 +91,14 @@ pub async fn update(
     anchor_date: Option<NaiveDate>,
     cycle_bitmask: i32,
 ) -> Result<Option<DayType>, DatabaseError> {
-    sqlx::query_as::<_, DayType>(&format!(
+    sqlx::query_as::<_, DayType>(sqlx::AssertSqlSafe(format!(
         "UPDATE user_day_types
          SET name = $3, days_bitmask = $4, wake_time = $5, sleep_time = $6,
              is_cycle = $7, cycle_length = $8, anchor_date = $9,
              cycle_bitmask = $10
          WHERE id = $1 AND user_id = $2
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .bind(name)

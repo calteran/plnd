@@ -26,17 +26,18 @@ pub async fn get_period(
     start: NaiveDate,
     end: NaiveDate,
 ) -> Result<SchedulePeriodResponse, DatabaseError> {
-    let entries: Vec<ScheduleEntry> = sqlx::query_as::<_, ScheduleEntry>(&format!(
-        "SELECT {ENTRY_COLS} FROM schedule_entries
+    let entries: Vec<ScheduleEntry> =
+        sqlx::query_as::<_, ScheduleEntry>(sqlx::AssertSqlSafe(format!(
+            "SELECT {ENTRY_COLS} FROM schedule_entries
          WHERE user_id = $1 AND date >= $2 AND date <= $3
          ORDER BY date, scheduled_start"
-    ))
-    .bind(user_id)
-    .bind(start)
-    .bind(end)
-    .fetch_all(pool)
-    .await
-    .map_err(DatabaseError::from)?;
+        )))
+        .bind(user_id)
+        .bind(start)
+        .bind(end)
+        .fetch_all(pool)
+        .await
+        .map_err(DatabaseError::from)?;
 
     let carryover = get_carryover(pool, user_id, start).await?;
 
@@ -49,13 +50,13 @@ pub async fn get_carryover(
     user_id: Uuid,
     before: NaiveDate,
 ) -> Result<Vec<ScheduleEntry>, DatabaseError> {
-    sqlx::query_as::<_, ScheduleEntry>(&format!(
+    sqlx::query_as::<_, ScheduleEntry>(sqlx::AssertSqlSafe(format!(
         "SELECT {ENTRY_COLS} FROM schedule_entries
          WHERE user_id = $1 AND date < $2
            AND status IN ('planned', 'deferred')
            AND one_shot = FALSE
          ORDER BY date, scheduled_start"
-    ))
+    )))
     .bind(user_id)
     .bind(before)
     .fetch_all(pool)
