@@ -14,10 +14,10 @@ pub async fn get_by_id(
     id: Uuid,
     user_id: Uuid,
 ) -> Result<Option<MealAnchorInstance>, DatabaseError> {
-    sqlx::query_as::<_, MealAnchorInstance>(&format!(
+    sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM meal_anchor_instances \
          WHERE id = $1 AND user_id = $2"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .fetch_optional(pool)
@@ -34,11 +34,11 @@ pub async fn list_for_date(
     user_id: Uuid,
     date: NaiveDate,
 ) -> Result<Vec<MealAnchorInstance>, DatabaseError> {
-    sqlx::query_as::<_, MealAnchorInstance>(&format!(
+    sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM meal_anchor_instances \
          WHERE user_id = $1 AND date = $2 \
          ORDER BY preferred_time, sort_order, id"
-    ))
+    )))
     .bind(user_id)
     .bind(date)
     .fetch_all(pool)
@@ -56,11 +56,11 @@ pub async fn list_for_date_range(
     start: NaiveDate,
     end: NaiveDate,
 ) -> Result<Vec<MealAnchorInstance>, DatabaseError> {
-    sqlx::query_as::<_, MealAnchorInstance>(&format!(
+    sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM meal_anchor_instances \
          WHERE user_id = $1 AND date >= $2 AND date <= $3 \
          ORDER BY date, preferred_time, sort_order, id"
-    ))
+    )))
     .bind(user_id)
     .bind(start)
     .bind(end)
@@ -141,11 +141,11 @@ pub async fn materialize(
         // don't keep re-checking. The instance set is correctly empty.
     }
 
-    let result = sqlx::query_as::<_, MealAnchorInstance>(&format!(
+    let result = sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
         "SELECT {COLUMNS} FROM meal_anchor_instances \
          WHERE user_id = $1 AND date = $2 \
          ORDER BY preferred_time, sort_order, id"
-    ))
+    )))
     .bind(user_id)
     .bind(date)
     .fetch_all(&mut *tx)
@@ -182,22 +182,23 @@ pub async fn add(
 
     // sort_order is purely cosmetic post-materialization (ordering is by
     // preferred_time), but the column is NOT NULL — append at the end.
-    let row: MealAnchorInstance = sqlx::query_as::<_, MealAnchorInstance>(&format!(
-        "INSERT INTO meal_anchor_instances \
+    let row: MealAnchorInstance =
+        sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
+            "INSERT INTO meal_anchor_instances \
             (user_id, date, name, preferred_time, tolerance_minutes, sort_order) \
          SELECT $1, $2, $3, $4, $5, COALESCE(MAX(sort_order), -1) + 1 \
            FROM meal_anchor_instances \
            WHERE user_id = $1 AND date = $2 \
          RETURNING {COLUMNS}"
-    ))
-    .bind(user_id)
-    .bind(date)
-    .bind(name)
-    .bind(preferred_time)
-    .bind(tolerance_minutes)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(DatabaseError::from)?;
+        )))
+        .bind(user_id)
+        .bind(date)
+        .bind(name)
+        .bind(preferred_time)
+        .bind(tolerance_minutes)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?;
 
     tx.commit().await.map_err(DatabaseError::from)?;
     Ok(row)
@@ -210,12 +211,12 @@ pub async fn rename(
     user_id: Uuid,
     name: &str,
 ) -> Result<Option<MealAnchorInstance>, DatabaseError> {
-    sqlx::query_as::<_, MealAnchorInstance>(&format!(
+    sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
         "UPDATE meal_anchor_instances \
          SET name = $3, updated_at = NOW() \
          WHERE id = $1 AND user_id = $2 \
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .bind(name)
@@ -232,12 +233,12 @@ pub async fn retime(
     preferred_time: NaiveTime,
     tolerance_minutes: i32,
 ) -> Result<Option<MealAnchorInstance>, DatabaseError> {
-    sqlx::query_as::<_, MealAnchorInstance>(&format!(
+    sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
         "UPDATE meal_anchor_instances \
          SET preferred_time = $3, tolerance_minutes = $4, updated_at = NOW() \
          WHERE id = $1 AND user_id = $2 \
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .bind(preferred_time)
@@ -256,7 +257,7 @@ pub async fn update(
     preferred_time: Option<NaiveTime>,
     tolerance_minutes: Option<i32>,
 ) -> Result<Option<MealAnchorInstance>, DatabaseError> {
-    sqlx::query_as::<_, MealAnchorInstance>(&format!(
+    sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
         "UPDATE meal_anchor_instances \
          SET name = COALESCE($3, name), \
              preferred_time = COALESCE($4, preferred_time), \
@@ -264,7 +265,7 @@ pub async fn update(
              updated_at = NOW() \
          WHERE id = $1 AND user_id = $2 \
          RETURNING {COLUMNS}"
-    ))
+    )))
     .bind(id)
     .bind(user_id)
     .bind(name)

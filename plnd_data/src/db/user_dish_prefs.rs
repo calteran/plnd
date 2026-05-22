@@ -29,11 +29,11 @@ const PREF_DETAIL_SELECT: &str = r#"
 
 #[tracing::instrument(skip(pool), fields(table = "user_dish_prefs", op = "list"))]
 pub async fn list(pool: &PgPool, user_id: Uuid) -> Result<Vec<UserDishPrefDetail>, DatabaseError> {
-    let sql = format!(
+    let sql = sqlx::AssertSqlSafe(format!(
         "{} WHERE p.user_id = $1 ORDER BY p.created_at",
         PREF_DETAIL_SELECT
-    );
-    sqlx::query_as::<_, UserDishPrefDetail>(&sql)
+    ));
+    sqlx::query_as::<_, UserDishPrefDetail>(sql)
         .bind(user_id)
         .fetch_all(pool)
         .await
@@ -46,11 +46,11 @@ pub async fn get(
     user_id: Uuid,
     pref_id: Uuid,
 ) -> Result<Option<UserDishPrefDetail>, DatabaseError> {
-    let sql = format!(
+    let sql = sqlx::AssertSqlSafe(format!(
         "{} WHERE p.user_id = $1 AND p.user_dish_pref_id = $2",
         PREF_DETAIL_SELECT
-    );
-    sqlx::query_as::<_, UserDishPrefDetail>(&sql)
+    ));
+    sqlx::query_as::<_, UserDishPrefDetail>(sql)
         .bind(user_id)
         .bind(pref_id)
         .fetch_optional(pool)
