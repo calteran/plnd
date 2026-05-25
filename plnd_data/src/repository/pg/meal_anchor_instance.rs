@@ -60,6 +60,17 @@ impl MealAnchorInstanceRepository for PgMealAnchorInstanceRepository {
             .map_err(Into::into)
     }
 
+    async fn materialize_range(
+        &self,
+        user_id: Uuid,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<MealAnchorInstance>, crate::Error> {
+        db::materialize_range(&self.pool, user_id, start, end)
+            .await
+            .map_err(Into::into)
+    }
+
     async fn add(
         &self,
         user_id: Uuid,

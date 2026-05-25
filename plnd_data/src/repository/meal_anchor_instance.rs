@@ -31,6 +31,13 @@ pub trait MealAnchorInstanceRepository: Send + Sync {
         date: NaiveDate,
     ) -> Result<Vec<MealAnchorInstance>, crate::Error>;
 
+    async fn materialize_range(
+        &self,
+        user_id: Uuid,
+        start: NaiveDate,
+        end: NaiveDate,
+    ) -> Result<Vec<MealAnchorInstance>, crate::Error>;
+
     async fn add(
         &self,
         user_id: Uuid,

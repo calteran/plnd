@@ -427,21 +427,10 @@ pub async fn resolve_open_slots(
         return Ok(Vec::new());
     }
 
-    // Lazy materialization: for each in-window date, ensure instances exist.
-    // `materialize` is idempotent and a no-op if the date is already
-    // materialized (whether non-empty or user-emptied).
-    let mut date = plan_start;
-    loop {
-        crate::db::meal_anchor_instance::materialize(pool, user_id, date).await?;
-        let Some(next) = date.succ_opt() else { break };
-        if next > plan_end {
-            break;
-        }
-        date = next;
-    }
-
+    // Lazy materialization: ensure all dates in the window have been materialized.
+    // `materialize_range` is idempotent and processes the whole range in one transaction.
     let instances =
-        crate::db::meal_anchor_instance::list_for_date_range(pool, user_id, plan_start, plan_end)
+        crate::db::meal_anchor_instance::materialize_range(pool, user_id, plan_start, plan_end)
             .await?;
 
     let locked_set: HashSet<(NaiveDate, &str)> =
