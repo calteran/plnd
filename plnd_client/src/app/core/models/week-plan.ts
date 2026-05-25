@@ -108,8 +108,7 @@ export interface PlanDraftShape {
 
 export interface ScheduleEntryDto {
   entry_id: string;
-  /** null only in legacy data; the backend now always returns a non-null task_type */
-  task_type: string | null;
+  task_type: string;
   title?: string;
   date: string;
   scheduled_start: string;

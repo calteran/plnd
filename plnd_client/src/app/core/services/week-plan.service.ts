@@ -123,9 +123,9 @@ export class WeekPlanService {
         ) {
           const tasks: PlannedTask[] = resp.entries.map(entry => ({
             date: entry.date,
-            title: entry.title ?? entry.task_type ?? '',
+            title: entry.title ?? entry.task_type,
             energy: 'medium' as const,
-            task_type: entry.task_type ?? undefined,
+            task_type: entry.task_type,
             scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
           }));
 

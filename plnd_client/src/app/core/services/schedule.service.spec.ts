@@ -136,6 +136,20 @@ describe('ScheduleService', () => {
     expect((svc.scheduleItems()[0] as ScheduleTask).type).toBe('general');
   });
 
+  it('uses task_type as label when title is absent', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e-notitle',
+      task_type: 'exercise',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+    }]);
+
+    const task = svc.scheduleItems()[0] as ScheduleTask;
+    expect(task.label).toBe('exercise');
+  });
+
   it('maps a meal anchor instance to MealAnchor with MEAL_SLOTS name and emoji', () => {
     svc.loadDay('2026-04-02');
     flushDay(httpMock, [], [{

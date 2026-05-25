@@ -305,6 +305,44 @@ describe('WeekPlanService', () => {
       // No meals were planned, so the date's slot map is not populated.
       expect(service.scheduledMeals()['2026-03-24']).toBeUndefined();
     });
+
+    it('hydrates scheduledTasks from resp.entries with task_type as title fallback', () => {
+      service.initSession('2026-03-24', '2026-03-24');
+      const resp: SchedulePeriodResponse = {
+        entries: [
+          {
+            entry_id: 'e-exercise',
+            task_type: 'exercise',
+            title: 'Morning run',
+            date: '2026-03-24',
+            scheduled_start: '2026-03-24T07:00:00Z',
+            status: 'planned',
+          },
+          {
+            entry_id: 'e-notitle',
+            task_type: 'general',
+            date: '2026-03-24',
+            scheduled_start: '2026-03-24T09:00:00Z',
+            status: 'planned',
+          },
+        ],
+        carryover: [],
+        planned_meals: [],
+      };
+      service.loadPeriod('2026-03-24', '2026-03-24').subscribe();
+      const req = httpMock.expectOne(r => r.url.includes('/schedule/period') && r.method === 'GET');
+      req.flush(resp);
+
+      const tasks = service.scheduledTasks();
+      expect(tasks.length).toBe(2);
+
+      const withTitle = tasks.find(t => t.task_type === 'exercise');
+      expect(withTitle?.title).toBe('Morning run');
+      expect(withTitle?.task_type).toBe('exercise');
+
+      const noTitle = tasks.find(t => t.task_type === 'general');
+      expect(noTitle?.title).toBe('general');  // task_type used as title fallback
+    });
   });
 
   describe('commitPlan / buildCommitRequest', () => {

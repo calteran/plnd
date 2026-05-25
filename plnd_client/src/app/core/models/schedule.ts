@@ -26,7 +26,7 @@ export type ScheduleItem = ScheduleTask | MealAnchor;
 
 const ITEM_TYPES: ReadonlySet<ItemType> = new Set(['work', 'exercise', 'leisure', 'medication', 'appointment', 'general']);
 
-export function parseItemType(value: string | null | undefined): ItemType {
+export function parseItemType(value: string | undefined): ItemType {
   if (value && ITEM_TYPES.has(value as ItemType)) return value as ItemType;
   return 'general';
 }
