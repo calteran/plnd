@@ -186,7 +186,7 @@ pub async fn materialize_range(
     // Claim all unclaimed materialization slots in one statement.
     // Already-materialized dates are skipped via ON CONFLICT DO NOTHING.
     // RETURNING gives us exactly the newly-claimed dates.
-    let claimed: Vec<NaiveDate> = sqlx::query_as::<_, (NaiveDate,)>(
+    let claimed: Vec<NaiveDate> = sqlx::query_scalar(
         "INSERT INTO meal_anchor_materializations (user_id, date) \
          SELECT $1, d FROM UNNEST($2::date[]) AS d \
          ON CONFLICT DO NOTHING \
@@ -196,10 +196,7 @@ pub async fn materialize_range(
     .bind(&dates)
     .fetch_all(&mut *tx)
     .await
-    .map_err(DatabaseError::from)?
-    .into_iter()
-    .map(|(d,)| d)
-    .collect();
+    .map_err(DatabaseError::from)?;
 
     if !claimed.is_empty() {
         // Fetch day types once — shared across all claimed dates.
