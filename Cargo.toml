@@ -3,4 +3,4 @@ members = ["plnd_agent", "plnd_api", "plnd_data", "plnd_seed"]
 resolver = "2"
 
 [workspace.package]
-rust-version = "1.88"
+rust-version = "1.94"
