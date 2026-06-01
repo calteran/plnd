@@ -7,6 +7,7 @@ use super::{
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
+const MAX_RETRIES: u32 = 3;
 
 pub struct AnthropicProvider {
     http: reqwest::Client,
@@ -138,27 +139,57 @@ enum AnthropicContentBlock {
     },
 }
 
+// ── Retry policy ─────────────────────────────────────────────────────────────
+
+/// Returns how long to wait (ms) before retrying a failed request, or `None`
+/// if the status code is not retriable.
+///
+/// Retriable: 429 (rate limit) and 529 (Anthropic overload).
+/// Priority: `retry-after-ms` header → `retry-after` (seconds) → exponential
+/// backoff starting at 1 s, doubling each attempt, capped at 8 s.
+fn retry_delay_ms(status: u16, headers: &reqwest::header::HeaderMap, attempt: u32) -> Option<u64> {
+    if status != 429 && status != 529 {
+        return None;
+    }
+    if let Some(ms) = headers
+        .get("retry-after-ms")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        return Some(ms);
+    }
+    if let Some(secs) = headers
+        .get("retry-after")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        return Some(secs * 1_000);
+    }
+    // Exponential backoff: 1 s, 2 s, 4 s, capped at 8 s.
+    Some(1_000 * (1u64 << attempt.min(3)))
+}
+
 // ── LlmProvider impl ─────────────────────────────────────────────────────────
 
-#[async_trait::async_trait]
-impl LlmProvider for AnthropicProvider {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
-        let messages: Vec<AnthropicMessage> = request
+impl AnthropicProvider {
+    /// Build Anthropic wire-format messages from a [`CompletionRequest`].
+    fn build_messages(request: &CompletionRequest) -> Vec<AnthropicMessage> {
+        request
             .messages
-            .into_iter()
+            .iter()
             .map(|m| match m.role {
                 MessageRole::User => AnthropicMessage {
                     role: "user",
-                    content: match m.content {
-                        MessageContent::Text(t) => AnthropicMessageContent::Text(t),
+                    content: match &m.content {
+                        MessageContent::Text(t) => AnthropicMessageContent::Text(t.clone()),
                         MessageContent::ToolResults(_) => {
                             unreachable!("User role should never carry ToolResults content")
                         }
                     },
                 },
                 MessageRole::Assistant => {
-                    let text = match m.content {
-                        MessageContent::Text(t) => t,
+                    let text = match &m.content {
+                        MessageContent::Text(t) => t.clone(),
                         MessageContent::ToolResults(_) => {
                             unreachable!("Assistant role should never carry ToolResults content")
                         }
@@ -176,11 +207,11 @@ impl LlmProvider for AnthropicProvider {
                         if !text.is_empty() {
                             blocks.push(AnthropicBlock::Text { text });
                         }
-                        for tc in m.tool_calls {
+                        for tc in &m.tool_calls {
                             blocks.push(AnthropicBlock::ToolUse {
-                                id: tc.id,
-                                name: tc.name,
-                                input: tc.arguments,
+                                id: tc.id.clone(),
+                                name: tc.name.clone(),
+                                input: tc.arguments.clone(),
                             });
                         }
                         AnthropicMessage {
@@ -194,22 +225,29 @@ impl LlmProvider for AnthropicProvider {
                 // tool call from the previous assistant turn.
                 MessageRole::Tool => AnthropicMessage {
                     role: "user",
-                    content: match m.content {
+                    content: match &m.content {
                         MessageContent::ToolResults(parts) => AnthropicMessageContent::Blocks(
                             parts
-                                .into_iter()
+                                .iter()
                                 .map(|p| AnthropicBlock::ToolResult {
-                                    tool_use_id: p.tool_call_id,
-                                    content: p.content,
+                                    tool_use_id: p.tool_call_id.clone(),
+                                    content: p.content.clone(),
                                 })
                                 .collect(),
                         ),
-                        MessageContent::Text(t) => AnthropicMessageContent::Text(t),
+                        MessageContent::Text(t) => AnthropicMessageContent::Text(t.clone()),
                     },
                 },
             })
-            .collect();
+            .collect()
+    }
 
+    /// Send one HTTP request to the Anthropic messages endpoint.
+    async fn send_request(
+        &self,
+        request: &CompletionRequest,
+    ) -> Result<reqwest::Response, LlmError> {
+        let messages = Self::build_messages(request);
         let tools: Vec<AnthropicToolDef<'_>> = request
             .tools
             .iter()
@@ -219,7 +257,6 @@ impl LlmProvider for AnthropicProvider {
                 input_schema: &t.schema,
             })
             .collect();
-
         let body = AnthropicRequest {
             model: &self.model,
             max_tokens: request.max_tokens,
@@ -227,9 +264,8 @@ impl LlmProvider for AnthropicProvider {
             messages,
             tools,
         };
-
         let url = format!("{}/v1/messages", self.base_url);
-        let http_response = self
+        Ok(self
             .http
             .post(&url)
             .header("x-api-key", &self.api_key)
@@ -239,17 +275,13 @@ impl LlmProvider for AnthropicProvider {
             )
             .json(&body)
             .send()
-            .await?;
+            .await?)
+    }
 
-        if !http_response.status().is_success() {
-            let status = http_response.status().as_u16();
-            let message = http_response
-                .text()
-                .await
-                .unwrap_or_else(|_| "(unreadable body)".to_string());
-            return Err(LlmError::Api { status, message });
-        }
-
+    /// Parse a successful HTTP response into a [`CompletionResponse`].
+    async fn parse_response(
+        http_response: reqwest::Response,
+    ) -> Result<CompletionResponse, LlmError> {
         let parsed: AnthropicResponse = http_response
             .json()
             .await
@@ -264,7 +296,6 @@ impl LlmProvider for AnthropicProvider {
 
         let mut text_parts: Vec<String> = Vec::new();
         let mut tool_calls: Vec<ToolCall> = Vec::new();
-
         for block in parsed.content {
             match block {
                 AnthropicContentBlock::Text { text } => text_parts.push(text),
@@ -277,20 +308,53 @@ impl LlmProvider for AnthropicProvider {
                 }
             }
         }
-
         let accumulated = text_parts.join("");
-        let content = if accumulated.is_empty() {
-            None
-        } else {
-            Some(accumulated)
-        };
-
         Ok(CompletionResponse {
-            content,
+            content: if accumulated.is_empty() {
+                None
+            } else {
+                Some(accumulated)
+            },
             tool_calls,
             stop_reason,
             usage: Some(parsed.usage.to_token_usage()),
         })
+    }
+}
+
+#[async_trait::async_trait]
+impl LlmProvider for AnthropicProvider {
+    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+        for attempt in 0..=MAX_RETRIES {
+            let http_response = self.send_request(&request).await?;
+
+            if http_response.status().is_success() {
+                return Self::parse_response(http_response).await;
+            }
+
+            let status = http_response.status().as_u16();
+            let headers = http_response.headers().clone();
+            let message = http_response
+                .text()
+                .await
+                .unwrap_or_else(|_| "(unreadable body)".to_string());
+
+            if let Some(delay_ms) = retry_delay_ms(status, &headers, attempt)
+                && attempt < MAX_RETRIES
+            {
+                tracing::warn!(
+                    attempt,
+                    status,
+                    delay_ms,
+                    "LLM rate limit or overload; retrying after delay"
+                );
+                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                continue;
+            }
+
+            return Err(LlmError::Api { status, message });
+        }
+        unreachable!()
     }
 
     fn name(&self) -> &str {
@@ -305,6 +369,62 @@ impl LlmProvider for AnthropicProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── retry_delay_ms ────────────────────────────────────────────────────────
+
+    #[test]
+    fn retry_delay_ms_returns_none_for_non_retriable_status() {
+        let headers = reqwest::header::HeaderMap::new();
+        assert_eq!(retry_delay_ms(200, &headers, 0), None);
+        assert_eq!(retry_delay_ms(400, &headers, 0), None);
+        assert_eq!(retry_delay_ms(500, &headers, 0), None);
+        assert_eq!(retry_delay_ms(503, &headers, 0), None);
+    }
+
+    #[test]
+    fn retry_delay_ms_uses_retry_after_ms_header_on_429() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("retry-after-ms", "2500".parse().unwrap());
+        assert_eq!(retry_delay_ms(429, &headers, 0), Some(2500));
+    }
+
+    #[test]
+    fn retry_delay_ms_converts_retry_after_seconds_to_ms_on_429() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("retry-after", "3".parse().unwrap());
+        assert_eq!(retry_delay_ms(429, &headers, 0), Some(3000));
+    }
+
+    #[test]
+    fn retry_delay_ms_prefers_ms_header_over_seconds_header() {
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert("retry-after-ms", "1500".parse().unwrap());
+        headers.insert("retry-after", "10".parse().unwrap());
+        assert_eq!(retry_delay_ms(429, &headers, 0), Some(1500));
+    }
+
+    #[test]
+    fn retry_delay_ms_exponential_backoff_when_no_header() {
+        let headers = reqwest::header::HeaderMap::new();
+        assert_eq!(retry_delay_ms(429, &headers, 0), Some(1_000));
+        assert_eq!(retry_delay_ms(429, &headers, 1), Some(2_000));
+        assert_eq!(retry_delay_ms(429, &headers, 2), Some(4_000));
+    }
+
+    #[test]
+    fn retry_delay_ms_caps_backoff_at_eight_seconds() {
+        let headers = reqwest::header::HeaderMap::new();
+        assert_eq!(retry_delay_ms(429, &headers, 3), Some(8_000));
+        assert_eq!(retry_delay_ms(429, &headers, 99), Some(8_000));
+    }
+
+    #[test]
+    fn retry_delay_ms_applies_to_529_overload() {
+        let headers = reqwest::header::HeaderMap::new();
+        assert_eq!(retry_delay_ms(529, &headers, 0), Some(1_000));
+    }
+
+    // ── AnthropicUsage ────────────────────────────────────────────────────────
 
     fn make_usage(input: u32, output: u32, cache_read: u32, cache_creation: u32) -> AnthropicUsage {
         AnthropicUsage {
