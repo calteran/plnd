@@ -827,17 +827,35 @@ pub fn register_meal_read_tools(
     ingredient_pref_repo: Arc<dyn UserIngredientPrefRepository>,
     user_meal_pref_repo: Arc<dyn UserMealPrefRepository>,
 ) {
+    register_meal_slot_read_tools(
+        registry,
+        Arc::clone(&meal_repo),
+        ingredient_pref_repo,
+        Arc::clone(&user_meal_pref_repo),
+    );
+    registry.register(Arc::new(GetMealNutritionTool(Arc::clone(&meal_repo))));
+    registry.register(Arc::new(EstimateNutritionFromDescriptionTool(meal_repo)));
+}
+
+/// Register only the search and preference tools needed for per-slot meal
+/// suggestion. Excludes the nutrition tools (`get_meal_nutrition`,
+/// `estimate_nutrition_from_description`) that the slot-suggestion prompt
+/// never calls — omitting them reduces per-request input tokens.
+pub fn register_meal_slot_read_tools(
+    registry: &mut ToolRegistry,
+    meal_repo: Arc<dyn MealRepository>,
+    ingredient_pref_repo: Arc<dyn UserIngredientPrefRepository>,
+    user_meal_pref_repo: Arc<dyn UserMealPrefRepository>,
+) {
     registry.register(Arc::new(SearchMealCatalogTool(Arc::clone(&meal_repo))));
     registry.register(Arc::new(GetUserMealLibraryTool(Arc::clone(
         &user_meal_pref_repo,
     ))));
     registry.register(Arc::new(GetUserMealPreferencesTool {
-        meal: Arc::clone(&meal_repo),
+        meal: meal_repo,
         ingredient_pref: ingredient_pref_repo,
-        meal_pref: Arc::clone(&user_meal_pref_repo),
+        meal_pref: user_meal_pref_repo,
     }));
-    registry.register(Arc::new(GetMealNutritionTool(Arc::clone(&meal_repo))));
-    registry.register(Arc::new(EstimateNutritionFromDescriptionTool(meal_repo)));
 }
 
 /// Registers the terminal tools for the `MealRebalance` use case.
@@ -1992,5 +2010,172 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result, input);
+    }
+
+    // ── register_meal_slot_read_tools ─────────────────────────────────────────
+
+    struct StubMealRepo;
+
+    #[async_trait::async_trait]
+    impl plnd_data::repository::MealRepository for StubMealRepo {
+        async fn list_dietary_restrictions(
+            &self,
+            _: uuid::Uuid,
+        ) -> Result<Vec<plnd_data::models::DietaryRestriction>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn create_dietary_restriction(
+            &self,
+            _: uuid::Uuid,
+            _: &str,
+            _: &str,
+            _: Option<&str>,
+        ) -> Result<plnd_data::models::DietaryRestriction, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn update_dietary_restriction(
+            &self,
+            _: uuid::Uuid,
+            _: uuid::Uuid,
+            _: Option<&str>,
+        ) -> Result<Option<plnd_data::models::DietaryRestriction>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn delete_dietary_restriction(
+            &self,
+            _: uuid::Uuid,
+            _: uuid::Uuid,
+        ) -> Result<bool, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn search_catalog_meals(
+            &self,
+            _: &str,
+            _: i64,
+            _: Option<&str>,
+            _: &[String],
+            _: Option<uuid::Uuid>,
+        ) -> Result<Vec<plnd_data::models::CatalogMeal>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn ingredient_names_by_ids(
+            &self,
+            _: &[uuid::Uuid],
+        ) -> Result<Vec<(uuid::Uuid, String)>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn catalog_meal_names_by_ids(
+            &self,
+            _: &[uuid::Uuid],
+        ) -> Result<Vec<(uuid::Uuid, String)>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn user_meal_names_by_ids(
+            &self,
+            _: uuid::Uuid,
+            _: &[uuid::Uuid],
+        ) -> Result<Vec<(uuid::Uuid, String)>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn search_ingredient_nutrition(
+            &self,
+            _: &str,
+            _: i64,
+        ) -> Result<Vec<plnd_data::models::CatalogIngredient>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn catalog_meal_nutrition(
+            &self,
+            _: uuid::Uuid,
+        ) -> Result<Option<Option<serde_json::Value>>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn user_meal_nutrition(
+            &self,
+            _: uuid::Uuid,
+            _: uuid::Uuid,
+        ) -> Result<Option<(Option<serde_json::Value>, bool)>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn catalog_ingredient(
+            &self,
+            _: uuid::Uuid,
+        ) -> Result<Option<plnd_data::models::CatalogIngredient>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn catalog_dish(
+            &self,
+            _: uuid::Uuid,
+        ) -> Result<
+            Option<(
+                plnd_data::models::CatalogDish,
+                Vec<plnd_data::models::CatalogDishIngredient>,
+            )>,
+            plnd_data::Error,
+        > {
+            unimplemented!("stub")
+        }
+        async fn catalog_meal(
+            &self,
+            _: uuid::Uuid,
+        ) -> Result<
+            Option<(
+                plnd_data::models::CatalogMeal,
+                Vec<plnd_data::models::CatalogMealDish>,
+            )>,
+            plnd_data::Error,
+        > {
+            unimplemented!("stub")
+        }
+    }
+
+    struct StubUserIngredientPrefRepo;
+
+    #[async_trait::async_trait]
+    impl plnd_data::repository::UserIngredientPrefRepository for StubUserIngredientPrefRepo {
+        async fn list(
+            &self,
+            _: uuid::Uuid,
+        ) -> Result<Vec<plnd_data::models::UserIngredientPref>, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn upsert(
+            &self,
+            _: uuid::Uuid,
+            _: uuid::Uuid,
+            _: i16,
+            _: Option<&str>,
+        ) -> Result<plnd_data::models::UserIngredientPref, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+        async fn delete(&self, _: uuid::Uuid, _: uuid::Uuid) -> Result<bool, plnd_data::Error> {
+            unimplemented!("stub")
+        }
+    }
+
+    #[test]
+    fn meal_slot_read_tools_excludes_nutrition_tools() {
+        let mut registry = ToolRegistry::new();
+        register_meal_slot_read_tools(
+            &mut registry,
+            Arc::new(StubMealRepo),
+            Arc::new(StubUserIngredientPrefRepo),
+            Arc::new(StubUserMealPrefRepo),
+        );
+
+        let names: std::collections::HashSet<String> =
+            registry.definitions().into_iter().map(|d| d.name).collect();
+
+        assert!(names.contains("search_meal_catalog"));
+        assert!(names.contains("get_user_meal_library"));
+        assert!(names.contains("get_user_meal_preferences"));
+        assert!(
+            !names.contains("get_meal_nutrition"),
+            "nutrition tool should not be in slot registry"
+        );
+        assert!(
+            !names.contains("estimate_nutrition_from_description"),
+            "nutrition estimation should not be in slot registry"
+        );
     }
 }

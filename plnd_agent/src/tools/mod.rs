@@ -2,6 +2,7 @@ pub(crate) mod meal;
 pub(crate) use meal::register_meal_adhoc_resolve_tools;
 pub(crate) use meal::register_meal_read_tools;
 pub(crate) use meal::register_meal_rebalance_tools;
+pub(crate) use meal::register_meal_slot_read_tools;
 pub(crate) use meal::register_meal_suggest_slot_tools;
 
 pub(crate) mod memory;
@@ -185,7 +186,7 @@ pub(crate) fn build_tool_registry(
             register_meal_rebalance_tools(&mut registry, week_state);
         }
         UseCase::MealSuggestSlot => {
-            register_meal_read_tools(
+            register_meal_slot_read_tools(
                 &mut registry,
                 Arc::clone(&repos.meal),
                 Arc::clone(&repos.user_ingredient_pref),
