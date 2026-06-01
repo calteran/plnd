@@ -51,11 +51,20 @@ pub async fn seed(
         return Ok(());
     }
 
-    tracing::info!(provider_count = nutrition_providers.len(), "catalog seed: fetching ingredients");
+    tracing::info!(
+        provider_count = nutrition_providers.len(),
+        "catalog seed: fetching ingredients"
+    );
     let fetched_ingredients = ingredients::fetch_ingredients(nutrition_providers).await;
-    tracing::info!(count = fetched_ingredients.len(), "catalog seed: ingredients fetched");
+    tracing::info!(
+        count = fetched_ingredients.len(),
+        "catalog seed: ingredients fetched"
+    );
 
-    tracing::info!(provider_count = recipe_providers.len(), "catalog seed: fetching dishes");
+    tracing::info!(
+        provider_count = recipe_providers.len(),
+        "catalog seed: fetching dishes"
+    );
     let fetched_dishes = dishes::fetch_dishes(recipe_providers).await;
     tracing::info!(count = fetched_dishes.len(), "catalog seed: dishes fetched");
 
@@ -64,7 +73,10 @@ pub async fn seed(
 
     let ingredients_inserted =
         ingredients::insert_ingredients(&mut tx, &fetched_ingredients).await?;
-    tracing::info!(count = ingredients_inserted, "catalog seed: ingredients inserted");
+    tracing::info!(
+        count = ingredients_inserted,
+        "catalog seed: ingredients inserted"
+    );
 
     let dishes_upserted = dishes::insert_dishes(&mut tx, &fetched_dishes).await?;
     tracing::info!(count = dishes_upserted, "catalog seed: dishes upserted");

@@ -406,7 +406,8 @@ mod tests {
                 { "nutrient": { "id": 1008 }, "amount": 346.0, "type": "FoodNutrient" }
             ]
         }"#;
-        let food: FdcDetailFood = serde_json::from_str(json).expect("should not fail on missing amount");
+        let food: FdcDetailFood =
+            serde_json::from_str(json).expect("should not fail on missing amount");
         let facts = build_nutrition_from_detail(&food.food_nutrients);
         assert_eq!(facts.calories_kcal, Some(346.0));
     }
