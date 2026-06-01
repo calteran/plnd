@@ -66,7 +66,8 @@ struct FdcFoodPortion {
 #[derive(Deserialize)]
 struct FdcDetailNutrient {
     nutrient: FdcNutrientInfo,
-    amount: f64,
+    // Category-header rows (e.g. "Proximates") have no amount field.
+    amount: Option<f64>,
 }
 
 #[derive(Deserialize)]
@@ -103,7 +104,9 @@ fn apply_nutrient(facts: &mut NutritionFacts, nutrient_id: i32, amount: f64) {
 fn build_nutrition_from_detail(nutrients: &[FdcDetailNutrient]) -> NutritionFacts {
     let mut facts = NutritionFacts::default();
     for n in nutrients {
-        apply_nutrient(&mut facts, n.nutrient.id, n.amount);
+        if let Some(amount) = n.amount {
+            apply_nutrient(&mut facts, n.nutrient.id, amount);
+        }
     }
     facts
 }
@@ -307,59 +310,59 @@ mod tests {
         let nutrients = vec![
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1008 },
-                amount: 52.0,
+                amount: Some(52.0),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1003 },
-                amount: 0.26,
+                amount: Some(0.26),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1005 },
-                amount: 13.81,
+                amount: Some(13.81),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1004 },
-                amount: 0.17,
+                amount: Some(0.17),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1079 },
-                amount: 2.4,
+                amount: Some(2.4),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 2000 },
-                amount: 10.39,
+                amount: Some(10.39),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1093 },
-                amount: 1.0,
+                amount: Some(1.0),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1092 },
-                amount: 107.0,
+                amount: Some(107.0),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1087 },
-                amount: 6.0,
+                amount: Some(6.0),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1089 },
-                amount: 0.12,
+                amount: Some(0.12),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1162 },
-                amount: 4.6,
+                amount: Some(4.6),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1110 },
-                amount: 0.0,
+                amount: Some(0.0),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1258 },
-                amount: 0.028,
+                amount: Some(0.028),
             },
             FdcDetailNutrient {
                 nutrient: FdcNutrientInfo { id: 1253 },
-                amount: 0.0,
+                amount: Some(0.0),
             },
         ];
         let facts = build_nutrition_from_detail(&nutrients);
@@ -388,7 +391,25 @@ mod tests {
         );
         assert!((food.food_portions.unwrap()[0].gram_weight - 182.0).abs() < 0.001);
         assert_eq!(food.food_nutrients[0].nutrient.id, 1008);
-        assert_eq!(food.food_nutrients[0].amount, 95.0);
+        assert_eq!(food.food_nutrients[0].amount, Some(95.0));
+    }
+
+    #[test]
+    fn test_header_nutrient_without_amount_is_skipped() {
+        // The USDA API includes category-header entries (e.g. "Proximates") with no
+        // amount field. Verify they deserialize cleanly and contribute nothing to facts.
+        let json = r#"{
+            "fdcId": 173945,
+            "description": "Bananas, dehydrated",
+            "foodNutrients": [
+                { "nutrient": { "id": 2045 }, "type": "FoodNutrient" },
+                { "nutrient": { "id": 1008 }, "amount": 346.0, "type": "FoodNutrient" }
+            ]
+        }"#;
+        let food: FdcDetailFood =
+            serde_json::from_str(json).expect("should not fail on missing amount");
+        let facts = build_nutrition_from_detail(&food.food_nutrients);
+        assert_eq!(facts.calories_kcal, Some(346.0));
     }
 
     #[tokio::test]

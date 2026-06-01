@@ -47,45 +47,45 @@ pub async fn seed(
     .await?;
 
     if already_seeded {
-        println!("Catalog seed: already seeded, skipping.");
+        tracing::info!("catalog seed: already seeded, skipping");
         return Ok(());
     }
 
-    println!(
-        "Catalog seed: fetching ingredients from {} provider(s)...",
-        nutrition_providers.len()
+    tracing::info!(
+        provider_count = nutrition_providers.len(),
+        "catalog seed: fetching ingredients"
     );
     let fetched_ingredients = ingredients::fetch_ingredients(nutrition_providers).await;
-    println!(
-        "Catalog seed: fetched {} ingredient(s).",
-        fetched_ingredients.len()
+    tracing::info!(
+        count = fetched_ingredients.len(),
+        "catalog seed: ingredients fetched"
     );
 
-    println!(
-        "Catalog seed: fetching dishes from {} provider(s)...",
-        recipe_providers.len()
+    tracing::info!(
+        provider_count = recipe_providers.len(),
+        "catalog seed: fetching dishes"
     );
     let fetched_dishes = dishes::fetch_dishes(recipe_providers).await;
-    println!("Catalog seed: fetched {} dish(es).", fetched_dishes.len());
+    tracing::info!(count = fetched_dishes.len(), "catalog seed: dishes fetched");
 
     // Single transaction: all DB writes or none
     let mut tx = pool.begin().await?;
 
     let ingredients_inserted =
         ingredients::insert_ingredients(&mut tx, &fetched_ingredients).await?;
-    println!(
-        "Catalog seed: inserted {} ingredient(s).",
-        ingredients_inserted
+    tracing::info!(
+        count = ingredients_inserted,
+        "catalog seed: ingredients inserted"
     );
 
     let dishes_upserted = dishes::insert_dishes(&mut tx, &fetched_dishes).await?;
-    println!("Catalog seed: upserted {} dish(es).", dishes_upserted);
+    tracing::info!(count = dishes_upserted, "catalog seed: dishes upserted");
 
     let meals_inserted = meals::insert_meals(&mut tx).await?;
-    println!("Catalog seed: inserted {} meal(s).", meals_inserted);
+    tracing::info!(count = meals_inserted, "catalog seed: meals inserted");
 
     tx.commit().await?;
-    println!("Catalog seed: complete.");
+    tracing::info!("catalog seed: complete");
 
     Ok(())
 }

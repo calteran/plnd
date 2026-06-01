@@ -40,10 +40,7 @@ pub async fn fetch_ingredients(
             let search_results = match provider.search_ingredients(&search_query).await {
                 Ok(r) => r,
                 Err(e) => {
-                    eprintln!(
-                        "Seed warning: ingredient search '{}' from {} failed: {}",
-                        term, source, e
-                    );
+                    tracing::warn!(term, provider = %source, error = %e, "catalog seed: ingredient search failed");
                     continue;
                 }
             };
@@ -63,10 +60,7 @@ pub async fn fetch_ingredients(
                         // Provider confirmed it no longer exists — skip silently
                     }
                     Err(e) => {
-                        eprintln!(
-                            "Seed warning: get_ingredient_by_id '{}' from {} failed: {}",
-                            result.external_id, source, e
-                        );
+                        tracing::warn!(external_id = %result.external_id, provider = %source, error = %e, "catalog seed: get_ingredient_by_id failed");
                     }
                 }
             }

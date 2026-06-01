@@ -6,6 +6,12 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .init();
     let database_url = std::env::var("DATABASE_URL")
         .or_else(|_| std::env::var("APP_DATABASE__URL"))
         .map_err(|_| anyhow::anyhow!("DATABASE_URL or APP_DATABASE__URL must be set"))?;
