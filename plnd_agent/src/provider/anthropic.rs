@@ -334,10 +334,6 @@ impl LlmProvider for AnthropicProvider {
 
             let status = http_response.status().as_u16();
             let headers = http_response.headers().clone();
-            let message = http_response
-                .text()
-                .await
-                .unwrap_or_else(|_| "(unreadable body)".to_string());
 
             if let Some(delay_ms) = retry_delay_ms(status, &headers, attempt)
                 && attempt < MAX_RETRIES
@@ -352,6 +348,10 @@ impl LlmProvider for AnthropicProvider {
                 continue;
             }
 
+            let message = http_response
+                .text()
+                .await
+                .unwrap_or_else(|_| "(unreadable body)".to_string());
             return Err(LlmError::Api { status, message });
         }
         unreachable!()
