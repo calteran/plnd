@@ -23,6 +23,8 @@ rust_decimal = { version = "1", features = ["db-postgres"] }
 tokio = { version = "1", features = ["full"] }
 thiserror = "2.0"
 anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 sqlx = { version = "0.9", features = ["macros"] }
