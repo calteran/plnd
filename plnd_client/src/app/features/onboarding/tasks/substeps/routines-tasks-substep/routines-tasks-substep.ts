@@ -301,12 +301,40 @@ function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekD
         }
       </section>
 
-      <!-- Save & Continue -->
-      <button
-        type="button"
-        class="save-btn"
-        (click)="save()"
-      >Save &amp; Continue →</button>
+      <!-- Save & Continue / Unsaved-entry warning -->
+      @if (showSaveWarning()) {
+        <div class="unsaved-warning" role="alert">
+          <p class="unsaved-msg">
+            You started typing but didn't click "+ Add":
+            @if (routineName.trim()) {
+              <strong>"{{ routineName }}"</strong> (routine)
+            }
+            @if (routineName.trim() && taskName.trim()) { and }
+            @if (taskName.trim()) {
+              <strong>"{{ taskName }}"</strong> (task)
+            }
+            — click "+ Add" to keep it, or continue to discard.
+          </p>
+          <div class="unsaved-actions">
+            <button
+              type="button"
+              class="cancel-btn"
+              (click)="showSaveWarning.set(false)"
+            >← Go Back</button>
+            <button
+              type="button"
+              class="save-btn"
+              (click)="dismissSaveWarning()"
+            >Continue Anyway →</button>
+          </div>
+        </div>
+      } @else {
+        <button
+          type="button"
+          class="save-btn"
+          (click)="save()"
+        >Save &amp; Continue →</button>
+      }
 
     </div>
   `,
@@ -587,6 +615,29 @@ function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekD
     .save-btn:hover:not([disabled]) {
       filter: brightness(0.88);
     }
+
+    .unsaved-warning {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px 14px;
+      background: color-mix(in srgb, var(--color-destructive) 8%, transparent);
+      border: 1.5px solid var(--color-destructive);
+      border-radius: 8px;
+    }
+
+    .unsaved-msg {
+      margin: 0;
+      font-size: 13px;
+      color: var(--color-text-primary);
+      line-height: 1.5;
+    }
+
+    .unsaved-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
   `],
 })
 export class RoutinesTasksSubstepComponent implements OnInit {
@@ -628,6 +679,7 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   // ── Task form state ───────────────────────────────────────────────────────
   taskName = '';
   readonly taskNames = signal<string[]>([]);
+  readonly showSaveWarning = signal(false);
 
   // ── Local routine chip state ──────────────────────────────────────────────
   /** Local representation of a routine (backed by a Routine server record). */
@@ -818,6 +870,21 @@ export class RoutinesTasksSubstepComponent implements OnInit {
   }
 
   save(): void {
+    if (this.routineName.trim() || this.taskName.trim()) {
+      this.showSaveWarning.set(true);
+      return;
+    }
+    this.doSave();
+  }
+
+  dismissSaveWarning(): void {
+    this.routineName = '';
+    this.taskName = '';
+    this.showSaveWarning.set(false);
+    this.doSave();
+  }
+
+  private doSave(): void {
     const routines = this.templatesService.routines() ?? [];
     this.stateService.setRoutines(routines);
     this.stateService.setUpcomingTaskNames(this.taskNames());

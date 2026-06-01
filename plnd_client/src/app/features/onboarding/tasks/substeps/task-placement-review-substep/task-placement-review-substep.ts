@@ -49,6 +49,7 @@ interface DayCard {
 
 interface EditState {
   entryIndex: number;
+  title: string;
   scheduledDate: string;
   timeWindowStart: string | undefined;
   durationMinutes: number;
@@ -237,6 +238,16 @@ export function buildDayCards(
                     <!-- Edit form -->
                     <div class="task-row task-row--editing">
                       <div class="edit-form">
+                        <label class="edit-field">
+                          <span class="edit-label">Name</span>
+                          <input
+                            type="text"
+                            class="edit-input"
+                            [value]="editState()!.title"
+                            (input)="onEditTitle($any($event.target).value)"
+                            aria-label="Task name"
+                          />
+                        </label>
                         <label class="edit-field">
                           <span class="edit-label">Date</span>
                           <select
@@ -721,11 +732,16 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     if (!entry) return;
     this.editState.set({
       entryIndex,
+      title: entry.title,
       scheduledDate: entry.scheduled_date,
       timeWindowStart: entry.time_window_start,
       durationMinutes: entry.duration_minutes,
       energyRequired: entry.energy_required,
     });
+  }
+
+  onEditTitle(value: string): void {
+    this.editState.update(s => s ? { ...s, title: value } : s);
   }
 
   onEditDate(value: string): void {
@@ -756,6 +772,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       const hasFixedTime = !!edit.timeWindowStart;
       updated[edit.entryIndex] = {
         ...updated[edit.entryIndex],
+        title: edit.title,
         scheduled_date: edit.scheduledDate,
         time_window_start: hasFixedTime ? edit.timeWindowStart : undefined,
         after_anchor: hasFixedTime ? undefined : updated[edit.entryIndex].after_anchor,
