@@ -772,7 +772,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       const hasFixedTime = !!edit.timeWindowStart;
       updated[edit.entryIndex] = {
         ...updated[edit.entryIndex],
-        title: edit.title,
+        title: edit.title.trim(),
         scheduled_date: edit.scheduledDate,
         time_window_start: hasFixedTime ? edit.timeWindowStart : undefined,
         after_anchor: hasFixedTime ? undefined : updated[edit.entryIndex].after_anchor,
