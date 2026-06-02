@@ -52,7 +52,7 @@ const PREDEFINED_LIFESTYLE_KEYS = new Set(
 interface IngredientRating {
   name: string;
   score: number;
-  catalogIngredientId: string;
+  catalogIngredientId: string | null;
 }
 
 const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], providers_queried: [], providers_from_cache: [] };
@@ -156,20 +156,20 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
             }
           </div>
           <button type="button" class="btn-add"
-            [disabled]="!pendingIngredientId() || pendingIngredientScore() === null || savingIngredient()"
+            [disabled]="!ingredientInput().trim() || pendingIngredientScore() === null || savingIngredient()"
             (click)="addIngredientRating()">Add</button>
         </div>
-        @for (r of ingredientRatings(); track r.catalogIngredientId) {
+        @for (r of ingredientRatings(); track r.name) {
           <div class="rated-row">
             <span class="rated-name flex-1">
-              <button type="button" class="btn-remove-inline" (click)="removeIngredientRating(r.catalogIngredientId)">✕</button>
+              <button type="button" class="btn-remove-inline" (click)="removeIngredientRating(r)">✕</button>
               {{ r.name }}
             </span>
             <div class="emoji-row">
               @for (e of emojis; track $index) {
                 <button type="button" class="emoji-btn"
                   [class.emoji-btn--selected]="r.score === $index"
-                  (click)="updateIngredientScore(r.catalogIngredientId, $index)"
+                  (click)="updateIngredientScore(r, $index)"
                 >{{ e }}</button>
               }
             </div>
@@ -367,7 +367,17 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
     const name  = this.ingredientInput().trim();
     const score = this.pendingIngredientScore();
     const id    = this.pendingIngredientId();
-    if (!name || score === null || !id || this.savingIngredient()) return;
+    if (!name || score === null || this.savingIngredient()) return;
+
+    if (!id) {
+      // Free-text entry: store locally; will link to catalog after the fact
+      this.ingredientRatings.update(r =>
+        [...r.filter(x => x.name !== name), { name, score, catalogIngredientId: null }]
+      );
+      this.ingredientInput.set('');
+      this.pendingIngredientScore.set(null);
+      return;
+    }
 
     const preferenceScore = score - 2; // emoji index 0-4 → API -2..+2
     this.savingIngredient.set(true);
@@ -388,20 +398,29 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
     });
   }
 
-  removeIngredientRating(catalogIngredientId: string): void {
-    this.ingredientPrefsService.remove(catalogIngredientId).subscribe({
-      next: () => this.ingredientRatings.update(r => r.filter(x => x.catalogIngredientId !== catalogIngredientId)),
+  removeIngredientRating(rating: IngredientRating): void {
+    if (!rating.catalogIngredientId) {
+      this.ingredientRatings.update(r => r.filter(x => x.name !== rating.name));
+      return;
+    }
+    this.ingredientPrefsService.remove(rating.catalogIngredientId).subscribe({
+      next: () => this.ingredientRatings.update(r => r.filter(x => x.catalogIngredientId !== rating.catalogIngredientId)),
       error: () => this.saveError.set(true),
     });
   }
 
-  updateIngredientScore(catalogIngredientId: string, score: number): void {
-    const existing = this.ingredientRatings().find(x => x.catalogIngredientId === catalogIngredientId);
-    if (!existing || existing.score === score) return;
+  updateIngredientScore(rating: IngredientRating, score: number): void {
+    if (rating.score === score) return;
     const preferenceScore = score - 2;
-    this.ingredientPrefsService.upsert(catalogIngredientId, { preference_score: preferenceScore }).subscribe({
+    if (!rating.catalogIngredientId) {
+      this.ingredientRatings.update(r =>
+        r.map(x => x.name === rating.name ? { ...x, score } : x)
+      );
+      return;
+    }
+    this.ingredientPrefsService.upsert(rating.catalogIngredientId, { preference_score: preferenceScore }).subscribe({
       next: () => this.ingredientRatings.update(r =>
-        r.map(x => x.catalogIngredientId === catalogIngredientId ? { ...x, score } : x)
+        r.map(x => x.catalogIngredientId === rating.catalogIngredientId ? { ...x, score } : x)
       ),
       error: () => this.saveError.set(true),
     });
