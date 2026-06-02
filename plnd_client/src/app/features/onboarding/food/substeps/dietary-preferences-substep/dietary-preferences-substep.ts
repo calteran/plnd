@@ -1,4 +1,4 @@
-import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Subject, forkJoin, from, mergeMap, of } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter, map, switchMap, take } from 'rxjs/operators';
@@ -44,6 +44,10 @@ const LIFESTYLE_GROUPS: { group: string; items: { key: string; emoji: string; la
     ],
   },
 ];
+
+const PREDEFINED_LIFESTYLE_KEYS = new Set(
+  LIFESTYLE_GROUPS.flatMap(g => g.items.map(i => i.key))
+);
 
 interface IngredientRating {
   name: string;
@@ -98,6 +102,16 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
             }
             <div class="custom-add">
               <span class="field-label">Add your own</span>
+              @if (customLifestyles().length) {
+                <div class="chip-row">
+                  @for (key of customLifestyles(); track key) {
+                    <span class="chip chip--amber">
+                      {{ key }}
+                      <button type="button" (click)="toggleLifestyle(key)" [attr.aria-label]="'Remove ' + key">✕</button>
+                    </span>
+                  }
+                </div>
+              }
               <div class="row">
                 <input type="text" class="text-input" placeholder="e.g. low FODMAP, raw food…"
                   [value]="customLifestyleInput()"
@@ -256,6 +270,9 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
   readonly lifestyleExpanded = signal(false);
   readonly selectedLifestyles = signal<string[]>([]);
   readonly customLifestyleInput = signal('');
+  readonly customLifestyles = computed(() =>
+    this.selectedLifestyles().filter(key => !PREDEFINED_LIFESTYLE_KEYS.has(key))
+  );
 
   readonly ingredientInput = signal('');
   readonly pendingIngredientScore = signal<number | null>(null);
