@@ -156,7 +156,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
             }
           </div>
           <button type="button" class="btn-add"
-            [disabled]="!ingredientInput().trim() || pendingIngredientScore() === null || savingIngredient()"
+            [disabled]="!ingredientInput().trim() || savingIngredient()"
             (click)="addIngredientRating()">Add</button>
         </div>
         @for (r of ingredientRatings(); track (r.catalogIngredientId ?? r.name)) {
