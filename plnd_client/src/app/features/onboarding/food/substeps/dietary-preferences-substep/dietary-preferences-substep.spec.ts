@@ -105,6 +105,19 @@ describe('DietaryPreferencesSubstepComponent', () => {
     expect(component.pendingIngredientScore()).toBeNull();
   }));
 
+  it('removeIngredientRating() removes only the free-text entry and not a catalog entry with the same name', fakeAsync(() => {
+    component['ingredientRatings'].set([
+      { name: 'Oats', score: 4, catalogIngredientId: 'ing-1' },
+      { name: 'Oats', score: 2, catalogIngredientId: null },
+    ]);
+
+    component.removeIngredientRating({ name: 'Oats', score: 2, catalogIngredientId: null });
+
+    expect(component.ingredientRatings().length).toBe(1);
+    expect(component.ingredientRatings()[0].catalogIngredientId).toBe('ing-1');
+    expect(ingredientPrefsSvc.remove).not.toHaveBeenCalled();
+  }));
+
   it('addMealRating() creates meal then updates metadata with correct rating', fakeAsync(() => {
     const mockMeal = {
       user_meal_pref_id: 'm1', user_id: 'u1', catalog_meal_id: null,

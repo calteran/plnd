@@ -159,7 +159,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
             [disabled]="!ingredientInput().trim() || pendingIngredientScore() === null || savingIngredient()"
             (click)="addIngredientRating()">Add</button>
         </div>
-        @for (r of ingredientRatings(); track r.name) {
+        @for (r of ingredientRatings(); track (r.catalogIngredientId ?? r.name)) {
           <div class="rated-row">
             <span class="rated-name flex-1">
               <button type="button" class="btn-remove-inline" (click)="removeIngredientRating(r)">✕</button>
@@ -372,7 +372,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
     if (!id) {
       // Free-text entry: store locally; will link to catalog after the fact
       this.ingredientRatings.update(r =>
-        [...r.filter(x => x.name !== name), { name, score, catalogIngredientId: null }]
+        [...r.filter(x => !(x.name === name && x.catalogIngredientId === null)), { name, score, catalogIngredientId: null }]
       );
       this.ingredientInput.set('');
       this.pendingIngredientScore.set(null);
@@ -400,7 +400,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
 
   removeIngredientRating(rating: IngredientRating): void {
     if (!rating.catalogIngredientId) {
-      this.ingredientRatings.update(r => r.filter(x => x.name !== rating.name));
+      this.ingredientRatings.update(r => r.filter(x => x.name !== rating.name || x.catalogIngredientId !== null));
       return;
     }
     this.ingredientPrefsService.remove(rating.catalogIngredientId).subscribe({
@@ -414,7 +414,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
     const preferenceScore = score - 2;
     if (!rating.catalogIngredientId) {
       this.ingredientRatings.update(r =>
-        r.map(x => x.name === rating.name ? { ...x, score } : x)
+        r.map(x => (x.name === rating.name && x.catalogIngredientId === null) ? { ...x, score } : x)
       );
       return;
     }
