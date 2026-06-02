@@ -90,7 +90,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
     expect(component.pendingIngredientId()).toBeNull();
   }));
 
-  it('addIngredientRating() does nothing when no catalog ID selected', fakeAsync(() => {
+  it('addIngredientRating() stores free-text entry locally without calling upsert when no catalog ID', fakeAsync(() => {
     component.ingredientInput.set('Unknown thing');
     component.pendingIngredientScore.set(3);
     // pendingIngredientId is null by default
@@ -99,7 +99,23 @@ describe('DietaryPreferencesSubstepComponent', () => {
     tick();
 
     expect(ingredientPrefsSvc.upsert).not.toHaveBeenCalled();
-    expect(component.ingredientRatings().length).toBe(0);
+    expect(component.ingredientRatings().length).toBe(1);
+    expect(component.ingredientRatings()[0]).toEqual({ name: 'Unknown thing', score: 3, catalogIngredientId: null });
+    expect(component.ingredientInput()).toBe('');
+    expect(component.pendingIngredientScore()).toBeNull();
+  }));
+
+  it('removeIngredientRating() removes only the free-text entry and not a catalog entry with the same name', fakeAsync(() => {
+    component['ingredientRatings'].set([
+      { name: 'Oats', score: 4, catalogIngredientId: 'ing-1' },
+      { name: 'Oats', score: 2, catalogIngredientId: null },
+    ]);
+
+    component.removeIngredientRating({ name: 'Oats', score: 2, catalogIngredientId: null });
+
+    expect(component.ingredientRatings().length).toBe(1);
+    expect(component.ingredientRatings()[0].catalogIngredientId).toBe('ing-1');
+    expect(ingredientPrefsSvc.remove).not.toHaveBeenCalled();
   }));
 
   it('addMealRating() creates meal then updates metadata with correct rating', fakeAsync(() => {
