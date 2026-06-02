@@ -193,7 +193,9 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
               >{{ e }}</button>
             }
           </div>
-          <button type="button" class="btn-add" [disabled]="!mealInput().trim() || pendingMealScore() === null || savingMeal()" (click)="addMealRating()">Add</button>
+          <button type="button" class="btn-add"
+            [disabled]="!mealInput().trim() || pendingMealScore() === null || savingMeal()"
+            (click)="addMealRating()">Add</button>
         </div>
         @for (r of mealRatings(); track r.name) {
           <div class="rated-row">
