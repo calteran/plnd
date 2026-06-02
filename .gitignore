@@ -35,5 +35,8 @@ plnd_client/.angular/
 .worktrees/
 .superpowers/
 
+# Playwright MCP output
+.playwright-mcp/
+
 # macOS
 .DS_Store
