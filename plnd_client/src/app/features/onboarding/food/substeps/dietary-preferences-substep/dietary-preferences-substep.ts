@@ -376,8 +376,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
       this.ingredientRatings.update(r =>
         [...r.filter(x => !(x.name === name && x.catalogIngredientId === null)), { name, score, catalogIngredientId: null }]
       );
-      this.ingredientInput.set('');
-      this.pendingIngredientScore.set(null);
+      this.resetIngredientEntry();
       return;
     }
 
@@ -388,9 +387,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
         this.ingredientRatings.update(r =>
           [...r.filter(x => x.catalogIngredientId !== id), { name, score, catalogIngredientId: id }]
         );
-        this.ingredientInput.set('');
-        this.pendingIngredientScore.set(null);
-        this.pendingIngredientId.set(null);
+        this.resetIngredientEntry();
         this.savingIngredient.set(false);
       },
       error: () => {
@@ -398,6 +395,19 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
         this.savingIngredient.set(false);
       },
     });
+  }
+
+  /**
+   * Clear the ingredient entry row after a successful add. Pushing an empty
+   * query through `ingredientSearch$` cancels any in-flight (debounced) search
+   * so stale results can't re-open the dropdown over the cleared input.
+   */
+  private resetIngredientEntry(): void {
+    this.ingredientInput.set('');
+    this.pendingIngredientScore.set(null);
+    this.pendingIngredientId.set(null);
+    this.ingredientSearchResults.set([]);
+    this.ingredientSearch$.next('');
   }
 
   removeIngredientRating(rating: IngredientRating): void {
