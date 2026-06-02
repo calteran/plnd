@@ -90,6 +90,33 @@ describe('DietaryPreferencesSubstepComponent', () => {
     expect(component.pendingIngredientId()).toBeNull();
   }));
 
+  it('addIngredientRating() dismisses the search dropdown after a catalog add', fakeAsync(() => {
+    component.ingredientSearchResults.set([
+      { ingredient_id: 'ing-1', name: 'Oats', description: null, allergens: [], occasion_tags: [], external_source: null },
+    ]);
+    component.ingredientInput.set('Oats');
+    component.pendingIngredientId.set('ing-1');
+    component.pendingIngredientScore.set(4);
+
+    component.addIngredientRating();
+    tick();
+
+    expect(component.ingredientSearchResults()).toEqual([]);
+  }));
+
+  it('addIngredientRating() dismisses the search dropdown after a free-text add', fakeAsync(() => {
+    component.ingredientSearchResults.set([
+      { ingredient_id: 'ing-9', name: 'Cheese product', description: null, allergens: [], occasion_tags: [], external_source: null },
+    ]);
+    component.ingredientInput.set('Unknown thing');
+    component.pendingIngredientScore.set(3);
+
+    component.addIngredientRating();
+    tick();
+
+    expect(component.ingredientSearchResults()).toEqual([]);
+  }));
+
   it('addIngredientRating() stores free-text entry locally without calling upsert when no catalog ID', fakeAsync(() => {
     component.ingredientInput.set('Unknown thing');
     component.pendingIngredientScore.set(3);

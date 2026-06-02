@@ -378,6 +378,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
       );
       this.ingredientInput.set('');
       this.pendingIngredientScore.set(null);
+      this.ingredientSearchResults.set([]);
       return;
     }
 
@@ -391,6 +392,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
         this.ingredientInput.set('');
         this.pendingIngredientScore.set(null);
         this.pendingIngredientId.set(null);
+        this.ingredientSearchResults.set([]);
         this.savingIngredient.set(false);
       },
       error: () => {
