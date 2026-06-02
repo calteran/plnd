@@ -1,5 +1,5 @@
 import { signal } from '@angular/core';
-import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { TestBed, fakeAsync, flush, tick } from '@angular/core/testing';
 import { ComponentFixture } from '@angular/core/testing';
 import { DietaryPreferencesSubstepComponent } from './dietary-preferences-substep';
 import { CatalogService } from '../../../../../core/services/catalog.service';
@@ -81,6 +81,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
     component.addIngredientRating();
     tick();
+    flush(); // drain the debounced search-cancel timer from resetIngredientEntry()
 
     expect(ingredientPrefsSvc.upsert).toHaveBeenCalledWith('ing-1', { preference_score: 2 });
     expect(component.ingredientRatings().length).toBe(1);
@@ -100,6 +101,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
     component.addIngredientRating();
     tick();
+    flush(); // let any in-flight debounced search resolve
 
     expect(component.ingredientSearchResults()).toEqual([]);
   }));
@@ -113,6 +115,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
     component.addIngredientRating();
     tick();
+    flush(); // let any in-flight debounced search resolve
 
     expect(component.ingredientSearchResults()).toEqual([]);
   }));
@@ -124,6 +127,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
     component.addIngredientRating();
     tick();
+    flush(); // drain the debounced search-cancel timer from resetIngredientEntry()
 
     expect(ingredientPrefsSvc.upsert).not.toHaveBeenCalled();
     expect(component.ingredientRatings().length).toBe(1);
