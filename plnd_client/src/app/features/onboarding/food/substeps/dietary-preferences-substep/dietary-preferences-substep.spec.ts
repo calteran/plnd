@@ -61,6 +61,19 @@ describe('DietaryPreferencesSubstepComponent', () => {
     expect(component.selectedLifestyles()).not.toContain('vegan');
   });
 
+  it('renders an amber chip for a custom lifestyle added while the section is expanded', () => {
+    component.lifestyleExpanded.set(true);
+    component.customLifestyleInput.set('low FODMAP');
+    component.addCustomLifestyle();
+    fixture.detectChanges();
+
+    const amberChips = Array.from(
+      fixture.nativeElement.querySelectorAll('.chip--amber') as NodeListOf<HTMLElement>
+    );
+    const customChip = amberChips.find(c => c.textContent?.includes('low FODMAP'));
+    expect(customChip).withContext('expected an amber chip showing the custom lifestyle').toBeTruthy();
+  });
+
   it('addIngredientRating() calls upsert with correct score mapping and adds to local list', fakeAsync(() => {
     component.ingredientInput.set('Oats');
     component.pendingIngredientId.set('ing-1');
