@@ -59,7 +59,7 @@
     "@types/jasmine": "~6.0.0",
     "@typescript-eslint/eslint-plugin": "^8.60.0",
     "@typescript-eslint/parser": "^8.58.1",
-    "dependency-cruiser": "^17.4.2",
+    "dependency-cruiser": "^17.4.3",
     "eslint": "^10.4.0",
     "jasmine-core": "~6.2.0",
     "karma": "~6.4.4",
@@ -68,7 +68,7 @@
     "karma-jasmine": "~5.1.0",
     "karma-jasmine-html-reporter": "~2.2.0",
     "license-checker-rseidelsohn": "^5.0.1",
-    "npm-check-updates": "^22.2.1",
+    "npm-check-updates": "^22.2.2",
     "typescript": "^5.9.3"
   }
 }
