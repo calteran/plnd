@@ -118,7 +118,6 @@ struct AnthropicUsage {
     #[serde(default)]
     cache_read_input_tokens: u32,
     #[serde(default)]
-    #[allow(dead_code)] // present in API response for completeness; not used in token mapping
     cache_creation_input_tokens: u32,
 }
 
@@ -129,6 +128,8 @@ impl AnthropicUsage {
             prompt_tokens,
             completion_tokens: self.output_tokens,
             total_tokens: prompt_tokens + self.output_tokens,
+            cache_read_tokens: self.cache_read_input_tokens,
+            cache_creation_tokens: self.cache_creation_input_tokens,
         }
     }
 }
@@ -432,6 +433,9 @@ mod tests {
         assert_eq!(t.completion_tokens, 50);
         assert_eq!(t.total_tokens, 180);
         assert_eq!(t.prompt_tokens + t.completion_tokens, t.total_tokens);
+        // New: raw cache counts surfaced for observability.
+        assert_eq!(t.cache_read_tokens, 30);
+        assert_eq!(t.cache_creation_tokens, 20);
     }
 
     #[test]

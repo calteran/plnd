@@ -207,6 +207,17 @@ pub struct TokenUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    /// Tokens served from a prompt cache read (Anthropic `cache_read_input_tokens`,
+    /// OpenAI `prompt_tokens_details.cached_tokens`). Already included in
+    /// `prompt_tokens`; exposed separately for cache-hit-rate observability.
+    #[serde(default)]
+    pub cache_read_tokens: u32,
+    /// Tokens written to the prompt cache on this call (Anthropic
+    /// `cache_creation_input_tokens`; 0 for OpenAI-compatible backends).
+    /// Already counted in `prompt_tokens` (Anthropic includes cache-creation
+    /// tokens in `input_tokens`); exposed separately for cost observability.
+    #[serde(default)]
+    pub cache_creation_tokens: u32,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

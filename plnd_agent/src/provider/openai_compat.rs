@@ -129,6 +129,8 @@ fn parse_completion(response: OaiResponse) -> Result<CompletionResponse, LlmErro
         prompt_tokens: u.prompt_tokens,
         completion_tokens: u.completion_tokens,
         total_tokens: u.total_tokens,
+        cache_read_tokens: 0,
+        cache_creation_tokens: 0,
     });
 
     let choice = response
