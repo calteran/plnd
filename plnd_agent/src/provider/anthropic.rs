@@ -62,10 +62,33 @@ impl AnthropicProvider {
 struct AnthropicRequest<'a> {
     model: &'a str,
     max_tokens: u32,
-    system: &'a str,
+    system: Vec<AnthropicSystemBlock<'a>>,
     messages: Vec<AnthropicMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<AnthropicToolDef<'a>>,
+}
+
+/// A system-prompt content block. Serialized as an array element so a
+/// `cache_control` breakpoint can be attached. Anthropic processes the request
+/// prefix in tools -> system -> messages order, so one breakpoint here caches
+/// the tool definitions and the system prompt together as a single segment.
+#[derive(Serialize)]
+struct AnthropicSystemBlock<'a> {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    text: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<CacheControl>,
+}
+
+#[derive(Serialize, Clone, Copy)]
+struct CacheControl {
+    #[serde(rename = "type")]
+    kind: &'static str,
+}
+
+impl CacheControl {
+    const EPHEMERAL: CacheControl = CacheControl { kind: "ephemeral" };
 }
 
 /// Outgoing message for the Anthropic wire format. Uses owned types because
@@ -227,13 +250,11 @@ impl AnthropicProvider {
             .collect()
     }
 
-    /// Send one HTTP request to the Anthropic messages endpoint.
-    async fn send_request(
-        &self,
-        request: &CompletionRequest,
-    ) -> Result<reqwest::Response, LlmError> {
+    /// Build the Anthropic wire-format request body, attaching a single
+    /// `cache_control: ephemeral` breakpoint to the system block.
+    fn build_body<'a>(&'a self, request: &'a CompletionRequest) -> AnthropicRequest<'a> {
         let messages = Self::build_messages(request);
-        let tools: Vec<AnthropicToolDef<'_>> = request
+        let tools: Vec<AnthropicToolDef<'a>> = request
             .tools
             .iter()
             .map(|t| AnthropicToolDef {
@@ -242,13 +263,25 @@ impl AnthropicProvider {
                 input_schema: &t.schema,
             })
             .collect();
-        let body = AnthropicRequest {
+        AnthropicRequest {
             model: &self.model,
             max_tokens: request.max_tokens,
-            system: &request.system,
+            system: vec![AnthropicSystemBlock {
+                kind: "text",
+                text: &request.system,
+                cache_control: Some(CacheControl::EPHEMERAL),
+            }],
             messages,
             tools,
-        };
+        }
+    }
+
+    /// Send one HTTP request to the Anthropic messages endpoint.
+    async fn send_request(
+        &self,
+        request: &CompletionRequest,
+    ) -> Result<reqwest::Response, LlmError> {
+        let body = self.build_body(request);
         let url = format!("{}/v1/messages", self.base_url);
         Ok(self
             .http
@@ -444,5 +477,24 @@ mod tests {
         let usage: AnthropicUsage = serde_json::from_str(json).unwrap();
         assert_eq!(usage.cache_read_input_tokens, 0);
         assert_eq!(usage.cache_creation_input_tokens, 0);
+    }
+
+    // ── Request body / cache_control ─────────────────────────────────────────
+
+    #[test]
+    fn system_block_carries_ephemeral_cache_control() {
+        let provider = AnthropicProvider::new("test-key", "claude-test");
+        let request = CompletionRequest {
+            system: "You are a helpful assistant.".to_string(),
+            messages: vec![],
+            tools: vec![],
+            max_tokens: 256,
+        };
+        let body = provider.build_body(&request);
+        let v = serde_json::to_value(&body).unwrap();
+
+        assert_eq!(v["system"][0]["type"], "text");
+        assert_eq!(v["system"][0]["text"], "You are a helpful assistant.");
+        assert_eq!(v["system"][0]["cache_control"]["type"], "ephemeral");
     }
 }
