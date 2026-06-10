@@ -214,8 +214,9 @@ pub struct TokenUsage {
     pub cache_read_tokens: u32,
     /// Tokens written to the prompt cache on this call (Anthropic
     /// `cache_creation_input_tokens`; 0 for OpenAI-compatible backends).
-    /// Already counted in `prompt_tokens` (Anthropic includes cache-creation
-    /// tokens in `input_tokens`); exposed separately for cost observability.
+    /// Already included in `prompt_tokens` — input, cache-read, and
+    /// cache-creation tokens are disjoint and summed. Exposed separately for
+    /// cost observability.
     #[serde(default)]
     pub cache_creation_tokens: u32,
 }

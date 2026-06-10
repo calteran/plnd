@@ -146,7 +146,10 @@ struct AnthropicUsage {
 
 impl AnthropicUsage {
     fn to_token_usage(&self) -> super::TokenUsage {
-        let prompt_tokens = self.input_tokens + self.cache_read_input_tokens;
+        // input_tokens, cache_read_input_tokens, and cache_creation_input_tokens
+        // are disjoint in the Anthropic API; total input is the sum of all three.
+        let prompt_tokens =
+            self.input_tokens + self.cache_read_input_tokens + self.cache_creation_input_tokens;
         super::TokenUsage {
             prompt_tokens,
             completion_tokens: self.output_tokens,
@@ -424,10 +427,10 @@ mod tests {
     fn prompt_tokens_includes_cache_tokens() {
         let usage = make_usage(100, 50, 30, 20);
         let token_usage = usage.to_token_usage();
-        // input_tokens (100) already includes cache_creation (20); only cache_read (30) is additive
-        assert_eq!(token_usage.prompt_tokens, 130);
+        // input (100), cache_read (30), cache_creation (20) are disjoint -> sum = 150
+        assert_eq!(token_usage.prompt_tokens, 150);
         assert_eq!(token_usage.completion_tokens, 50);
-        assert_eq!(token_usage.total_tokens, 180);
+        assert_eq!(token_usage.total_tokens, 200);
         assert_eq!(
             token_usage.prompt_tokens + token_usage.completion_tokens,
             token_usage.total_tokens
@@ -462,11 +465,10 @@ mod tests {
         let json = r#"{"input_tokens":100,"output_tokens":50,"cache_read_input_tokens":30,"cache_creation_input_tokens":20}"#;
         let usage: AnthropicUsage = serde_json::from_str(json).unwrap();
         let t = usage.to_token_usage();
-        assert_eq!(t.prompt_tokens, 130); // input_tokens (100) + cache_read (30)
+        assert_eq!(t.prompt_tokens, 150); // input (100) + cache_read (30) + cache_creation (20)
         assert_eq!(t.completion_tokens, 50);
-        assert_eq!(t.total_tokens, 180);
+        assert_eq!(t.total_tokens, 200);
         assert_eq!(t.prompt_tokens + t.completion_tokens, t.total_tokens);
-        // New: raw cache counts surfaced for observability.
         assert_eq!(t.cache_read_tokens, 30);
         assert_eq!(t.cache_creation_tokens, 20);
     }

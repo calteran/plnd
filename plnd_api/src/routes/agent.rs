@@ -2461,7 +2461,11 @@ mod tests {
         gate.record_outcome(false);
         assert_eq!(gate.limit(), 2, "streak below threshold does not grow");
         gate.record_outcome(false);
-        assert_eq!(gate.limit(), 3, "grows by one after a clean streak of three");
+        assert_eq!(
+            gate.limit(),
+            3,
+            "grows by one after a clean streak of three"
+        );
     }
 
     // ---- AimdGate tests ----
