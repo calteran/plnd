@@ -271,6 +271,19 @@ pub struct NutritionSummary {
     pub flags: Vec<String>,
 }
 
+/// Why a meal-plan window produced no plannable slots.
+///
+/// Present only when generation returned an empty plan for a reason the client
+/// should act on, so an empty `meals` array is no longer ambiguous between
+/// "planned successfully, nothing left to do" and a precondition gap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum UnplannableReason {
+    /// The user has no day-type / meal-anchor template configured, so there are
+    /// no slots to fill. The client should route them to set one up.
+    NoAnchorTemplate,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 pub struct MealPlanResponse {
     pub plan_start: NaiveDate,
@@ -278,6 +291,10 @@ pub struct MealPlanResponse {
     pub nutrition_summary: Option<NutritionSummary>,
     #[serde(default)]
     pub failed_slots: Vec<FailedSlot>,
+    /// Set only when `meals` is empty for an actionable reason; omitted on a
+    /// normal plan so existing clients see an unchanged payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unplannable_reason: Option<UnplannableReason>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -543,6 +560,7 @@ mod meal_plan_tests {
             meals: vec![],
             nutrition_summary: None,
             failed_slots: vec![],
+            unplannable_reason: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"plan_start\":\"2026-04-21\""));
@@ -701,6 +719,7 @@ mod meal_plan_tests {
                 meal_name: "breakfast".to_string(),
                 reason: "no suitable meal found".to_string(),
             }],
+            unplannable_reason: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
         let decoded: MealPlanResponse = serde_json::from_str(&json).unwrap();
@@ -708,5 +727,38 @@ mod meal_plan_tests {
         assert_eq!(decoded.failed_slots[0].date.to_string(), "2026-04-22");
         assert_eq!(decoded.failed_slots[0].meal_name, "breakfast");
         assert_eq!(decoded.failed_slots[0].reason, "no suitable meal found");
+    }
+
+    #[test]
+    fn meal_plan_response_omits_unplannable_reason_when_none() {
+        // The common case: a normal plan never carries the field, so existing clients
+        // see exactly the payload they always did.
+        let resp = MealPlanResponse {
+            plan_start: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
+            meals: vec![],
+            nutrition_summary: None,
+            failed_slots: vec![],
+            unplannable_reason: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(!json.contains("unplannable_reason"));
+    }
+
+    #[test]
+    fn meal_plan_response_serializes_unplannable_reason_as_snake_case() {
+        let resp = MealPlanResponse {
+            plan_start: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
+            meals: vec![],
+            nutrition_summary: None,
+            failed_slots: vec![],
+            unplannable_reason: Some(UnplannableReason::NoAnchorTemplate),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"unplannable_reason\":\"no_anchor_template\""));
+        let decoded: MealPlanResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(
+            decoded.unplannable_reason,
+            Some(UnplannableReason::NoAnchorTemplate)
+        );
     }
 }

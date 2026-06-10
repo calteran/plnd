@@ -66,11 +66,19 @@ export interface MealEntry {
   estimated?: boolean;     // client-side only; never in API response
 }
 
+/**
+ * Why a plan came back with no meals. Present only when the empty result is
+ * actionable (currently: the user has no day-type/meal-anchor template), so the
+ * client can show guidance instead of an unexplained empty grid.
+ */
+export type UnplannableReason = 'no_anchor_template';
+
 export interface MealPlanResponse {
   plan_start: string;
   meals: MealEntry[];
   nutrition_summary?: { daily_avg_calories?: number };
   failed_slots?: FailedSlot[];
+  unplannable_reason?: UnplannableReason;
 }
 
 export interface ResolveResponse {

@@ -400,6 +400,39 @@ describe('PlanMealsStepComponent', () => {
         expect(failedCells.length).toBe(3);
       });
 
+      it('should show a no-template banner (not an error or partial banner) when unplannable_reason is no_anchor_template', () => {
+        generateWeek$.next({
+          plan_start: '2026-03-23',
+          meals: [],
+          failed_slots: [],
+          unplannable_reason: 'no_anchor_template',
+        });
+        generateWeek$.complete();
+        fixture.detectChanges();
+
+        const banner = fixture.nativeElement.querySelector('.no-template-banner');
+        expect(banner).toBeTruthy();
+        expect(banner.textContent.toLowerCase()).toContain('day type');
+        // This is a precondition, not a failure or a partial fill.
+        expect(fixture.nativeElement.querySelector('.gen-error')).toBeNull();
+        expect(fixture.nativeElement.querySelector('.partial-banner')).toBeNull();
+      });
+
+      it('should clear the no-template banner on a subsequent successful generation', () => {
+        generateWeek$.next({
+          plan_start: '2026-03-23', meals: [], failed_slots: [], unplannable_reason: 'no_anchor_template',
+        });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('.no-template-banner')).toBeTruthy();
+
+        component.retryGeneration();
+        generateWeek$.next(
+          makeMockPlanResponse(['2026-03-23', '2026-03-24', '2026-03-25', '2026-03-26', '2026-03-27'])
+        );
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('.no-template-banner')).toBeNull();
+      });
+
       it('should remove .gc-failed from a cell after refreshSlot succeeds', () => {
         // Set up one failed slot
         generateWeek$.next({

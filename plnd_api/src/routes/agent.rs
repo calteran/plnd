@@ -10,7 +10,7 @@ use crate::auth::jwt::Claims;
 use crate::models::{
     FailedSlot, MealAdhocResolveRequest, MealAdhocResolveResponse, MealEntry, MealPlanRequest,
     MealPlanResponse, MealRef, MealSuggestRequest, NutritionSummary, PlaceTasksEntry,
-    PlaceTasksRequest, TaskEntryRequest, TaskEntryResponse,
+    PlaceTasksRequest, TaskEntryRequest, TaskEntryResponse, UnplannableReason,
 };
 use crate::scheduling::{
     constrained_dates_for_rule, day_type_applies_to, has_floating_instance_in_window,
@@ -691,6 +691,10 @@ pub async fn post_meal_plan(
         .cloned()
         .collect();
 
+    // Captured before the fan-out moves `open_slots`; used after the run to tell a
+    // genuinely empty plan apart from a precondition gap (see `classify_unplannable`).
+    let open_slot_count = open_slots.len();
+
     // Parallel fan-out: each slot sees only locked context (no sibling awareness).
     // The review pass below catches any resulting clashes or imbalance.
     let agent = state.agent.clone();
@@ -901,12 +905,51 @@ pub async fn post_meal_plan(
     }
     let nutrition_summary = aggregate_nutrition(&meals);
 
+    // Only consult the day-type count in the one case where the answer matters —
+    // nothing resolved and nothing locked — so the common path adds no query.
+    let unplannable_reason = if open_slot_count == 0 && locked_slots.is_empty() {
+        let day_type_count = state
+            .repos
+            .day_type
+            .count_for_user(user_id)
+            .await
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "meal-plan: failed to count day types; not flagging unplannable");
+                // A non-zero fallback keeps us from mislabelling a transient DB
+                // error as "no template configured".
+                1
+            });
+        classify_unplannable(open_slot_count, locked_slots.len(), day_type_count)
+    } else {
+        None
+    };
+
     Ok(Json(MealPlanResponse {
         plan_start,
         meals,
         nutrition_summary,
         failed_slots: failed,
+        unplannable_reason,
     }))
+}
+
+/// Explain an empty plan when it is empty for an actionable reason.
+///
+/// Returns `Some` only when no slots were resolved (`open_slot_count == 0`),
+/// nothing was carried in locked (`locked_slot_count == 0`), and the user has no
+/// day types — i.e. there is no meal-anchor template to materialize from. Any
+/// other empty result (work already locked, or a template that simply produced
+/// no slots for this window) is a normal outcome and returns `None`.
+fn classify_unplannable(
+    open_slot_count: usize,
+    locked_slot_count: usize,
+    day_type_count: i64,
+) -> Option<UnplannableReason> {
+    if open_slot_count == 0 && locked_slot_count == 0 && day_type_count == 0 {
+        Some(UnplannableReason::NoAnchorTemplate)
+    } else {
+        None
+    }
 }
 
 fn aggregate_nutrition(meals: &[MealEntry]) -> Option<NutritionSummary> {
@@ -1514,6 +1557,7 @@ mod tests {
     use super::*;
     use crate::models::{
         ActionTaken, MealEntry, MealRef, Nutrition, TaskEntryRequest, TaskEntryResponse,
+        UnplannableReason,
     };
     use chrono::NaiveDate;
     use uuid::Uuid;
@@ -1608,6 +1652,36 @@ mod tests {
             req.plan_end_effective(),
             NaiveDate::from_ymd_opt(2026, 4, 28).unwrap()
         );
+    }
+
+    #[test]
+    fn classify_unplannable_flags_missing_template() {
+        // Nothing resolved for the window, nothing locked, and the user has zero
+        // day types: the empty result is a precondition gap, not a finished plan.
+        assert_eq!(
+            classify_unplannable(0, 0, 0),
+            Some(UnplannableReason::NoAnchorTemplate)
+        );
+    }
+
+    #[test]
+    fn classify_unplannable_none_when_slots_were_resolved() {
+        // Open slots existed — a normal generation run, regardless of template count.
+        assert_eq!(classify_unplannable(3, 0, 0), None);
+    }
+
+    #[test]
+    fn classify_unplannable_none_when_work_is_locked() {
+        // No open slots, but the caller carried locked entries: "planned
+        // successfully, nothing left to do," not a missing-template case.
+        assert_eq!(classify_unplannable(0, 2, 0), None);
+    }
+
+    #[test]
+    fn classify_unplannable_none_when_template_exists() {
+        // Empty window but the user does have day types configured, so the
+        // emptiness has some other cause (e.g. no matching day in range).
+        assert_eq!(classify_unplannable(0, 0, 2), None);
     }
 
     #[test]
