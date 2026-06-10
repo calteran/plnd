@@ -583,20 +583,21 @@ impl AgentService {
 // ── Provider factory ──────────────────────────────────────────────────────────
 
 fn build_provider(config: &crate::config::LlmModelConfig) -> Box<dyn LlmProvider> {
+    let max_retry_wait = std::time::Duration::from_secs(config.max_retry_wait_secs);
     match config.provider.as_str() {
         "anthropic" => {
             let mut p = AnthropicProvider::new(&config.api_key, &config.model)
-                .with_base_url(&config.base_url);
+                .with_base_url(&config.base_url)
+                .with_max_retry_wait(max_retry_wait);
             if let Some(v) = &config.api_version {
                 p = p.with_api_version(v);
             }
             Box::new(p)
         }
-        _ => Box::new(OpenAiCompatibleProvider::new(
-            &config.base_url,
-            &config.api_key,
-            &config.model,
-        )),
+        _ => Box::new(
+            OpenAiCompatibleProvider::new(&config.base_url, &config.api_key, &config.model)
+                .with_max_retry_wait(max_retry_wait),
+        ),
     }
 }
 

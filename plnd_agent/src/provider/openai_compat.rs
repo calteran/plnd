@@ -1,9 +1,14 @@
+use std::time::{Duration, Instant};
+
 use serde::{Deserialize, Serialize};
 
 use super::{
     CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent, MessageRole,
-    StopReason, ToolCall,
+    StopReason, ToolCall, resolve_retry_sleep, retry_delay,
 };
+
+/// Default total backoff budget for rate-limit (429) / overload (529) retries.
+const DEFAULT_MAX_RETRY_WAIT: Duration = Duration::from_secs(300);
 
 // ── Request wire types ────────────────────────────────────────────────────────
 
@@ -193,6 +198,9 @@ pub struct OpenAiCompatibleProvider {
     api_key: String,
     base_url: String,
     model: String,
+    /// Cumulative wall-clock budget for retrying 429/529 responses before the
+    /// request is failed. See [`OpenAiCompatibleProvider::with_max_retry_wait`].
+    max_retry_wait: Duration,
 }
 
 impl OpenAiCompatibleProvider {
@@ -206,7 +214,14 @@ impl OpenAiCompatibleProvider {
             api_key: api_key.into(),
             base_url: base_url.into(),
             model: model.into(),
+            max_retry_wait: DEFAULT_MAX_RETRY_WAIT,
         }
+    }
+
+    /// Override the total backoff budget for rate-limit / overload retries.
+    pub fn with_max_retry_wait(mut self, wait: Duration) -> Self {
+        self.max_retry_wait = wait;
+        self
     }
 }
 
@@ -293,22 +308,56 @@ impl LlmProvider for OpenAiCompatibleProvider {
         };
 
         let url = format!("{}/chat/completions", self.base_url);
-        let http_response = self
-            .http
-            .post(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key))
-            .json(&body)
-            .send()
-            .await?;
 
-        if !http_response.status().is_success() {
+        // Retry 429/529 with jittered backoff until the cumulative wait would
+        // exceed the configured budget, then fail. Mirrors the Anthropic
+        // provider's policy. `body` is reused verbatim across attempts.
+        let started = Instant::now();
+        let mut attempt: u32 = 0;
+        let http_response = loop {
+            let http_response = self
+                .http
+                .post(&url)
+                .header("Authorization", format!("Bearer {}", self.api_key))
+                .json(&body)
+                .send()
+                .await?;
+
+            if http_response.status().is_success() {
+                break http_response;
+            }
+
             let status = http_response.status().as_u16();
+            let headers = http_response.headers().clone();
+
+            if let Some(delay) = retry_delay(status, &headers, attempt) {
+                let sleep = resolve_retry_sleep(delay);
+                if started.elapsed() + sleep <= self.max_retry_wait {
+                    tracing::warn!(
+                        attempt,
+                        status,
+                        sleep_ms = sleep.as_millis() as u64,
+                        elapsed_ms = started.elapsed().as_millis() as u64,
+                        "LLM rate limit or overload; retrying after backoff"
+                    );
+                    tokio::time::sleep(sleep).await;
+                    attempt += 1;
+                    continue;
+                }
+                tracing::warn!(
+                    attempt,
+                    status,
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "LLM retry budget exhausted; giving up"
+                );
+            }
+
             let message = http_response
                 .text()
                 .await
                 .unwrap_or_else(|_| "(unreadable body)".to_string());
             return Err(LlmError::Api { status, message });
-        }
+        };
 
         let parsed: OaiResponse = http_response
             .json()
