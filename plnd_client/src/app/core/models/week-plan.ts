@@ -61,7 +61,7 @@ export interface MealEntry {
   date: string;
   meal_name: MealSlot;
   meal_ref: MealRef | null;
-  title?: string;          // client-side only; never in API response
+  title?: string;          // resolved server-side from meal_ref on responses; omitted on requests
   estimated_nutrition?: MealNutrition;
   estimated?: boolean;     // client-side only; never in API response
 }
