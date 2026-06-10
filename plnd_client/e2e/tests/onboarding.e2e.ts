@@ -757,6 +757,41 @@ test.describe('Onboarding', () => {
     });
   });
 
+  // Regression: a user who opens the Food spoke before the Tasks spoke (and
+  // therefore has no day-type template yet) must still be routed through the
+  // shared day-types substep before meal planning. Without it, meal generation
+  // has zero anchor slots and silently produces an empty plan.
+  test.describe('Food spoke — shared day-types substep (food-first)', () => {
+    test('day-types substep appears before meal plan when no day types exist', async ({ page }) => {
+      await seedOnboarding(page); // no day types seeded
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN })
+      );
+
+      await page.goto('/onboarding/food');
+
+      // Shared planning-prefs substep on first entry to either spoke.
+      await expect(page.locator('.planning-prefs')).toBeVisible();
+      await page.locator('.btn-continue').click();
+
+      await expect(page.locator('.restrictions-substep')).toBeVisible();
+      await page.locator('.btn-continue').click();
+
+      await expect(page.locator('.prefs-substep')).toBeVisible();
+      await page.locator('.btn-continue').click();
+
+      // The fix: day-types is inserted before plan-meals. Previously the spoke
+      // jumped straight to meal planning with no anchors → zero meals.
+      await expect(page.locator('.day-types-substep')).toBeVisible();
+      await expect(page.locator('.schedule-card').first()).toBeVisible({ timeout: 5_000 });
+      await page.locator('.day-types-substep .save-btn').click();
+
+      // Saving the default day types unblocks meal generation; the meal-plan
+      // review step renders and its Save & Continue enables once the plan loads.
+      await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10_000 });
+    });
+  });
+
   test.describe('Full happy path', () => {
     test('complete all 3 sections → stats banner → Approve Plan → /day/plan-start', async ({ page }) => {
       const { sub } = await seedOnboarding(page);
