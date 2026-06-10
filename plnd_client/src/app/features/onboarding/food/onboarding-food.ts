@@ -6,11 +6,28 @@ import { localIsoDate } from '../../../core/services/schedule.service';
 import { OnboardingStateService } from '../onboarding-state.service';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
+import { DayTypesSubstepComponent } from '../tasks/substeps/day-types-substep/day-types-substep';
 import { DietaryRestrictionsSubstepComponent } from './substeps/dietary-restrictions-substep/dietary-restrictions-substep';
 import { DietaryPreferencesSubstepComponent } from './substeps/dietary-preferences-substep/dietary-preferences-substep';
 import { MealEntry, MealPlanResponse } from '../../../core/models/week-plan';
 import { PlanMealsStepComponent } from '../../planning/steps/plan-meals-step/plan-meals-step';
 import { mealsForDate } from '../../../core/utils/day-type-utils';
+
+// Ordered union of every substep the food spoke can present. The active
+// sequence is computed (see `substeps`) and conditionally drops the two
+// shared substeps once they are satisfied:
+//   - 'planning-prefs' is shared with the tasks spoke and skipped once the
+//     user has saved planning preferences (`planningPrefsComplete`).
+//   - 'day-types' is shared with the tasks spoke and skipped once the user
+//     has configured at least one day type. It must run on first entry to
+//     EITHER spoke, otherwise meal planning has no anchor slots to fill and
+//     silently produces zero meals.
+type FoodSubstep =
+  | 'planning-prefs'
+  | 'dietary-restrictions'
+  | 'dietary-preferences'
+  | 'day-types'
+  | 'plan-meals';
 
 @Component({
   selector: 'app-onboarding-food',
@@ -20,6 +37,7 @@ import { mealsForDate } from '../../../core/utils/day-type-utils';
     PlanningPrefsSubstepComponent,
     DietaryRestrictionsSubstepComponent,
     DietaryPreferencesSubstepComponent,
+    DayTypesSubstepComponent,
     PlanMealsStepComponent,
   ],
   template: `
@@ -27,21 +45,25 @@ import { mealsForDate } from '../../../core/utils/day-type-utils';
       title="Food & Meals"
       [totalSteps]="totalSteps()"
       [currentStep]="currentStep()"
-      [continueDisabled]="continueDisabledForStep()"
+      [showContinue]="showContinue()"
+      [continueDisabled]="continueDisabled()"
       (backClick)="onBack()"
       (continueClick)="onContinue()"
     >
-      @switch (internalStep()) {
-        @case (0) {
-          <app-planning-prefs-substep (complete)="advance()" />
+      @switch (activeSubstep()) {
+        @case ('planning-prefs') {
+          <app-planning-prefs-substep (complete)="onSubstepComplete()" />
         }
-        @case (1) {
-          <app-dietary-restrictions-substep (complete)="advance()" />
+        @case ('dietary-restrictions') {
+          <app-dietary-restrictions-substep (complete)="onSubstepComplete()" />
         }
-        @case (2) {
-          <app-dietary-preferences-substep (complete)="advance()" />
+        @case ('dietary-preferences') {
+          <app-dietary-preferences-substep (complete)="onSubstepComplete()" />
         }
-        @case (3) {
+        @case ('day-types') {
+          <app-day-types-substep (complete)="onSubstepComplete()" />
+        }
+        @case ('plan-meals') {
           @if (planStart()) {
             <app-plan-meals-step
               [firstRun]="true"
@@ -61,8 +83,6 @@ import { mealsForDate } from '../../../core/utils/day-type-utils';
   `],
 })
 export class OnboardingFoodComponent implements OnInit {
-  readonly internalStep = signal(0);
-
   private readonly weekPlanService = inject(WeekPlanService);
   private readonly state = inject(OnboardingStateService);
   private readonly preferencesService = inject(PreferencesService);
@@ -72,30 +92,49 @@ export class OnboardingFoodComponent implements OnInit {
   private readonly restrictionsRef = viewChild(DietaryRestrictionsSubstepComponent);
   private readonly preferencesRef = viewChild(DietaryPreferencesSubstepComponent);
 
-  readonly totalSteps = computed(() => this.state.planningPrefsComplete() ? 3 : 4);
-  readonly currentStep = computed(() => {
-    const step = this.internalStep();
-    return this.state.planningPrefsComplete() ? step : step + 1;
+  // The substep sequence is reactive: saving 'planning-prefs' or 'day-types'
+  // flips the gating signal and drops that substep from the sequence. We track
+  // the active substep by NAME (not index) so a mid-flow recompute never
+  // mis-points the cursor.
+  readonly substeps = computed<FoodSubstep[]>(() => {
+    const seq: FoodSubstep[] = [];
+    if (!this.state.planningPrefsComplete()) seq.push('planning-prefs');
+    seq.push('dietary-restrictions', 'dietary-preferences');
+    if (this.state.dayTypes().length === 0) seq.push('day-types');
+    seq.push('plan-meals');
+    return seq;
   });
+
+  readonly activeSubstep = signal<FoodSubstep>(this.substeps()[0]);
+
+  // The day-types substep carries its own "Save & Continue" button (it owns a
+  // multi-card save transaction), so the chrome continue is hidden for it —
+  // mirroring the tasks spoke.
+  readonly showContinue = computed(() => this.activeSubstep() !== 'day-types');
+  readonly totalSteps = computed(() => this.substeps().length);
+  readonly currentStep = computed(() => {
+    const idx = this.substeps().indexOf(this.activeSubstep());
+    return idx < 0 ? 1 : idx + 1;
+  });
+  readonly continueDisabled = computed(() => {
+    switch (this.activeSubstep()) {
+      case 'planning-prefs': return this.planningPrefsRef()?.isSaving() ?? false;
+      case 'plan-meals': return this.weekPlanService.isGenerating();
+      default: return false;
+    }
+  });
+
   readonly planStart = computed(() => this.state.planPeriod()?.start ?? '');
   readonly planEnd   = computed(() => this.state.planPeriod()?.end ?? '');
   readonly getMealsForDateFn = (date: string) => mealsForDate(date, this.state.dayTypes());
-  readonly continueDisabledForStep = computed(() => {
-    if (this.internalStep() === 0) return this.planningPrefsRef()?.isSaving() ?? false;
-    return this.internalStep() === 3 && this.weekPlanService.isGenerating();
-  });
 
   private sessionInitialized = false;
 
   constructor() {
-    if (this.state.planningPrefsComplete()) {
-      this.internalStep.set(1);
-    }
-
     // Mirror the PlanningWizardComponent pattern: call initSession() once when
     // planPeriod becomes available and the user reaches the meal plan step.
     effect(() => {
-      if (this.internalStep() !== 3) return;
+      if (this.activeSubstep() !== 'plan-meals') return;
       const period = this.state.planPeriod();
       if (!period || this.sessionInitialized) return;
 
@@ -128,23 +167,53 @@ export class OnboardingFoodComponent implements OnInit {
     }
   }
 
-  advance(): void {
-    this.internalStep.update(s => Math.min(s + 1, 3));
+  /**
+   * Advance to the next substep. Transitions are explicit by name rather than
+   * index-based: saving 'planning-prefs'/'day-types' drops that substep from
+   * the sequence before `complete` fires, so an index lookup on the recomputed
+   * sequence would lose the cursor. The 'dietary-preferences' → 'day-types'
+   * hop is skipped when day types are already configured.
+   */
+  onSubstepComplete(): void {
+    switch (this.activeSubstep()) {
+      case 'planning-prefs':
+        this.activeSubstep.set('dietary-restrictions');
+        break;
+      case 'dietary-restrictions':
+        this.activeSubstep.set('dietary-preferences');
+        break;
+      case 'dietary-preferences':
+        this.activeSubstep.set(
+          this.state.dayTypes().length === 0 ? 'day-types' : 'plan-meals',
+        );
+        break;
+      case 'day-types':
+        this.activeSubstep.set('plan-meals');
+        break;
+      case 'plan-meals':
+        // Terminal substep; completion is handled by finalSave().
+        break;
+    }
   }
 
   onBack(): void {
-    const minStep = this.state.planningPrefsComplete() ? 1 : 0;
-    if (this.internalStep() > minStep) {
-      this.internalStep.update(s => s - 1);
+    const seq = this.substeps();
+    const idx = seq.indexOf(this.activeSubstep());
+    if (idx > 0) {
+      this.activeSubstep.set(seq[idx - 1]);
+    } else {
+      this.router.navigate(['/onboarding']);
     }
   }
 
   onContinue(): void {
-    switch (this.internalStep()) {
-      case 0: this.planningPrefsRef()?.save(); break;
-      case 1: this.restrictionsRef()?.save(); break;
-      case 2: this.preferencesRef()?.save(); break;
-      case 3: this.finalSave(); break;
+    switch (this.activeSubstep()) {
+      case 'planning-prefs': this.planningPrefsRef()?.save(); break;
+      case 'dietary-restrictions': this.restrictionsRef()?.save(); break;
+      case 'dietary-preferences': this.preferencesRef()?.save(); break;
+      case 'plan-meals': this.finalSave(); break;
+      // 'day-types' uses its own Save & Continue button (showContinue is false).
+      case 'day-types': break;
     }
   }
 

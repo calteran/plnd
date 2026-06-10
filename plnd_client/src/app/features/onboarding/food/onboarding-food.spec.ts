@@ -6,18 +6,19 @@ import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
 import { DietaryRestrictionsService } from '../../../core/services/dietary-restrictions.service';
 import { UserMealsService } from '../../../core/services/user-meals.service';
+import { DayTypesService } from '../../../core/services/day-types.service';
 
 describe('OnboardingFoodComponent', () => {
   let fixture: ComponentFixture<OnboardingFoodComponent>;
   let component: OnboardingFoodComponent;
 
-  function buildMocks(planningPrefsComplete: boolean) {
+  function buildMocks(planningPrefsComplete: boolean, dayTypes: unknown[] = []) {
     const mockState = jasmine.createSpyObj('OnboardingStateService',
       ['markComplete', 'setMealPlan', 'setPlanningPrefsComplete', 'computeAndSetPlanPeriod'],
       {
         planningPrefsComplete: jasmine.createSpy().and.returnValue(planningPrefsComplete),
         planPeriod: jasmine.createSpy().and.returnValue(null),
-        dayTypes: jasmine.createSpy().and.returnValue([]),
+        dayTypes: jasmine.createSpy().and.returnValue(dayTypes),
       });
     const mockWPS = jasmine.createSpyObj('WeekPlanService', ['initSession'], {
       planStart: jasmine.createSpy().and.returnValue(''),
@@ -32,8 +33,8 @@ describe('OnboardingFoodComponent', () => {
     return { mockState, mockWPS, mockPrefs };
   }
 
-  async function setup(planningPrefsComplete = false) {
-    const { mockState, mockWPS, mockPrefs } = buildMocks(planningPrefsComplete);
+  async function setup(planningPrefsComplete = false, dayTypes: unknown[] = []) {
+    const { mockState, mockWPS, mockPrefs } = buildMocks(planningPrefsComplete, dayTypes);
     await TestBed.configureTestingModule({
       imports: [OnboardingFoodComponent],
       providers: [
@@ -43,6 +44,7 @@ describe('OnboardingFoodComponent', () => {
         { provide: PreferencesService, useValue: mockPrefs },
         { provide: DietaryRestrictionsService, useValue: jasmine.createSpyObj('DRS', ['load', 'create', 'update', 'delete'], { restrictions: () => [] }) },
         { provide: UserMealsService, useValue: jasmine.createSpyObj('UMS', ['createFromScratch', 'updateMetadata']) },
+        { provide: DayTypesService, useValue: jasmine.createSpyObj('DTS', ['list', 'listMeals', 'create', 'update', 'delete', 'createMeal', 'deleteMeal']) },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(OnboardingFoodComponent);
@@ -55,31 +57,63 @@ describe('OnboardingFoodComponent', () => {
     expect(fixture.nativeElement.textContent).toContain('Food');
   });
 
-  it('starts at internalStep 0 when planningPrefsComplete is false', async () => {
+  it('starts at planning-prefs when planningPrefsComplete is false', async () => {
     await setup(false);
-    expect(component.internalStep()).toBe(0);
+    expect(component.activeSubstep()).toBe('planning-prefs');
   });
 
-  it('starts at internalStep 1 when planningPrefsComplete is true', async () => {
+  it('skips planning-prefs when already complete', async () => {
     await setup(true);
-    expect(component.internalStep()).toBe(1);
+    expect(component.activeSubstep()).toBe('dietary-restrictions');
   });
 
-  it('advance() increments internalStep up to 3', async () => {
-    await setup();
-    expect(component.internalStep()).toBe(0);
-    component.advance();
-    expect(component.internalStep()).toBe(1);
-    for (let i = 0; i < 10; i++) component.advance();
-    expect(component.internalStep()).toBe(3);
+  it('inserts the day-types substep before plan-meals when no day types exist', async () => {
+    await setup(false, []);
+    expect(component.substeps()).toEqual([
+      'planning-prefs',
+      'dietary-restrictions',
+      'dietary-preferences',
+      'day-types',
+      'plan-meals',
+    ]);
   });
 
-  it('onBack() decrements internalStep but not below min', async () => {
-    await setup(false);
-    component.advance();
-    component.onBack();
-    expect(component.internalStep()).toBe(0);
-    component.onBack(); // already at min
-    expect(component.internalStep()).toBe(0);
+  it('omits the day-types substep once day types are configured', async () => {
+    await setup(false, [{ id: 'dt-1' }]);
+    expect(component.substeps()).toEqual([
+      'planning-prefs',
+      'dietary-restrictions',
+      'dietary-preferences',
+      'plan-meals',
+    ]);
+  });
+
+  it('routes dietary-preferences → day-types when day types are missing', async () => {
+    await setup(false, []);
+    component.activeSubstep.set('dietary-preferences');
+    component.onSubstepComplete();
+    expect(component.activeSubstep()).toBe('day-types');
+  });
+
+  it('routes dietary-preferences → plan-meals when day types already exist', async () => {
+    await setup(false, [{ id: 'dt-1' }]);
+    component.activeSubstep.set('dietary-preferences');
+    component.onSubstepComplete();
+    expect(component.activeSubstep()).toBe('plan-meals');
+  });
+
+  it('hides the chrome continue button on the day-types substep', async () => {
+    await setup(false, []);
+    component.activeSubstep.set('day-types');
+    expect(component.showContinue()).toBe(false);
+    component.activeSubstep.set('plan-meals');
+    expect(component.showContinue()).toBe(true);
+  });
+
+  it('day-types → plan-meals on completion', async () => {
+    await setup(false, []);
+    component.activeSubstep.set('day-types');
+    component.onSubstepComplete();
+    expect(component.activeSubstep()).toBe('plan-meals');
   });
 });
