@@ -27,7 +27,6 @@ declare -a JOB_TMPFILES=()
 # ── Cleanup ────────────────────────────────────────────────────────────────────
 cleanup() {
     exec 3>&- 2>/dev/null || true   # close FIFO write-end → reader gets EOF
-    exec 9>&- 2>/dev/null || true   # release flock
     for pid in "${JOB_PIDS[@]+"${JOB_PIDS[@]}"}"; do
         kill "$pid" 2>/dev/null || true
     done
@@ -37,6 +36,16 @@ cleanup() {
         rm -f "$f" 2>/dev/null || true
     done
     (cd "$PROJECT_ROOT" && doppler run -- docker compose down --volumes) 2>/dev/null || true
+    # Release the flock only AFTER teardown completes. The lock must cover the
+    # whole run lifecycle — including `docker compose down --volumes`. The `db`,
+    # `mock-oauth-server`, and `plnd_api` all bind fixed host ports (5432/8080/
+    # 3000) within one Compose project, so concurrent verify runs cannot
+    # parallelize and must serialize through this lock. Releasing it before the
+    # volume teardown lets a queued run bring the shared DB up, then this run's
+    # deferred `down --volumes` wipes it out from under the new run's live e2e
+    # suite — minted sessions vanish (auth/token 500s, /test/seed + authed
+    # endpoints 401s), clustering failures in whatever specs are mid-flight (#875).
+    exec 9>&- 2>/dev/null || true   # release flock
     [[ -n "${FIFO:-}" ]] && rm -f "$FIFO" 2>/dev/null || true
     [[ -n "${API_LOG:-}" ]] && rm -f "$API_LOG" 2>/dev/null || true
 }
@@ -61,6 +70,10 @@ if ! command -v doppler &>/dev/null; then
 fi
 
 # ── Semaphore: serialize concurrent verify runs ────────────────────────────────
+# Held for the ENTIRE run, including the cleanup trap's `docker compose down
+# --volumes` (see cleanup() — fd 9 is closed only after teardown). The lock must
+# span teardown so a queued run never brings the shared DB up while this run is
+# still tearing it down. Do not release fd 9 earlier (#875).
 LOCK_FILE="/tmp/plnd-verify.lock"
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
