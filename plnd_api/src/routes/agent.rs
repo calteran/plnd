@@ -287,19 +287,23 @@ async fn resolve_meal_names<'a>(
     user_id: Uuid,
     entries: impl IntoIterator<Item = &'a MealEntry>,
 ) -> std::collections::HashMap<Uuid, String> {
-    let refs: Vec<&MealRef> = entries.into_iter().map(|e| &e.meal_ref).collect();
-    let catalog_ids: Vec<Uuid> = refs
-        .iter()
-        .filter(|r| r.meal_type == "catalog")
-        .map(|r| r.id)
-        .collect();
-    let user_ids: Vec<Uuid> = refs
-        .iter()
-        .filter(|r| r.meal_type == "user")
-        .map(|r| r.id)
-        .collect();
+    // Partition ref ids by kind in a single pass, then dedup — a week plan often repeats the
+    // same meal across days, so deduping shrinks the `IN` lists sent to the database.
+    let mut catalog_ids = Vec::new();
+    let mut user_ids = Vec::new();
+    for entry in entries {
+        match entry.meal_ref.meal_type.as_str() {
+            "catalog" => catalog_ids.push(entry.meal_ref.id),
+            "user" => user_ids.push(entry.meal_ref.id),
+            _ => {}
+        }
+    }
+    catalog_ids.sort_unstable();
+    catalog_ids.dedup();
+    user_ids.sort_unstable();
+    user_ids.dedup();
 
-    let mut map = std::collections::HashMap::new();
+    let mut map = std::collections::HashMap::with_capacity(catalog_ids.len() + user_ids.len());
     if !catalog_ids.is_empty() {
         match repos.meal.catalog_meal_names_by_ids(&catalog_ids).await {
             Ok(names) => map.extend(names),
