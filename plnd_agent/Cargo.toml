@@ -17,6 +17,7 @@ serde        = { version = "1.0", features = ["derive"] }
 serde_json   = "1.0"
 tokio        = { version = "1", features = ["full"] }
 thiserror    = "2.0"
+fastrand     = "2"
 uuid         = { version = "1", features = ["v4", "serde"] }
 reqwest      = { version = "0.13", default-features = false, features = ["json", "native-tls"] }
 jsonschema   = { version = "0.46", default-features = false } # disables resolve-http/resolve-file; format validators (uuid, date-time) are unconditional

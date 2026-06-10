@@ -1,13 +1,17 @@
+use std::time::{Duration, Instant};
+
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent, MessageRole,
-    StopReason, ToolCall,
+    Completion, CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent,
+    MessageRole, StopReason, ToolCall, resolve_retry_sleep, retry_delay,
 };
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 const DEFAULT_BASE_URL: &str = "https://api.anthropic.com";
-const MAX_RETRIES: u32 = 3;
+
+/// Default total backoff budget for rate-limit (429) / overload (529) retries.
+const DEFAULT_MAX_RETRY_WAIT: Duration = Duration::from_secs(300);
 
 pub struct AnthropicProvider {
     http: reqwest::Client,
@@ -15,6 +19,9 @@ pub struct AnthropicProvider {
     model: String,
     base_url: String,
     api_version: Option<String>,
+    /// Cumulative wall-clock budget for retrying 429/529 responses before the
+    /// request is failed. See [`AnthropicProvider::with_max_retry_wait`].
+    max_retry_wait: Duration,
 }
 
 impl AnthropicProvider {
@@ -25,6 +32,7 @@ impl AnthropicProvider {
             model: model.into(),
             base_url: DEFAULT_BASE_URL.to_string(),
             api_version: None,
+            max_retry_wait: DEFAULT_MAX_RETRY_WAIT,
         }
     }
 
@@ -32,6 +40,12 @@ impl AnthropicProvider {
     /// Note: AWS Bedrock uses a different request envelope and auth model — not supported here.
     pub fn with_base_url(mut self, url: impl Into<String>) -> Self {
         self.base_url = url.into();
+        self
+    }
+
+    /// Override the total backoff budget for rate-limit / overload retries.
+    pub fn with_max_retry_wait(mut self, wait: Duration) -> Self {
+        self.max_retry_wait = wait;
         self
     }
 
@@ -137,36 +151,6 @@ enum AnthropicContentBlock {
         name: String,
         input: serde_json::Value,
     },
-}
-
-// ── Retry policy ─────────────────────────────────────────────────────────────
-
-/// Returns how long to wait (ms) before retrying a failed request, or `None`
-/// if the status code is not retriable.
-///
-/// Retriable: 429 (rate limit) and 529 (Anthropic overload).
-/// Priority: `retry-after-ms` header → `retry-after` (seconds) → exponential
-/// backoff starting at 1 s, doubling each attempt, capped at 8 s.
-fn retry_delay_ms(status: u16, headers: &reqwest::header::HeaderMap, attempt: u32) -> Option<u64> {
-    if status != 429 && status != 529 {
-        return None;
-    }
-    if let Some(ms) = headers
-        .get("retry-after-ms")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.parse::<u64>().ok())
-    {
-        return Some(ms);
-    }
-    if let Some(secs) = headers
-        .get("retry-after")
-        .and_then(|v| v.to_str().ok())
-        .and_then(|s| s.parse::<u64>().ok())
-    {
-        return Some(secs * 1_000);
-    }
-    // Exponential backoff: 1 s, 2 s, 4 s, capped at 8 s.
-    Some(1_000 * (1u64 << attempt.min(3)))
 }
 
 // ── LlmProvider impl ─────────────────────────────────────────────────────────
@@ -324,28 +308,50 @@ impl AnthropicProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for AnthropicProvider {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
-        for attempt in 0..=MAX_RETRIES {
+    async fn complete(&self, request: CompletionRequest) -> Result<Completion, LlmError> {
+        let started = Instant::now();
+        let mut attempt: u32 = 0;
+        let mut rate_limited = false;
+        loop {
             let http_response = self.send_request(&request).await?;
 
             if http_response.status().is_success() {
-                return Self::parse_response(http_response).await;
+                return Self::parse_response(http_response)
+                    .await
+                    .map(|response| Completion {
+                        response,
+                        rate_limited,
+                    });
             }
 
             let status = http_response.status().as_u16();
             let headers = http_response.headers().clone();
 
-            if let Some(delay_ms) = retry_delay_ms(status, &headers, attempt)
-                && attempt < MAX_RETRIES
-            {
+            // Retry 429/529 with jittered backoff until the cumulative wait would
+            // exceed the configured budget, then fail. Server `retry-after` hints
+            // are honored verbatim; computed backoff is jittered so concurrent
+            // callers do not re-collide in lockstep.
+            if let Some(delay) = retry_delay(status, &headers, attempt) {
+                let sleep = resolve_retry_sleep(delay);
+                if started.elapsed() + sleep <= self.max_retry_wait {
+                    rate_limited = true;
+                    tracing::warn!(
+                        attempt,
+                        status,
+                        sleep_ms = sleep.as_millis() as u64,
+                        elapsed_ms = started.elapsed().as_millis() as u64,
+                        "LLM rate limit or overload; retrying after backoff"
+                    );
+                    tokio::time::sleep(sleep).await;
+                    attempt += 1;
+                    continue;
+                }
                 tracing::warn!(
                     attempt,
                     status,
-                    delay_ms,
-                    "LLM rate limit or overload; retrying after delay"
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "LLM retry budget exhausted; giving up"
                 );
-                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
-                continue;
             }
 
             let message = http_response
@@ -354,7 +360,6 @@ impl LlmProvider for AnthropicProvider {
                 .unwrap_or_else(|_| "(unreadable body)".to_string());
             return Err(LlmError::Api { status, message });
         }
-        unreachable!()
     }
 
     fn name(&self) -> &str {
@@ -369,60 +374,6 @@ impl LlmProvider for AnthropicProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    // ── retry_delay_ms ────────────────────────────────────────────────────────
-
-    #[test]
-    fn retry_delay_ms_returns_none_for_non_retriable_status() {
-        let headers = reqwest::header::HeaderMap::new();
-        assert_eq!(retry_delay_ms(200, &headers, 0), None);
-        assert_eq!(retry_delay_ms(400, &headers, 0), None);
-        assert_eq!(retry_delay_ms(500, &headers, 0), None);
-        assert_eq!(retry_delay_ms(503, &headers, 0), None);
-    }
-
-    #[test]
-    fn retry_delay_ms_uses_retry_after_ms_header_on_429() {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert("retry-after-ms", "2500".parse().unwrap());
-        assert_eq!(retry_delay_ms(429, &headers, 0), Some(2500));
-    }
-
-    #[test]
-    fn retry_delay_ms_converts_retry_after_seconds_to_ms_on_429() {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert("retry-after", "3".parse().unwrap());
-        assert_eq!(retry_delay_ms(429, &headers, 0), Some(3000));
-    }
-
-    #[test]
-    fn retry_delay_ms_prefers_ms_header_over_seconds_header() {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert("retry-after-ms", "1500".parse().unwrap());
-        headers.insert("retry-after", "10".parse().unwrap());
-        assert_eq!(retry_delay_ms(429, &headers, 0), Some(1500));
-    }
-
-    #[test]
-    fn retry_delay_ms_exponential_backoff_when_no_header() {
-        let headers = reqwest::header::HeaderMap::new();
-        assert_eq!(retry_delay_ms(429, &headers, 0), Some(1_000));
-        assert_eq!(retry_delay_ms(429, &headers, 1), Some(2_000));
-        assert_eq!(retry_delay_ms(429, &headers, 2), Some(4_000));
-    }
-
-    #[test]
-    fn retry_delay_ms_caps_backoff_at_eight_seconds() {
-        let headers = reqwest::header::HeaderMap::new();
-        assert_eq!(retry_delay_ms(429, &headers, 3), Some(8_000));
-        assert_eq!(retry_delay_ms(429, &headers, 99), Some(8_000));
-    }
-
-    #[test]
-    fn retry_delay_ms_applies_to_529_overload() {
-        let headers = reqwest::header::HeaderMap::new();
-        assert_eq!(retry_delay_ms(529, &headers, 0), Some(1_000));
-    }
 
     // ── AnthropicUsage ────────────────────────────────────────────────────────
 
