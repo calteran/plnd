@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use chrono::Utc;
+use plnd_agent::provider::LlmError;
 use plnd_agent::{AgentContext, AgentError, UseCase, xml_escape};
 use uuid::Uuid;
 
@@ -345,11 +346,117 @@ pub async fn post_task(
     Ok(Json(response))
 }
 
-/// Fan out per-slot agent calls with bounded concurrency.
+/// Per-slot result plus the rate-limit signal that drives AIMD concurrency.
+struct SlotOutcome {
+    result: Result<MealEntry, FailedSlot>,
+    /// True if the slot's agent run was rate-limited (429) or overloaded (529).
+    rate_limited: bool,
+}
+
+/// Consecutive clean completions required before the AIMD limit grows by one.
+const AIMD_GROW_AFTER: usize = 3;
+
+/// Additive-increase / multiplicative-decrease concurrency gate.
 ///
-/// Each slot is submitted to `call` independently; at most `concurrency` futures
-/// run simultaneously. Results are returned in original slot order regardless of
-/// completion order. Task panics are logged but do not abort the batch.
+/// Starts at `max_limit` simultaneous slots. A rate-limited completion halves
+/// the limit (floor 1); after [`AIMD_GROW_AFTER`] consecutive clean completions
+/// the limit grows by one, up to `max_limit`. Shrinking below the current
+/// in-flight count simply stops admitting new work until enough slots drain — no
+/// running slot is ever cancelled. This lets the fan-out converge under a
+/// sustained ITPM rate limit instead of hammering it with fixed concurrency.
+struct AimdGate {
+    max_limit: usize,
+    state: std::sync::Mutex<AimdState>,
+    notify: tokio::sync::Notify,
+}
+
+struct AimdState {
+    limit: usize,
+    in_flight: usize,
+    clean_streak: usize,
+}
+
+impl AimdGate {
+    fn new(max_limit: usize) -> Self {
+        let max_limit = max_limit.max(1);
+        Self {
+            max_limit,
+            state: std::sync::Mutex::new(AimdState {
+                limit: max_limit,
+                in_flight: 0,
+                clean_streak: 0,
+            }),
+            notify: tokio::sync::Notify::new(),
+        }
+    }
+
+    /// Wait until the current limit has headroom, then reserve one slot.
+    async fn acquire(self: &Arc<Self>) -> AimdPermit {
+        loop {
+            // Register interest *before* checking the condition, per tokio's
+            // race-free `Notify` pattern, so a release between the check and the
+            // await is delivered rather than lost.
+            let notified = self.notify.notified();
+            {
+                let mut s = self.state.lock().expect("AIMD gate poisoned");
+                if s.in_flight < s.limit {
+                    s.in_flight += 1;
+                    return AimdPermit {
+                        gate: Arc::clone(self),
+                    };
+                }
+            }
+            notified.await;
+        }
+    }
+
+    /// Fold a completed slot's outcome into the limit (AIMD), then wake a waiter
+    /// if growing the limit freed a slot.
+    fn record_outcome(&self, rate_limited: bool) {
+        {
+            let mut s = self.state.lock().expect("AIMD gate poisoned");
+            if rate_limited {
+                s.limit = (s.limit / 2).max(1);
+                s.clean_streak = 0;
+            } else {
+                s.clean_streak += 1;
+                if s.clean_streak >= AIMD_GROW_AFTER && s.limit < self.max_limit {
+                    s.limit += 1;
+                    s.clean_streak = 0;
+                }
+            }
+        }
+        self.notify.notify_one();
+    }
+
+    #[cfg(test)]
+    fn limit(&self) -> usize {
+        self.state.lock().expect("AIMD gate poisoned").limit
+    }
+}
+
+/// RAII guard: dropping it releases one in-flight slot and wakes a waiter.
+struct AimdPermit {
+    gate: Arc<AimdGate>,
+}
+
+impl Drop for AimdPermit {
+    fn drop(&mut self) {
+        {
+            let mut s = self.gate.state.lock().expect("AIMD gate poisoned");
+            s.in_flight = s.in_flight.saturating_sub(1);
+        }
+        self.gate.notify.notify_one();
+    }
+}
+
+/// Fan out per-slot agent calls with adaptive concurrency.
+///
+/// Each slot is submitted to `call` independently; at most the gate's current
+/// limit run simultaneously, and that limit shrinks under rate limiting and
+/// recovers when calls succeed (see [`AimdGate`]). Results are returned in
+/// original slot order regardless of completion order. Task panics are logged
+/// but do not abort the batch.
 async fn fill_slots_parallel<F, Fut>(
     open_slots: Vec<plnd_data::models::OpenSlot>,
     concurrency: usize,
@@ -357,19 +464,22 @@ async fn fill_slots_parallel<F, Fut>(
 ) -> (Vec<MealEntry>, Vec<FailedSlot>)
 where
     F: Fn(plnd_data::models::OpenSlot) -> Fut + Send + Sync + 'static,
-    Fut: std::future::Future<Output = Result<MealEntry, FailedSlot>> + Send + 'static,
+    Fut: std::future::Future<Output = SlotOutcome> + Send + 'static,
 {
     let n = open_slots.len();
-    let sem = Arc::new(tokio::sync::Semaphore::new(concurrency));
-    let mut join_set: tokio::task::JoinSet<(usize, Result<MealEntry, FailedSlot>)> =
-        tokio::task::JoinSet::new();
+    let gate = Arc::new(AimdGate::new(concurrency));
+    let mut join_set: tokio::task::JoinSet<(usize, SlotOutcome)> = tokio::task::JoinSet::new();
 
     for (i, slot) in open_slots.into_iter().enumerate() {
-        let sem = Arc::clone(&sem);
+        let gate = Arc::clone(&gate);
         let fut = call(slot);
         join_set.spawn(async move {
-            let _permit = sem.acquire().await.expect("semaphore closed");
-            (i, fut.await)
+            let _permit = gate.acquire().await;
+            let outcome = fut.await;
+            // Adjust the limit before the permit drops so the AIMD signal lands
+            // before the freed slot is offered to the next waiter.
+            gate.record_outcome(outcome.rate_limited);
+            (i, outcome)
         });
     }
 
@@ -384,8 +494,8 @@ where
 
     let mut chosen = Vec::new();
     let mut failed = Vec::new();
-    for (_, result) in indexed {
-        match result {
+    for (_, outcome) in indexed {
+        match outcome.result {
             Ok(meal) => chosen.push(meal),
             Err(slot) => failed.push(slot),
         }
@@ -492,34 +602,57 @@ pub async fn post_meal_plan(
         async move {
             let ctx = build_suggest_slot_ctx(user_id, &slot, &prefs, &locked, &[]);
             match agent.run(&ctx).await {
-                Ok(output) => match serde_json::from_str::<MealEntry>(&output.content) {
-                    Ok(meal) => Ok(meal),
-                    Err(e) => {
-                        tracing::warn!(
-                            error = %e,
-                            date = %slot.date,
-                            meal_name = %slot.meal_name,
-                            "meal-plan: failed to parse slot suggestion"
-                        );
-                        Err(FailedSlot {
-                            date: slot.date,
-                            meal_name: slot.meal_name,
-                            reason: e.to_string(),
-                        })
+                Ok(output) => {
+                    // `rate_limited` is true if the run backed off on a 429/529
+                    // even though it ultimately succeeded — still a congestion
+                    // signal for the AIMD gate.
+                    let rate_limited = output.rate_limited;
+                    let result = match serde_json::from_str::<MealEntry>(&output.content) {
+                        Ok(meal) => Ok(meal),
+                        Err(e) => {
+                            tracing::warn!(
+                                error = %e,
+                                date = %slot.date,
+                                meal_name = %slot.meal_name,
+                                "meal-plan: failed to parse slot suggestion"
+                            );
+                            Err(FailedSlot {
+                                date: slot.date,
+                                meal_name: slot.meal_name,
+                                reason: e.to_string(),
+                            })
+                        }
+                    };
+                    SlotOutcome {
+                        result,
+                        rate_limited,
                     }
-                },
+                }
                 Err(e) => {
+                    // A slot that failed because the provider's retry budget was
+                    // exhausted on a 429/529 is the strongest congestion signal —
+                    // surface it so the AIMD gate backs concurrency off hard.
+                    let rate_limited = matches!(
+                        &e,
+                        AgentError::Llm(LlmError::Api {
+                            status: 429 | 529,
+                            ..
+                        })
+                    );
                     tracing::warn!(
                         error = %e,
                         date = %slot.date,
                         meal_name = %slot.meal_name,
                         "meal-plan: agent slot suggestion failed"
                     );
-                    Err(FailedSlot {
-                        date: slot.date,
-                        meal_name: slot.meal_name,
-                        reason: e.to_string(),
-                    })
+                    SlotOutcome {
+                        result: Err(FailedSlot {
+                            date: slot.date,
+                            meal_name: slot.meal_name,
+                            reason: e.to_string(),
+                        }),
+                        rate_limited,
+                    }
                 }
             }
         }
@@ -2209,15 +2342,18 @@ mod tests {
                 peak.fetch_max(current, Ordering::SeqCst);
                 tokio::time::sleep(std::time::Duration::from_millis(5)).await;
                 in_flight.fetch_sub(1, Ordering::SeqCst);
-                Ok(MealEntry {
-                    date: slot.date,
-                    meal_name: slot.meal_name.clone(),
-                    meal_ref: MealRef {
-                        meal_type: "catalog".to_string(),
-                        id: uuid::Uuid::new_v4(),
-                    },
-                    estimated_nutrition: None,
-                })
+                super::SlotOutcome {
+                    result: Ok(MealEntry {
+                        date: slot.date,
+                        meal_name: slot.meal_name.clone(),
+                        meal_ref: MealRef {
+                            meal_type: "catalog".to_string(),
+                            id: uuid::Uuid::new_v4(),
+                        },
+                        estimated_nutrition: None,
+                    }),
+                    rate_limited: false,
+                }
             }
         })
         .await;
@@ -2245,7 +2381,7 @@ mod tests {
         ];
 
         let (chosen, failed) = super::fill_slots_parallel(open_slots, 4, |slot| async move {
-            if slot.meal_name == "breakfast" {
+            let result = if slot.meal_name == "breakfast" {
                 Ok(MealEntry {
                     date: slot.date,
                     meal_name: slot.meal_name.clone(),
@@ -2261,6 +2397,10 @@ mod tests {
                     meal_name: slot.meal_name.clone(),
                     reason: "mock failure".to_string(),
                 })
+            };
+            super::SlotOutcome {
+                result,
+                rate_limited: false,
             }
         })
         .await;
@@ -2269,6 +2409,100 @@ mod tests {
         assert_eq!(failed.len(), 1);
         assert_eq!(chosen[0].meal_name, "breakfast");
         assert_eq!(failed[0].meal_name, "lunch");
+    }
+
+    // ---- AimdGate tests ----
+
+    #[test]
+    fn aimd_shrinks_multiplicatively_on_rate_limit_with_floor_one() {
+        let gate = super::AimdGate::new(8);
+        assert_eq!(gate.limit(), 8);
+        gate.record_outcome(true);
+        assert_eq!(gate.limit(), 4);
+        gate.record_outcome(true);
+        assert_eq!(gate.limit(), 2);
+        gate.record_outcome(true);
+        assert_eq!(gate.limit(), 1);
+        gate.record_outcome(true);
+        assert_eq!(gate.limit(), 1, "limit must never drop below 1");
+    }
+
+    #[test]
+    fn aimd_grows_after_clean_streak_capped_at_max() {
+        let gate = super::AimdGate::new(4);
+        // Shrink to the floor first: 4 -> 2 -> 1.
+        gate.record_outcome(true);
+        gate.record_outcome(true);
+        assert_eq!(gate.limit(), 1);
+
+        // Additive increase: one step per AIMD_GROW_AFTER clean completions.
+        for _ in 0..super::AIMD_GROW_AFTER {
+            gate.record_outcome(false);
+        }
+        assert_eq!(gate.limit(), 2);
+        for _ in 0..super::AIMD_GROW_AFTER {
+            gate.record_outcome(false);
+        }
+        assert_eq!(gate.limit(), 3);
+        for _ in 0..super::AIMD_GROW_AFTER {
+            gate.record_outcome(false);
+        }
+        assert_eq!(gate.limit(), 4);
+        // Capped at max_limit.
+        for _ in 0..super::AIMD_GROW_AFTER {
+            gate.record_outcome(false);
+        }
+        assert_eq!(gate.limit(), 4, "limit must not exceed max_limit");
+    }
+
+    #[test]
+    fn aimd_clean_streak_resets_on_rate_limit() {
+        let gate = super::AimdGate::new(4);
+        gate.record_outcome(true);
+        gate.record_outcome(true);
+        assert_eq!(gate.limit(), 1);
+
+        // Two clean completions (below the grow threshold), then a rate limit
+        // resets the streak — so the next two cleans alone must not grow.
+        gate.record_outcome(false);
+        gate.record_outcome(false);
+        gate.record_outcome(true);
+        gate.record_outcome(false);
+        gate.record_outcome(false);
+        assert_eq!(gate.limit(), 1, "streak should have reset, no growth yet");
+        gate.record_outcome(false);
+        assert_eq!(gate.limit(), 2, "third clean after reset grows the limit");
+    }
+
+    #[tokio::test]
+    async fn aimd_acquire_blocks_until_permit_released() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::time::Duration;
+
+        let gate = Arc::new(super::AimdGate::new(1));
+        let p1 = gate.acquire().await; // limit is 1; this fills it.
+
+        let acquired = Arc::new(AtomicBool::new(false));
+        let gate2 = Arc::clone(&gate);
+        let acquired2 = Arc::clone(&acquired);
+        let handle = tokio::spawn(async move {
+            let _p2 = gate2.acquire().await;
+            acquired2.store(true, Ordering::SeqCst);
+        });
+
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert!(
+            !acquired.load(Ordering::SeqCst),
+            "second acquire must block while the only permit is held"
+        );
+
+        drop(p1);
+        tokio::time::timeout(Duration::from_millis(500), handle)
+            .await
+            .expect("second acquire should complete once the permit is released")
+            .expect("task must not panic");
+        assert!(acquired.load(Ordering::SeqCst));
     }
 
     // ---- aggregate_nutrition helpers ----

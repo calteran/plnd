@@ -6,9 +6,9 @@ use uuid::Uuid;
 use crate::config::LlmConfig;
 use crate::context::AgentContext;
 use crate::provider::{
-    AnthropicProvider, CompletionRequest, LlmError, LlmProvider, Message, MessageContent,
-    MessageRole, OpenAiCompatibleProvider, ProviderRegistry, ProviderTier, StopReason, ToolCall,
-    ToolResultPart,
+    AnthropicProvider, Completion, CompletionRequest, LlmError, LlmProvider, Message,
+    MessageContent, MessageRole, OpenAiCompatibleProvider, ProviderRegistry, ProviderTier,
+    StopReason, ToolCall, ToolResultPart,
 };
 use crate::tools::{ToolContext, ToolError, ToolRegistry};
 
@@ -60,6 +60,10 @@ pub enum AgentError {
 pub struct AgentOutput {
     pub content: String,
     pub messages: Vec<Message>,
+    /// `true` if any LLM call during this run was rate-limited (429) or
+    /// overloaded (529) and had to back off. Drives adaptive concurrency in
+    /// callers that fan out many runs (e.g. the meal-plan slot fill).
+    pub rate_limited: bool,
 }
 
 // ── Internal result type used during parallel tool execution ─────────────────
@@ -155,6 +159,7 @@ impl AgentLoop<'_> {
         let ctx = ToolContext { user_id };
         let mut messages = initial_messages;
         let mut last_content: Option<String> = None;
+        let mut rate_limited = false;
 
         for _ in 0..self.max_iterations {
             let request = CompletionRequest {
@@ -178,7 +183,10 @@ impl AgentLoop<'_> {
                 otel.status_code = tracing::field::Empty,
                 otel.status_message = tracing::field::Empty,
             );
-            let response = provider
+            let Completion {
+                response,
+                rate_limited: call_rate_limited,
+            } = provider
                 .complete(request)
                 .instrument(llm_span.clone())
                 .await
@@ -186,6 +194,7 @@ impl AgentLoop<'_> {
                     llm_span.record("otel.status_code", "ERROR");
                     llm_span.record("otel.status_message", tracing::field::display(e));
                 })?;
+            rate_limited |= call_rate_limited;
             if let Some(ref usage) = response.usage {
                 llm_span.record("llm_prompt_tokens", usage.prompt_tokens);
                 llm_span.record("llm_completion_tokens", usage.completion_tokens);
@@ -289,6 +298,7 @@ impl AgentLoop<'_> {
         Ok(AgentOutput {
             content: last_content.unwrap_or_default(),
             messages,
+            rate_limited,
         })
     }
 
@@ -484,6 +494,9 @@ impl AgentService {
         let mut output = agent_loop
             .run(ctx.user_id, tier, system.clone(), initial_messages)
             .await?;
+        // Rate limiting can occur on any run (the initial one or a schema-retry);
+        // OR the flag across all of them so the caller's AIMD controller sees it.
+        let mut any_rate_limited = output.rate_limited;
 
         // Step 7: Validate output against the use-case schema, retrying with a
         // correction message when validation fails. The loop is bounded by
@@ -552,6 +565,7 @@ impl AgentService {
                         output = agent_loop
                             .run(ctx.user_id, tier, system.clone(), retry_messages)
                             .await?;
+                        any_rate_limited |= output.rate_limited;
                         // If the model produced no content at all on retry, the
                         // most likely cause is that it confused the tool-call
                         // format with a text-JSON response and the provider
@@ -576,6 +590,7 @@ impl AgentService {
             }
         }
 
+        output.rate_limited = any_rate_limited;
         Ok(output)
     }
 }

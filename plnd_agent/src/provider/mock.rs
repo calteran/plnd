@@ -4,7 +4,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 
-use super::{CompletionRequest, CompletionResponse, LlmError, LlmProvider};
+use super::{Completion, CompletionRequest, CompletionResponse, LlmError, LlmProvider};
 #[cfg(test)]
 use super::{Message, MessageContent, MessageRole, StopReason, ToolCall};
 
@@ -54,7 +54,7 @@ impl MockLlmProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for MockLlmProvider {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+    async fn complete(&self, request: CompletionRequest) -> Result<Completion, LlmError> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
         *self.last_request.lock().unwrap() = Some(request);
         self.responses
@@ -62,6 +62,7 @@ impl LlmProvider for MockLlmProvider {
             .unwrap()
             .pop_front()
             .unwrap_or_else(|| panic!("MockLlmProvider '{}': no more responses queued", self.name))
+            .map(Completion::ok)
     }
 
     fn name(&self) -> &str {
@@ -104,9 +105,10 @@ mod tests {
 
         let result = provider.complete(minimal_request()).await.unwrap();
 
-        assert_eq!(result.content, Some("hello world".to_string()));
-        assert!(result.tool_calls.is_empty());
-        assert_eq!(result.stop_reason, StopReason::EndTurn);
+        assert!(!result.rate_limited);
+        assert_eq!(result.response.content, Some("hello world".to_string()));
+        assert!(result.response.tool_calls.is_empty());
+        assert_eq!(result.response.stop_reason, StopReason::EndTurn);
     }
 
     #[tokio::test]
@@ -125,14 +127,14 @@ mod tests {
 
         let result = provider.complete(minimal_request()).await.unwrap();
 
-        assert_eq!(result.content, None);
-        assert_eq!(result.tool_calls.len(), 1);
-        assert_eq!(result.tool_calls[0].name, "create_task");
+        assert_eq!(result.response.content, None);
+        assert_eq!(result.response.tool_calls.len(), 1);
+        assert_eq!(result.response.tool_calls[0].name, "create_task");
         assert_eq!(
-            result.tool_calls[0].arguments,
+            result.response.tool_calls[0].arguments,
             serde_json::json!({"energy_level": "high"})
         );
-        assert_eq!(result.stop_reason, StopReason::ToolUse);
+        assert_eq!(result.response.stop_reason, StopReason::ToolUse);
     }
 
     #[tokio::test]
@@ -147,7 +149,7 @@ mod tests {
 
         let result = provider.complete(minimal_request()).await.unwrap();
 
-        assert_eq!(result.stop_reason, StopReason::MaxTokens);
+        assert_eq!(result.response.stop_reason, StopReason::MaxTokens);
     }
 
     #[tokio::test]

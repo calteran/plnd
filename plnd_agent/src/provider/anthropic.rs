@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent, MessageRole,
-    StopReason, ToolCall, resolve_retry_sleep, retry_delay,
+    Completion, CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent,
+    MessageRole, StopReason, ToolCall, resolve_retry_sleep, retry_delay,
 };
 
 const ANTHROPIC_VERSION: &str = "2023-06-01";
@@ -308,14 +308,20 @@ impl AnthropicProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for AnthropicProvider {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+    async fn complete(&self, request: CompletionRequest) -> Result<Completion, LlmError> {
         let started = Instant::now();
         let mut attempt: u32 = 0;
+        let mut rate_limited = false;
         loop {
             let http_response = self.send_request(&request).await?;
 
             if http_response.status().is_success() {
-                return Self::parse_response(http_response).await;
+                return Self::parse_response(http_response)
+                    .await
+                    .map(|response| Completion {
+                        response,
+                        rate_limited,
+                    });
             }
 
             let status = http_response.status().as_u16();
@@ -328,6 +334,7 @@ impl LlmProvider for AnthropicProvider {
             if let Some(delay) = retry_delay(status, &headers, attempt) {
                 let sleep = resolve_retry_sleep(delay);
                 if started.elapsed() + sleep <= self.max_retry_wait {
+                    rate_limited = true;
                     tracing::warn!(
                         attempt,
                         status,

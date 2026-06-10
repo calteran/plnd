@@ -3,8 +3,8 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 
 use super::{
-    CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent, MessageRole,
-    StopReason, ToolCall, resolve_retry_sleep, retry_delay,
+    Completion, CompletionRequest, CompletionResponse, LlmError, LlmProvider, MessageContent,
+    MessageRole, StopReason, ToolCall, resolve_retry_sleep, retry_delay,
 };
 
 /// Default total backoff budget for rate-limit (429) / overload (529) retries.
@@ -227,7 +227,7 @@ impl OpenAiCompatibleProvider {
 
 #[async_trait::async_trait]
 impl LlmProvider for OpenAiCompatibleProvider {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError> {
+    async fn complete(&self, request: CompletionRequest) -> Result<Completion, LlmError> {
         let mut messages: Vec<OaiReqMsg> = Vec::new();
 
         messages.push(OaiReqMsg::System {
@@ -314,6 +314,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
         // provider's policy. `body` is reused verbatim across attempts.
         let started = Instant::now();
         let mut attempt: u32 = 0;
+        let mut rate_limited = false;
         let http_response = loop {
             let http_response = self
                 .http
@@ -333,6 +334,7 @@ impl LlmProvider for OpenAiCompatibleProvider {
             if let Some(delay) = retry_delay(status, &headers, attempt) {
                 let sleep = resolve_retry_sleep(delay);
                 if started.elapsed() + sleep <= self.max_retry_wait {
+                    rate_limited = true;
                     tracing::warn!(
                         attempt,
                         status,
@@ -364,7 +366,10 @@ impl LlmProvider for OpenAiCompatibleProvider {
             .await
             .map_err(|e| LlmError::Deserialization(e.to_string()))?;
 
-        parse_completion(parsed)
+        parse_completion(parsed).map(|response| Completion {
+            response,
+            rate_limited,
+        })
     }
 
     fn name(&self) -> &str {

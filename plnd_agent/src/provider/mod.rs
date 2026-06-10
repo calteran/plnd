@@ -75,7 +75,9 @@ pub(crate) fn retry_delay(
     }
     let cap_ms = RETRY_BACKOFF_CAP.as_millis() as u64;
     let base_ms = (1_000u64 << attempt.min(5)).min(cap_ms);
-    Some(RetryDelay::Backoff(std::time::Duration::from_millis(base_ms)))
+    Some(RetryDelay::Backoff(std::time::Duration::from_millis(
+        base_ms,
+    )))
 }
 
 /// Parse the server's retry-after hint (milliseconds), preferring the
@@ -215,11 +217,35 @@ pub struct CompletionResponse {
     pub usage: Option<TokenUsage>,
 }
 
+/// The result of a single [`LlmProvider::complete`] call: the model response
+/// plus transport metadata the caller needs for adaptive concurrency control.
+///
+/// `rate_limited` is kept off [`CompletionResponse`] deliberately — that type
+/// is serialized and represents model output, whereas this is a per-call
+/// transport observation (did the provider have to back off on a 429/529?).
+#[derive(Debug, Clone)]
+pub struct Completion {
+    pub response: CompletionResponse,
+    /// `true` if the provider observed and retried at least one rate-limit
+    /// (429) or overload (529) response while producing this completion.
+    pub rate_limited: bool,
+}
+
+impl Completion {
+    /// Wrap a response that completed without any rate-limit retries.
+    pub fn ok(response: CompletionResponse) -> Self {
+        Self {
+            response,
+            rate_limited: false,
+        }
+    }
+}
+
 // ── Trait ────────────────────────────────────────────────────────────────────
 
 #[async_trait::async_trait]
 pub trait LlmProvider: Send + Sync {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, LlmError>;
+    async fn complete(&self, request: CompletionRequest) -> Result<Completion, LlmError>;
 
     fn name(&self) -> &str;
 
