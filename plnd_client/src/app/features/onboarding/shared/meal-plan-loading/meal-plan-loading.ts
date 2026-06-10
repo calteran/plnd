@@ -203,6 +203,13 @@ function dayLabel(iso: string): string {
     }
     .stage {
       display: flex; align-items: center; justify-content: center;
+      /* Keep the animated particles inside their own box. Without this they spill
+         past the stage's edges into the sibling reassurance note below (and the
+         heading above), so the floating captions collide with that text. The
+         ingredients enter from translate(140px) — only ~20px beyond the 240px-tall
+         box — so the clip is visually unnoticeable while isolating the animation. */
+      overflow: hidden;
+      border-radius: 14px;
     }
     .static-stage {
       display: flex; align-items: center; justify-content: center;
@@ -274,7 +281,9 @@ function dayLabel(iso: string): string {
       line-height: 1;
     }
     .particle.text {
-      background: rgba(255, 255, 255, 0.88);
+      /* Theme-aware surface so the (theme-aware) caption text stays legible in
+         dark mode — a hardcoded near-white left light lavender text unreadable. */
+      background: var(--color-surface-white, #ffffff);
       border: 1px solid var(--color-accent-light, #fde68a);
       color: var(--color-accent-dark, #92400e);
       font-size: 11px;
@@ -307,7 +316,7 @@ function dayLabel(iso: string): string {
       line-height: 22px;
     }
     .drop-particle.text {
-      background: rgba(255, 255, 255, 0.88);
+      background: var(--color-surface-white, #ffffff);
       border: 1px solid var(--color-accent-light, #fde68a);
       color: var(--color-accent-dark, #92400e);
       font-size: 10px;
@@ -344,18 +353,24 @@ function dayLabel(iso: string): string {
       white-space: nowrap;
     }
 
-    /* ── Reassurance note (long rate-limit backoffs, #872) ── */
+    /* ── Reassurance note (long rate-limit backoffs, #872) ──
+       Rendered as its own calm status band beneath the animation. Uses opaque,
+       theme-aware tokens (not a hardcoded translucent white) so the text stays
+       legible in dark mode, where accent-dark flips to a light lavender that was
+       previously unreadable over the near-white pill. */
     .reassurance {
       font-size: 12px;
       font-style: italic;
-      color: var(--color-accent-dark, #92400e);
-      background: rgba(255, 255, 255, 0.6);
+      color: var(--color-text-secondary, #b45309);
+      background: var(--color-surface-white, #ffffff);
+      border: 1px solid var(--color-border-meal, #fde68a);
       border-radius: 10px;
-      padding: 5px 12px;
-      margin: 0;
+      padding: 6px 14px;
+      margin: 4px 0 0;
       text-align: center;
       max-width: 320px;
       line-height: 1.35;
+      position: relative;
       z-index: 10;
     }
 
