@@ -236,6 +236,48 @@ fn build_suggest_slot_ctx(
     }
 }
 
+/// Stamp the authoritative slot identity onto an LLM-produced meal entry.
+///
+/// The `suggest_slot_meal` tool lets the agent fill `date`/`meal_name` freely, and its
+/// schema shows lower-cased examples (`breakfast`, `lunch`, `dinner`). Real day-type slot
+/// names are frequently capitalised (`Breakfast`), so the agent's echoed `meal_name` can
+/// drift from the slot it was asked to fill. The client keys meal cells by the exact
+/// `(date, meal_name)` of the active day-type slot, so a drifted identifier makes the meal
+/// invisible in the grid (renders as an empty `—`). We therefore trust the agent only for
+/// `meal_ref`/`estimated_nutrition` and overwrite the identity with the slot we asked for.
+fn stamp_slot_identity(mut meal: MealEntry, date: chrono::NaiveDate, meal_name: &str) -> MealEntry {
+    meal.date = date;
+    meal.meal_name = meal_name.to_string();
+    meal
+}
+
+/// Rewrite each meal's `meal_name` to the canonical day-type slot name for its date,
+/// matched case-insensitively.
+///
+/// The rebalance agent returns a whole plan as free-form JSON, so (like single-slot
+/// suggestions — see `stamp_slot_identity`) its slot names can drift in casing from the
+/// authoritative day-type slots the client keys cells by. Meals whose `(date, meal_name)`
+/// has no canonical match (e.g. an agent-invented slot or date) pass through unchanged.
+fn canonicalize_slot_names(
+    meals: Vec<MealEntry>,
+    canonical_slots: &[plnd_data::models::OpenSlot],
+) -> Vec<MealEntry> {
+    let lookup: std::collections::HashMap<(chrono::NaiveDate, String), &str> = canonical_slots
+        .iter()
+        .map(|s| ((s.date, s.meal_name.to_lowercase()), s.meal_name.as_str()))
+        .collect();
+    meals
+        .into_iter()
+        .map(|m| {
+            let date = m.date;
+            match lookup.get(&(date, m.meal_name.to_lowercase())) {
+                Some(canonical) => stamp_slot_identity(m, date, canonical),
+                None => m,
+            }
+        })
+        .collect()
+}
+
 /// Build an `AgentContext` for the week-level review pass.
 ///
 /// Serialises the full assembled plan (locked + chosen) as a JSON array of
@@ -624,7 +666,9 @@ pub async fn post_meal_plan(
                     // signal for the AIMD gate.
                     let rate_limited = output.rate_limited;
                     let result = match serde_json::from_str::<MealEntry>(&output.content) {
-                        Ok(meal) => Ok(meal),
+                        // Trust the agent for the meal_ref/nutrition only; the slot
+                        // identity is authoritative from the open slot we asked it to fill.
+                        Ok(meal) => Ok(stamp_slot_identity(meal, slot.date, &slot.meal_name)),
                         Err(e) => {
                             tracing::warn!(
                                 error = %e,
@@ -815,7 +859,11 @@ pub async fn post_meal_plan(
                             reason = %change.reason,
                             "meal-plan: review pass replaced slot"
                         );
-                        chosen[pos] = new_meal;
+                        // Preserve the slot's authoritative identity (the flagged meal's
+                        // own date/meal_name) rather than trusting the re-suggestion's echo.
+                        let slot_date = chosen[pos].date;
+                        let slot_name = chosen[pos].meal_name.clone();
+                        chosen[pos] = stamp_slot_identity(new_meal, slot_date, &slot_name);
                     }
                     Err(e) => {
                         tracing::warn!(
@@ -944,10 +992,24 @@ pub async fn post_meal_plan_rebalance(
         }
     })?;
 
-    let response: MealPlanResponse = serde_json::from_str(&output.content).map_err(|e| {
+    let mut response: MealPlanResponse = serde_json::from_str(&output.content).map_err(|e| {
         tracing::error!(error = %e, content = %output.content, "failed to parse rebalanced meal plan output");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    // Normalize the agent's free-form slot names to the authoritative day-type slots so the
+    // client can find each cell by exact (date, meal_name) key. Best-effort: on lookup
+    // failure we return the agent's names unchanged rather than fail the whole rebalance.
+    let canonical_slots = state
+        .repos
+        .schedule
+        .resolve_open_slots(user_id, plan_start, plan_end, &[])
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "meal-plan rebalance: failed to resolve canonical slots; returning agent slot names unchanged");
+            Vec::new()
+        });
+    response.meals = canonicalize_slot_names(response.meals, &canonical_slots);
 
     Ok(Json(response))
 }
@@ -2216,6 +2278,79 @@ mod tests {
             prior.contains(&locked_id),
             "locked entry meal ref id must appear in avoid list"
         );
+    }
+
+    // --- stamp_slot_identity tests ---
+
+    #[test]
+    fn stamp_slot_identity_overrides_drifted_meal_name_casing() {
+        // The agent echoed a lower-cased slot name ("breakfast") while the day-type
+        // slot is "Breakfast"; the stamped entry must carry the authoritative casing
+        // so the client can find the cell by exact key.
+        let drifted = meal_entry("2026-05-12", "breakfast");
+        let stamped = super::stamp_slot_identity(drifted, d(2026, 5, 12), "Breakfast");
+        assert_eq!(stamped.meal_name, "Breakfast");
+    }
+
+    #[test]
+    fn stamp_slot_identity_overrides_drifted_date() {
+        // A hallucinated date is replaced by the slot's authoritative date.
+        let drifted = meal_entry("2026-05-11", "Lunch");
+        let stamped = super::stamp_slot_identity(drifted, d(2026, 5, 12), "Lunch");
+        assert_eq!(stamped.date, d(2026, 5, 12));
+    }
+
+    #[test]
+    fn stamp_slot_identity_preserves_meal_ref_and_nutrition() {
+        // Only identity is overwritten; the agent's chosen meal_ref/nutrition survive.
+        let mut entry = meal_entry("2026-05-12", "breakfast");
+        let ref_id = entry.meal_ref.id;
+        entry.estimated_nutrition = Some(crate::models::Nutrition {
+            kcal: 400.0,
+            protein_g: 20.0,
+            carbs_g: 40.0,
+            fat_g: 15.0,
+        });
+        let stamped = super::stamp_slot_identity(entry, d(2026, 5, 12), "Breakfast");
+        assert_eq!(stamped.meal_ref.id, ref_id);
+        assert_eq!(stamped.estimated_nutrition.unwrap().kcal, 400.0);
+    }
+
+    // --- canonicalize_slot_names tests ---
+
+    #[test]
+    fn canonicalize_slot_names_fixes_casing_against_authoritative_slots() {
+        // Agent returned lower-cased names; the authoritative day-type slots are capitalised.
+        let meals = vec![
+            meal_entry("2026-05-12", "breakfast"),
+            meal_entry("2026-05-12", "lunch"),
+        ];
+        let slots = vec![
+            open_slot("2026-05-12", "Breakfast"),
+            open_slot("2026-05-12", "Lunch"),
+        ];
+        let out = super::canonicalize_slot_names(meals, &slots);
+        assert_eq!(out[0].meal_name, "Breakfast");
+        assert_eq!(out[1].meal_name, "Lunch");
+    }
+
+    #[test]
+    fn canonicalize_slot_names_passes_through_unmatched_slots() {
+        // No canonical slot matches "Brunch" on this date → left unchanged.
+        let meals = vec![meal_entry("2026-05-12", "Brunch")];
+        let slots = vec![open_slot("2026-05-12", "Breakfast")];
+        let out = super::canonicalize_slot_names(meals, &slots);
+        assert_eq!(out[0].meal_name, "Brunch");
+    }
+
+    #[test]
+    fn canonicalize_slot_names_matches_per_date() {
+        // The same lower-cased name on a date with no matching slot is not rewritten using
+        // another date's canonical slot.
+        let meals = vec![meal_entry("2026-05-13", "breakfast")];
+        let slots = vec![open_slot("2026-05-12", "Breakfast")];
+        let out = super::canonicalize_slot_names(meals, &slots);
+        assert_eq!(out[0].meal_name, "breakfast");
     }
 
     // --- build_review_meal_plan_ctx tests ---
