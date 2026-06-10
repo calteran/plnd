@@ -180,6 +180,8 @@ impl AgentLoop<'_> {
                 llm_prompt_tokens = tracing::field::Empty,
                 llm_completion_tokens = tracing::field::Empty,
                 llm_total_tokens = tracing::field::Empty,
+                llm_cache_read_tokens = tracing::field::Empty,
+                llm_cache_creation_tokens = tracing::field::Empty,
                 otel.status_code = tracing::field::Empty,
                 otel.status_message = tracing::field::Empty,
             );
@@ -199,12 +201,16 @@ impl AgentLoop<'_> {
                 llm_span.record("llm_prompt_tokens", usage.prompt_tokens);
                 llm_span.record("llm_completion_tokens", usage.completion_tokens);
                 llm_span.record("llm_total_tokens", usage.total_tokens);
+                llm_span.record("llm_cache_read_tokens", usage.cache_read_tokens);
+                llm_span.record("llm_cache_creation_tokens", usage.cache_creation_tokens);
                 tracing::info!(
                     llm_provider = provider.name(),
                     llm_model = provider.model(),
                     llm_prompt_tokens = usage.prompt_tokens,
                     llm_completion_tokens = usage.completion_tokens,
                     llm_total_tokens = usage.total_tokens,
+                    llm_cache_read_tokens = usage.cache_read_tokens,
+                    llm_cache_creation_tokens = usage.cache_creation_tokens,
                     "llm call complete"
                 );
             }

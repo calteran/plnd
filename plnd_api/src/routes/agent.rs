@@ -356,14 +356,16 @@ struct SlotOutcome {
 /// Consecutive clean completions required before the AIMD limit grows by one.
 const AIMD_GROW_AFTER: usize = 3;
 
-/// Additive-increase / multiplicative-decrease concurrency gate.
+/// TCP-style slow start + additive-increase / multiplicative-decrease gate.
 ///
-/// Starts at `max_limit` simultaneous slots. A rate-limited completion halves
-/// the limit (floor 1); after [`AIMD_GROW_AFTER`] consecutive clean completions
-/// the limit grows by one, up to `max_limit`. Shrinking below the current
-/// in-flight count simply stops admitting new work until enough slots drain — no
-/// running slot is ever cancelled. This lets the fan-out converge under a
-/// sustained ITPM rate limit instead of hammering it with fixed concurrency.
+/// Starts at concurrency 1 so the first slot completes alone — warming the
+/// shared prompt-cache prefix before any sibling is admitted. While in slow
+/// start (no rate-limit seen yet) each clean completion doubles the limit up to
+/// `max_limit`. The first rate-limited completion exits slow start, halves the
+/// limit (floor 1), and thereafter the limit grows by one only after
+/// [`AIMD_GROW_AFTER`] consecutive clean completions. Shrinking below the
+/// in-flight count simply stops admitting new work until slots drain — no
+/// running slot is cancelled.
 struct AimdGate {
     max_limit: usize,
     state: std::sync::Mutex<AimdState>,
@@ -374,6 +376,11 @@ struct AimdState {
     limit: usize,
     in_flight: usize,
     clean_streak: usize,
+    /// True until the first rate-limit is observed. While set, clean completions
+    /// double the limit (TCP-style slow start) so the first call warms the prompt
+    /// cache alone before concurrency ramps. The first congestion signal exits
+    /// slow start permanently.
+    slow_start: bool,
 }
 
 impl AimdGate {
@@ -382,9 +389,10 @@ impl AimdGate {
         Self {
             max_limit,
             state: std::sync::Mutex::new(AimdState {
-                limit: max_limit,
+                limit: 1,
                 in_flight: 0,
                 clean_streak: 0,
+                slow_start: true,
             }),
             notify: tokio::sync::Notify::new(),
         }
@@ -418,6 +426,14 @@ impl AimdGate {
             if rate_limited {
                 s.limit = (s.limit / 2).max(1);
                 s.clean_streak = 0;
+                s.slow_start = false;
+            } else if s.slow_start {
+                // Slow start: double the ceiling per clean completion. Admission
+                // trails this by a few completions (each completion fires only two
+                // wakes), so effective concurrency ramps up to — not instantly to —
+                // the doubled limit. Correctness is unaffected; the batch still
+                // saturates to max_limit.
+                s.limit = (s.limit * 2).min(self.max_limit);
             } else {
                 s.clean_streak += 1;
                 if s.clean_streak >= AIMD_GROW_AFTER && s.limit < self.max_limit {
@@ -2411,12 +2427,59 @@ mod tests {
         assert_eq!(failed[0].meal_name, "lunch");
     }
 
+    // --- AimdGate slow-start tests ---
+
+    #[test]
+    fn aimd_starts_at_one() {
+        let gate = super::AimdGate::new(8);
+        assert_eq!(gate.limit(), 1, "slow start must begin at concurrency 1");
+    }
+
+    #[test]
+    fn aimd_slow_start_doubles_per_clean_completion() {
+        let gate = super::AimdGate::new(8);
+        assert_eq!(gate.limit(), 1);
+        gate.record_outcome(false);
+        assert_eq!(gate.limit(), 2);
+        gate.record_outcome(false);
+        assert_eq!(gate.limit(), 4);
+        gate.record_outcome(false);
+        assert_eq!(gate.limit(), 8, "doubling caps at max_limit");
+        gate.record_outcome(false);
+        assert_eq!(gate.limit(), 8, "stays capped");
+    }
+
+    #[test]
+    fn aimd_rate_limit_exits_slow_start_then_additive() {
+        let gate = super::AimdGate::new(8);
+        gate.record_outcome(false); // 1 -> 2 (slow start)
+        gate.record_outcome(false); // 2 -> 4
+        gate.record_outcome(true); // rate-limited: 4 -> 2, exit slow start
+        assert_eq!(gate.limit(), 2);
+        // Congestion avoidance: +1 only after AIMD_GROW_AFTER (3) clean completions.
+        gate.record_outcome(false);
+        gate.record_outcome(false);
+        assert_eq!(gate.limit(), 2, "streak below threshold does not grow");
+        gate.record_outcome(false);
+        assert_eq!(
+            gate.limit(),
+            3,
+            "grows by one after a clean streak of three"
+        );
+    }
+
     // ---- AimdGate tests ----
 
     #[test]
     fn aimd_shrinks_multiplicatively_on_rate_limit_with_floor_one() {
         let gate = super::AimdGate::new(8);
+        // Ramp up through slow start to reach max_limit: 1 → 2 → 4 → 8.
+        gate.record_outcome(false);
+        gate.record_outcome(false);
+        gate.record_outcome(false);
         assert_eq!(gate.limit(), 8);
+        // Still in slow start at max_limit; the first rate-limit both exits slow
+        // start and halves the limit. Subsequent rate-limits keep halving, floor 1.
         gate.record_outcome(true);
         assert_eq!(gate.limit(), 4);
         gate.record_outcome(true);

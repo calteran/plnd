@@ -62,10 +62,33 @@ impl AnthropicProvider {
 struct AnthropicRequest<'a> {
     model: &'a str,
     max_tokens: u32,
-    system: &'a str,
+    system: Vec<AnthropicSystemBlock<'a>>,
     messages: Vec<AnthropicMessage>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     tools: Vec<AnthropicToolDef<'a>>,
+}
+
+/// A system-prompt content block. Serialized as an array element so a
+/// `cache_control` breakpoint can be attached. Anthropic processes the request
+/// prefix in tools -> system -> messages order, so one breakpoint here caches
+/// the tool definitions and the system prompt together as a single segment.
+#[derive(Serialize)]
+struct AnthropicSystemBlock<'a> {
+    #[serde(rename = "type")]
+    kind: &'static str,
+    text: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cache_control: Option<CacheControl>,
+}
+
+#[derive(Serialize, Clone, Copy)]
+struct CacheControl {
+    #[serde(rename = "type")]
+    kind: &'static str,
+}
+
+impl CacheControl {
+    const EPHEMERAL: CacheControl = CacheControl { kind: "ephemeral" };
 }
 
 /// Outgoing message for the Anthropic wire format. Uses owned types because
@@ -118,17 +141,21 @@ struct AnthropicUsage {
     #[serde(default)]
     cache_read_input_tokens: u32,
     #[serde(default)]
-    #[allow(dead_code)] // present in API response for completeness; not used in token mapping
     cache_creation_input_tokens: u32,
 }
 
 impl AnthropicUsage {
     fn to_token_usage(&self) -> super::TokenUsage {
-        let prompt_tokens = self.input_tokens + self.cache_read_input_tokens;
+        // input_tokens, cache_read_input_tokens, and cache_creation_input_tokens
+        // are disjoint in the Anthropic API; total input is the sum of all three.
+        let prompt_tokens =
+            self.input_tokens + self.cache_read_input_tokens + self.cache_creation_input_tokens;
         super::TokenUsage {
             prompt_tokens,
             completion_tokens: self.output_tokens,
             total_tokens: prompt_tokens + self.output_tokens,
+            cache_read_tokens: self.cache_read_input_tokens,
+            cache_creation_tokens: self.cache_creation_input_tokens,
         }
     }
 }
@@ -226,13 +253,11 @@ impl AnthropicProvider {
             .collect()
     }
 
-    /// Send one HTTP request to the Anthropic messages endpoint.
-    async fn send_request(
-        &self,
-        request: &CompletionRequest,
-    ) -> Result<reqwest::Response, LlmError> {
+    /// Build the Anthropic wire-format request body, attaching a single
+    /// `cache_control: ephemeral` breakpoint to the system block.
+    fn build_body<'a>(&'a self, request: &'a CompletionRequest) -> AnthropicRequest<'a> {
         let messages = Self::build_messages(request);
-        let tools: Vec<AnthropicToolDef<'_>> = request
+        let tools: Vec<AnthropicToolDef<'a>> = request
             .tools
             .iter()
             .map(|t| AnthropicToolDef {
@@ -241,13 +266,25 @@ impl AnthropicProvider {
                 input_schema: &t.schema,
             })
             .collect();
-        let body = AnthropicRequest {
+        AnthropicRequest {
             model: &self.model,
             max_tokens: request.max_tokens,
-            system: &request.system,
+            system: vec![AnthropicSystemBlock {
+                kind: "text",
+                text: &request.system,
+                cache_control: Some(CacheControl::EPHEMERAL),
+            }],
             messages,
             tools,
-        };
+        }
+    }
+
+    /// Send one HTTP request to the Anthropic messages endpoint.
+    async fn send_request(
+        &self,
+        request: &CompletionRequest,
+    ) -> Result<reqwest::Response, LlmError> {
+        let body = self.build_body(request);
         let url = format!("{}/v1/messages", self.base_url);
         Ok(self
             .http
@@ -390,10 +427,10 @@ mod tests {
     fn prompt_tokens_includes_cache_tokens() {
         let usage = make_usage(100, 50, 30, 20);
         let token_usage = usage.to_token_usage();
-        // input_tokens (100) already includes cache_creation (20); only cache_read (30) is additive
-        assert_eq!(token_usage.prompt_tokens, 130);
+        // input (100), cache_read (30), cache_creation (20) are disjoint -> sum = 150
+        assert_eq!(token_usage.prompt_tokens, 150);
         assert_eq!(token_usage.completion_tokens, 50);
-        assert_eq!(token_usage.total_tokens, 180);
+        assert_eq!(token_usage.total_tokens, 200);
         assert_eq!(
             token_usage.prompt_tokens + token_usage.completion_tokens,
             token_usage.total_tokens
@@ -428,10 +465,12 @@ mod tests {
         let json = r#"{"input_tokens":100,"output_tokens":50,"cache_read_input_tokens":30,"cache_creation_input_tokens":20}"#;
         let usage: AnthropicUsage = serde_json::from_str(json).unwrap();
         let t = usage.to_token_usage();
-        assert_eq!(t.prompt_tokens, 130); // input_tokens (100) + cache_read (30)
+        assert_eq!(t.prompt_tokens, 150); // input (100) + cache_read (30) + cache_creation (20)
         assert_eq!(t.completion_tokens, 50);
-        assert_eq!(t.total_tokens, 180);
+        assert_eq!(t.total_tokens, 200);
         assert_eq!(t.prompt_tokens + t.completion_tokens, t.total_tokens);
+        assert_eq!(t.cache_read_tokens, 30);
+        assert_eq!(t.cache_creation_tokens, 20);
     }
 
     #[test]
@@ -440,5 +479,24 @@ mod tests {
         let usage: AnthropicUsage = serde_json::from_str(json).unwrap();
         assert_eq!(usage.cache_read_input_tokens, 0);
         assert_eq!(usage.cache_creation_input_tokens, 0);
+    }
+
+    // ── Request body / cache_control ─────────────────────────────────────────
+
+    #[test]
+    fn system_block_carries_ephemeral_cache_control() {
+        let provider = AnthropicProvider::new("test-key", "claude-test");
+        let request = CompletionRequest {
+            system: "You are a helpful assistant.".to_string(),
+            messages: vec![],
+            tools: vec![],
+            max_tokens: 256,
+        };
+        let body = provider.build_body(&request);
+        let v = serde_json::to_value(&body).unwrap();
+
+        assert_eq!(v["system"][0]["type"], "text");
+        assert_eq!(v["system"][0]["text"], "You are a helpful assistant.");
+        assert_eq!(v["system"][0]["cache_control"]["type"], "ephemeral");
     }
 }

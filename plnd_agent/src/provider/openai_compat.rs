@@ -117,6 +117,17 @@ struct OaiUsage {
     prompt_tokens: u32,
     completion_tokens: u32,
     total_tokens: u32,
+    /// OpenAI reports cached prefix tokens here. Absent (or present but empty)
+    /// on backends that do not support automatic prompt caching — defaults to
+    /// all-zero via `#[serde(default)]` on both this field and `cached_tokens`.
+    #[serde(default)]
+    prompt_tokens_details: OaiPromptTokensDetails,
+}
+
+#[derive(Deserialize, Default)]
+struct OaiPromptTokensDetails {
+    #[serde(default)]
+    cached_tokens: u32,
 }
 
 // ── Response parsing ──────────────────────────────────────────────────────────
@@ -129,6 +140,8 @@ fn parse_completion(response: OaiResponse) -> Result<CompletionResponse, LlmErro
         prompt_tokens: u.prompt_tokens,
         completion_tokens: u.completion_tokens,
         total_tokens: u.total_tokens,
+        cache_read_tokens: u.prompt_tokens_details.cached_tokens,
+        cache_creation_tokens: 0,
     });
 
     let choice = response
@@ -450,5 +463,43 @@ mod tests {
         assert_eq!(result.stop_reason, StopReason::EndTurn);
         assert!(result.tool_calls.is_empty());
         assert_eq!(result.content.as_deref(), Some("hello"));
+    }
+
+    #[test]
+    fn cached_tokens_map_to_cache_read() {
+        let response = OaiResponse {
+            choices: vec![OaiChoice {
+                finish_reason: Some(OaiFinishReason::Stop),
+                message: OaiRespMsg {
+                    content: Some("hi".to_string()),
+                    tool_calls: vec![],
+                    function_call: None,
+                },
+            }],
+            usage: Some(OaiUsage {
+                prompt_tokens: 100,
+                completion_tokens: 10,
+                total_tokens: 110,
+                prompt_tokens_details: OaiPromptTokensDetails { cached_tokens: 80 },
+            }),
+        };
+        let parsed = parse_completion(response).expect("parse should succeed");
+        let usage = parsed.usage.expect("usage present");
+        assert_eq!(usage.cache_read_tokens, 80);
+        assert_eq!(usage.cache_creation_tokens, 0);
+    }
+
+    #[test]
+    fn usage_without_prompt_details_defaults_cached_to_zero() {
+        let json = r#"{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}"#;
+        let usage: OaiUsage = serde_json::from_str(json).unwrap();
+        assert_eq!(usage.prompt_tokens_details.cached_tokens, 0);
+    }
+
+    #[test]
+    fn usage_with_empty_prompt_details_defaults_cached_to_zero() {
+        let json = r#"{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15,"prompt_tokens_details":{}}"#;
+        let usage: OaiUsage = serde_json::from_str(json).unwrap();
+        assert_eq!(usage.prompt_tokens_details.cached_tokens, 0);
     }
 }
