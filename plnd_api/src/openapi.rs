@@ -16,7 +16,7 @@ use crate::models::{
     MealEntry, MealEntryRequest, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
     MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryStatusRequest, PlaceTasksEntry,
     PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef,
-    TaskEntryRequest, TaskEntryResponse, UpdateMealPatternEntryRequest,
+    TaskEntryRequest, TaskEntryResponse, UnplannableReason, UpdateMealPatternEntryRequest,
     UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
@@ -231,6 +231,7 @@ impl Modify for BearerSecurityAddon {
         MealPlanRequest,
         NutritionSummary,
         MealPlanResponse,
+        UnplannableReason,
         MealSuggestRequest,
         MealAdhocResolveRequest,
         MealAdhocResolveResponse,

@@ -8,7 +8,7 @@ import { UserMealsService } from '../../../../core/services/user-meals.service';
 import { UserDishesService } from '../../../../core/services/user-dishes.service';
 import { MealPlanLoadingComponent } from '../../../onboarding/shared/meal-plan-loading/meal-plan-loading';
 import { formatDayName, formatDayDate, daysInRange } from '../../utils/date-format.utils';
-import { FailedSlot, MealPlanResponse, MealSlot, PlannedMeal } from '../../../../core/models/week-plan';
+import { FailedSlot, MealPlanResponse, MealSlot, PlannedMeal, UnplannableReason } from '../../../../core/models/week-plan';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
 @Component({
@@ -41,6 +41,13 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
       @if (errorMessage()) {
         <div class="gen-error" role="alert">{{ errorMessage() }}</div>
+      }
+
+      @if (unplannableReason() === 'no_anchor_template') {
+        <div class="no-template-banner" role="status">
+          We couldn't plan any meals because you haven't set up your day types yet.
+          Add a day type with its meal times, then come back to plan your week.
+        </div>
       }
 
       @if (partialBannerMsg()) {
@@ -177,6 +184,17 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
       border: 1px solid var(--color-warning-border);
       border-radius: 8px;
       color: var(--color-warning);
+      font-size: 13px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+    }
+
+    /* ── No-template guidance banner ── */
+    .no-template-banner {
+      background: var(--color-accent-light);
+      border: 1px solid var(--color-accent-border);
+      border-radius: 8px;
+      color: var(--color-accent-dark);
       font-size: 13px;
       padding: 10px 14px;
       margin-bottom: 10px;
@@ -446,6 +464,9 @@ export class PlanMealsStepComponent implements OnInit {
   readonly showRefreshModal = signal(false);
   readonly errorMessage     = signal<string | null>(null);
   readonly failedSlots      = signal<FailedSlot[]>([]);
+  // Set when generation returns no meals for an actionable reason (e.g. the user
+  // has no day-type template); distinct from an error or a partial fill.
+  readonly unplannableReason = signal<UnplannableReason | null>(null);
   readonly cancelled        = signal(false);
   private  totalPlannedCount = signal(0);
   private  generationSub: Subscription | null = null;
@@ -505,6 +526,7 @@ export class PlanMealsStepComponent implements OnInit {
   private runAgentPlan(obs$: Observable<MealPlanResponse>): void {
     this.errorMessage.set(null);
     this.failedSlots.set([]);
+    this.unplannableReason.set(null);
     this.totalPlannedCount.set(0);
     this.cancelled.set(false);
     this.weekPlanService.setGenerating(true);
@@ -514,6 +536,7 @@ export class PlanMealsStepComponent implements OnInit {
         this.weekPlanService.applyAgentMeals(resp.meals);
         this.totalPlannedCount.set(resp.meals.length + (resp.failed_slots?.length ?? 0));
         this.failedSlots.set(resp.failed_slots ?? []);
+        this.unplannableReason.set(resp.unplannable_reason ?? null);
         this.generationSub = null;
       },
       error: () => {
