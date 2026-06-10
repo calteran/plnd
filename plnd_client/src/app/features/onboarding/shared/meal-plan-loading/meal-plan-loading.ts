@@ -281,7 +281,9 @@ function dayLabel(iso: string): string {
       line-height: 1;
     }
     .particle.text {
-      background: rgba(255, 255, 255, 0.88);
+      /* Theme-aware surface so the (theme-aware) caption text stays legible in
+         dark mode — a hardcoded near-white left light lavender text unreadable. */
+      background: var(--color-surface-white, #ffffff);
       border: 1px solid var(--color-accent-light, #fde68a);
       color: var(--color-accent-dark, #92400e);
       font-size: 11px;
@@ -314,7 +316,7 @@ function dayLabel(iso: string): string {
       line-height: 22px;
     }
     .drop-particle.text {
-      background: rgba(255, 255, 255, 0.88);
+      background: var(--color-surface-white, #ffffff);
       border: 1px solid var(--color-accent-light, #fde68a);
       color: var(--color-accent-dark, #92400e);
       font-size: 10px;
@@ -370,19 +372,6 @@ function dayLabel(iso: string): string {
       line-height: 1.35;
       position: relative;
       z-index: 10;
-    }
-
-    /* ── Dark-mode contrast overrides ──
-       The floating caption pills hardcode a near-white background, but their text
-       color (--color-accent-dark) flips to a light lavender in dark mode, leaving
-       light text on a white pill. Swap the pill to a dark, theme-aware surface so
-       the lavender text reads clearly. Light mode keeps its original cream pills. */
-    :host-context([data-theme="dark"]) .particle.text,
-    :host-context([data-theme="dark"]) .drop-particle.text {
-      background: var(--color-surface-white);
-      border-color: var(--color-accent-border);
-      color: var(--color-accent-dark);
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
     }
 
     /* ── Cancel link ── */
