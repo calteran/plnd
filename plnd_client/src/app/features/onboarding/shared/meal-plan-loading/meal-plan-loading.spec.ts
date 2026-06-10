@@ -6,6 +6,10 @@ import {
   MODE_DURATION_MS,
   PARTICLE_LIFETIME_MS,
   STATIC_CAPTION_MS,
+  STILL_WORKING_MS,
+  STILL_WORKING_EXTENDED_MS,
+  STILL_WORKING_TEXT,
+  STILL_WORKING_EXTENDED_TEXT,
   PLAYFUL_TEXTS,
 } from './meal-plan-loading';
 
@@ -288,6 +292,57 @@ describe('MealPlanLoadingComponent', () => {
       fixture.detectChanges();
       // No stage, no particles ever rendered.
       expect(fixture.nativeElement.querySelectorAll('.particle, .drop-particle').length).toBe(0);
+
+      teardown(fixture);
+    }));
+  });
+
+  describe('still-working reassurance', () => {
+    it('shows no reassurance message before STILL_WORKING_MS', fakeAsync(() => {
+      const fixture = setUp();
+      fixture.detectChanges();
+
+      tick(STILL_WORKING_MS - 1000);
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('.reassurance')).toBeNull();
+
+      teardown(fixture);
+    }));
+
+    it('shows the tier-1 reassurance message after STILL_WORKING_MS', fakeAsync(() => {
+      const fixture = setUp();
+      fixture.detectChanges();
+
+      tick(STILL_WORKING_MS + 50);
+      fixture.detectChanges();
+      const msg = fixture.nativeElement.querySelector('.reassurance') as HTMLElement | null;
+      expect(msg).not.toBeNull();
+      expect(msg!.textContent?.trim()).toBe(STILL_WORKING_TEXT);
+      expect(msg!.getAttribute('aria-live')).toBe('polite');
+
+      teardown(fixture);
+    }));
+
+    it('escalates to the tier-2 message after STILL_WORKING_EXTENDED_MS', fakeAsync(() => {
+      const fixture = setUp();
+      fixture.detectChanges();
+
+      tick(STILL_WORKING_EXTENDED_MS + 50);
+      fixture.detectChanges();
+      const msg = fixture.nativeElement.querySelector('.reassurance') as HTMLElement | null;
+      expect(msg?.textContent?.trim()).toBe(STILL_WORKING_EXTENDED_TEXT);
+
+      teardown(fixture);
+    }));
+
+    it('shows the reassurance message in reduced-motion mode too', fakeAsync(() => {
+      const fixture = setUp({ reducedMotion: true });
+      fixture.detectChanges();
+
+      tick(STILL_WORKING_MS + 50);
+      fixture.detectChanges();
+      const msg = fixture.nativeElement.querySelector('.reassurance') as HTMLElement | null;
+      expect(msg?.textContent?.trim()).toBe(STILL_WORKING_TEXT);
 
       teardown(fixture);
     }));

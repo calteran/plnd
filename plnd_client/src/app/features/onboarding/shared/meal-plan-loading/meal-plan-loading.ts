@@ -48,6 +48,15 @@ export const MODE_DURATION_MS     = 10_000;
 export const STATIC_CAPTION_MS    = 4000;
 export const MAX_PARTICLES        = 16;
 
+// Reassurance cues for long rate-limit backoffs (#872). A 429-throttled week
+// generation can stay in flight far longer than usual; these gentle, non-alarming
+// notes confirm the wizard hasn't stalled. Calm tone — no spinners, no error styling.
+export const STILL_WORKING_MS          = 30_000;
+export const STILL_WORKING_EXTENDED_MS = 90_000;
+export const STILL_WORKING_TEXT          = 'Still working on your week…';
+export const STILL_WORKING_EXTENDED_TEXT =
+  "Thanks for hanging in there — this one's taking a little longer than usual.";
+
 // Stage width in px — used to convert drop-mode startX/targetX from % to px
 // offsets for the dropAndDrift keyframe's translateX. Matches .stage width.
 export const STAGE_WIDTH_PX       = 360;
@@ -149,6 +158,10 @@ function dayLabel(iso: string): string {
         <p class="aria-only" role="status" aria-live="polite" aria-label="Planning progress">
           {{ lastTextParticle() }}
         </p>
+      }
+
+      @if (reassurance()) {
+        <p class="reassurance" role="status" aria-live="polite">{{ reassurance() }}</p>
       }
 
       <button class="cancel-link" type="button" (click)="cancelClick.emit()">Cancel</button>
@@ -331,6 +344,21 @@ function dayLabel(iso: string): string {
       white-space: nowrap;
     }
 
+    /* ── Reassurance note (long rate-limit backoffs, #872) ── */
+    .reassurance {
+      font-size: 12px;
+      font-style: italic;
+      color: var(--color-accent-dark, #92400e);
+      background: rgba(255, 255, 255, 0.6);
+      border-radius: 10px;
+      padding: 5px 12px;
+      margin: 0;
+      text-align: center;
+      max-width: 320px;
+      line-height: 1.35;
+      z-index: 10;
+    }
+
     /* ── Cancel link ── */
     .cancel-link {
       background: transparent;
@@ -364,12 +392,15 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
   protected readonly lastTextParticle = signal<string>('');
   protected readonly staticCaption    = signal<string>('Planning…');
   protected readonly reducedMotion    = signal<boolean>(detectReducedMotion());
+  protected readonly reassurance      = signal<string>('');
 
   private nextParticleId = 0;
   private foodTimer: ReturnType<typeof setInterval> | null = null;
   private textTimer: ReturnType<typeof setInterval> | null = null;
   private modeTimer: ReturnType<typeof setInterval> | null = null;
   private staticTimer: ReturnType<typeof setInterval> | null = null;
+  private stillWorkingTimer: ReturnType<typeof setTimeout> | null = null;
+  private stillWorkingExtTimer: ReturnType<typeof setTimeout> | null = null;
   private particleRemovers: ReturnType<typeof setTimeout>[] = [];
 
   // Pre-built pool of slot/day captions, recomputed when inputs change.
@@ -388,6 +419,19 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
   );
 
   ngOnInit(): void {
+    // Reassurance timers run regardless of motion preference — the wizard can stall on
+    // a long rate-limit backoff in either render mode. Cleared on destroy, which (because
+    // this component is only mounted while generating) coincides with generation
+    // completing or erroring — so the message clears automatically. (#872)
+    this.stillWorkingTimer = setTimeout(
+      () => this.reassurance.set(STILL_WORKING_TEXT),
+      STILL_WORKING_MS,
+    );
+    this.stillWorkingExtTimer = setTimeout(
+      () => this.reassurance.set(STILL_WORKING_EXTENDED_TEXT),
+      STILL_WORKING_EXTENDED_MS,
+    );
+
     if (this.reducedMotion()) {
       this.staticCaption.set(this.pickText() ?? 'Planning…');
       this.staticTimer = setInterval(
@@ -410,6 +454,8 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
     if (this.textTimer)   clearInterval(this.textTimer);
     if (this.modeTimer)   clearInterval(this.modeTimer);
     if (this.staticTimer) clearInterval(this.staticTimer);
+    if (this.stillWorkingTimer)    clearTimeout(this.stillWorkingTimer);
+    if (this.stillWorkingExtTimer) clearTimeout(this.stillWorkingExtTimer);
     this.particleRemovers.forEach(t => clearTimeout(t));
     this.particleRemovers = [];
   }
