@@ -399,7 +399,7 @@ export class MealPlanLoadingComponent implements OnInit, OnDestroy {
   private textTimer: ReturnType<typeof setInterval> | null = null;
   private modeTimer: ReturnType<typeof setInterval> | null = null;
   private staticTimer: ReturnType<typeof setInterval> | null = null;
-  private stillWorkingTimer:  ReturnType<typeof setTimeout> | null = null;
+  private stillWorkingTimer: ReturnType<typeof setTimeout> | null = null;
   private stillWorkingExtTimer: ReturnType<typeof setTimeout> | null = null;
   private particleRemovers: ReturnType<typeof setTimeout>[] = [];
 
