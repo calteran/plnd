@@ -278,6 +278,51 @@ fn canonicalize_slot_names(
         .collect()
 }
 
+/// Batch-resolve human-readable names for each meal's `meal_ref`, keyed by ref id.
+///
+/// Catalog and user meals are looked up in separate batched queries; lookup failures are
+/// logged and simply omitted, so the affected meals fall back to no resolved name.
+async fn resolve_meal_names<'a>(
+    repos: &plnd_data::Repositories,
+    user_id: Uuid,
+    entries: impl IntoIterator<Item = &'a MealEntry>,
+) -> std::collections::HashMap<Uuid, String> {
+    // Partition ref ids by kind in a single pass, then dedup — a week plan often repeats the
+    // same meal across days, so deduping shrinks the `IN` lists sent to the database.
+    let mut catalog_ids = Vec::new();
+    let mut user_ids = Vec::new();
+    for entry in entries {
+        match entry.meal_ref.meal_type.as_str() {
+            "catalog" => catalog_ids.push(entry.meal_ref.id),
+            "user" => user_ids.push(entry.meal_ref.id),
+            _ => {}
+        }
+    }
+    catalog_ids.sort_unstable();
+    catalog_ids.dedup();
+    user_ids.sort_unstable();
+    user_ids.dedup();
+
+    let mut map = std::collections::HashMap::with_capacity(catalog_ids.len() + user_ids.len());
+    if !catalog_ids.is_empty() {
+        match repos.meal.catalog_meal_names_by_ids(&catalog_ids).await {
+            Ok(names) => map.extend(names),
+            Err(e) => {
+                tracing::warn!(error = %e, "meal-plan: failed to load catalog meal names; titles omitted")
+            }
+        }
+    }
+    if !user_ids.is_empty() {
+        match repos.meal.user_meal_names_by_ids(user_id, &user_ids).await {
+            Ok(names) => map.extend(names),
+            Err(e) => {
+                tracing::warn!(error = %e, "meal-plan: failed to load user meal names; titles omitted")
+            }
+        }
+    }
+    map
+}
+
 /// Build an `AgentContext` for the week-level review pass.
 ///
 /// Serialises the full assembled plan (locked + chosen) as a JSON array of
@@ -721,51 +766,12 @@ pub async fn post_meal_plan(
 
     // Pre-fetch dish names for all entries so the review agent sees human-readable
     // names rather than opaque UUIDs when checking for blocked ingredients.
-    let dish_names: std::collections::HashMap<Uuid, String> = {
-        let catalog_ids: Vec<Uuid> = locked_entries
-            .iter()
-            .chain(chosen.iter())
-            .filter(|e| e.meal_ref.meal_type == "catalog")
-            .map(|e| e.meal_ref.id)
-            .collect();
-        let user_ids: Vec<Uuid> = locked_entries
-            .iter()
-            .chain(chosen.iter())
-            .filter(|e| e.meal_ref.meal_type == "user")
-            .map(|e| e.meal_ref.id)
-            .collect();
-
-        let mut map = std::collections::HashMap::new();
-        if !catalog_ids.is_empty() {
-            match state
-                .repos
-                .meal
-                .catalog_meal_names_by_ids(&catalog_ids)
-                .await
-            {
-                Ok(names) => map.extend(names),
-                Err(e) => tracing::warn!(
-                    error = %e,
-                    "meal-plan: failed to load catalog meal names for review; names will be omitted"
-                ),
-            }
-        }
-        if !user_ids.is_empty() {
-            match state
-                .repos
-                .meal
-                .user_meal_names_by_ids(user_id, &user_ids)
-                .await
-            {
-                Ok(names) => map.extend(names),
-                Err(e) => tracing::warn!(
-                    error = %e,
-                    "meal-plan: failed to load user meal names for review; names will be omitted"
-                ),
-            }
-        }
-        map
-    };
+    let dish_names = resolve_meal_names(
+        &state.repos,
+        user_id,
+        locked_entries.iter().chain(chosen.iter()),
+    )
+    .await;
 
     // Review pass — examine the assembled week and re-suggest flagged slots.
     // Capped at 2 passes to prevent runaway regeneration.
@@ -886,7 +892,13 @@ pub async fn post_meal_plan(
         }
     }
 
-    let meals: Vec<MealEntry> = locked_entries.into_iter().chain(chosen).collect();
+    let mut meals: Vec<MealEntry> = locked_entries.into_iter().chain(chosen).collect();
+    // Attach display titles for the final ref set. Re-resolved here (not reused from
+    // `dish_names`) because the review pass may have swapped in refs not seen earlier.
+    let title_names = resolve_meal_names(&state.repos, user_id, meals.iter()).await;
+    for m in &mut meals {
+        m.title = title_names.get(&m.meal_ref.id).cloned();
+    }
     let nutrition_summary = aggregate_nutrition(&meals);
 
     Ok(Json(MealPlanResponse {
@@ -1011,6 +1023,12 @@ pub async fn post_meal_plan_rebalance(
         });
     response.meals = canonicalize_slot_names(response.meals, &canonical_slots);
 
+    // Attach display titles resolved from each meal_ref so the client can render names.
+    let title_names = resolve_meal_names(&state.repos, user_id, response.meals.iter()).await;
+    for m in &mut response.meals {
+        m.title = title_names.get(&m.meal_ref.id).cloned();
+    }
+
     Ok(Json(response))
 }
 
@@ -1069,10 +1087,15 @@ pub async fn post_meal_plan_suggest(
         }
     })?;
 
-    let response: MealEntry = serde_json::from_str(&output.content).map_err(|e| {
+    let mut response: MealEntry = serde_json::from_str(&output.content).map_err(|e| {
         tracing::error!(error = %e, content = %output.content, "failed to parse suggest-slot output");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    // Attach the display title resolved from the chosen meal_ref.
+    let title_names =
+        resolve_meal_names(&state.repos, user_id, std::slice::from_ref(&response)).await;
+    response.title = title_names.get(&response.meal_ref.id).cloned();
 
     Ok(Json(response))
 }
@@ -2221,6 +2244,7 @@ mod tests {
                 meal_type: "catalog".to_string(),
                 id: uuid::Uuid::new_v4(),
             },
+            title: None,
             estimated_nutrition: None,
         }
     }
@@ -2363,6 +2387,7 @@ mod tests {
                 meal_type: meal_type.to_string(),
                 id: Uuid::parse_str(id).unwrap(),
             },
+            title: None,
             estimated_nutrition: None,
         }
     }
@@ -2501,6 +2526,7 @@ mod tests {
                             meal_type: "catalog".to_string(),
                             id: uuid::Uuid::new_v4(),
                         },
+                        title: None,
                         estimated_nutrition: None,
                     }),
                     rate_limited: false,
@@ -2540,6 +2566,7 @@ mod tests {
                         meal_type: "catalog".to_string(),
                         id: uuid::Uuid::new_v4(),
                     },
+                    title: None,
                     estimated_nutrition: None,
                 })
             } else {
@@ -2713,6 +2740,7 @@ mod tests {
                 meal_type: "catalog".to_string(),
                 id: Uuid::new_v4(),
             },
+            title: None,
             estimated_nutrition: Some(Nutrition {
                 kcal,
                 protein_g,
@@ -2730,6 +2758,7 @@ mod tests {
                 meal_type: "catalog".to_string(),
                 id: Uuid::new_v4(),
             },
+            title: None,
             estimated_nutrition: None,
         }
     }

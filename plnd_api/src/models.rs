@@ -215,6 +215,11 @@ pub struct MealEntry {
     pub date: NaiveDate,
     pub meal_name: String,
     pub meal_ref: MealRef,
+    /// Human-readable meal name, resolved server-side from `meal_ref` for display.
+    /// Absent on inbound requests (the wizard's `current_state` omits it); populated on
+    /// outbound responses so the client can render the meal without a follow-up lookup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
     pub estimated_nutrition: Option<Nutrition>,
 }
 
@@ -541,6 +546,42 @@ mod meal_plan_tests {
         };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"plan_start\":\"2026-04-21\""));
+    }
+
+    #[test]
+    fn meal_entry_deserializes_without_title() {
+        // The suggest_slot_meal tool output and the wizard's current_state both omit `title`;
+        // it must default to None rather than fail deserialization.
+        let json = r#"{
+            "date": "2026-04-21",
+            "meal_name": "breakfast",
+            "meal_ref": {"type": "catalog", "id": "00000000-0000-0000-0000-000000000001"}
+        }"#;
+        let entry: MealEntry = serde_json::from_str(json).unwrap();
+        assert!(entry.title.is_none());
+    }
+
+    #[test]
+    fn meal_entry_title_serializes_when_present_and_omits_when_none() {
+        let mut entry = MealEntry {
+            date: chrono::NaiveDate::from_ymd_opt(2026, 4, 21).unwrap(),
+            meal_name: "breakfast".to_string(),
+            meal_ref: MealRef {
+                meal_type: "catalog".to_string(),
+                id: uuid::Uuid::nil(),
+            },
+            title: None,
+            estimated_nutrition: None,
+        };
+        // Omitted when None.
+        assert!(!serde_json::to_string(&entry).unwrap().contains("title"));
+        // Present when Some.
+        entry.title = Some("Oatmeal with berries".to_string());
+        assert!(
+            serde_json::to_string(&entry)
+                .unwrap()
+                .contains("\"title\":\"Oatmeal with berries\"")
+        );
     }
 
     #[test]
