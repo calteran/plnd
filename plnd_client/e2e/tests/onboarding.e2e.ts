@@ -718,17 +718,29 @@ test.describe('Onboarding', () => {
       await page.route(`${API_BASE}/agent/place-tasks`, route =>
         route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
       );
+      // Gate the meal-plan response behind a manually-resolved promise rather
+      // than a fixed setTimeout. A fixed delay races the disabled assertion —
+      // under parallel load the response can resolve before Playwright polls —
+      // whereas an explicit gate holds the in-flight (generating) window open
+      // until the test releases it, making the disabled state deterministic.
+      // Definite assignment: the Promise executor runs synchronously, so
+      // releaseMealPlan is assigned before the route handler can read it.
+      let releaseMealPlan!: () => void;
+      const mealPlanGate = new Promise<void>(resolve => {
+        releaseMealPlan = resolve;
+      });
       await page.route(`${API_BASE}/agent/meal-plan`, async route => {
-        await new Promise(r => setTimeout(r, 300));
-        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN });
+        await mealPlanGate;
+        await route.fulfill({ status: 200, json: MOCK_MEAL_PLAN });
       });
 
       await page.goto('/onboarding');
       await landAtMealPlanReview(page);
 
-      // Button should be disabled while generation is in flight
-      await expect(page.locator('.btn-continue')).toBeDisabled({ timeout: 500 });
-      // Then enabled once the agent response arrives
+      // Button is disabled while generation is in flight (response gated open).
+      await expect(page.locator('.btn-continue')).toBeDisabled();
+      // Releasing the gated response transitions the button to enabled.
+      releaseMealPlan();
       await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
     });
 
@@ -813,7 +825,10 @@ test.describe('Onboarding', () => {
       await expect(page.locator('.btn-cta.btn--accent')).toBeVisible();
 
       await page.locator('.btn-cta.btn--accent').click();
-      await expect(page).toHaveURL(/\/day\/2026-03-28/);
+      // Approve Plan commits via the real backend before redirecting; give the
+      // redirect a generous timeout so the assertion survives CPU starvation
+      // when the full suite runs in parallel under `just verify`.
+      await expect(page).toHaveURL(/\/day\/2026-03-28/, { timeout: 15_000 });
     });
   });
 

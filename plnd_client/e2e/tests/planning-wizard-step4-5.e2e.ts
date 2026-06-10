@@ -170,14 +170,19 @@ test.describe('Planning Wizard — Step 6: Confirmation', () => {
       // Real backend serves POST /schedule/plan; the seeded onboarded user has
       // a planning task created on demand by /tasks/weekly-plan, so commit
       // succeeds without any mocks.
-      const submitRequest = page.waitForRequest(req =>
-        req.url().includes('/schedule/plan') && req.method() === 'POST'
+      //
+      // Await the *response* (not just the request): the post-Finish redirect
+      // only fires once the commit resolves, so synchronizing on the response
+      // — then giving the redirect a generous timeout — keeps this assertion
+      // stable when `just verify` starves the suite of CPU under parallel load.
+      const submitResponse = page.waitForResponse(resp =>
+        resp.url().includes('/schedule/plan') && resp.request().method() === 'POST'
       );
 
       await page.locator('.btn-finish').click();
-      await submitRequest;
+      await submitResponse;
 
-      await expect(page).toHaveURL(/\/day\//);
+      await expect(page).toHaveURL(/\/day\//, { timeout: 15_000 });
     });
   });
 
