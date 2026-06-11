@@ -63,12 +63,23 @@ plan_end = (days_until_trigger / planLength < 0.15)
              ? nextPeriodStart + planLength − 1           // roll into following week
              : currentPeriodEnd                            // end of current week
 
-// Guard retained from the existing implementation: plan_end is never earlier than
-// currentPeriodEnd (protects against large negative offsets, |offset| > planLength).
 return { start: plan_start, end: plan_end }
 ```
 
 Where `planLength = default_plan_length_days` and `offset = planning_trigger_offset`.
+
+**No clamp guard.** The previous implementation carried a guard that clamped `plan_end` up to
+`currentPeriodEnd`, because its roll-over branch computed `secondPeriodEnd + offset` — a large
+negative offset could pull the end *before* the current period. In this formulation `offset`
+only influences the *decision* (`days_until_trigger`); both branch outcomes are `≥ currentPeriodEnd`
+by construction (the roll-over branch extends forward by a full `planLength`). The end is therefore
+monotonic and the guard is provably unreachable, so it is removed rather than carried as dead code.
+
+**`planLength ≥ 7` assumption.** This function is invoked only during onboarding, where the UI
+offers exactly a 1-week or 2-week plan length. With `planLength ≥ 7` and `daysSinceWeekStart ∈ [0,6]`,
+the current period always extends to or past `plan_start`, so the window is non-empty. The
+implementation documents this assumption in a comment; it deliberately does not defend against
+`planLength < 7`, which no onboarding path can produce.
 
 ### Why anchor on `plan_start` rather than `today`
 
@@ -109,8 +120,9 @@ task-side window logic to change.
    `plan_start = today + 1`, week-align the window, and revive the 0.15 roll-over branch. The
    two call sites continue to pass `today`; "tomorrow" is derived inside the function.
 2. **Unit tests** — rewrite the `computeFirstPlanPeriod` and `computeAndSetPlanPeriod` cases to
-   cover tomorrow-start, week-alignment, the normal and roll-over branches, the `planLength ≠ 7`
-   case, and the large-negative-offset clamp.
+   cover tomorrow-start, week-alignment, the normal and roll-over branches, a non-Monday
+   `week_start_day`, the 14-day length, and large-negative-offset (which now lands in the
+   roll-over branch rather than triggering a clamp). The old clamp test is removed with the guard.
 3. **Architecture doc §4.9** — add one abstract paragraph describing first-window derivation:
    the first window begins the day after onboarding, spans to the end of the user's current
    week, and extends into the following week when little of the current week remains. No code,
