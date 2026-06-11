@@ -22,8 +22,9 @@ pub async fn yesterday_snapshot(
     user_id: Uuid,
     date: NaiveDate,
 ) -> Result<YesterdaySnapshot, DatabaseError> {
-    // Post-#828, schedule_entries is task-only; meal anchors live in meal_anchor_instances.
-    // meals_logged has no source until #829 restores completion tracking — return 0 for now.
+    // Post-#828, schedule_entries is task-only; meal anchors live in
+    // meal_anchor_instances. meals_logged counts instances the user has logged
+    // as eaten (status = 'consumed') — see #829 / migration 0045.
     sqlx::query_as::<_, YesterdaySnapshot>(
         "WITH tasks AS (
             SELECT
@@ -33,7 +34,9 @@ pub async fn yesterday_snapshot(
             WHERE user_id = $1 AND date = $2
          ),
          meals AS (
-            SELECT COUNT(*) AS planned
+            SELECT
+                COUNT(*)                                     AS planned,
+                COUNT(*) FILTER (WHERE status = 'consumed') AS logged
             FROM meal_anchor_instances
             WHERE user_id = $1 AND date = $2
          )
@@ -41,7 +44,7 @@ pub async fn yesterday_snapshot(
              tasks.total   AS tasks_total,
              tasks.done    AS tasks_done,
              meals.planned AS meals_planned,
-             0::bigint     AS meals_logged
+             meals.logged  AS meals_logged
          FROM tasks, meals",
     )
     .bind(user_id)
@@ -61,7 +64,7 @@ mod tests {
 
     use super::*;
     use crate::db::{meal_anchor_instance, schedule, tasks, users};
-    use crate::models::{CommitPlanInput, PlanEntryInput};
+    use crate::models::{CommitPlanInput, MealConsumptionStatus, PlanEntryInput};
 
     async fn new_user(pool: &PgPool) -> Uuid {
         users::create(
@@ -140,9 +143,12 @@ mod tests {
         };
         schedule::commit_plan(&pool, uid, &req).await.unwrap();
 
-        // Add a meal anchor instance directly (post-#828 they live in their
-        // own table, not in schedule_entries).
-        meal_anchor_instance::add(&pool, uid, yesterday, "Lunch", noon, 60)
+        // Add two meal anchor instances directly (post-#828 they live in
+        // their own table, not in schedule_entries).
+        let lunch = meal_anchor_instance::add(&pool, uid, yesterday, "Lunch", noon, 60)
+            .await
+            .unwrap();
+        meal_anchor_instance::add(&pool, uid, yesterday, "Dinner", noon, 60)
             .await
             .unwrap();
 
@@ -157,12 +163,16 @@ mod tests {
         .await
         .unwrap();
 
+        // Log the lunch as eaten; dinner stays planned.
+        meal_anchor_instance::set_status(&pool, lunch.id, uid, MealConsumptionStatus::Consumed)
+            .await
+            .unwrap();
+
         let snap = yesterday_snapshot(&pool, uid, yesterday).await.unwrap();
 
         assert_eq!(snap.tasks_total, 2, "2 task entries");
         assert_eq!(snap.tasks_done, 1, "1 completed task");
-        assert_eq!(snap.meals_planned, 1, "1 meal anchor instance");
-        // meals_logged stubbed to 0 until #829 restores completion tracking.
-        assert_eq!(snap.meals_logged, 0);
+        assert_eq!(snap.meals_planned, 2, "2 meal anchor instances");
+        assert_eq!(snap.meals_logged, 1, "1 meal logged as consumed");
     }
 }

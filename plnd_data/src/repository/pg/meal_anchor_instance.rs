@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::meal_anchor_instance as db;
-use crate::models::MealAnchorInstance;
+use crate::models::{MealAnchorInstance, MealConsumptionStatus};
 use crate::repository::meal_anchor_instance::MealAnchorInstanceRepository;
 
 pub struct PgMealAnchorInstanceRepository {
@@ -132,6 +132,17 @@ impl MealAnchorInstanceRepository for PgMealAnchorInstanceRepository {
         )
         .await
         .map_err(Into::into)
+    }
+
+    async fn set_status(
+        &self,
+        id: Uuid,
+        user_id: Uuid,
+        status: MealConsumptionStatus,
+    ) -> Result<Option<MealAnchorInstance>, crate::Error> {
+        db::set_status(&self.pool, id, user_id, status)
+            .await
+            .map_err(Into::into)
     }
 
     async fn remove(&self, id: Uuid, user_id: Uuid) -> Result<bool, crate::Error> {
