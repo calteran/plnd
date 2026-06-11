@@ -3,10 +3,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
-use crate::models::{DayType, MealAnchorInstance, day_type_applies_to};
+use crate::models::{DayType, MealAnchorInstance, MealConsumptionStatus, day_type_applies_to};
 
 const COLUMNS: &str = "id, user_id, date, name, preferred_time, tolerance_minutes, \
-     sort_order, template_entry_id, created_at, updated_at";
+     sort_order, template_entry_id, status, consumed_at, created_at, updated_at";
 
 #[tracing::instrument(skip(pool), fields(table = "meal_anchor_instances", op = "get_by_id"))]
 pub async fn get_by_id(
@@ -380,6 +380,35 @@ pub async fn update(
     .map_err(DatabaseError::from)
 }
 
+/// Set the consumption status of a single instance.
+///
+/// `consumed_at` is stamped to `NOW()` when transitioning to `Consumed` and
+/// cleared for every other status, which keeps the `consumed_at ⟺ consumed`
+/// CHECK constraint satisfied without the caller having to manage the timestamp.
+/// Returns `None` if the instance does not exist or belongs to another user.
+#[tracing::instrument(skip(pool), fields(table = "meal_anchor_instances", op = "set_status"))]
+pub async fn set_status(
+    pool: &PgPool,
+    id: Uuid,
+    user_id: Uuid,
+    status: MealConsumptionStatus,
+) -> Result<Option<MealAnchorInstance>, DatabaseError> {
+    sqlx::query_as::<_, MealAnchorInstance>(sqlx::AssertSqlSafe(format!(
+        "UPDATE meal_anchor_instances \
+         SET status = $3, \
+             consumed_at = CASE WHEN $3 = 'consumed' THEN NOW() ELSE NULL END, \
+             updated_at = NOW() \
+         WHERE id = $1 AND user_id = $2 \
+         RETURNING {COLUMNS}"
+    )))
+    .bind(id)
+    .bind(user_id)
+    .bind(status.as_str())
+    .fetch_optional(pool)
+    .await
+    .map_err(DatabaseError::from)
+}
+
 #[tracing::instrument(skip(pool), fields(table = "meal_anchor_instances", op = "remove"))]
 pub async fn remove(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<bool, DatabaseError> {
     sqlx::query("DELETE FROM meal_anchor_instances WHERE id = $1 AND user_id = $2")
@@ -395,6 +424,7 @@ pub async fn remove(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<bool, Data
 mod tests {
     use super::*;
     use crate::db::{day_type as dt_db, meal_pattern as mp_db, users};
+    use crate::models::MealConsumptionStatus;
     use chrono::NaiveTime as T;
 
     async fn new_user(pool: &PgPool) -> Uuid {
@@ -571,6 +601,73 @@ mod tests {
         assert_eq!(updated.name, "Lunch");
         assert_eq!(updated.preferred_time, t(13, 0));
         assert_eq!(updated.tolerance_minutes, 45);
+    }
+
+    // ── set_status (consumption tracking) ───────────────────────────────────────
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn add_defaults_to_planned_not_consumed(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let inst = add(&pool, uid, monday(), "Lunch", t(12, 0), 30)
+            .await
+            .unwrap();
+        assert_eq!(inst.status, "planned");
+        assert!(inst.consumed_at.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn set_status_consumed_records_timestamp(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let inst = add(&pool, uid, monday(), "Lunch", t(12, 0), 30)
+            .await
+            .unwrap();
+
+        let consumed = set_status(&pool, inst.id, uid, MealConsumptionStatus::Consumed)
+            .await
+            .unwrap()
+            .expect("present");
+        assert_eq!(consumed.status, "consumed");
+        assert!(
+            consumed.consumed_at.is_some(),
+            "consuming a meal must stamp consumed_at"
+        );
+
+        // Reverting to planned clears the timestamp (CHECK invariant).
+        let reverted = set_status(&pool, inst.id, uid, MealConsumptionStatus::Planned)
+            .await
+            .unwrap()
+            .expect("present");
+        assert_eq!(reverted.status, "planned");
+        assert!(reverted.consumed_at.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn set_status_skipped_has_no_timestamp(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let inst = add(&pool, uid, monday(), "Lunch", t(12, 0), 30)
+            .await
+            .unwrap();
+        let skipped = set_status(&pool, inst.id, uid, MealConsumptionStatus::Skipped)
+            .await
+            .unwrap()
+            .expect("present");
+        assert_eq!(skipped.status, "skipped");
+        assert!(skipped.consumed_at.is_none());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn set_status_enforces_user_isolation(pool: PgPool) {
+        let uid_a = new_user(&pool).await;
+        let uid_b = new_user(&pool).await;
+        let inst = add(&pool, uid_a, monday(), "Lunch", t(12, 0), 30)
+            .await
+            .unwrap();
+        assert!(
+            set_status(&pool, inst.id, uid_b, MealConsumptionStatus::Consumed)
+                .await
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
