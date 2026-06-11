@@ -23,9 +23,11 @@ function makeScheduleServiceMock(overrides: Partial<{
     isLoading:     loading.asReadonly(),
     loadError:     error.asReadonly(),
     date:          date.asReadonly(),
-    loadDay:    jasmine.createSpy('loadDay'),
-    toggleItem: jasmine.createSpy('toggleItem'),
-    addItem:    jasmine.createSpy('addItem'),
+    loadDay:             jasmine.createSpy('loadDay'),
+    toggleItem:          jasmine.createSpy('toggleItem'),
+    toggleMealConsumed:  jasmine.createSpy('toggleMealConsumed'),
+    setMealConsumption:  jasmine.createSpy('setMealConsumption'),
+    addItem:             jasmine.createSpy('addItem'),
   };
 }
 
