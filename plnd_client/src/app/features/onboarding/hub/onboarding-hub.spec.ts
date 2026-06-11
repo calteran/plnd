@@ -307,6 +307,15 @@ describe('OnboardingHubComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/day', today]);
   });
 
+  it('"Skip for now" dismisses the modal immediately so any commit error is visible', () => {
+    spyOn(router, 'navigate');
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.btn-gray-primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.modal-backdrop')).toBeNull();
+  });
+
   it('"Skip for now" persists a completed meal plan via /schedule/plan before completing onboarding', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
     spyOn(router, 'navigate');

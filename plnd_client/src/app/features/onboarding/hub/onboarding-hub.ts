@@ -566,6 +566,7 @@ export class OnboardingHubComponent {
 
   skipOnboarding(): void {
     if (this.isSubmitting()) return;
+    this.showSkipModal.set(false);
 
     // The skip modal promises "Your progress is saved." A user who finished the
     // Food or Tasks spoke has a meal plan / placed tasks held only in client
@@ -582,11 +583,19 @@ export class OnboardingHubComponent {
     // Nothing schedule-shaped was completed — just finalize and land on today.
     const d = new Date();
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.isSubmitting.set(true);
+    this.commitError.set(false);
     this.userService.completeOnboarding()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: () => this.router.navigate(['/day', today]),
-        error: () => this.commitError.set(true),
+        next: () => {
+          this.isSubmitting.set(false);
+          this.router.navigate(['/day', today]);
+        },
+        error: () => {
+          this.isSubmitting.set(false);
+          this.commitError.set(true);
+        },
       });
   }
 
