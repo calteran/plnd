@@ -87,6 +87,10 @@ pub struct MealAnchorInstanceResponse {
     pub tolerance_minutes: i32,
     pub sort_order: i32,
     pub template_entry_id: Option<Uuid>,
+    /// Consumption lifecycle: "planned" | "consumed" | "skipped".
+    pub status: String,
+    /// Set exactly when `status == "consumed"`.
+    pub consumed_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -102,6 +106,8 @@ impl From<plnd_data::models::MealAnchorInstance> for MealAnchorInstanceResponse 
             tolerance_minutes: i.tolerance_minutes,
             sort_order: i.sort_order,
             template_entry_id: i.template_entry_id,
+            status: i.status,
+            consumed_at: i.consumed_at,
             created_at: i.created_at,
             updated_at: i.updated_at,
         }

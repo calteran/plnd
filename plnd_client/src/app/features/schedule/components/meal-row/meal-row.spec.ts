@@ -22,6 +22,10 @@ const withTasks: MealAnchor = {
     { id: 'dt1', type: 'general', label: '💊 Vitamins', status: 'pending' }
   ]
 };
+const skippedMeal: MealAnchor = {
+  id: 'm4', name: 'Dinner', emoji: '🍽',
+  status: 'skipped', duringMealTasks: []
+};
 
 async function setup(meal: MealAnchor, date = '2026-04-20') {
   await TestBed.configureTestingModule({
@@ -106,5 +110,17 @@ describe('MealRowComponent', () => {
     f.componentInstance.toggled.subscribe((id: string) => emitted = id);
     f.debugElement.query(By.css('app-task-row .checkbox')).nativeElement.click();
     expect(emitted).toBe('dt1');
+  });
+
+  it('applies the skipped modifier class for a skipped meal', async () => {
+    const f = await setup(skippedMeal);
+    const band = f.debugElement.query(By.css('.meal-band')).nativeElement as HTMLElement;
+    expect(band.classList).toContain('meal-band--skipped');
+  });
+
+  it('does not apply the skipped modifier for a done meal', async () => {
+    const f = await setup(doneMeal);
+    const band = f.debugElement.query(By.css('.meal-band')).nativeElement as HTMLElement;
+    expect(band.classList).not.toContain('meal-band--skipped');
   });
 });

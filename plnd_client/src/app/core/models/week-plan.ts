@@ -135,6 +135,8 @@ export interface MealAnchorInstanceDto {
   tolerance_minutes: number;
   sort_order: number;
   template_entry_id: string | null;
+  status: string;            // "planned" | "consumed" | "skipped"
+  consumed_at: string | null;
   created_at: string;
   updated_at: string;
 }

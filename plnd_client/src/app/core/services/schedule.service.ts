@@ -7,6 +7,8 @@ import { ScheduleItem, MealAnchor, ScheduleTask, isMealAnchor, parseItemType } f
 import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
 
+export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
+
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {
   private readonly http       = inject(HttpClient);
@@ -90,16 +92,26 @@ export class ScheduleService {
       .subscribe({ error: () => this.loadDay(this._date()) });
   }
 
-  skipMeal(id: string): void {
+  /** Set a meal anchor's consumption status (planned/consumed/skipped). */
+  setMealConsumption(id: string, status: MealConsumptionApi): void {
     this._items.update(items =>
       items.map(item =>
-        isMealAnchor(item) && item.id === id ? { ...item, status: 'skipped' as const } : item,
+        isMealAnchor(item) && item.id === id
+          ? { ...item, status: toMealUiStatus(status, item.description) }
+          : item,
       ),
     );
     this.http
-      .patch(`${this.apiBase}/schedule/entries/${id}/status`, { status: 'skipped' })
+      .patch(`${this.apiBase}/schedule/anchors/${id}/status`, { status })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({ error: () => this.loadDay(this._date()) });
+  }
+
+  /** Toggle a meal between consumed and not-consumed (day-view checkbox). */
+  toggleMealConsumed(id: string): void {
+    const item = this._items().find(i => isMealAnchor(i) && i.id === id) as MealAnchor | undefined;
+    if (!item) return;
+    this.setMealConsumption(id, item.status === 'done' ? 'planned' : 'consumed');
   }
 
   addItem(task: ScheduleTask): void {
@@ -158,15 +170,27 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
   dinner:    { name: 'Dinner',    emoji: '🍽' },
 };
 
+/**
+ * Folds the backend consumption status into the UI `MealAnchor.status`.
+ * `consumed` → done, `skipped` → skipped, `planned` falls back to the
+ * dish-planning state (a dish title means 'planned', otherwise 'unplanned').
+ */
+function toMealUiStatus(
+  status: string | undefined,
+  description?: string,
+): MealAnchor['status'] {
+  if (status === 'consumed') return 'done';
+  if (status === 'skipped') return 'skipped';
+  return description ? 'planned' : 'unplanned';
+}
+
 function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntryDto): MealAnchor {
   const slot = MEAL_SLOTS[dto.name.toLowerCase()];
   return {
     id:    dto.id,
     name:  slot?.name ?? dto.name,
     emoji: slot?.emoji ?? '🍴',
-    // A committed meal makes the slot 'planned' and surfaces its dish title;
-    // an anchor with no persisted meal stays 'unplanned' with no description.
-    status:      planned ? 'planned' : 'unplanned',
+    status:      toMealUiStatus(dto.status, planned?.title ?? undefined),
     description: planned?.title ?? undefined,
     duringMealTasks: [],
   };

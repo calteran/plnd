@@ -1,4 +1,5 @@
 use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
+use plnd_data::models::MealConsumptionStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -137,6 +138,16 @@ pub enum CarryoverDecision {
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
 pub struct PatchEntryStatusRequest {
     pub status: String,
+}
+
+/// Body for `PATCH /schedule/anchors/{id}/status`. Deserializes directly into
+/// the meal-specific `MealConsumptionStatus` enum (serde `snake_case`); an
+/// unknown value yields a 422 from the JSON extractor.
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct SetAnchorStatusRequest {
+    /// "planned" | "consumed" | "skipped".
+    #[schema(value_type = String, example = "consumed")]
+    pub status: MealConsumptionStatus,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]

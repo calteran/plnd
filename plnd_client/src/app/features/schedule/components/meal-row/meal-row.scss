@@ -93,3 +93,11 @@
     opacity: 1;
   }
 }
+
+.meal-band--skipped {
+  opacity: 0.6;
+
+  .meal-name {
+    text-decoration: line-through;
+  }
+}

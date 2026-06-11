@@ -29,6 +29,7 @@ function anchorDto(id: string, name: string, date = '2026-04-02'): Record<string
   return {
     id, user_id: 'u1', date, name, preferred_time: '08:00:00',
     tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+    status: 'planned', consumed_at: null,
     created_at: `${date}T08:00:00Z`, updated_at: `${date}T08:00:00Z`,
   };
 }
@@ -166,6 +167,7 @@ describe('ScheduleService', () => {
       id: 'm1', user_id: 'u1', date: '2026-04-02',
       name: 'breakfast', preferred_time: '08:00:00',
       tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+      status: 'planned', consumed_at: null,
       created_at: '2026-04-02T08:00:00Z', updated_at: '2026-04-02T08:00:00Z',
     }]);
 
@@ -395,40 +397,97 @@ describe('ScheduleService', () => {
     expect(svc.scheduleItems().length).toBe(1);
   });
 
-  describe('skipMeal', () => {
+  it('maps a consumed anchor to status done', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [], [{ ...anchorDto('m1', 'breakfast'), status: 'consumed' }]);
+    expect((svc.scheduleItems()[0] as MealAnchor).status).toBe('done');
+  });
+
+  it('maps a skipped anchor to status skipped', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [], [{ ...anchorDto('m1', 'breakfast'), status: 'skipped' }]);
+    expect((svc.scheduleItems()[0] as MealAnchor).status).toBe('skipped');
+  });
+
+  describe('setMealConsumption', () => {
     beforeEach(() => {
       (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
         id: 'meal-1', name: 'Lunch', emoji: '🥗',
-        status: 'planned', duringMealTasks: [],
+        status: 'planned', description: 'Soup', duringMealTasks: [],
       }]);
     });
 
-    it('immediately sets the meal status to skipped in the signal', () => {
-      svc.skipMeal('meal-1');
-      httpMock.expectOne(r => r.url.includes('/schedule/entries/meal-1/status')).flush(null);
-
-      const meal = svc.scheduleItems()[0] as MealAnchor;
-      expect(meal.status).toBe('skipped');
-    });
-
-    it('issues PATCH /schedule/entries/:id/status with body { status: skipped }', () => {
-      svc.skipMeal('meal-1');
-
-      const req = httpMock.expectOne('http://localhost:3000/schedule/entries/meal-1/status');
+    it('PATCHes /schedule/anchors/:id/status with the given status', () => {
+      svc.setMealConsumption('meal-1', 'skipped');
+      const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
       expect(req.request.method).toBe('PATCH');
       expect(req.request.body).toEqual({ status: 'skipped' });
-      req.flush(null);
+      req.flush({});
     });
 
-    it('reloads the day on HTTP error to restore server state', () => {
+    it('optimistically sets skipped in the signal', () => {
+      svc.setMealConsumption('meal-1', 'skipped');
+      httpMock.expectOne(r => r.url.includes('/schedule/anchors/meal-1/status')).flush({});
+      expect((svc.scheduleItems()[0] as MealAnchor).status).toBe('skipped');
+    });
+
+    it('optimistically sets done when consumed', () => {
+      svc.setMealConsumption('meal-1', 'consumed');
+      httpMock.expectOne(r => r.url.includes('/schedule/anchors/meal-1/status')).flush({});
+      expect((svc.scheduleItems()[0] as MealAnchor).status).toBe('done');
+    });
+
+    it('reverts to planned (has dish) when set to planned', () => {
+      svc.setMealConsumption('meal-1', 'planned');
+      httpMock.expectOne(r => r.url.includes('/schedule/anchors/meal-1/status')).flush({});
+      expect((svc.scheduleItems()[0] as MealAnchor).status).toBe('planned');
+    });
+
+    it('reloads the day on HTTP error', () => {
       svc['_date'].set('2026-04-20');
-      svc.skipMeal('meal-1');
-
-      const patchReq = httpMock.expectOne(r => r.url.includes('/schedule/entries/meal-1/status'));
-      patchReq.flush('error', { status: 500, statusText: 'Internal Server Error' });
-
-      // Reload issues both requests
+      svc.setMealConsumption('meal-1', 'consumed');
+      httpMock.expectOne(r => r.url.includes('/schedule/anchors/meal-1/status'))
+        .flush('error', { status: 500, statusText: 'Internal Server Error' });
       flushDay(httpMock);
+    });
+  });
+
+  describe('toggleMealConsumed', () => {
+    it('marks consumed when the meal is not done', () => {
+      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+        id: 'meal-1', name: 'Lunch', emoji: '🥗', status: 'planned', duringMealTasks: [],
+      }]);
+      svc.toggleMealConsumed('meal-1');
+      const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
+      expect(req.request.body).toEqual({ status: 'consumed' });
+      req.flush({});
+    });
+
+    it('reverts to planned when the meal is done', () => {
+      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+        id: 'meal-1', name: 'Lunch', emoji: '🥗', status: 'done', duringMealTasks: [],
+      }]);
+      svc.toggleMealConsumed('meal-1');
+      const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
+      expect(req.request.body).toEqual({ status: 'planned' });
+      req.flush({});
+    });
+
+    it('marks consumed when the meal is skipped', () => {
+      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+        id: 'meal-1', name: 'Lunch', emoji: '🥗', status: 'skipped', duringMealTasks: [],
+      }]);
+      svc.toggleMealConsumed('meal-1');
+      const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
+      expect(req.request.body).toEqual({ status: 'consumed' });
+      req.flush({});
+    });
+
+    it('does not issue a PATCH when the meal id is not found', () => {
+      svc.loadDay('2026-04-02');
+      flushDay(httpMock);
+      svc.toggleMealConsumed('nonexistent-id');
+      expect(httpMock.match(r => r.url.includes('/schedule/anchors/')).length).toBe(0);
     });
   });
 });

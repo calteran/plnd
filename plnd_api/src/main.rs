@@ -385,6 +385,10 @@ async fn main() {
             patch(schedule_anchors::update).delete(schedule_anchors::delete),
         )
         .route(
+            "/schedule/anchors/{id}/status",
+            patch(schedule_anchors::set_status),
+        )
+        .route(
             "/routines",
             get(routine::list_routines).post(routine::create_routine),
         )

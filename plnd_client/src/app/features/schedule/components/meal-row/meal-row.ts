@@ -8,7 +8,7 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
   standalone: true,
   imports: [TaskRowComponent, MealReviewPaneComponent],
   template: `
-    <div class="meal-band">
+    <div class="meal-band" [class.meal-band--skipped]="meal().status === 'skipped'">
       <div class="meal-header">
         <div class="gutter">
           <span class="emoji" aria-hidden="true">{{ meal().emoji }}</span>
