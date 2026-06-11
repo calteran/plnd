@@ -167,6 +167,7 @@ describe('ScheduleService', () => {
       id: 'm1', user_id: 'u1', date: '2026-04-02',
       name: 'breakfast', preferred_time: '08:00:00',
       tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+      status: 'planned', consumed_at: null,
       created_at: '2026-04-02T08:00:00Z', updated_at: '2026-04-02T08:00:00Z',
     }]);
 
@@ -470,6 +471,23 @@ describe('ScheduleService', () => {
       const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
       expect(req.request.body).toEqual({ status: 'planned' });
       req.flush({});
+    });
+
+    it('marks consumed when the meal is skipped', () => {
+      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+        id: 'meal-1', name: 'Lunch', emoji: '🥗', status: 'skipped', duringMealTasks: [],
+      }]);
+      svc.toggleMealConsumed('meal-1');
+      const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
+      expect(req.request.body).toEqual({ status: 'consumed' });
+      req.flush({});
+    });
+
+    it('does not issue a PATCH when the meal id is not found', () => {
+      svc.loadDay('2026-04-02');
+      flushDay(httpMock);
+      svc.toggleMealConsumed('nonexistent-id');
+      expect(httpMock.match(r => r.url.includes('/schedule/anchors/')).length).toBe(0);
     });
   });
 });
