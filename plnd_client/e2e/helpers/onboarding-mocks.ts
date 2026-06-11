@@ -65,6 +65,47 @@ export const MOCK_MEAL_PLAN = {
   ],
 };
 
+// ── Meal Plan, slot-name aligned (POST /agent/meal-plan) ──────────────────────
+//
+// MOCK_MEAL_PLAN above uses lowercase `meal_name`, which does NOT match the
+// capitalized day-type slots seeded by `seedWeekdaysWeekends`
+// (Breakfast/Lunch/Dinner). The client keys meal cells by `(date, slot-name)`,
+// so the lowercase mock produces an empty onboarding meal grid and the commit
+// forwards ZERO `meal_entries` — which is why the existing happy-path commit
+// tests pass without seeding any `meal_anchor_instances`.
+//
+// This variant capitalizes `meal_name` to match the seeded slots, so the grid
+// renders and the commit forwards REAL `meal_entries`. It must be paired with
+// seeded `meal_anchor_instances` for the same `(date, name)` pairs (see
+// `seedDayMealAnchors` in onboarding.e2e.ts), since `commit_plan` pairs each
+// staged meal against an existing instance and 500s otherwise. Used by the
+// meal-persistence e2e coverage for #887.
+//
+// Dates match the first onboarding plan window: with the clock fixed to Sat
+// 2026-03-28, the first window starts the day after (Sun 2026-03-29) per #888,
+// so a meal must be dated inside [plan_start, plan_end] or buildMealPlanResponse
+// drops it. 2026-03-29 is a Sunday → the seeded Weekends day type (Breakfast/
+// Lunch/Dinner slots).
+export const MOCK_MEAL_PLAN_MATCHED = {
+  plan_start: '2026-03-29',
+  meals: [
+    {
+      date: '2026-03-29',
+      meal_name: 'Breakfast',
+      meal_ref: { id: '11111111-1111-4111-8111-111111111111', type: 'catalog' },
+      title: 'Oatmeal',
+      estimated: true,
+    },
+    {
+      date: '2026-03-29',
+      meal_name: 'Lunch',
+      meal_ref: { id: '22222222-2222-4222-8222-222222222222', type: 'catalog' },
+      title: 'Salad',
+      estimated: true,
+    },
+  ],
+};
+
 // ── seedOnboarding ────────────────────────────────────────────────────────────
 // Sets up a non-onboarded user session with fixed clock 2026-03-28. Each call
 // generates a fresh per-test sub so parallel tests cannot collide on writes —
