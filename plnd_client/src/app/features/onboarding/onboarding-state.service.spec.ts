@@ -69,7 +69,7 @@ describe('OnboardingStateService', () => {
     prefsSignal.set({
       user_id: 'u1',
       week_start_day: 1,
-      planning_trigger_offset: -3,
+      planning_trigger_offset: -1,
       default_plan_length_days: 7,
       email_notifications_enabled: false,
       sms_notifications_enabled: false,
@@ -81,8 +81,9 @@ describe('OnboardingStateService', () => {
     service.computeAndSetPlanPeriod('2026-04-22');
     const period = service.planPeriod();
     expect(period).not.toBeNull();
-    expect(period!.start).toBe('2026-04-22');
-    expect(period!.end).toBe('2026-04-28'); // offset=-3 → ratio 4/7 = 0.57 ≥ 0.15 → normal case
+    // today=Wed 2026-04-22 → plan_start=Thu 2026-04-23; current week ends Sun 2026-04-26.
+    expect(period!.start).toBe('2026-04-23');
+    expect(period!.end).toBe('2026-04-26');
   });
 
   // ── New signal initial state ────────────────────────────────────────────
@@ -216,20 +217,20 @@ describe('OnboardingStateService', () => {
     expect(service.planDays()).toBe(0);
   });
 
-  it('planDays computes days between start and end', () => {
+  it('planDays counts the inclusive span of the first window', () => {
     prefsSignal.set({
       user_id: 'u1', week_start_day: 1,
-      planning_trigger_offset: -3, default_plan_length_days: 7,
+      planning_trigger_offset: -1, default_plan_length_days: 7,
       email_notifications_enabled: false, sms_notifications_enabled: false,
       push_notifications_enabled: false, phone_number: null,
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     });
     service.computeAndSetPlanPeriod('2026-04-22');
-    // start='2026-04-22', end='2026-04-28' → 7 days
-    expect(service.planDays()).toBe(7);
+    // Thu 2026-04-23 – Sun 2026-04-26 → 4 inclusive days.
+    expect(service.planDays()).toBe(4);
   });
 
-  it('planDays works for 14-day plan periods', () => {
+  it('planDays counts the inclusive span of a 14-day-length first window', () => {
     prefsSignal.set({
       user_id: 'u1', week_start_day: 1,
       planning_trigger_offset: -2, default_plan_length_days: 14,
@@ -238,84 +239,114 @@ describe('OnboardingStateService', () => {
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     });
     service.computeAndSetPlanPeriod('2026-04-22');
-    // start='2026-04-22', end='2026-05-05' → 14 days
-    expect(service.planDays()).toBe(14);
+    // Thu 2026-04-23 – Sun 2026-05-03 → 11 inclusive days.
+    expect(service.planDays()).toBe(11);
   });
 
-  it('planDays works for 28-day plan periods', () => {
+  it('planDays reflects the extended span when the window rolls into the following week', () => {
     prefsSignal.set({
       user_id: 'u1', week_start_day: 1,
-      planning_trigger_offset: -2, default_plan_length_days: 28,
+      planning_trigger_offset: -1, default_plan_length_days: 7,
       email_notifications_enabled: false, sms_notifications_enabled: false,
       push_notifications_enabled: false, phone_number: null,
       created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
     });
-    service.computeAndSetPlanPeriod('2026-04-22');
-    // offset=-2, planLength=28 → trigger on day 26 → ratio 26/28 = 0.929 ≥ 0.15 → normal
-    // end = 2026-04-22 + 27 = 2026-05-19
-    expect(service.planDays()).toBe(28);
+    service.computeAndSetPlanPeriod('2026-04-25');
+    // today=Sat 2026-04-25 → plan_start=Sun 2026-04-26 (last day of week) → roll-over
+    // to Sun 2026-05-03 → 8 inclusive days.
+    expect(service.planDays()).toBe(8);
   });
 });
 
 describe('computeFirstPlanPeriod', () => {
-  it('normal case: plan_end = today + default_plan_length_days - 1 (inclusive) when ratio >= 0.15', () => {
-    // offset=-3, planLength=7 → trigger on day 4 → ratio 4/7 = 0.57 ≥ 0.15
-    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -3 });
-    expect(result.start).toBe('2026-04-22');
-    expect(result.end).toBe('2026-04-28');
+  // All cases use a Monday-start week (week_start_day=1) unless noted.
+  // plan_start is always the day AFTER `today`.
+
+  it('normal mid-week: plans from tomorrow to the end of the current week', () => {
+    // today=Wed 2026-04-22 → plan_start=Thu 2026-04-23; week Mon–Sun ends Sun 2026-04-26.
+    // offset=-1 → trigger Sun 2026-04-26, ratio 3/7=0.43 ≥ 0.15 → normal.
+    const result = computeFirstPlanPeriod('2026-04-22', {
+      default_plan_length_days: 7, planning_trigger_offset: -1, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-23');
+    expect(result.end).toBe('2026-04-26');
   });
 
-  it('extends to second trigger when ratio < 0.15 (offset=-6, planLength=7)', () => {
-    // trigger on day 1 → ratio 1/7 = 0.143 < 0.15 → extend
-    // secondPeriodEnd = today+14, secondTrigger = today+14-6 = today+8 = 2026-04-30
-    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -6 });
-    expect(result.start).toBe('2026-04-22');
-    expect(result.end).toBe('2026-04-30');
+  it('onboarding on the week-start day still starts tomorrow', () => {
+    // today=Mon 2026-04-20 → plan_start=Tue 2026-04-21; week ends Sun 2026-04-26.
+    const result = computeFirstPlanPeriod('2026-04-20', {
+      default_plan_length_days: 7, planning_trigger_offset: -1, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-21');
+    expect(result.end).toBe('2026-04-26');
   });
 
-  it('extends when trigger fires on day 0 (offset=-7, planLength=7)', () => {
-    // trigger on day 0 → ratio 0/7 = 0 < 0.15 → extend
-    // secondPeriodEnd = today+14, secondTrigger = today+14-7 = today+7 = 2026-04-29
-    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -7 });
-    expect(result.start).toBe('2026-04-22');
-    expect(result.end).toBe('2026-04-29');
+  it('rolls into the following week when little of the current week remains', () => {
+    // today=Sat 2026-04-25 → plan_start=Sun 2026-04-26 (last day of week).
+    // trigger Sun 2026-04-26, days_until_trigger=0, ratio 0 < 0.15 → extend.
+    const result = computeFirstPlanPeriod('2026-04-25', {
+      default_plan_length_days: 7, planning_trigger_offset: -1, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-26');
+    expect(result.end).toBe('2026-05-03');
   });
 
-  it('does NOT extend when ratio is above 0.15 (offset=-5, planLength=7, ratio=2/7=0.286)', () => {
-    // trigger on day 2 → ratio 2/7 = 0.286 ≥ 0.15 → normal
-    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -5 });
-    expect(result.start).toBe('2026-04-22');
-    expect(result.end).toBe('2026-04-28');
+  it('onboarding on the last day of the week starts a full following week', () => {
+    // today=Sun 2026-04-26 → plan_start=Mon 2026-04-27 (next week start) → Mon–Sun.
+    const result = computeFirstPlanPeriod('2026-04-26', {
+      default_plan_length_days: 7, planning_trigger_offset: -1, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-27');
+    expect(result.end).toBe('2026-05-03');
   });
 
-  it('works with 14-day plan lengths', () => {
-    // offset=-2, planLength=14 → trigger on day 12 → ratio 12/14 = 0.857 ≥ 0.15 → normal
-    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 14, planning_trigger_offset: -2 });
-    expect(result.start).toBe('2026-04-22');
-    expect(result.end).toBe('2026-05-05');
+  it('respects a non-Monday week_start_day (Sunday-start week)', () => {
+    // week_start_day=0 (Sun). today=Wed 2026-04-22 → plan_start=Thu 2026-04-23.
+    // week Sun 2026-04-19 – Sat 2026-04-25; trigger Sat 2026-04-25, ratio 2/7 ≥ 0.15 → normal.
+    const result = computeFirstPlanPeriod('2026-04-22', {
+      default_plan_length_days: 7, planning_trigger_offset: -1, week_start_day: 0,
+    });
+    expect(result.start).toBe('2026-04-23');
+    expect(result.end).toBe('2026-04-25');
   });
 
-  it('clamps planEnd to inclusive last day of first period when |offset| > planLength (offset=-10, planLength=7)', () => {
-    // trigger fires on day -3 → ratio -3/7 < 0.15 → extension branch
-    // secondPeriodEnd = today+14, secondTrigger = today+4 which is before minPlanEnd (today+6)
-    // clamp applies → planEnd = today+6 = 2026-04-28
-    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 7, planning_trigger_offset: -10 });
-    expect(result.start).toBe('2026-04-22');
-    expect(result.end).toBe('2026-04-28');
+  it('works with a 14-day plan length', () => {
+    // today=Wed 2026-04-22 → plan_start=Thu 2026-04-23; 14-day period Mon 2026-04-20 – Sun 2026-05-03.
+    // offset=-2 → trigger Sat 2026-05-02, ratio 9/14 ≥ 0.15 → normal.
+    const result = computeFirstPlanPeriod('2026-04-22', {
+      default_plan_length_days: 14, planning_trigger_offset: -2, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-23');
+    expect(result.end).toBe('2026-05-03');
   });
 
-  it('works with 28-day plan lengths (4-week segmented option)', () => {
-    // offset=-2, planLength=28 → trigger on day 26 → ratio 26/28 = 0.929 ≥ 0.15 → normal
-    const result = computeFirstPlanPeriod('2026-04-22', { default_plan_length_days: 28, planning_trigger_offset: -2 });
-    expect(result.start).toBe('2026-04-22');
-    expect(result.end).toBe('2026-05-19');
+  it('threshold: ratio >= 0.15 stays in the current week (offset=-2)', () => {
+    // today=Wed 2026-04-22 → plan_start=Thu 2026-04-23; trigger Sat 2026-04-25,
+    // days_until_trigger=2, ratio 2/7=0.286 ≥ 0.15 → normal.
+    const result = computeFirstPlanPeriod('2026-04-22', {
+      default_plan_length_days: 7, planning_trigger_offset: -2, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-23');
+    expect(result.end).toBe('2026-04-26');
   });
 
-  it('M→Su week with Sunday planning day (offset=-1): end is Sunday, not Monday', () => {
-    // Reported bug: tested on Mon 2026-05-11, window extended to Mon 2026-05-18.
-    // today=Mon, planLength=7, offset=-1 → normal branch → end must be Sun 2026-05-17.
-    const result = computeFirstPlanPeriod('2026-05-11', { default_plan_length_days: 7, planning_trigger_offset: -1 });
-    expect(result.start).toBe('2026-05-11');
-    expect(result.end).toBe('2026-05-17');
+  it('threshold: ratio < 0.15 rolls into the following week (offset=-3)', () => {
+    // today=Wed 2026-04-22 → plan_start=Thu 2026-04-23; trigger Fri 2026-04-24,
+    // days_until_trigger=1, ratio 1/7=0.143 < 0.15 → extend.
+    const result = computeFirstPlanPeriod('2026-04-22', {
+      default_plan_length_days: 7, planning_trigger_offset: -3, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-23');
+    expect(result.end).toBe('2026-05-03');
+  });
+
+  it('large negative offset lands in the roll-over branch, not a clamp', () => {
+    // today=Wed 2026-04-22 → plan_start=Thu 2026-04-23; trigger 2026-04-17,
+    // days_until_trigger=-6 < 0.15·7 → extend to following week end 2026-05-03.
+    const result = computeFirstPlanPeriod('2026-04-22', {
+      default_plan_length_days: 7, planning_trigger_offset: -10, week_start_day: 1,
+    });
+    expect(result.start).toBe('2026-04-23');
+    expect(result.end).toBe('2026-05-03');
   });
 });
