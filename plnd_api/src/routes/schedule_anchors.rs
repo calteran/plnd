@@ -8,7 +8,8 @@
 use crate::api_response::MealAnchorInstanceResponse;
 use crate::auth::jwt::Claims;
 use crate::models::{
-    CreateScheduleAnchorRequest, ListScheduleAnchorsQuery, UpdateScheduleAnchorRequest,
+    CreateScheduleAnchorRequest, ListScheduleAnchorsQuery, SetAnchorStatusRequest,
+    UpdateScheduleAnchorRequest,
 };
 use crate::state::AppState;
 use axum::{
@@ -204,6 +205,41 @@ pub async fn delete(
     } else {
         Err(StatusCode::NOT_FOUND)
     }
+}
+
+#[utoipa::path(
+    patch,
+    path = "/schedule/anchors/{id}/status",
+    tag = "Schedule Anchors",
+    security(("bearer_auth" = [])),
+    params(("id" = Uuid, Path, description = "Instance ID")),
+    request_body = SetAnchorStatusRequest,
+    responses(
+        (status = 200, description = "Consumption status updated", body = MealAnchorInstanceResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Not found"),
+        (status = 422, description = "Invalid status value"),
+    )
+)]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub, id = %id))]
+pub async fn set_status(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(id): Path<Uuid>,
+    Json(body): Json<SetAnchorStatusRequest>,
+) -> Result<Json<MealAnchorInstanceResponse>, StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    // Past-date logging is allowed (architecture.md §4.6) — no date guard.
+    let row = state
+        .repos
+        .meal_anchor_instance
+        .set_status(id, user_id, body.status)
+        .await
+        .map_err(map_repo_error)?
+        .ok_or(StatusCode::NOT_FOUND)?;
+
+    Ok(Json(MealAnchorInstanceResponse::from(row)))
 }
 
 fn map_repo_error(e: Error) -> StatusCode {

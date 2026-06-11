@@ -15,8 +15,8 @@ use crate::models::{
     CreateScheduleAnchorRequest, FailedSlot, MealAdhocResolveRequest, MealAdhocResolveResponse,
     MealEntry, MealEntryRequest, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
     MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryStatusRequest, PlaceTasksEntry,
-    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SlotRef,
-    TaskEntryRequest, TaskEntryResponse, UnplannableReason, UpdateMealPatternEntryRequest,
+    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SetAnchorStatusRequest,
+    SlotRef, TaskEntryRequest, TaskEntryResponse, UnplannableReason, UpdateMealPatternEntryRequest,
     UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
@@ -133,6 +133,7 @@ impl Modify for BearerSecurityAddon {
         crate::routes::schedule_anchors::create,
         crate::routes::schedule_anchors::update,
         crate::routes::schedule_anchors::delete,
+        crate::routes::schedule_anchors::set_status,
         // Routines
         crate::routes::routine::list_routines,
         crate::routes::routine::create_routine,
@@ -192,6 +193,7 @@ impl Modify for BearerSecurityAddon {
         MealAnchorInstanceResponse,
         CreateScheduleAnchorRequest,
         UpdateScheduleAnchorRequest,
+        SetAnchorStatusRequest,
         CarryoverDecision,
         PatchEntryStatusRequest,
         RoutineResponse,
