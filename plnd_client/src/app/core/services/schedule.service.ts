@@ -5,6 +5,7 @@ import { Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
 import { ConfigService } from './config.service';
 import { ScheduleItem, MealAnchor, ScheduleTask, isMealAnchor, parseItemType } from '../models/schedule';
 import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
+import { PlannedMealEntryDto } from '../models/planned-meal-entry';
 
 @Injectable({ providedIn: 'root' })
 export class ScheduleService {
@@ -44,7 +45,15 @@ export class ScheduleService {
       takeUntilDestroyed(),
     ).subscribe(({ schedule, anchors }) => {
       if (schedule.error) this._error.set('Failed to load schedule');
-      this._items.set([...anchors.map(mapAnchorInstance), ...schedule.data.entries.map(mapEntry)]);
+      // Index persisted meals by the anchor instance they were committed against,
+      // so each anchor row can render the dish a user planned (onboarding / wizard).
+      const mealByAnchor = new Map<string, PlannedMealEntryDto>(
+        (schedule.data.planned_meals ?? []).map(pm => [pm.meal_anchor_instance_id, pm]),
+      );
+      this._items.set([
+        ...anchors.map(a => mapAnchorInstance(a, mealByAnchor.get(a.id))),
+        ...schedule.data.entries.map(mapEntry),
+      ]);
       this._loading.set(false);
     });
   }
@@ -149,13 +158,16 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
   dinner:    { name: 'Dinner',    emoji: '🍽' },
 };
 
-function mapAnchorInstance(dto: MealAnchorInstanceDto): MealAnchor {
+function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntryDto): MealAnchor {
   const slot = MEAL_SLOTS[dto.name.toLowerCase()];
   return {
     id:    dto.id,
     name:  slot?.name ?? dto.name,
     emoji: slot?.emoji ?? '🍴',
-    status: 'unplanned',
+    // A committed meal makes the slot 'planned' and surfaces its dish title;
+    // an anchor with no persisted meal stays 'unplanned' with no description.
+    status:      planned ? 'planned' : 'unplanned',
+    description: planned?.title ?? undefined,
     duringMealTasks: [],
   };
 }
