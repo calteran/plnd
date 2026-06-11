@@ -9,9 +9,15 @@ import {
 import {
   MOCK_PLACED_TASKS,
   MOCK_MEAL_PLAN,
+  MOCK_MEAL_PLAN_MATCHED,
   seedOnboarding,
 } from '../helpers/onboarding-mocks';
-import { seedDayType, seedDayTypeMeal } from '../helpers/seed-data';
+import {
+  fetchPlannedMeals,
+  seedDayType,
+  seedDayTypeMeal,
+  seedMealAnchor,
+} from '../helpers/seed-data';
 
 // ── Mock policy ────────────────────────────────────────────────────────────────
 //
@@ -382,17 +388,89 @@ test.describe('Onboarding', () => {
     });
   });
 
-  // NOTE: The "Skip preserves completed work" behavior (skipOnboarding() now
-  // commits completed meals/tasks via /schedule/plan instead of discarding them)
-  // is covered by the OnboardingHubComponent unit spec — it asserts skip POSTs
-  // the meal plan and that an empty skip does not. An end-to-end variant is not
-  // added here: the mocked /agent/meal-plan flow cannot materialize the backend
-  // meal_anchor_instances that commit_plan pairs against, so a real skip-commit
-  // of meals can't be exercised without orthogonal fixture machinery. The real
-  // backend's acceptance of this exact POST + redirect to /day is already
-  // covered by the "commit plan" happy-path test above (persistPlanThenComplete
-  // is shared between the Approve and Skip paths). The missing e2e layer for
-  // onboarding meal persistence is tracked in #887.
+  // ── Meal persistence end-to-end (#887) ─────────────────────────────────────
+  //
+  // The "commit plan" / "full happy path" tests above forward an EMPTY
+  // meal_entries list — lowercase MOCK_MEAL_PLAN never matches the capitalized
+  // seeded slots, so buildMealPlanResponse() drops every cell — and therefore
+  // assert navigation only, never persistence. These tests close that gap: they
+  // drive the slot-aligned MOCK_MEAL_PLAN_MATCHED plus seeded meal_anchor_instances
+  // so the real commit_plan pairs each staged meal against an instance and writes
+  // planned_meals, then read those rows back from GET /schedule/period to prove
+  // they survived the round-trip — across both the Approve and Skip exits, which
+  // share persistPlanThenComplete().
+  //
+  // (The day view does not yet render persisted planned meals — schedule.service
+  // discards /schedule/period's planned_meals — so these assert persistence via
+  // the API rather than the day-view DOM. Day-view rendering is tracked in #889.)
+  test.describe('Onboarding meal persistence', () => {
+    // commit_plan pairs each staged meal against an existing meal_anchor_instance
+    // matching (user_id, date, name); the mocked /agent/meal-plan flow never
+    // materializes them, so seed the two the matched mock proposes on the
+    // plan-start date. With the clock fixed to Sat 2026-03-28, the first plan
+    // window starts the day after (Sun 2026-03-29) per #888 — a Sunday, so the
+    // seeded Weekends day type (Breakfast/Lunch/Dinner) applies. Without these
+    // instances the commit 500s.
+    async function seedDayMealAnchors(sub: string): Promise<void> {
+      await seedMealAnchor(sub, { date: '2026-03-29', name: 'Breakfast', preferred_time: '08:00' });
+      await seedMealAnchor(sub, { date: '2026-03-29', name: 'Lunch', preferred_time: '12:00' });
+    }
+
+    test('Approve Plan persists generated meals to the backend', async ({ page }) => {
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await seedDayMealAnchors(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN_MATCHED })
+      );
+      await page.goto('/onboarding');
+
+      await completeAccountSpoke(page);
+      await completeTasksSpoke(page);
+      await completeFoodSpoke(page);
+
+      await page.locator('.btn-cta.btn--accent').click();
+      await expect(page).toHaveURL(/\/day\/2026-03-29/, { timeout: 15_000 });
+
+      const meals = await fetchPlannedMeals(sub, '2026-03-29', '2026-03-29');
+      expect(meals).toHaveLength(2);
+      const byName = new Map(meals.map(m => [m.anchor_name, m.title]));
+      expect(byName.get('Breakfast')).toBe('Oatmeal');
+      expect(byName.get('Lunch')).toBe('Salad');
+    });
+
+    test('Skip persists already-completed meals (Account left incomplete)', async ({ page }) => {
+      const { sub } = await seedOnboarding(page);
+      await seedWeekdaysWeekends(sub);
+      await seedDayMealAnchors(sub);
+      await page.route(`${API_BASE}/agent/place-tasks`, route =>
+        route.fulfill({ status: 200, json: MOCK_PLACED_TASKS })
+      );
+      await page.route(`${API_BASE}/agent/meal-plan`, route =>
+        route.fulfill({ status: 200, json: MOCK_MEAL_PLAN_MATCHED })
+      );
+      await page.goto('/onboarding');
+
+      // Complete Tasks (sets planning prefs) + Food (generates meals) but leave
+      // Account incomplete, so the Skip affordance stays — Approve replaces Skip
+      // only once all three sections are done.
+      await completeTasksSpoke(page);
+      await completeFoodSpoke(page);
+
+      await page.locator('.btn-skip').click();
+      await page.locator('.btn-gray-primary').click();
+      await expect(page).toHaveURL(/\/day\/2026-03-29/, { timeout: 15_000 });
+
+      const meals = await fetchPlannedMeals(sub, '2026-03-29', '2026-03-29');
+      expect(meals).toHaveLength(2);
+      const byName = new Map(meals.map(m => [m.anchor_name, m.title]));
+      expect(byName.get('Breakfast')).toBe('Oatmeal');
+      expect(byName.get('Lunch')).toBe('Salad');
+    });
+  });
 
   test.describe('Account spoke', () => {
     test.beforeEach(async ({ page }) => {

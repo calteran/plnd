@@ -409,6 +409,47 @@ export async function seedMealAnchor(
   return (await res.json()) as SeededMealAnchor;
 }
 
+// ── fetchPlannedMeals (read-back assertion helper) ───────────────────────────
+
+export interface PlannedMealEntry {
+  meal_entry_id: string;
+  meal_anchor_instance_id: string;
+  meal_ref_id: string;
+  meal_ref_type: string;
+  title: string | null;
+  /** Anchor instance date 'YYYY-MM-DD'; populated on list queries. */
+  anchor_date: string | null;
+  /** Anchor instance name (e.g. "Breakfast"); populated on list queries. */
+  anchor_name: string | null;
+}
+
+/**
+ * Reads the persisted planned meals for a period straight from the real backend
+ * (`GET /schedule/period`). Unlike the seed helpers above this is a read used by
+ * assertions — it lets a test confirm that a committed plan actually reached the
+ * database (rather than only asserting client-side navigation). `anchor_date` and
+ * `anchor_name` are populated on these list queries, so callers can match meals
+ * by `(date, slot)`.
+ */
+export async function fetchPlannedMeals(
+  sub: string,
+  start: string,
+  end: string,
+): Promise<PlannedMealEntry[]> {
+  const token = await mintTestToken(sub);
+  const res = await fetch(`${API_BASE}/schedule/period?start=${start}&end=${end}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '<no body>');
+    throw new Error(
+      `fetchPlannedMeals: GET /schedule/period returned ${res.status}. Body: ${text.slice(0, 200)}`,
+    );
+  }
+  const body = (await res.json()) as { planned_meals: PlannedMealEntry[] };
+  return body.planned_meals;
+}
+
 // ── seedCatalogIngredient ────────────────────────────────────────────────────
 
 export interface SeededCatalogIngredient {
