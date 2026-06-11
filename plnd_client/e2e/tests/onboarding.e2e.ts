@@ -400,9 +400,9 @@ test.describe('Onboarding', () => {
   // they survived the round-trip — across both the Approve and Skip exits, which
   // share persistPlanThenComplete().
   //
-  // (The day view does not yet render persisted planned meals — schedule.service
-  // discards /schedule/period's planned_meals — so these assert persistence via
-  // the API rather than the day-view DOM. Day-view rendering is tracked in #889.)
+  // The Approve test also asserts the dishes render in the day-view DOM (#889:
+  // schedule.service now joins /schedule/period's planned_meals onto the anchor
+  // rows). The Skip test keeps the API-only assertion to cover that exit path.
   test.describe('Onboarding meal persistence', () => {
     // commit_plan pairs each staged meal against an existing meal_anchor_instance
     // matching (user_id, date, name); the mocked /agent/meal-plan flow never
@@ -434,6 +434,10 @@ test.describe('Onboarding', () => {
 
       await page.locator('.btn-cta.btn--accent').click();
       await expect(page).toHaveURL(/\/day\/2026-03-29/, { timeout: 15_000 });
+
+      // Day view renders the committed dish on each anchor row (#889).
+      await expect(page.locator('.meal-desc').filter({ hasText: 'Oatmeal' })).toBeVisible();
+      await expect(page.locator('.meal-desc').filter({ hasText: 'Salad' })).toBeVisible();
 
       const meals = await fetchPlannedMeals(sub, '2026-03-29', '2026-03-29');
       expect(meals).toHaveLength(2);

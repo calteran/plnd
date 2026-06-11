@@ -16,11 +16,21 @@ function flushDay(
   httpMock: HttpTestingController,
   entries: unknown[] = [],
   anchors: unknown[] = [],
+  plannedMeals: unknown[] = [],
 ): void {
   httpMock.expectOne(r => r.url.includes('/schedule/period'))
-    .flush({ entries, carryover: [] });
+    .flush({ entries, carryover: [], planned_meals: plannedMeals });
   httpMock.expectOne(r => r.url.includes('/schedule/anchors'))
     .flush(anchors);
+}
+
+/** A meal anchor instance DTO with sensible defaults for the given id/name. */
+function anchorDto(id: string, name: string, date = '2026-04-02'): Record<string, unknown> {
+  return {
+    id, user_id: 'u1', date, name, preferred_time: '08:00:00',
+    tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+    created_at: `${date}T08:00:00Z`, updated_at: `${date}T08:00:00Z`,
+  };
 }
 
 describe('ScheduleService', () => {
@@ -182,6 +192,42 @@ describe('ScheduleService', () => {
     const meal = items[0] as MealAnchor;
     expect(meal.name).toBe('Brunch');
     expect(meal.emoji).toBe('🍴');
+  });
+
+  it('joins a persisted planned meal into its anchor by meal_anchor_instance_id', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(
+      httpMock,
+      [],
+      [anchorDto('m1', 'breakfast')],
+      [{
+        meal_entry_id: 'pm1', meal_anchor_instance_id: 'm1',
+        meal_ref_id: 'dish-7', meal_ref_type: 'catalog_dish',
+        title: 'Avocado toast + eggs', anchor_date: '2026-04-02', anchor_name: 'breakfast',
+      }],
+    );
+
+    const meal = svc.scheduleItems()[0] as MealAnchor;
+    expect(meal.status).toBe('planned');
+    expect(meal.description).toBe('Avocado toast + eggs');
+  });
+
+  it('leaves an anchor unplanned when no planned meal references it', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(
+      httpMock,
+      [],
+      [anchorDto('m1', 'breakfast'), anchorDto('m2', 'lunch')],
+      [{
+        meal_entry_id: 'pm1', meal_anchor_instance_id: 'm1',
+        meal_ref_id: 'dish-7', meal_ref_type: 'catalog_dish',
+        title: 'Avocado toast + eggs', anchor_date: '2026-04-02', anchor_name: 'breakfast',
+      }],
+    );
+
+    const lunch = svc.scheduleItems()[1] as MealAnchor;
+    expect(lunch.status).toBe('unplanned');
+    expect(lunch.description).toBeUndefined();
   });
 
   it('places anchor items before task items in scheduleItems', () => {
