@@ -17,6 +17,8 @@ interface AnchorResponse {
   tolerance_minutes: number;
   sort_order: number;
   template_entry_id: string | null;
+  status: string;
+  consumed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -155,5 +157,66 @@ test.describe('Schedule anchors — per-date meal anchor instances (API)', () =>
     // should also be empty and not re-import a template.
     const list = (await listRes.json()) as AnchorResponse[];
     expect(list).toEqual([]);
+  });
+
+  test('PATCH status: consumed stamps consumed_at; skipped and revert clear it; bad value 422; unknown id 404', async () => {
+    const sub = generateTestSub();
+    const headers = await authHeaders(sub);
+    const date = isoDate(-1); // yesterday — past-date logging allowed
+
+    const addRes = await fetch(`${API_BASE}/schedule/anchors`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ date, name: 'Lunch', preferred_time: '12:00' }),
+    });
+    const inst = (await addRes.json()) as AnchorResponse;
+    expect(inst.status).toBe('planned');
+    expect(inst.consumed_at).toBeNull();
+
+    // → consumed
+    const consumedRes = await fetch(`${API_BASE}/schedule/anchors/${inst.id}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: 'consumed' }),
+    });
+    expect(consumedRes.status).toBe(200);
+    const consumed = (await consumedRes.json()) as AnchorResponse;
+    expect(consumed.status).toBe('consumed');
+    expect(consumed.consumed_at).not.toBeNull();
+
+    // → skipped (clears consumed_at)
+    const skippedRes = await fetch(`${API_BASE}/schedule/anchors/${inst.id}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: 'skipped' }),
+    });
+    expect(skippedRes.status).toBe(200);
+    const skipped = (await skippedRes.json()) as AnchorResponse;
+    expect(skipped.status).toBe('skipped');
+    expect(skipped.consumed_at).toBeNull();
+
+    // → revert to planned
+    const plannedRes = await fetch(`${API_BASE}/schedule/anchors/${inst.id}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: 'planned' }),
+    });
+    expect(plannedRes.status).toBe(200);
+    expect(((await plannedRes.json()) as AnchorResponse).status).toBe('planned');
+
+    // invalid status value → 422
+    const badRes = await fetch(`${API_BASE}/schedule/anchors/${inst.id}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: 'eaten' }),
+    });
+    expect(badRes.status).toBe(422);
+
+    // unknown id → 404
+    const missingRes = await fetch(
+      `${API_BASE}/schedule/anchors/00000000-0000-0000-0000-000000000000/status`,
+      { method: 'PATCH', headers, body: JSON.stringify({ status: 'consumed' }) },
+    );
+    expect(missingRes.status).toBe(404);
   });
 });
