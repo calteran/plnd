@@ -307,6 +307,70 @@ describe('OnboardingHubComponent', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/day', today]);
   });
 
+  it('"Skip for now" dismisses the modal immediately so any commit error is visible', () => {
+    spyOn(router, 'navigate');
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.btn-gray-primary') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('.modal-backdrop')).toBeNull();
+  });
+
+  it('"Skip for now" persists a completed meal plan via /schedule/plan before completing onboarding', () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    spyOn(router, 'navigate');
+
+    // User finished the Food spoke (meals held in client state) but skips the rest.
+    const meal: MealEntry = {
+      date: '2026-05-01',
+      meal_name: 'breakfast',
+      meal_ref: { type: 'catalog', id: 'meal-abc' },
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (stateMock as any).mealPlan = signal({ plan_start: '2026-05-01', meals: [meal] }).asReadonly();
+    stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
+    stateMock.markComplete('food'); // food only — sections are NOT all complete
+    fixture.detectChanges();
+
+    // open the skip modal and confirm
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.btn-gray-primary') as HTMLButtonElement).click();
+
+    const planReq = httpTesting.expectOne(r =>
+      r.method === 'POST' && r.url.includes('/schedule/plan'),
+    );
+    const body = planReq.request.body as PostSchedulePlanRequest;
+    expect(body.meal_entries).toEqual([
+      {
+        date: '2026-05-01',
+        meal_name: 'breakfast',
+        meal_ref_id: 'meal-abc',
+        meal_ref_type: 'catalog_meal',
+        title: undefined,
+      },
+    ]);
+    planReq.flush({ committed: 1, planning_task_status: 'completed' });
+
+    expect(userServiceStub.completeOnboarding).toHaveBeenCalled();
+    expect(router.navigate).toHaveBeenCalledWith(['/day', '2026-05-01']);
+    httpTesting.verify();
+  });
+
+  it('"Skip for now" does NOT POST /schedule/plan when no schedule work was completed', () => {
+    const httpTesting = TestBed.inject(HttpTestingController);
+    spyOn(router, 'navigate');
+
+    // open the skip modal and confirm — nothing was completed, planPeriod is null
+    (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    (fixture.nativeElement.querySelector('.btn-gray-primary') as HTMLButtonElement).click();
+
+    // no plan POST is issued; onboarding still completes
+    httpTesting.verify();
+    expect(userServiceStub.completeOnboarding).toHaveBeenCalled();
+  });
+
   it('Escape key closes the skip modal', () => {
     // open via UI, then test the keyboard handler directly
     (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();

@@ -561,10 +561,74 @@ export class OnboardingHubComponent {
   commitPlan(): void {
     const period = this.onboardingState.planPeriod();
     if (!period || this.isSubmitting()) return;
+    this.persistPlanThenComplete(period);
+  }
 
+  skipOnboarding(): void {
+    if (this.isSubmitting()) return;
+    this.showSkipModal.set(false);
+
+    // The skip modal promises "Your progress is saved." A user who finished the
+    // Food or Tasks spoke has a meal plan / placed tasks held only in client
+    // state — persist them before finalizing onboarding, otherwise that work is
+    // silently discarded and never reaches the day view. commitPlan() is the
+    // only other path that writes /schedule/plan, and it's gated behind ALL
+    // sections being complete, so skip is the sole exit for partial progress.
+    const period = this.onboardingState.planPeriod();
+    if (period && this.hasPersistableWork()) {
+      this.persistPlanThenComplete(period);
+      return;
+    }
+
+    // Nothing schedule-shaped was completed — just finalize and land on today.
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.isSubmitting.set(true);
+    this.commitError.set(false);
+    this.userService.completeOnboarding()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.isSubmitting.set(false);
+          this.router.navigate(['/day', today]);
+        },
+        error: () => {
+          this.isSubmitting.set(false);
+          this.commitError.set(true);
+        },
+      });
+  }
+
+  /** Whether the user completed any schedule work worth persisting on skip. */
+  private hasPersistableWork(): boolean {
+    return (this.onboardingState.mealPlan()?.meals.length ?? 0) > 0
+      || this.onboardingState.placedTasks().length > 0;
+  }
+
+  /** Shared commit path: POST the assembled plan, complete onboarding, land on the plan's first day. */
+  private persistPlanThenComplete(period: { start: string; end: string }): void {
     this.isSubmitting.set(true);
     this.commitError.set(false);
 
+    const apiBase = this.config.getConfig().api.baseUrl;
+    this.http.post<PostSchedulePlanResponse>(`${apiBase}/schedule/plan`, this.buildPlanRequest(period))
+      .pipe(
+        switchMap(() => this.userService.completeOnboarding()),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: () => {
+          this.isSubmitting.set(false);
+          this.router.navigate(['/day', period.start]);
+        },
+        error: () => {
+          this.isSubmitting.set(false);
+          this.commitError.set(true);
+        },
+      });
+  }
+
+  private buildPlanRequest(period: { start: string; end: string }): PostSchedulePlanRequest {
     const mealPlan = this.onboardingState.mealPlan();
     const entries: PlanEntryRequest[] = [];
     const mealEntries: MealEntryRequest[] = [];
@@ -590,7 +654,7 @@ export class OnboardingHubComponent {
       }
     }
 
-    const body: PostSchedulePlanRequest = {
+    return {
       plan_start: period.start,
       plan_end: period.end,
       planning_task_id: NIL_UUID,
@@ -598,33 +662,5 @@ export class OnboardingHubComponent {
       meal_entries: mealEntries,
       placed_tasks: this.onboardingState.placedTasks(),
     };
-
-    const apiBase = this.config.getConfig().api.baseUrl;
-    this.http.post<PostSchedulePlanResponse>(`${apiBase}/schedule/plan`, body)
-      .pipe(
-        switchMap(() => this.userService.completeOnboarding()),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: () => {
-          this.isSubmitting.set(false);
-          this.router.navigate(['/day', period.start]);
-        },
-        error: () => {
-          this.isSubmitting.set(false);
-          this.commitError.set(true);
-        },
-      });
-  }
-
-  skipOnboarding(): void {
-    const d = new Date();
-    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    this.userService.completeOnboarding()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => this.router.navigate(['/day', today]),
-        error: () => this.commitError.set(true),
-      });
   }
 }
