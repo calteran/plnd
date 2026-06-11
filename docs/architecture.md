@@ -423,6 +423,8 @@ The surfaces have **different navigation shapes**, deliberately:
 
 **Onboarding's meal spoke surfaces the advance-planning toggle.** The first page of the meal spoke includes an *I don't want to plan meals in advance* affordance, giving the user the option at the moment of first encounter rather than after onboarding has completed. Selecting it flips `advance_meal_planning_enabled` to `false` and offers a convenience follow-up to clear the default `breakfast → lunch → dinner` anchors as well (§4.6). Skipping the food-preferences spoke follows automatically — that spoke is hidden when advance planning is off.
 
+**The onboarding wizard's first window starts the day after onboarding.** A user finishing onboarding is not asked to plan a day already underway; the first plannable day is the day after they finish. From that start the window runs to the end of the user's current week — bounded by their chosen week-start day and plan length. When a user finishes late in their week, with little of it left to plan, the window instead extends through the following week, so the first plan is substantive rather than a one- or two-day stub. The recurring planning wizard carries no equivalent rule: it always plans a full window beginning on the next week-start and is future-dated by construction.
+
 ### 4.10 The planning process
 
 Building a schedule for a planning window proceeds in four conceptual passes:
