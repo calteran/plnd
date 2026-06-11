@@ -381,6 +381,18 @@ test.describe('Onboarding', () => {
     });
   });
 
+  // NOTE: The "Skip preserves completed work" behavior (skipOnboarding() now
+  // commits completed meals/tasks via /schedule/plan instead of discarding them)
+  // is covered by the OnboardingHubComponent unit spec — it asserts skip POSTs
+  // the meal plan and that an empty skip does not. An end-to-end variant is not
+  // added here: the mocked /agent/meal-plan flow cannot materialize the backend
+  // meal_anchor_instances that commit_plan pairs against, so a real skip-commit
+  // of meals can't be exercised without orthogonal fixture machinery. The real
+  // backend's acceptance of this exact POST + redirect to /day is already
+  // covered by the "commit plan" happy-path test above (persistPlanThenComplete
+  // is shared between the Approve and Skip paths). The missing e2e layer for
+  // onboarding meal persistence is tracked in #887.
+
   test.describe('Account spoke', () => {
     test.beforeEach(async ({ page }) => {
       await seedOnboarding(page);
