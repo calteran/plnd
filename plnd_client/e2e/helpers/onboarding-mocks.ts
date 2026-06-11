@@ -11,11 +11,18 @@ import { generateTestSub, injectAuthToken, seedTestState } from './auth';
 // flow through the real backend via seed helpers in ./seed-data.ts.
 
 // ── Task Placement (POST /agent/place-tasks) ──────────────────────────────────
+//
+// Dates fall inside the first onboarding window. seedOnboarding fixes the clock
+// to Sat 2026-03-28 and the seeded "new" user has week_start_day=Mon, offset=0,
+// length=7, so the first window starts the day AFTER today (Sun 2026-03-29) and
+// runs to Sun 2026-04-05 (computeFirstPlanPeriod rolls into the following week
+// because plan_start lands on the last day of the current week). 'Morning run'
+// is dated to the first window day so it renders in the first day card.
 
 export const MOCK_PLACED_TASKS = [
   {
     title: 'Morning run',
-    scheduled_date: '2026-03-28',
+    scheduled_date: '2026-03-29',
     time_window_start: '07:30',
     duration_minutes: 30,
     energy_required: 'high',
@@ -23,7 +30,7 @@ export const MOCK_PLACED_TASKS = [
   },
   {
     title: 'Read book',
-    scheduled_date: '2026-03-29',
+    scheduled_date: '2026-03-30',
     time_window_start: '20:00',
     duration_minutes: 45,
     energy_required: 'low',
@@ -39,17 +46,17 @@ export const MOCK_PLACED_TASKS = [
 // the full happy-path tests.
 
 export const MOCK_MEAL_PLAN = {
-  plan_start: '2026-03-28',
+  plan_start: '2026-03-29',
   meals: [
     {
-      date: '2026-03-28',
+      date: '2026-03-29',
       meal_name: 'breakfast',
       meal_ref: { id: '11111111-1111-4111-8111-111111111111', type: 'catalog' },
       title: 'Oatmeal',
       estimated: true,
     },
     {
-      date: '2026-03-28',
+      date: '2026-03-29',
       meal_name: 'lunch',
       meal_ref: { id: '22222222-2222-4222-8222-222222222222', type: 'catalog' },
       title: 'Salad',

@@ -112,35 +112,58 @@ export class OnboardingStateService {
 }
 
 // Pure function — exported for unit testing without Angular DI.
-// Uses local-noon Date parsing to avoid UTC-offset day rollback (same pattern as WeekPlanService).
+/**
+ * Compute the user's first planning window during onboarding.
+ *
+ * The window starts the day AFTER `today` — a new user is never asked to plan a
+ * day that has already started — and runs to the end of the week containing that
+ * start day, where a "week" is `default_plan_length_days` long and anchored on
+ * `week_start_day`. When the next weekly-planning prompt is imminent (less than
+ * 15% of a plan length away), the window extends through the following week so the
+ * first plan is substantive rather than a one- or two-day stub.
+ *
+ * Invoked only during onboarding, which offers a 1- or 2-week plan length, so
+ * `daysSinceWeekStart` (0–6) is always < planLength and the window is non-empty;
+ * the function deliberately does not defend against planLength < 7.
+ *
+ * Uses local-noon Date parsing to avoid UTC-offset day rollback (same pattern as
+ * WeekPlanService).
+ */
 export function computeFirstPlanPeriod(
   today: string,
-  prefs: { default_plan_length_days: number; planning_trigger_offset: number }
+  prefs: {
+    default_plan_length_days: number;
+    planning_trigger_offset: number;
+    week_start_day: number;
+  },
 ): { start: string; end: string } {
   const planLength = prefs.default_plan_length_days;
   const offset = prefs.planning_trigger_offset;
-  const startDate = new Date(`${today}T12:00:00`);
+  const weekStartDay = prefs.week_start_day;
 
-  const firstPeriodEnd = addDays(startDate, planLength);
-  const firstTrigger = addDays(firstPeriodEnd, offset);
+  // plan_start is tomorrow.
+  const planStart = addDays(new Date(`${today}T12:00:00`), 1);
+
+  // Anchor the window on the most recent week-start on or before plan_start.
+  const daysSinceWeekStart = (planStart.getDay() - weekStartDay + 7) % 7;
+  const currentPeriodStart = addDays(planStart, -daysSinceWeekStart);
+  const nextPeriodStart = addDays(currentPeriodStart, planLength);
+  const currentPeriodEnd = addDays(nextPeriodStart, -1); // inclusive end of plan_start's week
+
+  // The next weekly-planning prompt fires `offset` days from the next period start.
+  const firstTrigger = addDays(nextPeriodStart, offset);
   const daysUntilTrigger = Math.round(
-    (firstTrigger.getTime() - startDate.getTime()) / 86_400_000
+    (firstTrigger.getTime() - planStart.getTime()) / 86_400_000,
   );
 
-  let planEnd: Date;
-  if (daysUntilTrigger / planLength < 0.15) {
-    const secondPeriodEnd = addDays(firstPeriodEnd, planLength);
-    planEnd = addDays(secondPeriodEnd, offset);
-  } else {
-    // Inclusive last day of the first period (all downstream callers treat end as inclusive).
-    planEnd = addDays(firstPeriodEnd, -1);
-  }
+  // Most of the way through the current week → extend into the following week.
+  // Both branches yield an end >= currentPeriodEnd, so no clamp is needed.
+  const planEnd =
+    daysUntilTrigger / planLength < 0.15
+      ? addDays(nextPeriodStart, planLength - 1)
+      : currentPeriodEnd;
 
-  // Guard: ensure planEnd is at least the inclusive last day of the first period.
-  const minPlanEnd = addDays(firstPeriodEnd, -1);
-  if (planEnd.getTime() < minPlanEnd.getTime()) planEnd = minPlanEnd;
-
-  return { start: today, end: toISODate(planEnd) };
+  return { start: toISODate(planStart), end: toISODate(planEnd) };
 }
 
 function addDays(date: Date, days: number): Date {
