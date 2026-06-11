@@ -348,7 +348,8 @@ test.describe('Onboarding', () => {
       await completeFoodSpoke(page);
 
       await page.locator('.btn-cta.btn--accent').click();
-      await expect(page).toHaveURL(/\/day\/2026-03-28/);
+      // Commit navigates to plan_start (the day after today), not today.
+      await expect(page).toHaveURL(/\/day\/2026-03-29/);
     });
 
     test('POST /schedule/plan 500 → error banner shown; CTA re-enables', async ({ page }) => {
@@ -839,8 +840,9 @@ test.describe('Onboarding', () => {
       await page.locator('.btn-cta.btn--accent').click();
       // Approve Plan commits via the real backend before redirecting; give the
       // redirect a generous timeout so the assertion survives CPU starvation
-      // when the full suite runs in parallel under `just verify`.
-      await expect(page).toHaveURL(/\/day\/2026-03-28/, { timeout: 15_000 });
+      // when the full suite runs in parallel under `just verify`. Redirect target
+      // is plan_start (the day after today), Sun 2026-03-29.
+      await expect(page).toHaveURL(/\/day\/2026-03-29/, { timeout: 15_000 });
     });
   });
 
