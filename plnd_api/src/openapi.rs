@@ -15,9 +15,9 @@ use crate::models::{
     CreateScheduleAnchorRequest, FailedSlot, MealAdhocResolveRequest, MealAdhocResolveResponse,
     MealEntry, MealEntryRequest, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
     MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryStatusRequest, PlaceTasksEntry,
-    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus, SetAnchorStatusRequest,
-    SlotRef, TaskEntryRequest, TaskEntryResponse, UnplannableReason, UpdateMealPatternEntryRequest,
-    UpdateScheduleAnchorRequest,
+    PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus,
+    SetAnchorStatusRequest, SlotRef, TaskEntryRequest, TaskEntryResponse, UnplannableReason,
+    UpdateMealPatternEntryRequest, UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
