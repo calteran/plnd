@@ -2200,11 +2200,15 @@ mod tests {
         let schema = SuggestSlotMealTool.schema();
         let meal_ref = &schema["properties"]["meal_ref"];
         // The widened schema is a oneOf of {existing ref} | {new proposal}.
-        let variants = meal_ref["oneOf"].as_array().expect("meal_ref must be a oneOf");
+        let variants = meal_ref["oneOf"]
+            .as_array()
+            .expect("meal_ref must be a oneOf");
         assert_eq!(variants.len(), 2, "expected existing + new variants");
         let has_new = variants.iter().any(|v| {
             v["properties"]["type"]["const"] == "new"
-                || v["properties"]["type"]["enum"].as_array().is_some_and(|e| e.iter().any(|x| x == "new"))
+                || v["properties"]["type"]["enum"]
+                    .as_array()
+                    .is_some_and(|e| e.iter().any(|x| x == "new"))
         });
         assert!(has_new, "one variant must accept type=new");
     }
@@ -2213,9 +2217,13 @@ mod tests {
     fn rebalance_meal_ref_allows_new_variant() {
         let schema = RebalanceMealPlanTool.schema();
         let meal_ref = &schema["properties"]["meals"]["items"]["properties"]["meal_ref"];
-        let variants = meal_ref["oneOf"].as_array().expect("rebalance meal_ref must be a oneOf");
+        let variants = meal_ref["oneOf"]
+            .as_array()
+            .expect("rebalance meal_ref must be a oneOf");
         assert_eq!(variants.len(), 2, "expected existing + new variants");
-        let has_new = variants.iter().any(|v| v["properties"]["type"]["const"] == "new");
+        let has_new = variants
+            .iter()
+            .any(|v| v["properties"]["type"]["const"] == "new");
         assert!(has_new, "one variant must accept type=new");
     }
 

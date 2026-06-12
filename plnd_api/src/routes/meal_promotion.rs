@@ -36,12 +36,16 @@ pub struct NewMealProposal {
 /// Note: serde's internally-tagged representation does not support newtype tuple
 /// variants that wrap structs, so the `New` variant uses an inline struct form
 /// rather than `New(NewMealProposal)`. The standalone `NewMealProposal` struct is
-/// kept for use by `promote_new_meal`'s signature and the Task 9 tests.
+/// kept for use by `promote_new_meal`'s signature and its tests.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
 pub enum RawMealRef {
-    Catalog { id: Uuid },
-    User { id: Uuid },
+    Catalog {
+        id: Uuid,
+    },
+    User {
+        id: Uuid,
+    },
     New {
         name: String,
         #[serde(default)]
@@ -54,9 +58,15 @@ impl RawMealRef {
     /// Extract a `NewMealProposal` if this is a `New` variant.
     pub fn into_new_proposal(self) -> Option<NewMealProposal> {
         match self {
-            RawMealRef::New { name, occasion_tags, inferred_ingredients } => {
-                Some(NewMealProposal { name, occasion_tags, inferred_ingredients })
-            }
+            RawMealRef::New {
+                name,
+                occasion_tags,
+                inferred_ingredients,
+            } => Some(NewMealProposal {
+                name,
+                occasion_tags,
+                inferred_ingredients,
+            }),
             _ => None,
         }
     }
@@ -109,30 +119,29 @@ pub async fn promote_new_meal(
     if let Some((source, dish)) = search.resolve_dish(&proposal.name).await {
         let mut links: Vec<DishIngredientLinkInput> = Vec::new();
         for (idx, di) in dish.ingredients.iter().enumerate() {
-            if let Some((ing_source, ing)) = search.resolve_ingredient(&di.name).await {
-                if let Ok(ingredient_id) = ingest
+            if let Some((ing_source, ing)) = search.resolve_ingredient(&di.name).await
+                && let Ok(ingredient_id) = ingest
                     .ingest_ingredient(ingredient_input_from(&ing_source, &ing))
                     .await
-                {
-                    let quantity = if di.quantity.is_sign_positive() && !di.quantity.is_zero() {
-                        di.quantity
-                    } else {
-                        Decimal::from(1)
-                    };
-                    let unit = if di.unit.trim().is_empty() {
-                        "serving".to_string()
-                    } else {
-                        di.unit.clone()
-                    };
-                    links.push(DishIngredientLinkInput {
-                        ingredient_id,
-                        quantity,
-                        unit,
-                        preparation_note: None,
-                        is_optional: false,
-                        sort_order: idx as i16,
-                    });
-                }
+            {
+                let quantity = if di.quantity.is_sign_positive() && !di.quantity.is_zero() {
+                    di.quantity
+                } else {
+                    Decimal::from(1)
+                };
+                let unit = if di.unit.trim().is_empty() {
+                    "serving".to_string()
+                } else {
+                    di.unit.clone()
+                };
+                links.push(DishIngredientLinkInput {
+                    ingredient_id,
+                    quantity,
+                    unit,
+                    preparation_note: None,
+                    is_optional: false,
+                    sort_order: idx as i16,
+                });
             }
         }
         let Ok(dish_id) = ingest
@@ -168,24 +177,23 @@ pub async fn promote_new_meal(
     // ── Branch 2: compose from inferred ingredients ──────────────────────────
     let mut links: Vec<DishIngredientLinkInput> = Vec::new();
     for (idx, inferred) in proposal.inferred_ingredients.iter().enumerate() {
-        if let Some((ing_source, ing)) = search.resolve_ingredient(&inferred.name).await {
-            if let Ok(ingredient_id) = ingest
+        if let Some((ing_source, ing)) = search.resolve_ingredient(&inferred.name).await
+            && let Ok(ingredient_id) = ingest
                 .ingest_ingredient(ingredient_input_from(&ing_source, &ing))
                 .await
-            {
-                let quantity = Decimal::try_from(inferred.grams)
-                    .ok()
-                    .filter(|d| d.is_sign_positive() && !d.is_zero())
-                    .unwrap_or_else(|| Decimal::from(1));
-                links.push(DishIngredientLinkInput {
-                    ingredient_id,
-                    quantity,
-                    unit: "g".into(),
-                    preparation_note: None,
-                    is_optional: false,
-                    sort_order: idx as i16,
-                });
-            }
+        {
+            let quantity = Decimal::try_from(inferred.grams)
+                .ok()
+                .filter(|d| d.is_sign_positive() && !d.is_zero())
+                .unwrap_or_else(|| Decimal::from(1));
+            links.push(DishIngredientLinkInput {
+                ingredient_id,
+                quantity,
+                unit: "g".into(),
+                preparation_note: None,
+                is_optional: false,
+                sort_order: idx as i16,
+            });
         }
     }
 
@@ -235,7 +243,10 @@ fn ingredient_input_from(
         name: ing.name.clone(),
         description: None,
         serving_size_g: None,
-        nutrition: ing.nutrition.as_ref().and_then(|n| serde_json::to_value(n).ok()),
+        nutrition: ing
+            .nutrition
+            .as_ref()
+            .and_then(|n| serde_json::to_value(n).ok()),
         allergens: vec![],
         occasion_tags: vec![],
     }
@@ -271,7 +282,10 @@ async fn wrap_dish_in_meal(
         })
         .await
     {
-        Ok(meal_id) => PromotionOutcome::Resolved { meal_type: "catalog".into(), id: meal_id },
+        Ok(meal_id) => PromotionOutcome::Resolved {
+            meal_type: "catalog".into(),
+            id: meal_id,
+        },
         Err(_) => PromotionOutcome::Missed,
     }
 }
@@ -284,7 +298,8 @@ mod tests {
 
     #[test]
     fn raw_meal_ref_parses_catalog() {
-        let v = serde_json::json!({ "type": "catalog", "id": "00000000-0000-0000-0000-000000000001" });
+        let v =
+            serde_json::json!({ "type": "catalog", "id": "00000000-0000-0000-0000-000000000001" });
         let r: RawMealRef = serde_json::from_value(v).unwrap();
         assert!(matches!(r, RawMealRef::Catalog { .. }));
     }
@@ -306,7 +321,11 @@ mod tests {
         });
         let r: RawMealRef = serde_json::from_value(v).unwrap();
         match r {
-            RawMealRef::New { name, inferred_ingredients, .. } => {
+            RawMealRef::New {
+                name,
+                inferred_ingredients,
+                ..
+            } => {
                 assert_eq!(name, "Spicy Peanut Tofu Bowl");
                 assert_eq!(inferred_ingredients.len(), 1);
             }
@@ -430,7 +449,7 @@ mod tests {
         let repo = Arc::new(CountingIngestRepo::default());
         let svc = ProviderSearchService::new(
             vec![Arc::new(TofuNutritionProvider)],
-            vec![],  // no recipe providers → branch 1 skipped
+            vec![], // no recipe providers → branch 1 skipped
             vec![],
             plnd_data::cache::SearchCache::new(36),
         );
@@ -442,16 +461,26 @@ mod tests {
                 grams: 150.0,
             }],
         };
-        let out =
-            promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
+        let out = promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { ref meal_type, .. } if meal_type == "catalog"),
             "expected Resolved, got {:?}",
             out
         );
-        assert!(*repo.ingredients.lock().unwrap() >= 1, "expected ≥1 ingredient ingested");
-        assert_eq!(*repo.dishes.lock().unwrap(), 1, "expected exactly 1 dish ingested");
-        assert_eq!(*repo.meals.lock().unwrap(), 1, "expected exactly 1 meal ingested");
+        assert!(
+            *repo.ingredients.lock().unwrap() >= 1,
+            "expected ≥1 ingredient ingested"
+        );
+        assert_eq!(
+            *repo.dishes.lock().unwrap(),
+            1,
+            "expected exactly 1 dish ingested"
+        );
+        assert_eq!(
+            *repo.meals.lock().unwrap(),
+            1,
+            "expected exactly 1 meal ingested"
+        );
     }
 
     // ── HIT path: recipe match ───────────────────────────────────────────────
@@ -519,9 +548,20 @@ mod tests {
             "expected Resolved, got {:?}",
             out
         );
-        assert!(*repo.ingredients.lock().unwrap() >= 1, "expected ≥1 ingredient ingested");
-        assert_eq!(*repo.dishes.lock().unwrap(), 1, "expected exactly 1 dish ingested");
-        assert_eq!(*repo.meals.lock().unwrap(), 1, "expected exactly 1 meal ingested");
+        assert!(
+            *repo.ingredients.lock().unwrap() >= 1,
+            "expected ≥1 ingredient ingested"
+        );
+        assert_eq!(
+            *repo.dishes.lock().unwrap(),
+            1,
+            "expected exactly 1 dish ingested"
+        );
+        assert_eq!(
+            *repo.meals.lock().unwrap(),
+            1,
+            "expected exactly 1 meal ingested"
+        );
     }
 
     // ── Task 13: integration test over real captured provider fixtures ────────
@@ -548,17 +588,19 @@ mod tests {
             Ok(Uuid::new_v4())
         }
         async fn ingest_dish(&self, i: IngestDishInput) -> Result<Uuid, plnd_data::Error> {
-            self.dishes
-                .lock()
-                .unwrap()
-                .push((i.external_source.clone(), i.external_id.clone(), i.name.clone()));
+            self.dishes.lock().unwrap().push((
+                i.external_source.clone(),
+                i.external_id.clone(),
+                i.name.clone(),
+            ));
             Ok(Uuid::new_v4())
         }
         async fn ingest_meal(&self, i: IngestMealInput) -> Result<Uuid, plnd_data::Error> {
-            self.meals
-                .lock()
-                .unwrap()
-                .push((i.external_source.clone(), i.external_id.clone(), i.name.clone()));
+            self.meals.lock().unwrap().push((
+                i.external_source.clone(),
+                i.external_id.clone(),
+                i.name.clone(),
+            ));
             Ok(Uuid::new_v4())
         }
     }
@@ -625,7 +667,10 @@ mod tests {
         assert_eq!(dishes.len(), 1, "exactly one dish ingested");
         assert_eq!(meals.len(), 1, "exactly one meal ingested");
         assert_eq!(dishes[0].0, "themealdb", "dish external_source");
-        assert_eq!(dishes[0].1, "52795", "dish external_id = the TheMealDB recipe id");
+        assert_eq!(
+            dishes[0].1, "52795",
+            "dish external_id = the TheMealDB recipe id"
+        );
         assert_eq!(meals[0].0, "themealdb", "meal external_source");
         assert_eq!(meals[0].1, "52795", "meal external_id");
     }

@@ -206,8 +206,14 @@ fn build_avoid_str(refs: &[MealRef]) -> String {
 /// Returns None for a `new` proposal (which must go through `promote_new_meal`).
 fn existing_ref_outcome(raw: &RawMealRef) -> Option<PromotionOutcome> {
     match raw {
-        RawMealRef::Catalog { id } => Some(PromotionOutcome::Resolved { meal_type: "catalog".into(), id: *id }),
-        RawMealRef::User { id } => Some(PromotionOutcome::Resolved { meal_type: "user".into(), id: *id }),
+        RawMealRef::Catalog { id } => Some(PromotionOutcome::Resolved {
+            meal_type: "catalog".into(),
+            id: *id,
+        }),
+        RawMealRef::User { id } => Some(PromotionOutcome::Resolved {
+            meal_type: "user".into(),
+            id: *id,
+        }),
         RawMealRef::New { .. } => None,
     }
 }
@@ -224,7 +230,11 @@ async fn resolve_slot_meal(
     raw_value: &serde_json::Value,
     build_constrained_ctx: impl Fn() -> AgentContext,
 ) -> Result<MealEntry, FailedSlot> {
-    let fail = |reason: String| FailedSlot { date: slot_date, meal_name: slot_name.to_string(), reason };
+    let fail = |reason: String| FailedSlot {
+        date: slot_date,
+        meal_name: slot_name.to_string(),
+        reason,
+    };
 
     let raw_ref: RawMealRef = serde_json::from_value(raw_value["meal_ref"].clone())
         .map_err(|e| fail(format!("bad meal_ref: {e}")))?;
@@ -248,7 +258,11 @@ async fn resolve_slot_meal(
                 PromotionOutcome::Missed => {
                     // Re-invoke the agent once, constrained to existing items.
                     let ctx = build_constrained_ctx();
-                    let out = state.agent.run(&ctx).await.map_err(|e| fail(e.to_string()))?;
+                    let out = state
+                        .agent
+                        .run(&ctx)
+                        .await
+                        .map_err(|e| fail(e.to_string()))?;
                     let v: serde_json::Value =
                         serde_json::from_str(&out.content).map_err(|e| fail(e.to_string()))?;
                     let reref: RawMealRef = serde_json::from_value(v["meal_ref"].clone())
@@ -808,7 +822,11 @@ pub async fn post_meal_plan(
                                 &value,
                                 || {
                                     let mut c = build_suggest_slot_ctx(
-                                        user_id, &slot, &prefs, &locked, &[],
+                                        user_id,
+                                        &slot,
+                                        &prefs,
+                                        &locked,
+                                        &[],
                                     );
                                     c.constrained_to_existing = true;
                                     c
@@ -1202,7 +1220,10 @@ pub async fn post_meal_plan_rebalance(
         let date: chrono::NaiveDate =
             serde_json::from_value(entry["date"].clone()).unwrap_or(plan_start);
         let meal_name = entry["meal_name"].as_str().unwrap_or_default().to_string();
-        let slot = plnd_data::models::OpenSlot { date, meal_name: meal_name.clone() };
+        let slot = plnd_data::models::OpenSlot {
+            date,
+            meal_name: meal_name.clone(),
+        };
         match resolve_slot_meal(&state, user_id, date, &meal_name, &entry, || {
             let mut c = build_suggest_slot_ctx(user_id, &slot, &prefs_blob, &locked_entries, &[]);
             c.constrained_to_existing = true;
@@ -3151,7 +3172,9 @@ mod tests {
 
     #[test]
     fn existing_ref_outcome_passes_catalog_unchanged() {
-        let raw = crate::routes::meal_promotion::RawMealRef::Catalog { id: uuid::Uuid::from_u128(1) };
+        let raw = crate::routes::meal_promotion::RawMealRef::Catalog {
+            id: uuid::Uuid::from_u128(1),
+        };
         assert_eq!(
             super::existing_ref_outcome(&raw),
             Some(crate::routes::meal_promotion::PromotionOutcome::Resolved {
@@ -3163,7 +3186,9 @@ mod tests {
 
     #[test]
     fn existing_ref_outcome_passes_user_unchanged() {
-        let raw = crate::routes::meal_promotion::RawMealRef::User { id: uuid::Uuid::from_u128(2) };
+        let raw = crate::routes::meal_promotion::RawMealRef::User {
+            id: uuid::Uuid::from_u128(2),
+        };
         assert_eq!(
             super::existing_ref_outcome(&raw),
             Some(crate::routes::meal_promotion::PromotionOutcome::Resolved {

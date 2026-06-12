@@ -467,8 +467,10 @@ impl AgentService {
         };
 
         // Step 3: Resolve system prompt.
-        let base_system =
-            apply_existing_constraint(ctx.use_case.system_prompt().to_string(), ctx.constrained_to_existing);
+        let base_system = apply_existing_constraint(
+            ctx.use_case.system_prompt().to_string(),
+            ctx.constrained_to_existing,
+        );
 
         // Step 4: Inject memories into system prompt preamble if present.
         let system = match memory_entries {

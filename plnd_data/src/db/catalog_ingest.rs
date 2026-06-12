@@ -433,16 +433,21 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(dish_id, dish_id_again, "re-ingest must return the same dish_id");
+        assert_eq!(
+            dish_id, dish_id_again,
+            "re-ingest must return the same dish_id"
+        );
 
-        let link_count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM catalog_dish_ingredients WHERE dish_id = $1",
-        )
-        .bind(dish_id)
-        .fetch_one(&pool)
-        .await
-        .unwrap();
-        assert_eq!(link_count, 1, "the resolvable ingredient must be linked exactly once");
+        let link_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM catalog_dish_ingredients WHERE dish_id = $1")
+                .bind(dish_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(
+            link_count, 1,
+            "the resolvable ingredient must be linked exactly once"
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -509,7 +514,11 @@ mod tests {
                 tags: &[],
                 nutrition: Some(serde_json::json!({"calories_kcal": 400})),
                 contributed_by_user_id: None,
-                dishes: &[MealDishLink { dish_id, dish_servings: Decimal::from(1), sort_order: 0 }],
+                dishes: &[MealDishLink {
+                    dish_id,
+                    dish_servings: Decimal::from(1),
+                    sort_order: 0,
+                }],
             },
         )
         .await
@@ -528,7 +537,11 @@ mod tests {
                 tags: &[],
                 nutrition: Some(serde_json::json!({"calories_kcal": 400})),
                 contributed_by_user_id: None,
-                dishes: &[MealDishLink { dish_id, dish_servings: Decimal::from(1), sort_order: 0 }],
+                dishes: &[MealDishLink {
+                    dish_id,
+                    dish_servings: Decimal::from(1),
+                    sort_order: 0,
+                }],
             },
         )
         .await
