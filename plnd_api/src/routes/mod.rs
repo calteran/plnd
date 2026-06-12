@@ -7,6 +7,7 @@ pub mod day_types;
 pub mod dietary_restrictions;
 pub mod domain_constants;
 pub mod meal_pattern;
+pub mod meal_promotion;
 pub mod meal_suggestions;
 pub mod preferences;
 pub mod routine;
