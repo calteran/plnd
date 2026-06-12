@@ -1,5 +1,5 @@
 use chrono::{NaiveDate, NaiveTime};
-use plnd_api::models::{PlanEntryRequest, PostSchedulePlanRequest};
+use plnd_api::models::{PatchEntryOneShotRequest, PlanEntryRequest, PostSchedulePlanRequest};
 use plnd_api::routes::schedule::PeriodQuery;
 
 use plnd_data::query_types::{
@@ -159,5 +159,29 @@ fn test_period_query_same_date_passes_guard() {
     assert!(
         query.end >= query.start,
         "end == start should not trigger the guard"
+    );
+}
+
+#[test]
+fn test_patch_entry_one_shot_request_true() {
+    let json = r#"{"one_shot":true}"#;
+    let req: PatchEntryOneShotRequest = serde_json::from_str(json).unwrap();
+    assert!(req.one_shot);
+}
+
+#[test]
+fn test_patch_entry_one_shot_request_false() {
+    let json = r#"{"one_shot":false}"#;
+    let req: PatchEntryOneShotRequest = serde_json::from_str(json).unwrap();
+    assert!(!req.one_shot);
+}
+
+#[test]
+fn test_patch_entry_one_shot_request_missing_field_fails() {
+    let json = r#"{}"#;
+    let result: Result<PatchEntryOneShotRequest, _> = serde_json::from_str(json);
+    assert!(
+        result.is_err(),
+        "missing one_shot field must fail to deserialize"
     );
 }

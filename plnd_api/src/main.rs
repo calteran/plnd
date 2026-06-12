@@ -381,6 +381,10 @@ async fn main() {
             patch(schedule::patch_entry_status),
         )
         .route(
+            "/schedule/entries/{id}/one-shot",
+            patch(schedule::patch_entry_one_shot),
+        )
+        .route(
             "/schedule/anchors",
             get(schedule_anchors::list_for_date).post(schedule_anchors::create),
         )

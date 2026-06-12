@@ -4,8 +4,8 @@ use crate::api_response::{
 };
 use crate::auth::jwt::Claims;
 use crate::models::{
-    CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryStatusRequest,
-    PlanEntryRequest, PostSchedulePlanRequest,
+    CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryOneShotRequest,
+    PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest,
 };
 use crate::routes::domain_constants::{
     VALID_ENERGY_LEVELS, VALID_MEAL_REF_TYPES, VALID_TASK_TYPES,
@@ -353,6 +353,44 @@ pub async fn patch_entry_status(
             Error::NotFound => StatusCode::NOT_FOUND,
             _ => {
                 tracing::error!(error = %e, "patch_entry_status error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })
+}
+
+#[utoipa::path(
+    patch,
+    path = "/schedule/entries/{id}/one-shot",
+    tag = "Schedule",
+    params(("id" = Uuid, Path, description = "Schedule entry ID")),
+    request_body = PatchEntryOneShotRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "one_shot updated"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Entry not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
+pub async fn patch_entry_one_shot(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(entry_id): Path<Uuid>,
+    Json(body): Json<PatchEntryOneShotRequest>,
+) -> Result<StatusCode, StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    state
+        .repos
+        .schedule
+        .update_entry_one_shot(user_id, entry_id, body.one_shot)
+        .await
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| match e {
+            Error::NotFound => StatusCode::NOT_FOUND,
+            _ => {
+                tracing::error!(error = %e, "patch_entry_one_shot error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })
