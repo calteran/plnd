@@ -140,7 +140,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
               (blur)="ingredientSearchResults.set([])" />
             @if (ingredientSearchResults().length) {
               <div class="search-dropdown">
-                @for (r of ingredientSearchResults(); track $index) {
+                @for (r of ingredientSearchResults(); track r.kind === 'local' ? r.ingredient_id : r.external_id) {
                   <button type="button" class="search-result" (mousedown)="$event.preventDefault()" (click)="selectIngredientResult(r)">
                     <span class="result-name">
                       {{ r.name }}
