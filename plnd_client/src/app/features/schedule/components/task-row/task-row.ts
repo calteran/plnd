@@ -39,13 +39,32 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
       @if (typeBadge()) {
         <span class="type-badge type-badge--{{ item().type }}">{{ typeBadge() }}</span>
       }
+      <button
+        type="button"
+        class="one-shot-toggle"
+        [class.active]="item().oneShot"
+        [attr.aria-pressed]="item().oneShot"
+        [attr.aria-label]="oneShotAriaLabel()"
+        [attr.title]="oneShotAriaLabel()"
+        (click)="toggleOneShot()"
+      >⤓</button>
     </div>
   `,
   styleUrl: './task-row.scss'
 })
 export class TaskRowComponent {
-  readonly item    = input.required<ScheduleTask>();
-  readonly toggled = output<string>();
+  readonly item           = input.required<ScheduleTask>();
+  readonly toggled        = output<string>();
+  readonly oneShotToggled = output<{ id: string; oneShot: boolean }>();
 
   protected readonly typeBadge = computed(() => TYPE_BADGE_LABELS[this.item().type] ?? null);
+
+  protected readonly oneShotAriaLabel = computed(() => this.item().oneShot
+    ? `${this.item().label} is one-time only; activate to let it carry over`
+    : `Mark ${this.item().label} one-time only (won't carry over if missed)`
+  );
+
+  protected toggleOneShot(): void {
+    this.oneShotToggled.emit({ id: this.item().id, oneShot: !this.item().oneShot });
+  }
 }

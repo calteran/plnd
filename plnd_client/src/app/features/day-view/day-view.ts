@@ -66,6 +66,7 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
                 <app-task-row
                   [item]="item"
                   (toggled)="scheduleService.toggleItem($event)"
+                  (oneShotToggled)="scheduleService.setEntryOneShot($event.id, $event.oneShot)"
                 />
               }
             }

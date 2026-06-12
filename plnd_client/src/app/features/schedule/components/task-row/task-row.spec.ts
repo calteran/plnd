@@ -102,4 +102,12 @@ describe('TaskRowComponent', () => {
     expect(badge.nativeElement.classList).toContain('type-badge--appointment');
     expect(badge.nativeElement.textContent.trim()).toBe('appt');
   });
+
+  it('emits oneShotToggled with the inverted value when the toggle is clicked', async () => {
+    const f = await setup({ id: 't1', type: 'general', label: 'meds', status: 'pending', oneShot: false });
+    let emitted: { id: string; oneShot: boolean } | undefined;
+    f.componentInstance.oneShotToggled.subscribe((e: { id: string; oneShot: boolean }) => (emitted = e));
+    f.debugElement.query(By.css('.one-shot-toggle')).nativeElement.click();
+    expect(emitted).toEqual({ id: 't1', oneShot: true });
+  });
 });
