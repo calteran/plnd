@@ -82,11 +82,11 @@ describe('MealReviewPaneComponent', () => {
     expect(btn.textContent).not.toContain('Mark not done');
   });
 
-  it('labels the done button "Mark not done" with an x for a completed meal', async () => {
+  it('labels the done button "Mark not done" with a cross for a completed meal', async () => {
     const { f } = await setup(doneMeal);
     const btn = f.debugElement.query(By.css('[data-action="done"]')).nativeElement;
     expect(btn.textContent).toContain('Mark not done');
-    expect(btn.textContent).toContain('✗');
+    expect(btn.textContent).toContain('×');
   });
 
   it('shows empty-meal action row for an unplanned meal', async () => {

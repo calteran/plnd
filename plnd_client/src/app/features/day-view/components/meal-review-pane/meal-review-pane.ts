@@ -77,7 +77,7 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
           <button data-action="edit"  (click)="activate('edit')">✏️ Edit</button>
           <button data-action="skip"  (click)="onSkip()">× Skip</button>
           <button data-action="done"  (click)="onDone()">
-            {{ isDone() ? '✗ Mark not done' : '✓ Mark done' }}
+            {{ isDone() ? '× Mark not done' : '✓ Mark done' }}
           </button>
         } @else {
           <button data-action="add"     (click)="activate('add')">➕ Add meal</button>
