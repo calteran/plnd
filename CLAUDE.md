@@ -28,6 +28,9 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 - **Never chain `cd` with `&&`** — run `cd <dir>` as a standalone command first, then follow with subsequent commands separately; this avoids triggering a permission prompt on every compound command
 - **For git commands in worktrees, prefer `git -C <path>`** — e.g. `git -C /path/to/worktree add ...` rather than `cd /path && git add ...`; the `-C` flag passes the working tree directly without a shell directory change, avoiding the untrusted-hooks security prompt entirely
 
+### Pointing the User at Documents to Review
+- **Always cite review documents by their path relative to the repository root, not relative to the worktree** — when you surface a spec, plan, or any file for the user to read (e.g. when the brainstorming workflow pauses for review), include the worktree prefix: `.worktrees/<branch>/docs/plan.md`, never the worktree-relative `docs/plan.md`. The user runs several agents in separate worktrees concurrently, and only the full root-relative path tells them *which* worktree's document to open.
+
 ### Server Processes
 - **NEVER run `cargo run` directly**
 - Use `just verify-build` to check compilation
