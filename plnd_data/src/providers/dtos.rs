@@ -28,6 +28,58 @@ pub struct NutritionFacts {
     pub cholesterol_mg: Option<f64>,
 }
 
+impl NutritionFacts {
+    /// Scale every present macro by `factor`, leaving absent (`None`) fields absent.
+    ///
+    /// Provider nutrition is reported per 100 g (USDA FDC and Open Food Facts both
+    /// normalise to `*_100g`), so a gram quantity `g` scales by `g / 100.0`.
+    pub fn scaled(&self, factor: f64) -> NutritionFacts {
+        let s = |v: Option<f64>| v.map(|x| x * factor);
+        NutritionFacts {
+            calories_kcal: s(self.calories_kcal),
+            protein_g: s(self.protein_g),
+            carbohydrates_g: s(self.carbohydrates_g),
+            fat_g: s(self.fat_g),
+            fiber_g: s(self.fiber_g),
+            sugar_g: s(self.sugar_g),
+            sodium_mg: s(self.sodium_mg),
+            potassium_mg: s(self.potassium_mg),
+            calcium_mg: s(self.calcium_mg),
+            iron_mg: s(self.iron_mg),
+            vitamin_c_mg: s(self.vitamin_c_mg),
+            vitamin_d_iu: s(self.vitamin_d_iu),
+            saturated_fat_g: s(self.saturated_fat_g),
+            cholesterol_mg: s(self.cholesterol_mg),
+        }
+    }
+
+    /// Sum two fact sets field-wise. A field is `Some` if either operand has it
+    /// (absent treated as 0); it stays `None` only when both operands are absent,
+    /// so summing ingredients never fabricates a `0.0` for data nobody reported.
+    pub fn plus(&self, other: &NutritionFacts) -> NutritionFacts {
+        let a = |x: Option<f64>, y: Option<f64>| match (x, y) {
+            (None, None) => None,
+            (a, b) => Some(a.unwrap_or(0.0) + b.unwrap_or(0.0)),
+        };
+        NutritionFacts {
+            calories_kcal: a(self.calories_kcal, other.calories_kcal),
+            protein_g: a(self.protein_g, other.protein_g),
+            carbohydrates_g: a(self.carbohydrates_g, other.carbohydrates_g),
+            fat_g: a(self.fat_g, other.fat_g),
+            fiber_g: a(self.fiber_g, other.fiber_g),
+            sugar_g: a(self.sugar_g, other.sugar_g),
+            sodium_mg: a(self.sodium_mg, other.sodium_mg),
+            potassium_mg: a(self.potassium_mg, other.potassium_mg),
+            calcium_mg: a(self.calcium_mg, other.calcium_mg),
+            iron_mg: a(self.iron_mg, other.iron_mg),
+            vitamin_c_mg: a(self.vitamin_c_mg, other.vitamin_c_mg),
+            vitamin_d_iu: a(self.vitamin_d_iu, other.vitamin_d_iu),
+            saturated_fat_g: a(self.saturated_fat_g, other.saturated_fat_g),
+            cholesterol_mg: a(self.cholesterol_mg, other.cholesterol_mg),
+        }
+    }
+}
+
 /// A single ingredient as returned by a `NutritionProvider`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ExternalIngredient {
@@ -89,6 +141,52 @@ pub struct SearchResult {
     pub name: String,
     pub description: Option<String>,
     pub thumbnail_url: Option<String>,
+}
+
+#[cfg(test)]
+mod nutrition_facts_tests {
+    use super::NutritionFacts;
+
+    #[test]
+    fn scaled_multiplies_present_fields_and_leaves_none() {
+        let facts = NutritionFacts {
+            calories_kcal: Some(200.0),
+            protein_g: Some(10.0),
+            // carbohydrates_g intentionally absent
+            sodium_mg: Some(50.0),
+            ..Default::default()
+        };
+
+        // 150 g of a per-100g fact set scales by 1.5.
+        let scaled = facts.scaled(1.5);
+
+        assert_eq!(scaled.calories_kcal, Some(300.0));
+        assert_eq!(scaled.protein_g, Some(15.0));
+        assert_eq!(scaled.sodium_mg, Some(75.0));
+        assert_eq!(scaled.carbohydrates_g, None, "absent fields stay absent");
+    }
+
+    #[test]
+    fn plus_adds_field_wise_and_preserves_none() {
+        let a = NutritionFacts {
+            calories_kcal: Some(100.0),
+            protein_g: Some(5.0),
+            ..Default::default()
+        };
+        let b = NutritionFacts {
+            calories_kcal: Some(50.0),
+            // protein absent here
+            fat_g: Some(3.0),
+            ..Default::default()
+        };
+
+        let sum = a.plus(&b);
+
+        assert_eq!(sum.calories_kcal, Some(150.0), "both present → summed");
+        assert_eq!(sum.protein_g, Some(5.0), "present + absent → present value");
+        assert_eq!(sum.fat_g, Some(3.0), "absent + present → present value");
+        assert_eq!(sum.fiber_g, None, "absent + absent → absent");
+    }
 }
 
 /// Query parameters shared by all three provider `search_*` methods.
