@@ -79,8 +79,8 @@
   letter-spacing: 0.3px;
 
   &--work        { background: var(--color-badge-work-bg);        color: var(--color-badge-work-fg); }
-  &--exercise    { background: var(--color-success-light);        color: var(--color-success); }
-  &--leisure     { background: var(--color-purple-light);         color: var(--color-purple); }
+  &--exercise    { background: var(--color-badge-exercise-bg);    color: var(--color-badge-exercise-fg); }
+  &--leisure     { background: var(--color-badge-leisure-bg);     color: var(--color-badge-leisure-fg); }
   &--medication  { background: var(--color-badge-medication-bg);  color: var(--color-badge-medication-fg); }
   &--appointment { background: var(--color-badge-appointment-bg); color: var(--color-badge-appointment-fg); }
 }

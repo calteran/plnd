@@ -48,6 +48,12 @@
   --color-badge-medication-fg:  #c2410c;
   --color-badge-appointment-bg: #e0f2fe;
   --color-badge-appointment-fg: #0369a1;
+  // exercise/leisure alias existing semantic tokens, which already carry
+  // dark-mode overrides — no entry needed in the [data-theme="dark"] block.
+  --color-badge-exercise-bg:    var(--color-success-light);
+  --color-badge-exercise-fg:    var(--color-success);
+  --color-badge-leisure-bg:     var(--color-purple-light);
+  --color-badge-leisure-fg:     var(--color-purple);
 }
 
 [data-theme="dark"] {
