@@ -92,6 +92,22 @@ export class ScheduleService {
       .subscribe({ error: () => this.loadDay(this._date()) });
   }
 
+  /** Set a task's one-shot flag (carry-over vs one-time). Optimistic; reloads on error. */
+  setEntryOneShot(id: string, oneShot: boolean): void {
+    const target = this._items().find(i => !isMealAnchor(i) && i.id === id);
+    if (!target) return;
+
+    this._items.update(items =>
+      items.map(item =>
+        !isMealAnchor(item) && item.id === id ? { ...item, oneShot } : item,
+      ),
+    );
+    this.http
+      .patch(`${this.apiBase}/schedule/entries/${id}/one-shot`, { one_shot: oneShot })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ error: () => this.loadDay(this._date()) });
+  }
+
   /** Set a meal anchor's consumption status (planned/consumed/skipped). */
   setMealConsumption(id: string, status: MealConsumptionApi): void {
     this._items.update(items =>

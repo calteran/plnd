@@ -390,6 +390,61 @@ describe('ScheduleService', () => {
     expect(httpMock.match(r => r.url.includes('/schedule/entries/')).length).toBe(0);
   });
 
+  it('setEntryOneShot PATCHes the one-shot endpoint and updates state', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e1',
+      task_type: 'general',
+      title: 'Take vitamins',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+      one_shot: false,
+    }]);
+
+    svc.setEntryOneShot('e1', true);
+
+    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/e1/one-shot');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ one_shot: true });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+
+    const task = svc.scheduleItems().find(i => i.id === 'e1') as ScheduleTask;
+    expect(task.oneShot).toBe(true);
+  });
+
+  it('setEntryOneShot reloads the day on PATCH error', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e1',
+      task_type: 'general',
+      title: 'Take vitamins',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+      one_shot: false,
+    }]);
+
+    svc.setEntryOneShot('e1', true);
+
+    httpMock.expectOne(r => r.url.includes('/schedule/entries/e1/one-shot'))
+      .flush('error', { status: 500, statusText: 'Internal Server Error' });
+
+    flushDay(httpMock);
+    expect(svc.date()).toBe('2026-04-02');
+  });
+
+  it('setEntryOneShot issues no PATCH for a meal-anchor id', () => {
+    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+      id: 'meal-1', name: 'Breakfast', emoji: '🥣',
+      status: 'planned', duringMealTasks: [],
+    }]);
+
+    svc.setEntryOneShot('meal-1', true);
+
+    httpMock.expectNone('http://localhost:3000/schedule/entries/meal-1/one-shot');
+  });
+
   it('addItem appends a ScheduleTask to scheduleItems', () => {
     const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending', oneShot: false };
     svc.addItem(task);
