@@ -188,8 +188,16 @@ pub async fn ingest_dish(
     Ok(dish_id)
 }
 
-#[cfg(test)]
+/// A meal→dish link; the dish row already exists.
+pub struct MealDishLink {
+    pub dish_id: Uuid,
+    pub dish_servings: Decimal,
+    pub sort_order: i16,
+}
+
 pub struct IngestMealParams<'a> {
+    pub external_source: &'a str,
+    pub external_id: &'a str,
     pub name: &'a str,
     pub description: Option<&'a str>,
     pub servings: Decimal,
@@ -197,9 +205,10 @@ pub struct IngestMealParams<'a> {
     pub occasion_tags: &'a [String],
     pub tags: &'a [String],
     pub nutrition: Option<Value>,
+    pub contributed_by_user_id: Option<Uuid>,
+    pub dishes: &'a [MealDishLink],
 }
 
-#[cfg(test)]
 #[tracing::instrument(
     skip(pool, params),
     fields(table = "catalog_meals", op = "ingest_meal")
@@ -208,11 +217,28 @@ pub async fn ingest_meal(
     pool: &PgPool,
     params: IngestMealParams<'_>,
 ) -> Result<Uuid, DatabaseError> {
-    sqlx::query_as::<_, (Uuid,)>(
-        "INSERT INTO catalog_meals \
-         (name, description, servings, allergens, occasion_tags, tags, nutrition) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7) \
-         RETURNING meal_id",
+    let mut tx = pool.begin().await?;
+
+    let (meal_id,) = sqlx::query_as::<_, (Uuid,)>(
+        r#"
+        INSERT INTO catalog_meals
+            (name, description, servings, allergens, allergens_overridden,
+             occasion_tags, tags, nutrition, nutrition_overridden,
+             external_source, external_id, contributed_by_user_id)
+        VALUES ($1, $2, $3, $4, false, $5, $6, $7, false, $8, $9, $10)
+        ON CONFLICT ON CONSTRAINT uq_meal_external DO UPDATE SET
+            name          = EXCLUDED.name,
+            description   = EXCLUDED.description,
+            servings      = EXCLUDED.servings,
+            allergens     = CASE WHEN catalog_meals.allergens_overridden
+                                 THEN catalog_meals.allergens ELSE EXCLUDED.allergens END,
+            occasion_tags = EXCLUDED.occasion_tags,
+            tags          = EXCLUDED.tags,
+            nutrition     = CASE WHEN catalog_meals.nutrition_overridden
+                                 THEN catalog_meals.nutrition ELSE EXCLUDED.nutrition END,
+            updated_at    = now()
+        RETURNING meal_id
+        "#,
     )
     .bind(params.name)
     .bind(params.description)
@@ -220,11 +246,33 @@ pub async fn ingest_meal(
     .bind(params.allergens)
     .bind(params.occasion_tags)
     .bind(params.tags)
-    .bind(params.nutrition)
-    .fetch_one(pool)
-    .await
-    .map_err(DatabaseError::from)
-    .map(|(id,)| id)
+    .bind(&params.nutrition)
+    .bind(params.external_source)
+    .bind(params.external_id)
+    .bind(params.contributed_by_user_id)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    for link in params.dishes {
+        sqlx::query(
+            r#"
+            INSERT INTO catalog_meal_dishes (meal_id, dish_id, dish_servings, sort_order)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT ON CONSTRAINT uq_meal_dish DO UPDATE SET
+                dish_servings = EXCLUDED.dish_servings,
+                sort_order    = EXCLUDED.sort_order
+            "#,
+        )
+        .bind(meal_id)
+        .bind(link.dish_id)
+        .bind(link.dish_servings)
+        .bind(link.sort_order)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+    Ok(meal_id)
 }
 
 // ---------------------------------------------------------------------------
@@ -282,9 +330,12 @@ mod tests {
 
     #[sqlx::test(migrations = "./migrations")]
     async fn ingest_meal_returns_meal_id(pool: PgPool) {
+        let external_id = Uuid::new_v4().to_string();
         let meal_id = ingest_meal(
             &pool,
             IngestMealParams {
+                external_source: "test",
+                external_id: &external_id,
                 name: "Test Oatmeal",
                 description: None,
                 servings: Decimal::from(1),
@@ -292,6 +343,8 @@ mod tests {
                 occasion_tags: &["breakfast".to_string()],
                 tags: &[],
                 nutrition: None,
+                contributed_by_user_id: None,
+                dishes: &[],
             },
         )
         .await
@@ -394,10 +447,13 @@ mod tests {
 
     #[sqlx::test(migrations = "./migrations")]
     async fn ingest_meal_stores_nutrition(pool: PgPool) {
+        let external_id = Uuid::new_v4().to_string();
         let nutrition = serde_json::json!({"calories_kcal": 200, "protein_g": 10});
         let meal_id = ingest_meal(
             &pool,
             IngestMealParams {
+                external_source: "test",
+                external_id: &external_id,
                 name: "Test Soup",
                 description: None,
                 servings: Decimal::from(1),
@@ -405,6 +461,8 @@ mod tests {
                 occasion_tags: &["lunch".to_string()],
                 tags: &[],
                 nutrition: Some(nutrition.clone()),
+                contributed_by_user_id: None,
+                dishes: &[],
             },
         )
         .await
@@ -415,5 +473,74 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(result, Some(Some(nutrition)));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn ingest_meal_links_dishes_and_is_idempotent(pool: PgPool) {
+        let dish_id = ingest_dish(
+            &pool,
+            IngestDishParams {
+                external_source: "themealdb",
+                external_id: "recipe-2",
+                name: "Grilled Cheese",
+                description: None,
+                instructions: None,
+                servings: Decimal::from(1),
+                allergens: &[],
+                occasion_tags: &["lunch".to_string()],
+                nutrition: None,
+                contributed_by_user_id: None,
+                ingredients: &[],
+            },
+        )
+        .await
+        .unwrap();
+
+        let meal_id = ingest_meal(
+            &pool,
+            IngestMealParams {
+                external_source: "themealdb",
+                external_id: "recipe-2",
+                name: "Grilled Cheese",
+                description: None,
+                servings: Decimal::from(1),
+                allergens: &[],
+                occasion_tags: &["lunch".to_string()],
+                tags: &[],
+                nutrition: Some(serde_json::json!({"calories_kcal": 400})),
+                contributed_by_user_id: None,
+                dishes: &[MealDishLink { dish_id, dish_servings: Decimal::from(1), sort_order: 0 }],
+            },
+        )
+        .await
+        .unwrap();
+
+        let meal_id_again = ingest_meal(
+            &pool,
+            IngestMealParams {
+                external_source: "themealdb",
+                external_id: "recipe-2",
+                name: "Grilled Cheese",
+                description: None,
+                servings: Decimal::from(1),
+                allergens: &[],
+                occasion_tags: &["lunch".to_string()],
+                tags: &[],
+                nutrition: Some(serde_json::json!({"calories_kcal": 400})),
+                contributed_by_user_id: None,
+                dishes: &[MealDishLink { dish_id, dish_servings: Decimal::from(1), sort_order: 0 }],
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(meal_id, meal_id_again);
+
+        let link_count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM catalog_meal_dishes WHERE meal_id = $1")
+                .bind(meal_id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(link_count, 1);
     }
 }
