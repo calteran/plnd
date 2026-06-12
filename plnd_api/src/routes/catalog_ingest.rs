@@ -229,4 +229,28 @@ mod tests {
         assert_eq!(input.name, "Bananas, dehydrated, or banana powder");
         assert_eq!(input.allergens, vec!["none".to_string()]);
     }
+
+    #[test]
+    fn ingest_input_from_detail_serializes_populated_nutrition() {
+        use plnd_data::providers::dtos::{ExternalIngredient, NutritionFacts};
+        let detail = ExternalIngredient {
+            external_id: "173945".into(),
+            name: "Bananas, dehydrated, or banana powder".into(),
+            serving_size_g: None,
+            nutrition: Some(NutritionFacts {
+                calories_kcal: Some(346.0),
+                protein_g: Some(3.89),
+                ..Default::default()
+            }),
+            allergens: vec![],
+            occasion_tags: vec![],
+        };
+        let input = ingest_input_from_detail("usda_fdc", detail);
+        let nutrition = input.nutrition.expect("nutrition serialized to Some");
+        assert!(
+            nutrition.get("calories_kcal").is_some(),
+            "serialized nutrition JSON should contain calories_kcal: {nutrition}"
+        );
+        assert_eq!(nutrition.get("calories_kcal").unwrap(), 346.0);
+    }
 }
