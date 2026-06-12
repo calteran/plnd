@@ -619,5 +619,51 @@
     },
     "allergens": [],
     "occasion_tags": []
+  },
+  "328637": {
+    "external_id": "328637",
+    "name": "Cheese, cheddar",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 403.0,
+      "protein_g": 24.9,
+      "carbohydrates_g": 3.4,
+      "fat_g": 33.1,
+      "fiber_g": null,
+      "sugar_g": 0.5,
+      "sodium_mg": 653.0,
+      "potassium_mg": null,
+      "calcium_mg": 710.0,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 18.9,
+      "cholesterol_mg": 99.0
+    },
+    "allergens": ["milk"],
+    "occasion_tags": []
+  },
+  "328649": {
+    "external_id": "328649",
+    "name": "Cheese, mozzarella, whole milk",
+    "serving_size_g": "100",
+    "nutrition": {
+      "calories_kcal": 300.0,
+      "protein_g": 22.2,
+      "carbohydrates_g": 2.2,
+      "fat_g": 22.4,
+      "fiber_g": null,
+      "sugar_g": 1.0,
+      "sodium_mg": 627.0,
+      "potassium_mg": null,
+      "calcium_mg": 505.0,
+      "iron_mg": null,
+      "vitamin_c_mg": null,
+      "vitamin_d_iu": null,
+      "saturated_fat_g": 13.2,
+      "cholesterol_mg": 79.0
+    },
+    "allergens": ["milk"],
+    "occasion_tags": []
   }
 }

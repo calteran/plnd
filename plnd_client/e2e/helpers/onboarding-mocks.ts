@@ -107,15 +107,23 @@ export const MOCK_MEAL_PLAN_MATCHED = {
 };
 
 // ── seedOnboarding ────────────────────────────────────────────────────────────
-// Sets up a non-onboarded user session with fixed clock 2026-03-28. Each call
+// Sets up a non-onboarded user session anchored to Sat 2026-03-28. Each call
 // generates a fresh per-test sub so parallel tests cannot collide on writes —
 // `user_id` is the isolation boundary (see docs/architecture.md §9). The
 // real backend serves /users/me, /preferences/me, /dietary-restrictions,
 // /day-types, /routines, /my/* etc. directly for this user. Returns the
 // generated sub so callers can chain seed helpers from ./seed-data.ts.
+//
+// Uses `setSystemTime` (anchors the clock then lets it tick) rather than
+// `setFixedTime` (which freezes Date.now() permanently). A frozen clock breaks
+// any real-time RxJS operator — e.g. the onboarding ingredient search's
+// `debounceTime(300)` compares against Date.now() and, with time frozen, never
+// reaches its threshold so the search never fires. A test runs for only a few
+// seconds, so the anchored clock stays within Sat 2026-03-28 and every existing
+// date-window assertion remains valid.
 
 export async function seedOnboarding(page: Page): Promise<{ sub: string }> {
-  await page.clock.setFixedTime('2026-03-28T00:00:00');
+  await page.clock.setSystemTime('2026-03-28T00:00:00');
   const sub = generateTestSub();
   await injectAuthToken(page, sub);
   await seedTestState(sub, { preset: 'new' });

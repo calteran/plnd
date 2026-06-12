@@ -1,8 +1,8 @@
 import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Subject, forkJoin, from, mergeMap, of } from 'rxjs';
-import { debounceTime, distinctUntilChanged, filter, map, switchMap, take } from 'rxjs/operators';
-import { CatalogService, IngredientSearchResponse, LocalIngredientResult } from '../../../../../core/services/catalog.service';
+import { debounceTime, distinctUntilChanged, filter, map, switchMap, take, takeUntil } from 'rxjs/operators';
+import { CatalogService, ExternalIngredientResult, IngredientSearchResponse } from '../../../../../core/services/catalog.service';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { UserIngredientPrefsService } from '../../../../../core/services/user-ingredient-prefs.service';
 import { UserMealsService } from '../../../../../core/services/user-meals.service';
@@ -54,6 +54,10 @@ interface IngredientRating {
   score: number;
   catalogIngredientId: string | null;
 }
+
+type IngredientSearchRow =
+  | { kind: 'local'; ingredient_id: string; name: string; allergens: string[] }
+  | { kind: 'external'; external_source: string; external_id: string; name: string; allergens: string[] };
 
 const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], providers_queried: [], providers_from_cache: [] };
 
@@ -136,9 +140,14 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
               (blur)="ingredientSearchResults.set([])" />
             @if (ingredientSearchResults().length) {
               <div class="search-dropdown">
-                @for (r of ingredientSearchResults(); track r.ingredient_id) {
+                @for (r of ingredientSearchResults(); track r.kind === 'local' ? r.ingredient_id : r.external_id) {
                   <button type="button" class="search-result" (mousedown)="$event.preventDefault()" (click)="selectIngredientResult(r)">
-                    <span class="result-name">{{ r.name }}</span>
+                    <span class="result-name">
+                      {{ r.name }}
+                      @if (r.kind === 'external') {
+                        <span class="result-source">{{ r.external_source === 'usda_fdc' ? 'USDA' : 'Open Food Facts' }}</span>
+                      }
+                    </span>
                     @if (r.allergens.length) {
                       <span class="result-allergens">{{ r.allergens.join(', ') }}</span>
                     }
@@ -248,6 +257,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
     .search-result:hover { background: var(--color-surface-base); }
     .result-name { font-size: 13px; color: var(--color-text-body); }
     .result-allergens { font-size: 11px; color: var(--color-text-muted); }
+    .result-source { margin-left: 6px; font-size: 0.7rem; color: var(--color-text-muted); border: 1px solid var(--color-border-row); border-radius: 4px; padding: 0 4px; }
     .emoji-row { display: flex; gap: 2px; }
     .emoji-btn { background: none; border: 1.5px solid transparent; border-radius: 6px; padding: 2px 4px; font-size: 18px; cursor: pointer; line-height: 1; }
     .emoji-btn--selected { border-color: var(--color-accent); background: var(--color-accent-light); }
@@ -268,6 +278,9 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
   private readonly injector = inject(Injector);
 
   private readonly ingredientSearch$ = new Subject<string>();
+  // Cancels an in-flight promote when the user edits the field again, so a late
+  // promote response can't set a stale pendingIngredientId against new input.
+  private readonly cancelPromote$ = new Subject<void>();
 
   readonly lifestyleExpanded = signal(false);
   readonly selectedLifestyles = signal<string[]>([]);
@@ -279,7 +292,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
   readonly ingredientInput = signal('');
   readonly pendingIngredientScore = signal<number | null>(null);
   readonly pendingIngredientId = signal<string | null>(null);
-  readonly ingredientSearchResults = signal<LocalIngredientResult[]>([]);
+  readonly ingredientSearchResults = signal<IngredientSearchRow[]>([]);
   readonly savingIngredient = signal(false);
   readonly ingredientRatings = signal<IngredientRating[]>([]);
 
@@ -325,7 +338,22 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
       distinctUntilChanged(),
       switchMap(q => q.length >= 2 ? this.catalogService.searchIngredients(q) : of(EMPTY_SEARCH)),
       takeUntilDestroyed(this.destroyRef),
-    ).subscribe(resp => this.ingredientSearchResults.set(resp.local));
+    ).subscribe((resp: IngredientSearchResponse) => {
+      const localRows: IngredientSearchRow[] = resp.local.map(r => ({
+        kind: 'local', ingredient_id: r.ingredient_id, name: r.name, allergens: r.allergens,
+      }));
+      const localNames = new Set(resp.local.map(r => r.name.toLowerCase()));
+      // The /search/ingredients response groups all providers into one untagged
+      // `external` array, so we stamp usda_fdc (the only wired nutrition provider).
+      // Per-result source tagging for multiple providers is tracked in #906; until
+      // then a mismatched source just 404s on promote and falls back to free-text.
+      const externalRows: IngredientSearchRow[] = resp.external
+        .filter((r: ExternalIngredientResult) => !localNames.has(r.name.toLowerCase()))
+        .map((r: ExternalIngredientResult) => ({
+          kind: 'external', external_source: 'usda_fdc', external_id: r.external_id, name: r.name, allergens: [],
+        }));
+      this.ingredientSearchResults.set([...localRows, ...externalRows]);
+    });
   }
 
   protected asText(e: Event): string {
@@ -354,15 +382,30 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
   }
 
   onIngredientInput(value: string): void {
+    this.cancelPromote$.next(); // editing again abandons any in-flight promote
     this.ingredientInput.set(value);
     this.pendingIngredientId.set(null);
     this.ingredientSearch$.next(value.trim());
   }
 
-  selectIngredientResult(result: LocalIngredientResult): void {
+  selectIngredientResult(result: IngredientSearchRow): void {
+    this.cancelPromote$.next();
     this.ingredientInput.set(result.name);
-    this.pendingIngredientId.set(result.ingredient_id);
     this.ingredientSearchResults.set([]);
+    if (result.kind === 'local') {
+      this.pendingIngredientId.set(result.ingredient_id);
+      return;
+    }
+    // External: promote into the catalog to obtain a real ingredient id. If the
+    // user edits the field before this resolves, cancelPromote$ drops the result
+    // so a stale id can't be applied to the new input.
+    this.catalogService
+      .promoteIngredient({ external_source: result.external_source, external_id: result.external_id })
+      .pipe(takeUntil(this.cancelPromote$), takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: r => this.pendingIngredientId.set(r.ingredient_id),
+        error: () => this.pendingIngredientId.set(null), // fall back to free-text entry
+      });
   }
 
   addIngredientRating(): void {

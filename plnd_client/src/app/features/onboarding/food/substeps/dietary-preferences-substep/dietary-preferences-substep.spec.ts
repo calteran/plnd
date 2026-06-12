@@ -6,7 +6,7 @@ import { CatalogService } from '../../../../../core/services/catalog.service';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { UserIngredientPrefsService } from '../../../../../core/services/user-ingredient-prefs.service';
 import { UserMealsService } from '../../../../../core/services/user-meals.service';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
 describe('DietaryPreferencesSubstepComponent', () => {
   let component: DietaryPreferencesSubstepComponent;
@@ -21,10 +21,11 @@ describe('DietaryPreferencesSubstepComponent', () => {
     restrictionsSvc = jasmine.createSpyObj('DietaryRestrictionsService', ['create', 'load', 'restrictions']);
     restrictionsSvc.restrictions.and.returnValue(null);
 
-    catalogSvc = jasmine.createSpyObj('CatalogService', ['searchIngredients']);
+    catalogSvc = jasmine.createSpyObj('CatalogService', ['searchIngredients', 'promoteIngredient']);
     catalogSvc.searchIngredients.and.returnValue(
       of({ local: [], external: [], providers_queried: [], providers_from_cache: [] })
     );
+    catalogSvc.promoteIngredient.and.returnValue(of({ ingredient_id: 'promoted-1' }));
 
     ingredientPrefsSvc = jasmine.createSpyObj('UserIngredientPrefsService', ['upsert', 'remove', 'load']);
     Object.defineProperty(ingredientPrefsSvc, 'prefs', { value: signal([]), configurable: true });
@@ -93,7 +94,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
   it('addIngredientRating() dismisses the search dropdown after a catalog add', fakeAsync(() => {
     component.ingredientSearchResults.set([
-      { ingredient_id: 'ing-1', name: 'Oats', description: null, allergens: [], occasion_tags: [], external_source: null },
+      { kind: 'local', ingredient_id: 'ing-1', name: 'Oats', allergens: [] },
     ]);
     component.ingredientInput.set('Oats');
     component.pendingIngredientId.set('ing-1');
@@ -108,7 +109,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
   it('addIngredientRating() dismisses the search dropdown after a free-text add', fakeAsync(() => {
     component.ingredientSearchResults.set([
-      { ingredient_id: 'ing-9', name: 'Cheese product', description: null, allergens: [], occasion_tags: [], external_source: null },
+      { kind: 'local', ingredient_id: 'ing-9', name: 'Cheese product', allergens: [] },
     ]);
     component.ingredientInput.set('Unknown thing');
     component.pendingIngredientScore.set(3);
@@ -194,5 +195,43 @@ describe('DietaryPreferencesSubstepComponent', () => {
     tick();
     expect(completed).toBe(true);
     expect(restrictionsSvc.create).not.toHaveBeenCalled();
+  }));
+
+  it('merges external results into the dropdown after local ones', fakeAsync(() => {
+    catalogSvc.searchIngredients.and.returnValue(of({
+      local: [{ ingredient_id: 'loc-1', name: 'Cheese, cheddar', description: null, allergens: [], occasion_tags: [], external_source: null }],
+      external: [{ external_id: '99', name: 'Cheese, mozzarella', description: null, thumbnail_url: null }],
+      providers_queried: ['usda_fdc'], providers_from_cache: [],
+    }));
+    component.onIngredientInput('cheese');
+    tick(300); // debounce
+    flush();
+    const rows = component.ingredientSearchResults();
+    expect(rows.length).toBe(2);
+    expect(rows[0].kind).toBe('local');
+    expect(rows[1].kind).toBe('external');
+  }));
+
+  it('selecting an external result promotes it then sets the catalog id', fakeAsync(() => {
+    component.selectIngredientResult({ kind: 'external', external_source: 'usda_fdc', external_id: '99', name: 'Cheese, mozzarella', allergens: [] });
+    flush();
+    expect(catalogSvc.promoteIngredient).toHaveBeenCalledWith({ external_source: 'usda_fdc', external_id: '99' });
+    expect(component.pendingIngredientId()).toBe('promoted-1');
+    expect(component.ingredientInput()).toBe('Cheese, mozzarella');
+  }));
+
+  it('editing the field cancels an in-flight promote so no stale catalog id is applied', fakeAsync(() => {
+    const promote$ = new Subject<{ ingredient_id: string }>();
+    catalogSvc.promoteIngredient.and.returnValue(promote$.asObservable());
+
+    component.selectIngredientResult({ kind: 'external', external_source: 'usda_fdc', external_id: '99', name: 'Cheese, mozzarella', allergens: [] });
+    // User starts typing a different ingredient before the promote resolves.
+    component.onIngredientInput('chedd');
+    // The late promote response must be ignored (cancelled).
+    promote$.next({ ingredient_id: 'promoted-1' });
+    promote$.complete();
+    flush();
+
+    expect(component.pendingIngredientId()).toBeNull();
   }));
 });

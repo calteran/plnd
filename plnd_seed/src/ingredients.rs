@@ -16,6 +16,38 @@ pub const INGREDIENT_TERMS: &[&str] = &[
     "milk",
     "egg",
     "olive oil",
+    "cheese",
+    "chicken",
+    "beef",
+    "pork",
+    "salmon",
+    "tuna",
+    "shrimp",
+    "tofu",
+    "rice",
+    "pasta",
+    "bread",
+    "butter",
+    "yogurt",
+    "spinach",
+    "tomato",
+    "onion",
+    "garlic",
+    "potato",
+    "sweet potato",
+    "carrot",
+    "apple",
+    "orange",
+    "strawberry",
+    "blueberry",
+    "almond",
+    "peanut butter",
+    "black beans",
+    "lentils",
+    "avocado",
+    "corn",
+    "lettuce",
+    "mushroom",
 ];
 
 /// Fetch ingredients from all providers for all search terms, deduplicated by
@@ -111,4 +143,26 @@ pub async fn insert_ingredients(
     }
 
     Ok(inserted)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::INGREDIENT_TERMS;
+
+    #[test]
+    fn seed_terms_include_common_ingredients_and_are_deduped() {
+        assert!(
+            INGREDIENT_TERMS.contains(&"cheese"),
+            "cheese must be seeded (the #858 example)"
+        );
+        assert!(
+            INGREDIENT_TERMS.len() >= 30,
+            "seed list should be meaningfully widened"
+        );
+        let mut sorted = INGREDIENT_TERMS.to_vec();
+        sorted.sort_unstable();
+        let before = sorted.len();
+        sorted.dedup();
+        assert_eq!(before, sorted.len(), "seed terms must be unique");
+    }
 }
