@@ -6,7 +6,7 @@ import { CatalogService } from '../../../../../core/services/catalog.service';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { UserIngredientPrefsService } from '../../../../../core/services/user-ingredient-prefs.service';
 import { UserMealsService } from '../../../../../core/services/user-meals.service';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
 describe('DietaryPreferencesSubstepComponent', () => {
   let component: DietaryPreferencesSubstepComponent;
@@ -218,5 +218,20 @@ describe('DietaryPreferencesSubstepComponent', () => {
     expect(catalogSvc.promoteIngredient).toHaveBeenCalledWith({ external_source: 'usda_fdc', external_id: '99' });
     expect(component.pendingIngredientId()).toBe('promoted-1');
     expect(component.ingredientInput()).toBe('Cheese, mozzarella');
+  }));
+
+  it('editing the field cancels an in-flight promote so no stale catalog id is applied', fakeAsync(() => {
+    const promote$ = new Subject<{ ingredient_id: string }>();
+    catalogSvc.promoteIngredient.and.returnValue(promote$.asObservable());
+
+    component.selectIngredientResult({ kind: 'external', external_source: 'usda_fdc', external_id: '99', name: 'Cheese, mozzarella', allergens: [] });
+    // User starts typing a different ingredient before the promote resolves.
+    component.onIngredientInput('chedd');
+    // The late promote response must be ignored (cancelled).
+    promote$.next({ ingredient_id: 'promoted-1' });
+    promote$.complete();
+    flush();
+
+    expect(component.pendingIngredientId()).toBeNull();
   }));
 });

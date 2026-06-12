@@ -809,6 +809,9 @@ test.describe('Onboarding', () => {
     // field returns a recognizable catalog result that can be selected. The backend
     // serves /catalog/search from real USDA fixtures seeded at startup, so no
     // page.route() mock is needed here per the e2e mock policy (§9.7).
+    // The cheese fixture is seeded into the catalog, so this exercises the *local*
+    // result path; the external→promote flow is covered by the component spec and
+    // the backend integration tests.
     test('ingredient search for "cheese" returns a recognizable result and can be selected (#858)', async ({ page }) => {
       const search = page.getByPlaceholder('Search ingredient…');
       await search.fill('cheese');
