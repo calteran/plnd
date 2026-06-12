@@ -804,6 +804,23 @@ test.describe('Onboarding', () => {
       await veganChip.click();
       await expect(veganChip).toHaveClass(/chip--amber/);
     });
+
+    // Acceptance criterion for #858: searching "cheese" in the Ingredient Ratings
+    // field returns a recognizable catalog result that can be selected. The backend
+    // serves /catalog/search from real USDA fixtures seeded at startup, so no
+    // page.route() mock is needed here per the e2e mock policy (§9.7).
+    test('ingredient search for "cheese" returns a recognizable result and can be selected (#858)', async ({ page }) => {
+      const search = page.getByPlaceholder('Search ingredient…');
+      await search.fill('cheese');
+
+      const dropdown = page.locator('.search-dropdown');
+      await expect(dropdown).toBeVisible({ timeout: 5_000 });
+      const cheeseResult = dropdown.locator('.search-result', { hasText: /Cheese/i }).first();
+      await expect(cheeseResult).toBeVisible();
+      await cheeseResult.click();
+
+      await expect(search).toHaveValue(/Cheese/i);
+    });
   });
 
   test.describe('Food spoke — Meal Plan Review', () => {
