@@ -324,7 +324,7 @@ describe('ScheduleService', () => {
     (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'm1', name: 'Breakfast', emoji: '🥣',
       status: 'planned', duringMealTasks: [
-        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending' }
+        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending', oneShot: false }
       ]
     }]);
     svc.toggleItem('t-dm2');
@@ -390,11 +390,116 @@ describe('ScheduleService', () => {
     expect(httpMock.match(r => r.url.includes('/schedule/entries/')).length).toBe(0);
   });
 
+  it('setEntryOneShot PATCHes the one-shot endpoint and updates state', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e1',
+      task_type: 'general',
+      title: 'Take vitamins',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+      one_shot: false,
+    }]);
+
+    svc.setEntryOneShot('e1', true);
+
+    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/e1/one-shot');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ one_shot: true });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+
+    const task = svc.scheduleItems().find(i => i.id === 'e1') as ScheduleTask;
+    expect(task.oneShot).toBe(true);
+  });
+
+  it('setEntryOneShot reloads the day on PATCH error', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e1',
+      task_type: 'general',
+      title: 'Take vitamins',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+      one_shot: false,
+    }]);
+
+    svc.setEntryOneShot('e1', true);
+
+    httpMock.expectOne(r => r.url.includes('/schedule/entries/e1/one-shot'))
+      .flush('error', { status: 500, statusText: 'Internal Server Error' });
+
+    flushDay(httpMock);
+    expect(svc.date()).toBe('2026-04-02');
+  });
+
+  it('setEntryOneShot issues no PATCH for a meal-anchor id', () => {
+    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+      id: 'meal-1', name: 'Breakfast', emoji: '🥣',
+      status: 'planned', duringMealTasks: [],
+    }]);
+
+    svc.setEntryOneShot('meal-1', true);
+
+    httpMock.expectNone('http://localhost:3000/schedule/entries/meal-1/one-shot');
+  });
+
+  it('setEntryOneShot PATCHes and updates a during-meal task nested in a meal anchor', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock);
+    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+      id: 'm1', name: 'Breakfast', emoji: '🥣',
+      status: 'planned', duringMealTasks: [
+        { id: 't-dm3', type: 'medication', label: 'Take pill with breakfast', status: 'pending', oneShot: false }
+      ]
+    }]);
+
+    svc.setEntryOneShot('t-dm3', true);
+
+    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/t-dm3/one-shot');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ one_shot: true });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+
+    const meal = svc.scheduleItems()[0] as MealAnchor;
+    expect(meal.duringMealTasks[0].oneShot).toBe(true);
+  });
+
   it('addItem appends a ScheduleTask to scheduleItems', () => {
-    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending' };
+    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending', oneShot: false };
     svc.addItem(task);
     expect(svc.scheduleItems()).toContain(task);
     expect(svc.scheduleItems().length).toBe(1);
+  });
+
+  it('maps one_shot from the DTO onto the task', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e1',
+      task_type: 'exercise',
+      title: 'Morning run',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+      one_shot: true,
+    }]);
+    const task = svc.scheduleItems().find(t => t.id === 'e1') as ScheduleTask;
+    expect(task.oneShot).toBe(true);
+  });
+
+  it('defaults oneShot to false when one_shot is absent from the DTO', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e2',
+      task_type: 'general',
+      title: 'Stretch',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+    }]);
+    const task = svc.scheduleItems().find(t => t.id === 'e2') as ScheduleTask;
+    expect(task.oneShot).toBe(false);
   });
 
   it('maps a consumed anchor to status done', () => {

@@ -454,6 +454,7 @@ pub struct ScheduleEntryResponse {
     pub deviation_note: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
+    pub one_shot: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -477,6 +478,7 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
             deviation_note: e.deviation_note,
             duration_minutes: e.duration_minutes,
             energy_required: e.energy_required,
+            one_shot: e.one_shot,
             created_at: e.created_at,
             updated_at: e.updated_at,
         }
@@ -803,6 +805,34 @@ impl From<UserMealPrefDetail> for UserMealPrefDetailResponse {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn schedule_entry_response_includes_one_shot() {
+        let entry = ScheduleEntry {
+            entry_id: Uuid::nil(),
+            user_id: Uuid::nil(),
+            routine_id: None,
+            task_type: "general".into(),
+            title: Some("take evening meds".into()),
+            date: NaiveDate::from_ymd_opt(2026, 6, 12).unwrap(),
+            scheduled_start: None,
+            scheduled_end: None,
+            status: "planned".into(),
+            actual_start: None,
+            actual_end: None,
+            after_anchor: None,
+            slot_meal_anchor_id: None,
+            deviation_note: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: true,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+
+        let resp = ScheduleEntryResponse::from(entry);
+        assert!(resp.one_shot);
+    }
 
     #[test]
     fn user_response_debug_redacts_pii() {

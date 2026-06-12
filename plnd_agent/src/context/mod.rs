@@ -1237,6 +1237,19 @@ mod tests {
     }
 
     #[test]
+    fn task_entry_prompt_covers_one_shot_uncertainty() {
+        let p = UseCase::TaskEntry.system_prompt();
+        assert!(
+            p.contains("one_shot"),
+            "task_entry prompt must guide the one_shot decision"
+        );
+        assert!(
+            p.contains("carryover") || p.contains("carry over"),
+            "task_entry prompt must tie one_shot to carryover"
+        );
+    }
+
+    #[test]
     fn review_meal_plan_memory_categories_match_meal_use_cases() {
         let cats = UseCase::ReviewMealPlan.memory_categories();
         assert!(cats.contains(&"food"), "ReviewMealPlan must include food");

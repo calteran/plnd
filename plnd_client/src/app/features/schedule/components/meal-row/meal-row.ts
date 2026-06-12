@@ -49,7 +49,11 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
       @if (meal().duringMealTasks.length > 0) {
         <div class="during-meal">
           @for (task of meal().duringMealTasks; track task.id) {
-            <app-task-row [item]="task" (toggled)="toggled.emit($event)" />
+            <app-task-row
+              [item]="task"
+              (toggled)="toggled.emit($event)"
+              (oneShotToggled)="oneShotToggled.emit($event)"
+            />
           }
         </div>
       }
@@ -60,9 +64,10 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
 export class MealRowComponent {
   readonly meal       = input.required<MealAnchor>();
   readonly date       = input.required<string>();
-  readonly toggled    = output<string>();
-  readonly doneToggle = output<string>();
-  readonly skipped    = output<string>();
+  readonly toggled         = output<string>();
+  readonly doneToggle      = output<string>();
+  readonly skipped         = output<string>();
+  readonly oneShotToggled  = output<{ id: string; oneShot: boolean }>();
 
   readonly reviewOpen = signal(false);
 

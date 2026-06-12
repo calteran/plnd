@@ -3,16 +3,16 @@ import { By } from '@angular/platform-browser';
 import { TaskRowComponent } from './task-row';
 import { ScheduleTask } from '../../../../core/models/schedule';
 
-const pending: ScheduleTask = { id: '1', type: 'general', label: '✉️ Email dentist', status: 'pending' };
-const done:    ScheduleTask = { id: '2', type: 'general', label: '💊 Vitamins',      status: 'done'    };
-const timed:   ScheduleTask = { id: '3', type: 'appointment', label: '📅 Standup', status: 'pending', scheduledTime: '11 AM' };
+const pending: ScheduleTask = { id: '1', type: 'general', label: '✉️ Email dentist', status: 'pending', oneShot: false };
+const done:    ScheduleTask = { id: '2', type: 'general', label: '💊 Vitamins',      status: 'done',    oneShot: false };
+const timed:   ScheduleTask = { id: '3', type: 'appointment', label: '📅 Standup', status: 'pending', scheduledTime: '11 AM', oneShot: false };
 
-const workTask:  ScheduleTask = { id: '10', type: 'work',        label: 'Write report',  status: 'pending' };
-const leiTask:   ScheduleTask = { id: '11', type: 'leisure',     label: 'Read novel',    status: 'pending' };
-const medTask:   ScheduleTask = { id: '12', type: 'medication',  label: 'Vitamins',      status: 'pending' };
-const genTask:   ScheduleTask = { id: '13', type: 'general',     label: 'Tidy desk',     status: 'pending' };
-const exTask:    ScheduleTask = { id: '14', type: 'exercise',    label: 'Morning run',   status: 'pending' };
-const apptTask:  ScheduleTask = { id: '15', type: 'appointment', label: 'Dentist',       status: 'pending' };
+const workTask:  ScheduleTask = { id: '10', type: 'work',        label: 'Write report',  status: 'pending', oneShot: false };
+const leiTask:   ScheduleTask = { id: '11', type: 'leisure',     label: 'Read novel',    status: 'pending', oneShot: false };
+const medTask:   ScheduleTask = { id: '12', type: 'medication',  label: 'Vitamins',      status: 'pending', oneShot: false };
+const genTask:   ScheduleTask = { id: '13', type: 'general',     label: 'Tidy desk',     status: 'pending', oneShot: false };
+const exTask:    ScheduleTask = { id: '14', type: 'exercise',    label: 'Morning run',   status: 'pending', oneShot: false };
+const apptTask:  ScheduleTask = { id: '15', type: 'appointment', label: 'Dentist',       status: 'pending', oneShot: false };
 
 describe('TaskRowComponent', () => {
   async function setup(item: ScheduleTask) {
@@ -101,5 +101,13 @@ describe('TaskRowComponent', () => {
     expect(badge).toBeTruthy();
     expect(badge.nativeElement.classList).toContain('type-badge--appointment');
     expect(badge.nativeElement.textContent.trim()).toBe('appt');
+  });
+
+  it('emits oneShotToggled with the inverted value when the toggle is clicked', async () => {
+    const f = await setup({ id: 't1', type: 'general', label: 'meds', status: 'pending', oneShot: false });
+    let emitted: { id: string; oneShot: boolean } | undefined;
+    f.componentInstance.oneShotToggled.subscribe((e: { id: string; oneShot: boolean }) => (emitted = e));
+    f.debugElement.query(By.css('.one-shot-toggle')).nativeElement.click();
+    expect(emitted).toEqual({ id: 't1', oneShot: true });
   });
 });

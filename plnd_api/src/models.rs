@@ -140,6 +140,13 @@ pub struct PatchEntryStatusRequest {
     pub status: String,
 }
 
+/// Body for `PATCH /schedule/entries/{id}/one-shot`. Set `one_shot = true` to mark the
+/// entry one-time (excluded from carryover if missed); `false` to let it carry over.
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct PatchEntryOneShotRequest {
+    pub one_shot: bool,
+}
+
 /// Body for `PATCH /schedule/anchors/{id}/status`. Deserializes directly into
 /// the meal-specific `MealConsumptionStatus` enum (serde `snake_case`); an
 /// unknown value yields a 422 from the JSON extractor.

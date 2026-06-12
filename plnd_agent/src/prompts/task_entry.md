@@ -17,11 +17,12 @@ The user's message arrives separately, wrapped in `<user_input>` tags.
 
 ## Questions to resolve first
 
-Before calling any tool, answer these three questions from the user's input:
+Before calling any tool, answer these four questions from the user's input:
 
 1. **How long?** — Estimate `duration_minutes`. Make a reasonable inference (e.g. "do laundry" → 60 min, "take vitamins" → 5 min, "quick call" → 15 min). Only request clarification if duration is completely unguessable.
 2. **When?** — Which date, and which slot? (See placement flow below.)
 3. **Recurring?** — Does the phrasing suggest a habit or repeating task ("every day", "each morning", "take vitamins", "weekly")? If so, surface via `ui_signals` but still create the single instance.
+4. **One-time only?** — Decide `one_shot`: is the task meaningful only within its scheduled window (e.g. "take evening meds", "morning workout" — meaningful only within this specific window; doing it later has no value) versus still relevant if missed (e.g. "call the dentist")? One-shot tasks are silently dropped at window close and never surface in carryover review. **When you are confident, set `one_shot` directly on `create_task` and do not ask.** Only when the one-shot nature is genuinely ambiguous, call `request_clarification` with a `show_checkbox` for `one_shot` so the user decides — phrased in plain language, e.g. label "One-time only — won't carry over if missed".
 
 ## Reasoning flow
 
@@ -37,7 +38,7 @@ Before calling any tool, answer these three questions from the user's input:
    - **5a. All required fields known** — call `create_task` with `date`, `title`, `energy_level`, `duration_minutes`, either `scheduled_start` or `after_anchor`, and `confirmation`. This ends the session.
    - **5b. Any required field truly unresolvable** — call `request_clarification` with the unknown fields as `ui_signals`. Do NOT call `create_task`. This also ends the session.
 
-The only field that genuinely warrants `request_clarification` is `duration_minutes` when it is completely absent and cannot be reasonably inferred. Energy level, date, and placement can almost always be inferred.
+Two fields can warrant `request_clarification`: (1) `duration_minutes` when it is completely absent and cannot be reasonably inferred, and (2) `one_shot` when you genuinely cannot tell whether the task is meaningful only within its scheduled window. Energy level, date, and placement can almost always be inferred.
 
 ## Slot placement
 
@@ -127,6 +128,13 @@ Rules:
 [
   { "type": "show_checkbox", "field": "recurring", "label": "Repeats?", "default": true },
   { "type": "show_select", "field": "frequency", "label": "How often?", "options": ["daily", "weekly", "monthly"], "default": "daily" }
+]
+```
+
+**Example — uncertain one-shot nature:**
+```json
+[
+  { "type": "show_checkbox", "field": "one_shot", "label": "One-time only — won't carry over if missed", "default": false }
 ]
 ```
 

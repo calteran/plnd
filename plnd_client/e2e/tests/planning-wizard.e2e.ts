@@ -269,6 +269,90 @@ test.describe('Planning Wizard', () => {
         await expect(page.locator('.decision-badge').nth(2)).toHaveAttribute('data-decision', 'carry');
       });
     });
+
+    // ── One-shot toggle excludes task from carryover ─────────────────────────
+    //
+    // End-to-end proof that the day-view "one-time only" toggle removes a task
+    // from the next planning window's carryover review. The test exercises:
+    //   1. REAL day-view UI → REAL PATCH /schedule/entries/{id}/one-shot
+    //   2. REAL GET /schedule/plan/carryover (one_shot=FALSE filter in backend)
+    //
+    // Positive control: an equivalent untoggled entry DOES appear in carryover,
+    // ensuring the test cannot pass vacuously (items must actually reach carryover
+    // before the toggle can exclude one of them).
+    //
+    // Plan window: 2026-03-30 → 2026-04-05 (Monday-anchored, clock=2026-03-28).
+    // Both entries are placed in 2026-03-22 (before the plan window) with
+    // status='planned' and one_shot=false so both would normally appear in
+    // carryover. Only "e2e one-time meds" is toggled via the day-view UI.
+
+    test('one-shot toggle in day-view removes task from planning wizard carryover', async ({ page }) => {
+      await page.clock.setFixedTime('2026-03-28T00:00:00');
+      const { sub } = await seedWizard(page);
+
+      // Seed both entries into the previous plan window (before 2026-03-30).
+      // Neither is one_shot at rest — the toggled one will be flipped via the UI.
+      await seedScheduleEntries(sub, {
+        plan_start: '2026-03-21',
+        plan_end: '2026-03-23',
+        placed_tasks: [
+          {
+            date: '2026-03-22',
+            task_type: 'medication',
+            title: 'e2e one-time meds',
+            scheduled_start: '09:00:00',
+            one_shot: false,
+          },
+          {
+            date: '2026-03-22',
+            task_type: 'general',
+            title: 'e2e control task',
+            scheduled_start: '10:00:00',
+            one_shot: false,
+          },
+        ],
+      });
+
+      // ── Step 1: navigate to the day-view date and confirm both tasks render ──
+      await page.goto('/day/2026-03-22');
+      await expect(page.locator('.schedule-list')).toBeVisible({ timeout: 2_000 });
+
+      // Both rows should be visible (positive control: they reach the day view).
+      const taskRows = page.locator('.schedule-list > app-task-row');
+      await expect(taskRows.filter({ hasText: 'e2e control task' })).toBeVisible({ timeout: 2_000 });
+      await expect(taskRows.filter({ hasText: 'e2e one-time meds' })).toBeVisible({ timeout: 2_000 });
+
+      // ── Step 2: toggle "e2e one-time meds" one-time only via the real UI ────
+      // aria-pressed flips optimistically on click, BEFORE the PATCH lands — so
+      // wait on the PATCH /one-shot response itself to guarantee the flag is
+      // committed server-side before we navigate to the wizard (which fires the
+      // carryover GET). Match /one-shot specifically so a status PATCH cannot
+      // satisfy this wait.
+      const oneShotRow = taskRows.filter({ hasText: 'e2e one-time meds' });
+      const [patchResponse] = await Promise.all([
+        page.waitForResponse(
+          r => r.url().includes('/schedule/entries/') && r.url().includes('/one-shot') && r.request().method() === 'PATCH',
+          { timeout: 5_000 },
+        ),
+        oneShotRow.locator('.one-shot-toggle').click(),
+      ]);
+      expect(patchResponse.status()).toBe(204);
+
+      // ── Step 3: open the planning wizard and assert carryover exclusion ──────
+      await page.goto('/plan/week');
+      await expect(page.locator('.carryover-list')).toBeVisible({ timeout: 5_000 });
+
+      const items = page.locator('.carryover-item');
+      const titles = items.locator('.item-title');
+
+      // Positive control: the untoggled entry DOES appear in carryover.
+      await expect(titles.filter({ hasText: 'e2e control task' })).toBeVisible();
+
+      // Primary assertion: the toggled entry is EXCLUDED from carryover. The
+      // exclusion is server-side (carryover query filters one_shot = FALSE), so
+      // the item must be entirely absent from the DOM, not merely hidden.
+      await expect(titles.filter({ hasText: 'e2e one-time meds' })).not.toBeAttached();
+    });
   });
 
   // ── Step 2 — Tasks Planning ───────────────────────────────────────────────

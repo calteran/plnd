@@ -92,6 +92,33 @@ export class ScheduleService {
       .subscribe({ error: () => this.loadDay(this._date()) });
   }
 
+  /** Set a task's one-shot flag (carry-over vs one-time). Optimistic; reloads on error. */
+  setEntryOneShot(id: string, oneShot: boolean): void {
+    // findItemStatus searches both top-level tasks and tasks nested inside meal
+    // anchors (duringMealTasks); it returns null for a meal-anchor's own id or an
+    // unknown id, which short-circuits before any optimistic update or PATCH.
+    if (findItemStatus(this._items(), id) === null) return;
+
+    this._items.update(items =>
+      items.map(item => {
+        if (isMealAnchor(item)) {
+          if (!item.duringMealTasks.some(t => t.id === id)) return item;
+          return {
+            ...item,
+            duringMealTasks: item.duringMealTasks.map(t =>
+              t.id === id ? { ...t, oneShot } : t,
+            ),
+          };
+        }
+        return item.id === id ? { ...item, oneShot } : item;
+      }),
+    );
+    this.http
+      .patch(`${this.apiBase}/schedule/entries/${id}/one-shot`, { one_shot: oneShot })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({ error: () => this.loadDay(this._date()) });
+  }
+
   /** Set a meal anchor's consumption status (planned/consumed/skipped). */
   setMealConsumption(id: string, status: MealConsumptionApi): void {
     this._items.update(items =>
@@ -198,9 +225,10 @@ function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntr
 
 function mapEntry(e: ScheduleEntryDto): ScheduleTask {
   return {
-    id:     e.entry_id,
-    type:   parseItemType(e.task_type),
-    label:  e.title ?? e.task_type,
-    status: e.status === 'completed' ? 'done' : 'pending',
+    id:      e.entry_id,
+    type:    parseItemType(e.task_type),
+    label:   e.title ?? e.task_type,
+    status:  e.status === 'completed' ? 'done' : 'pending',
+    oneShot: e.one_shot ?? false,
   };
 }

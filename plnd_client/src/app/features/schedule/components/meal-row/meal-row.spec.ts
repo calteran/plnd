@@ -19,7 +19,7 @@ const unplanned: MealAnchor = {
 const withTasks: MealAnchor = {
   id: 'm3', name: 'Breakfast', emoji: '🥑', status: 'planned',
   duringMealTasks: [
-    { id: 'dt1', type: 'general', label: '💊 Vitamins', status: 'pending' }
+    { id: 'dt1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false }
   ]
 };
 const skippedMeal: MealAnchor = {
@@ -110,6 +110,14 @@ describe('MealRowComponent', () => {
     f.componentInstance.toggled.subscribe((id: string) => emitted = id);
     f.debugElement.query(By.css('app-task-row .checkbox')).nativeElement.click();
     expect(emitted).toBe('dt1');
+  });
+
+  it('re-emits oneShotToggled from a during-meal task row', async () => {
+    const f = await setup(withTasks);
+    let emitted: { id: string; oneShot: boolean } | undefined;
+    f.componentInstance.oneShotToggled.subscribe((e: { id: string; oneShot: boolean }) => (emitted = e));
+    f.debugElement.query(By.css('app-task-row .one-shot-toggle')).nativeElement.click();
+    expect(emitted).toEqual({ id: 'dt1', oneShot: true });
   });
 
   it('applies the skipped modifier class for a skipped meal', async () => {
