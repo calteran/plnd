@@ -78,9 +78,9 @@
   text-transform: uppercase;
   letter-spacing: 0.3px;
 
-  &--work        { background: #e3f0ff; color: #2563eb; }
-  &--exercise    { background: var(--color-success-light); color: var(--color-success); }
-  &--leisure     { background: var(--color-purple-light);  color: var(--color-purple); }
-  &--medication  { background: #fff7ed; color: #c2410c; }
-  &--appointment { background: #e0f2fe; color: #0369a1; }
+  &--work        { background: var(--color-badge-work-bg);        color: var(--color-badge-work-fg); }
+  &--exercise    { background: var(--color-success-light);        color: var(--color-success); }
+  &--leisure     { background: var(--color-purple-light);         color: var(--color-purple); }
+  &--medication  { background: var(--color-badge-medication-bg);  color: var(--color-badge-medication-fg); }
+  &--appointment { background: var(--color-badge-appointment-bg); color: var(--color-badge-appointment-fg); }
 }

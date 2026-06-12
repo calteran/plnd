@@ -42,6 +42,12 @@
   --color-btn-neutral-bg-hover: #4b5563;
   --color-border-input:         #d1d5db;
   --color-modal-backdrop:       rgba(254, 249, 240, 0.88);
+  --color-badge-work-bg:        #e3f0ff;
+  --color-badge-work-fg:        #2563eb;
+  --color-badge-medication-bg:  #fff7ed;
+  --color-badge-medication-fg:  #c2410c;
+  --color-badge-appointment-bg: #e0f2fe;
+  --color-badge-appointment-fg: #0369a1;
 }
 
 [data-theme="dark"] {
@@ -87,4 +93,10 @@
   --color-btn-neutral-bg-hover: #374151;
   --color-border-input:         #4b5563;
   --color-modal-backdrop:       rgba(30, 30, 46, 0.88);
+  --color-badge-work-bg:        rgba(37, 99, 235, 0.15);
+  --color-badge-work-fg:        #60a5fa;
+  --color-badge-medication-bg:  rgba(194, 65, 12, 0.15);
+  --color-badge-medication-fg:  #fb923c;
+  --color-badge-appointment-bg: rgba(3, 105, 161, 0.15);
+  --color-badge-appointment-fg: #38bdf8;
 }
