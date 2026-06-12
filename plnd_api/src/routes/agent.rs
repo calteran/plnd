@@ -12,6 +12,7 @@ use crate::models::{
     MealPlanResponse, MealRef, MealSuggestRequest, NutritionSummary, PlaceTasksEntry,
     PlaceTasksRequest, TaskEntryRequest, TaskEntryResponse, UnplannableReason,
 };
+use crate::routes::meal_promotion::{PromotionOutcome, RawMealRef, promote_new_meal};
 use crate::scheduling::{
     constrained_dates_for_rule, day_type_applies_to, has_floating_instance_in_window,
 };
@@ -199,6 +200,82 @@ fn build_avoid_str(refs: &[MealRef]) -> String {
     serde_json::to_string(refs)
         .map(|json| format!("[Avoid these meals: {}]\n", xml_escape(&json)))
         .unwrap_or_default()
+}
+
+/// Existing refs need no provider work — map them straight to a Resolved outcome.
+/// Returns None for a `new` proposal (which must go through `promote_new_meal`).
+fn existing_ref_outcome(raw: &RawMealRef) -> Option<PromotionOutcome> {
+    match raw {
+        RawMealRef::Catalog { id } => Some(PromotionOutcome::Resolved { meal_type: "catalog".into(), id: *id }),
+        RawMealRef::User { id } => Some(PromotionOutcome::Resolved { meal_type: "user".into(), id: *id }),
+        RawMealRef::New { .. } => None,
+    }
+}
+
+/// Resolve one slot's raw agent output into a concrete MealEntry. Existing refs
+/// pass through; a `new` proposal is promoted via providers; on a provider miss
+/// the agent is re-invoked once, constrained to existing items, via `build_constrained_ctx`.
+/// `slot_date`/`slot_name` are authoritative and stamped onto the result.
+async fn resolve_slot_meal(
+    state: &AppState,
+    user_id: Uuid,
+    slot_date: chrono::NaiveDate,
+    slot_name: &str,
+    raw_value: &serde_json::Value,
+    build_constrained_ctx: impl Fn() -> AgentContext,
+) -> Result<MealEntry, FailedSlot> {
+    let fail = |reason: String| FailedSlot { date: slot_date, meal_name: slot_name.to_string(), reason };
+
+    let raw_ref: RawMealRef = serde_json::from_value(raw_value["meal_ref"].clone())
+        .map_err(|e| fail(format!("bad meal_ref: {e}")))?;
+
+    let outcome = match existing_ref_outcome(&raw_ref) {
+        Some(o) => o,
+        None => {
+            // `raw_ref` is a New proposal; promote it.
+            let proposal = raw_ref
+                .into_new_proposal()
+                .expect("existing_ref_outcome returns None only for the New variant");
+            match promote_new_meal(
+                &state.provider_search,
+                state.repos.catalog_ingest.as_ref(),
+                user_id,
+                &proposal,
+            )
+            .await
+            {
+                resolved @ PromotionOutcome::Resolved { .. } => resolved,
+                PromotionOutcome::Missed => {
+                    // Re-invoke the agent once, constrained to existing items.
+                    let ctx = build_constrained_ctx();
+                    let out = state.agent.run(&ctx).await.map_err(|e| fail(e.to_string()))?;
+                    let v: serde_json::Value =
+                        serde_json::from_str(&out.content).map_err(|e| fail(e.to_string()))?;
+                    let reref: RawMealRef = serde_json::from_value(v["meal_ref"].clone())
+                        .map_err(|e| fail(format!("constrained retry bad meal_ref: {e}")))?;
+                    existing_ref_outcome(&reref)
+                        .ok_or_else(|| fail("constrained retry still returned a new meal".into()))?
+                }
+            }
+        }
+    };
+
+    let PromotionOutcome::Resolved { meal_type, id } = outcome else {
+        return Err(fail("unresolved".into()));
+    };
+
+    let estimated_nutrition = serde_json::from_value(raw_value["estimated_nutrition"].clone()).ok();
+    Ok(stamp_slot_identity(
+        MealEntry {
+            date: slot_date,
+            meal_name: slot_name.to_string(),
+            meal_ref: crate::models::MealRef { meal_type, id },
+            title: None,
+            estimated_nutrition,
+        },
+        slot_date,
+        slot_name,
+    ))
 }
 
 /// Build an `AgentContext` for a single open meal slot.
@@ -1135,8 +1212,36 @@ pub async fn post_meal_plan_suggest(
         }
     })?;
 
-    let mut response: MealEntry = serde_json::from_str(&output.content).map_err(|e| {
+    let raw_value: serde_json::Value = serde_json::from_str(&output.content).map_err(|e| {
         tracing::error!(error = %e, content = %output.content, "failed to parse suggest-slot output");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    // Promote a `new` meal_ref into the catalog (or re-invoke constrained on miss).
+    let slot_date = body.date;
+    let meal_name_for_closure = meal_name.clone();
+    let avoid_str_for_closure = avoid_str.clone();
+    let date_for_closure = date.clone();
+    let mut response = resolve_slot_meal(
+        &state,
+        user_id,
+        slot_date,
+        &meal_name,
+        &raw_value,
+        move || AgentContext {
+            user_id,
+            use_case: UseCase::MealSuggestSlot,
+            input: format!("Suggest a {meal_name_for_closure} meal for {date_for_closure}."),
+            prior_context: Some(format!(
+                "{avoid_str_for_closure}[Date: {date_for_closure}]\n[Meal: {meal_name_for_closure}]\n"
+            )),
+            extra: None,
+            constrained_to_existing: true,
+        },
+    )
+    .await
+    .map_err(|f| {
+        tracing::error!(date = %f.date, meal_name = %f.meal_name, reason = %f.reason, "suggest-slot: could not resolve meal");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
@@ -2944,5 +3049,41 @@ mod tests {
         assert!((s.avg_kcal.unwrap() - 200.0).abs() < 1e-9);
         assert!((s.avg_protein.unwrap() - 20.0).abs() < 1e-9);
         assert_eq!(s.flags, vec!["< 3 days have nutrition data"]);
+    }
+
+    // --- existing_ref_outcome tests ---
+
+    #[test]
+    fn existing_ref_outcome_passes_catalog_unchanged() {
+        let raw = crate::routes::meal_promotion::RawMealRef::Catalog { id: uuid::Uuid::from_u128(1) };
+        assert_eq!(
+            super::existing_ref_outcome(&raw),
+            Some(crate::routes::meal_promotion::PromotionOutcome::Resolved {
+                meal_type: "catalog".into(),
+                id: uuid::Uuid::from_u128(1),
+            })
+        );
+    }
+
+    #[test]
+    fn existing_ref_outcome_passes_user_unchanged() {
+        let raw = crate::routes::meal_promotion::RawMealRef::User { id: uuid::Uuid::from_u128(2) };
+        assert_eq!(
+            super::existing_ref_outcome(&raw),
+            Some(crate::routes::meal_promotion::PromotionOutcome::Resolved {
+                meal_type: "user".into(),
+                id: uuid::Uuid::from_u128(2),
+            })
+        );
+    }
+
+    #[test]
+    fn existing_ref_outcome_returns_none_for_new() {
+        let raw = crate::routes::meal_promotion::RawMealRef::New {
+            name: "X".into(),
+            occasion_tags: vec![],
+            inferred_ingredients: vec![],
+        };
+        assert_eq!(super::existing_ref_outcome(&raw), None);
     }
 }
