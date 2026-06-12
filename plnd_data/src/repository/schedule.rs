@@ -40,6 +40,13 @@ pub trait ScheduleRepository: Send + Sync {
         status: &str,
     ) -> Result<(), crate::Error>;
 
+    async fn update_entry_one_shot(
+        &self,
+        user_id: Uuid,
+        entry_id: Uuid,
+        one_shot: bool,
+    ) -> Result<(), crate::Error>;
+
     async fn get_carryover(
         &self,
         user_id: Uuid,

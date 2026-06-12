@@ -72,6 +72,17 @@ impl ScheduleRepository for PgScheduleRepository {
             .map_err(Into::into)
     }
 
+    async fn update_entry_one_shot(
+        &self,
+        user_id: Uuid,
+        entry_id: Uuid,
+        one_shot: bool,
+    ) -> Result<(), crate::Error> {
+        schedule::update_entry_one_shot(&self.pool, user_id, entry_id, one_shot)
+            .await
+            .map_err(Into::into)
+    }
+
     async fn get_carryover(
         &self,
         user_id: Uuid,
