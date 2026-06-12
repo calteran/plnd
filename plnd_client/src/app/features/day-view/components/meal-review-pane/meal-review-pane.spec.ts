@@ -27,6 +27,11 @@ const emptyMeal: MealAnchor = {
   status: 'unplanned', duringMealTasks: [],
 };
 
+const doneMeal: MealAnchor = {
+  id: 'm5', name: 'Breakfast', emoji: '🥑', description: 'Avocado toast',
+  status: 'done', duringMealTasks: [],
+};
+
 describe('MealReviewPaneComponent', () => {
   async function setup(meal: MealAnchor, date = '2026-04-20') {
     await TestBed.configureTestingModule({
@@ -68,6 +73,20 @@ describe('MealReviewPaneComponent', () => {
     expect(f.debugElement.query(By.css('[data-action="swap"]'))).toBeTruthy();
     expect(f.debugElement.query(By.css('[data-action="skip"]'))).toBeTruthy();
     expect(f.debugElement.query(By.css('[data-action="done"]'))).toBeTruthy();
+  });
+
+  it('labels the done button "Mark done" for a not-yet-completed meal', async () => {
+    const { f } = await setup(filledMeal);
+    const btn = f.debugElement.query(By.css('[data-action="done"]')).nativeElement;
+    expect(btn.textContent).toContain('Mark done');
+    expect(btn.textContent).not.toContain('Mark not done');
+  });
+
+  it('labels the done button "Mark not done" with an x for a completed meal', async () => {
+    const { f } = await setup(doneMeal);
+    const btn = f.debugElement.query(By.css('[data-action="done"]')).nativeElement;
+    expect(btn.textContent).toContain('Mark not done');
+    expect(btn.textContent).toContain('✗');
   });
 
   it('shows empty-meal action row for an unplanned meal', async () => {

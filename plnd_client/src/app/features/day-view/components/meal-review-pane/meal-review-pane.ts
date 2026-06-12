@@ -76,7 +76,9 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
           <button data-action="swap"  (click)="activate('swap')">🔀 Swap</button>
           <button data-action="edit"  (click)="activate('edit')">✏️ Edit</button>
           <button data-action="skip"  (click)="onSkip()">× Skip</button>
-          <button data-action="done"  (click)="onDone()">✓ Mark done</button>
+          <button data-action="done"  (click)="onDone()">
+            {{ isDone() ? '✗ Mark not done' : '✓ Mark done' }}
+          </button>
         } @else {
           <button data-action="add"     (click)="activate('add')">➕ Add meal</button>
           <button data-action="suggest" (click)="onSuggest()">🔀 Suggest one</button>
@@ -103,6 +105,7 @@ export class MealReviewPaneComponent {
   readonly resolving    = signal(false);
 
   readonly isFilled = computed(() => this.meal().status !== 'unplanned');
+  readonly isDone   = computed(() => this.meal().status === 'done');
 
   private mealNameFor(meal: MealAnchor): MealSlot {
     return meal.name.trim().toLowerCase();
