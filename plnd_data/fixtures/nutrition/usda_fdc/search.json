@@ -178,5 +178,9 @@
       "description": "Pre-Packaged Fruit & Vegetables",
       "thumbnail_url": null
     }
+  ],
+  "cheese": [
+    { "external_id": "328637", "name": "Cheese, cheddar", "description": "Dairy and Egg Products", "thumbnail_url": null },
+    { "external_id": "328649", "name": "Cheese, mozzarella, whole milk", "description": "Dairy and Egg Products", "thumbnail_url": null }
   ]
 }
