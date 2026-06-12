@@ -366,7 +366,7 @@ pub async fn patch_entry_status(
     request_body = PatchEntryOneShotRequest,
     security(("bearer_auth" = [])),
     responses(
-        (status = 204, description = "one_shot updated"),
+        (status = 204, description = "One-shot flag updated"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Entry not found"),
         (status = 500, description = "Internal server error"),
