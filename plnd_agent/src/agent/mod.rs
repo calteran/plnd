@@ -102,6 +102,24 @@ pub fn xml_escape(s: &str) -> String {
 /// worst-case latency on validation failure, so keep this small.
 pub(crate) const MAX_SCHEMA_RETRIES: u32 = 3;
 
+/// Max characters of raw agent output included in schema-validation failure
+/// logs. Bounds the log-line size while still capturing enough of the model's
+/// response (a refusal message, malformed JSON, prose-instead-of-tool-call,
+/// etc.) to diagnose *why* validation failed rather than just *that* it did.
+const SCHEMA_LOG_CONTENT_LIMIT: usize = 1000;
+
+/// Borrow a logging-safe prefix of raw agent output — at most
+/// [`SCHEMA_LOG_CONTENT_LIMIT`] characters — plus whether it was shortened.
+/// Slices on a character boundary (never mid-codepoint) and stops scanning at
+/// the limit, so it allocates nothing and does no work proportional to the full
+/// response length.
+fn content_snippet(content: &str) -> (&str, bool) {
+    match content.char_indices().nth(SCHEMA_LOG_CONTENT_LIMIT) {
+        Some((idx, _)) => (&content[..idx], true),
+        None => (content, false),
+    }
+}
+
 /// Validates `content` (a JSON string produced by the agent loop) against a
 /// pre-compiled JSON Schema validator.
 ///
@@ -515,23 +533,30 @@ impl AgentService {
                     Ok(()) => break,
                     Err(AgentError::SchemaValidation { violations }) => {
                         if retries >= max_schema_retries {
-                            let snippet: String = output.content.chars().take(1000).collect();
-                            let truncated = output.content.chars().count() > 1000;
+                            let (content, content_truncated) = content_snippet(&output.content);
                             tracing::error!(
                                 use_case = ?ctx.use_case,
                                 violations = %violations,
-                                content = %snippet,
-                                content_truncated = truncated,
+                                content = %content,
+                                content_truncated,
                                 "agent output failed schema validation after retries"
                             );
                             return Err(AgentError::SchemaValidation { violations });
                         }
                         retries += 1;
+                        // Log the raw text the model produced before retrying. If the
+                        // retry later succeeds, this is the only record of what the
+                        // model got wrong — essential for diagnosing intermittent
+                        // failures (e.g. a refusal returned as prose instead of the
+                        // terminal tool call) that never reach the error branch above.
+                        let (content, content_truncated) = content_snippet(&output.content);
                         tracing::warn!(
                             use_case = ?ctx.use_case,
                             attempt = retries,
                             max_schema_retries,
                             violations = %violations,
+                            content = %content,
+                            content_truncated,
                             "schema validation failed; retrying with correction message"
                         );
                         // Phrase the correction differently depending on whether
@@ -1771,6 +1796,46 @@ mod tests {
             2,
             "LLM must be called max_schema_retries + 1 times before giving up"
         );
+    }
+
+    /// `content_snippet` returns short output verbatim and flags nothing as
+    /// truncated, so the full raw model response appears in failure logs.
+    #[test]
+    fn test_content_snippet_returns_short_output_untruncated() {
+        let raw = "I can't call the tool without a valid meal_ref.";
+        let (snippet, truncated) = content_snippet(raw);
+        assert_eq!(snippet, raw);
+        assert!(!truncated);
+    }
+
+    /// Output exactly at the limit is not flagged as truncated (boundary).
+    #[test]
+    fn test_content_snippet_at_limit_is_not_truncated() {
+        let raw = "x".repeat(SCHEMA_LOG_CONTENT_LIMIT);
+        let (snippet, truncated) = content_snippet(&raw);
+        assert_eq!(snippet.chars().count(), SCHEMA_LOG_CONTENT_LIMIT);
+        assert!(!truncated);
+    }
+
+    /// Oversized output is capped at the limit and flagged truncated, bounding
+    /// log-line size.
+    #[test]
+    fn test_content_snippet_over_limit_is_capped_and_flagged() {
+        let raw = "y".repeat(SCHEMA_LOG_CONTENT_LIMIT + 500);
+        let (snippet, truncated) = content_snippet(&raw);
+        assert_eq!(snippet.chars().count(), SCHEMA_LOG_CONTENT_LIMIT);
+        assert!(truncated);
+    }
+
+    /// Truncation lands on a character boundary, so multi-byte content yields
+    /// exactly the limit in characters and never slices mid-codepoint (which
+    /// would panic when indexing the `&str`).
+    #[test]
+    fn test_content_snippet_counts_chars_not_bytes() {
+        let raw = "🍽".repeat(SCHEMA_LOG_CONTENT_LIMIT + 10);
+        let (snippet, truncated) = content_snippet(&raw);
+        assert_eq!(snippet.chars().count(), SCHEMA_LOG_CONTENT_LIMIT);
+        assert!(truncated);
     }
 
     /// The correction message sent on retry must contain the violation text so
