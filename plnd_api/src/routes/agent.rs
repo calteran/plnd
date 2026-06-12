@@ -233,6 +233,7 @@ fn build_suggest_slot_ctx(
             "{prefs_blob}{avoid_str}[Date: {date}]\n[Meal: {meal_name}]\n"
         )),
         extra: None,
+        constrained_to_existing: false,
     }
 }
 
@@ -365,6 +366,7 @@ fn build_review_meal_plan_ctx(
         input: "Review this week's meal plan for quality and variety.".to_string(),
         prior_context: Some(format!("{prefs_blob}[Current meal plan]\n{week_json}\n")),
         extra: None,
+        constrained_to_existing: false,
     }
 }
 
@@ -410,6 +412,7 @@ pub async fn post_task(
         input: body.input.clone(),
         prior_context,
         extra: None,
+        constrained_to_existing: false,
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
@@ -1034,6 +1037,7 @@ pub async fn post_meal_plan_rebalance(
         input: format!("Rebalance the meal plan for the period {plan_start} through {plan_end}."),
         prior_context: Some(format!("[Period: {plan_start} through {plan_end}]\n")),
         extra: Some(current_state_json),
+        constrained_to_existing: false,
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
@@ -1117,6 +1121,7 @@ pub async fn post_meal_plan_suggest(
         input: format!("Suggest a {meal_name} meal for {date}."),
         prior_context: Some(format!("{avoid_str}[Date: {date}]\n[Meal: {meal_name}]\n")),
         extra: None,
+        constrained_to_existing: false,
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
@@ -1189,6 +1194,7 @@ pub async fn post_meal_plan_resolve(
         input: body.text.clone(),
         prior_context: Some(format!("{date_context}[Meal: {meal_name}]\n")),
         extra: None,
+        constrained_to_existing: false,
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {
@@ -1531,6 +1537,7 @@ pub async fn post_place_tasks(
             "[Period: {plan_start} through {plan_end}]\n{anchor_block}{routine_ctx}"
         )),
         extra: None,
+        constrained_to_existing: false,
     };
 
     let output = state.agent.run(&ctx).await.map_err(|e| match &e {

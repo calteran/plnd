@@ -507,6 +507,9 @@ pub struct AgentContext {
     /// Passed to `build_tool_registry` so tools can be constructed with it.
     /// Currently used by `UseCase::MealRebalance` to pass week schedule state.
     pub extra: Option<serde_json::Value>,
+    /// When true (set on a provider-miss re-invocation), the agent MUST choose an
+    /// existing catalog/user meal and MUST NOT emit a `new` meal_ref.
+    pub constrained_to_existing: bool,
 }
 
 #[cfg(test)]
