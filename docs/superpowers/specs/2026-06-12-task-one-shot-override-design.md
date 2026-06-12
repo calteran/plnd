@@ -66,21 +66,31 @@ A near-mechanical clone of the existing status-patch path
   `{ "one_shot": bool }`. Responses: `204` on success, `404` when the entry is absent,
   `401` unauthorized. No validation table needed (boolean).
 
-### 4.2 Creation-path override — agent `show_checkbox`, **uncertainty-gated**
+### 4.2 Creation-path override — `request_clarification`, **uncertainty-gated**
 
-Reuses the existing `UiSignal` → `show_checkbox` mechanism end to end; the `add-entry`
-signal-form already renders checkbox signals, and answers round-trip via
-`ConversationTurn.answers` → `TaskEntryRequest.context` → agent re-run → persisted value.
+Reuses the existing clarification round-trip end to end. **Mechanism note:** the `add-entry`
+component discards `ui_signals` once a task is created (it completes the flow "regardless of
+any informational ui_signals") and renders the checkbox form *only* when no task was created
+yet — i.e. the `request_clarification` path. Therefore the creation-path override must ask
+**before** creating the task, not after.
 
-**Behavioral rule (the key UX decision):** the agent surfaces the `one_shot` confirmation
-checkbox **only to resolve genuine uncertainty**. When the agent is confident about the
-inferred value, it sets `one_shot` silently and emits no signal — preserving low-friction,
-neurodivergent-friendly capture.
+**Behavioral rule (the key UX decision):** the agent resolves `one_shot` with the user **only
+to settle genuine uncertainty**. When confident, it sets `one_shot` directly on `create_task`
+and asks nothing — preserving low-friction, neurodivergent-friendly capture.
 
-- Update the `create_task` tool guidance so the agent: (a) when confident, sets `one_shot`
-  and emits no confirmation signal; (b) when genuinely ambiguous, emits a `show_checkbox`
-  with `field: "one_shot"` and `default` = its best inference, letting the user decide.
-- No new client rendering — the checkbox renders through the existing signal-form.
+Flow:
+
+- **Confident** → call `create_task` with `one_shot` set; no clarification.
+- **Genuinely uncertain** → call `request_clarification` with a `show_checkbox`
+  (`field: "one_shot"`, `default` = best inference, human-readable `label`). The task is *not*
+  created yet. The `add-entry` signal-form renders it; the answer round-trips via
+  `ConversationTurn.answers` → `TaskEntryRequest.context`; on re-run the agent reads the
+  answer from `<answers>` and calls `create_task` with the resolved `one_shot`.
+
+Only the agent prompt (`prompts/task_entry.md`) changes — no client or schema changes. The
+prompt currently restricts `request_clarification` to truly-unresolvable `duration_minutes`;
+this adds `one_shot` as a second, rare, legitimate trigger (used only when the one-shot nature
+genuinely cannot be inferred).
 
 ### 4.3 Day-view override — `task-row` toggle (only net-new UI)
 
@@ -102,12 +112,12 @@ Never expose the words `one_shot` or `time_sensitive` in the UI.
 ## 5. Data flow
 
 ```
-Creation (uncertain):
+Creation:
   user types task → agent infers one_shot, judges uncertainty
-    → uncertain: create_task emits show_checkbox(one_shot, default=inferred)
-        → add-entry renders checkbox → user answers
-        → answer returns as context → agent persists chosen one_shot
-    → confident: create_task sets one_shot silently (no signal)
+    → confident: create_task sets one_shot directly (no clarification)
+    → uncertain: request_clarification with show_checkbox(one_shot, default=inferred)
+        → task NOT yet created → add-entry renders checkbox → user answers
+        → answer returns as context → agent re-runs → create_task with resolved one_shot
 
 Post-creation:
   day view shows task with oneShot (from DTO)
@@ -127,8 +137,10 @@ Carryover (unchanged):
     wrong user).
   - `PATCH /schedule/entries/{id}/one-shot` route: `204` success, `404` missing, `401`
     unauthorized.
-  - Agent `create_task`: can carry a `one_shot` `show_checkbox`; confident path sets the value
-    without a signal.
+  - Agent prompt: when the one-shot nature is genuinely ambiguous the agent calls
+    `request_clarification` with a `one_shot` `show_checkbox`; the confident path calls
+    `create_task` with `one_shot` set and no clarification. (Exercise via the mock provider's
+    scripted tool calls, mirroring existing `request_clarification` agent tests.)
 - **Angular**
   - `task-row` toggle emits the expected event and reflects `oneShot` state.
   - `ScheduleService.setEntryOneShot` issues the correct PATCH.
