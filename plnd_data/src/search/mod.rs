@@ -29,6 +29,36 @@ pub enum ProviderSearchEvent {
     },
 }
 
+/// Minimum share of a query's tokens that must appear in a provider result's
+/// name for the match to be trusted. Below this, the top hit is treated as a
+/// miss so an invented meal name with no true match doesn't promote a
+/// loosely-related recipe under its occasion tags (#903). Deliberately
+/// conservative — single-token queries ("chicken") still match supersets
+/// ("Chicken Handi") at confidence 1.0.
+const MATCH_CONFIDENCE_THRESHOLD: f64 = 0.5;
+
+/// Split a name into a set of lowercased alphanumeric tokens, dropping
+/// separators and empties.
+fn tokenize(s: &str) -> std::collections::HashSet<String> {
+    s.split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .map(|t| t.to_lowercase())
+        .collect()
+}
+
+/// Fraction of the query's tokens that also appear in the candidate's tokens
+/// (query-coverage). Order-insensitive and tolerant of extra candidate words,
+/// which suits free-text food names. Returns 0.0 for an empty query.
+fn name_match_confidence(query: &str, candidate: &str) -> f64 {
+    let q = tokenize(query);
+    if q.is_empty() {
+        return 0.0;
+    }
+    let c = tokenize(candidate);
+    let matched = q.iter().filter(|t| c.contains(*t)).count();
+    matched as f64 / q.len() as f64
+}
+
 #[derive(Clone)]
 pub struct ProviderSearchService {
     nutrition_providers: Vec<Arc<dyn NutritionProvider>>,
@@ -295,6 +325,11 @@ impl ProviderSearchService {
             let Some(top) = results.into_iter().next() else {
                 continue;
             };
+            // Gate out a loosely-related top hit before paying for the detail
+            // fetch — an unconfident name match counts as a miss (#903).
+            if name_match_confidence(name, &top.name) < MATCH_CONFIDENCE_THRESHOLD {
+                continue;
+            }
             if let Ok(Some(dish)) = provider.get_dish_by_id(&top.external_id).await {
                 return Some((source, dish));
             }
@@ -327,6 +362,11 @@ impl ProviderSearchService {
             let Some(top) = results.into_iter().next() else {
                 continue;
             };
+            // Gate out a loosely-related top hit before paying for the detail
+            // fetch — an unconfident name match counts as a miss (#903).
+            if name_match_confidence(name, &top.name) < MATCH_CONFIDENCE_THRESHOLD {
+                continue;
+            }
             if let Ok(Some(ing)) = provider.get_ingredient_by_id(&top.external_id).await {
                 return Some((source, ing));
             }
@@ -471,5 +511,112 @@ mod resolve_tests {
             SearchCache::new(36),
         );
         assert!(svc.resolve_ingredient("nonexistent").await.is_none());
+    }
+
+    // ── Confidence gate (#903) ───────────────────────────────────────────────
+
+    #[test]
+    fn name_match_confidence_scores_token_coverage() {
+        // Exact match → full confidence.
+        assert_eq!(name_match_confidence("Tomato Soup", "Tomato Soup"), 1.0);
+        // Query fully contained in a longer candidate → full confidence.
+        assert_eq!(name_match_confidence("chicken", "Chicken Handi"), 1.0);
+        // Half the query's tokens present → 0.5.
+        assert_eq!(name_match_confidence("tofu bowl", "tofu curry"), 0.5);
+        // No shared tokens → zero.
+        assert_eq!(name_match_confidence("tofu", "beef stew"), 0.0);
+        // Empty query has nothing to match → zero, never a divide-by-zero.
+        assert_eq!(name_match_confidence("", "anything"), 0.0);
+    }
+
+    /// Returns a real result, but with a name unrelated to any query.
+    struct UnrelatedRecipe;
+    #[async_trait]
+    impl RecipeProvider for UnrelatedRecipe {
+        fn source_name(&self) -> &str {
+            "themealdb"
+        }
+        async fn search_dishes(
+            &self,
+            _q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            Ok(vec![SearchResult {
+                external_id: "x1".into(),
+                name: "Beef Wellington".into(),
+                ..Default::default()
+            }])
+        }
+        async fn get_dish_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalDish>, ExternalProviderError> {
+            Ok(Some(ExternalDish {
+                external_id: "x1".into(),
+                name: "Beef Wellington".into(),
+                ..Default::default()
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn resolve_dish_rejects_low_confidence_match() {
+        let svc = ProviderSearchService::new(
+            vec![],
+            vec![Arc::new(UnrelatedRecipe)],
+            vec![],
+            SearchCache::new(36),
+        );
+        // The provider would happily return "Beef Wellington", but it shares no
+        // tokens with the invented name, so promotion must treat it as a miss.
+        assert!(
+            svc.resolve_dish("Spicy Peanut Tofu Bowl").await.is_none(),
+            "unrelated top hit must be gated out"
+        );
+    }
+
+    /// Returns a real ingredient with a name unrelated to any query.
+    struct UnrelatedNutrition;
+    #[async_trait]
+    impl NutritionProvider for UnrelatedNutrition {
+        fn source_name(&self) -> &str {
+            "usda_fdc"
+        }
+        async fn search_ingredients(
+            &self,
+            _q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            Ok(vec![SearchResult {
+                external_id: "z1".into(),
+                name: "Granulated Sugar".into(),
+                ..Default::default()
+            }])
+        }
+        async fn get_ingredient_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
+            Ok(Some(ExternalIngredient {
+                external_id: "z1".into(),
+                name: "Granulated Sugar".into(),
+                serving_size_g: None,
+                nutrition: None,
+                allergens: vec![],
+                occasion_tags: vec![],
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn resolve_ingredient_rejects_low_confidence_match() {
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(UnrelatedNutrition)],
+            vec![],
+            vec![],
+            SearchCache::new(36),
+        );
+        assert!(
+            svc.resolve_ingredient("fresh basil").await.is_none(),
+            "unrelated top hit must be gated out"
+        );
     }
 }
