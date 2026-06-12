@@ -9,6 +9,7 @@ export interface ScheduleTask {
   label: string;
   status: ItemStatus;
   scheduledTime?: string; // e.g. '11 AM'
+  oneShot: boolean;
 }
 
 export interface MealAnchor {

@@ -198,9 +198,10 @@ function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntr
 
 function mapEntry(e: ScheduleEntryDto): ScheduleTask {
   return {
-    id:     e.entry_id,
-    type:   parseItemType(e.task_type),
-    label:  e.title ?? e.task_type,
-    status: e.status === 'completed' ? 'done' : 'pending',
+    id:      e.entry_id,
+    type:    parseItemType(e.task_type),
+    label:   e.title ?? e.task_type,
+    status:  e.status === 'completed' ? 'done' : 'pending',
+    oneShot: e.one_shot ?? false,
   };
 }

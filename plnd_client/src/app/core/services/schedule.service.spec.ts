@@ -324,7 +324,7 @@ describe('ScheduleService', () => {
     (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'm1', name: 'Breakfast', emoji: '🥣',
       status: 'planned', duringMealTasks: [
-        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending' }
+        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending', oneShot: false }
       ]
     }]);
     svc.toggleItem('t-dm2');
@@ -391,10 +391,39 @@ describe('ScheduleService', () => {
   });
 
   it('addItem appends a ScheduleTask to scheduleItems', () => {
-    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending' };
+    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending', oneShot: false };
     svc.addItem(task);
     expect(svc.scheduleItems()).toContain(task);
     expect(svc.scheduleItems().length).toBe(1);
+  });
+
+  it('maps one_shot from the DTO onto the task', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e1',
+      task_type: 'exercise',
+      title: 'Morning run',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+      one_shot: true,
+    }]);
+    const task = svc.scheduleItems().find(t => t.id === 'e1') as ScheduleTask;
+    expect(task.oneShot).toBe(true);
+  });
+
+  it('defaults oneShot to false when one_shot is absent from the DTO', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e2',
+      task_type: 'general',
+      title: 'Stretch',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: null,
+    }]);
+    const task = svc.scheduleItems().find(t => t.id === 'e2') as ScheduleTask;
+    expect(task.oneShot).toBe(false);
   });
 
   it('maps a consumed anchor to status done', () => {
