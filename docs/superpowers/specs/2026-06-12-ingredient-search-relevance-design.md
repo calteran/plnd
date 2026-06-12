@@ -173,8 +173,9 @@ result path (which exercises A regardless of seed state).
 
 ## Follow-up sub-issue (D)
 
-Open against the catalog area: **"Curated canonical ingredient catalog distinct from branded
-provider data."** Capture the three candidate approaches for its own brainstorm:
+Tracked as [#906](https://github.com/calteran/plnd/issues/906) — **"Curated canonical ingredient
+catalog distinct from branded provider data."** Its own brainstorm will choose between the three
+candidate approaches:
 
 1. A curated canonical-ingredient table presented above/instead of branded provider rows.
 2. Provider data-type filtering (prefer USDA *Foundation* / *SR Legacy* over *Branded*; prefer
