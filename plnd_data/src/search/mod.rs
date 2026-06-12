@@ -373,6 +373,22 @@ impl ProviderSearchService {
         }
         None
     }
+
+    /// Fetch the full detail for a specific external ingredient by `(source, external_id)`.
+    /// Used by the promote-on-select flow: the caller already holds the exact id the
+    /// user picked, so this fetches that id directly rather than re-running a search.
+    /// Returns `None` if no provider matches `source` or the provider has no such id.
+    pub async fn fetch_ingredient_detail(
+        &self,
+        source: &str,
+        external_id: &str,
+    ) -> Option<ExternalIngredient> {
+        let provider = self
+            .nutrition_providers
+            .iter()
+            .find(|p| p.source_name() == source)?;
+        provider.get_ingredient_by_id(external_id).await.ok().flatten()
+    }
 }
 
 #[cfg(test)]
@@ -618,5 +634,32 @@ mod resolve_tests {
             svc.resolve_ingredient("fresh basil").await.is_none(),
             "unrelated top hit must be gated out"
         );
+    }
+
+    #[tokio::test]
+    async fn fetch_ingredient_detail_returns_detail_for_matching_source() {
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(FakeNutrition)],
+            vec![],
+            vec![],
+            SearchCache::new(36),
+        );
+        let detail = svc
+            .fetch_ingredient_detail("usda_fdc", "i1")
+            .await
+            .expect("expected detail for known id");
+        assert_eq!(detail.name, "Tomato");
+        assert_eq!(detail.external_id, "i1");
+    }
+
+    #[tokio::test]
+    async fn fetch_ingredient_detail_returns_none_for_unknown_source() {
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(FakeNutrition)],
+            vec![],
+            vec![],
+            SearchCache::new(36),
+        );
+        assert!(svc.fetch_ingredient_detail("not_a_source", "i1").await.is_none());
     }
 }
