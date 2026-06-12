@@ -111,13 +111,41 @@ const MEAL_PLAN_RESPONSE_SCHEMA: &str = r##"{
       }
     },
     "MealRef": {
-      "type": "object",
-      "required": ["type", "id"],
-      "additionalProperties": false,
-      "properties": {
-        "type": { "type": "string", "enum": ["catalog", "user"] },
-        "id":   { "type": "string", "format": "uuid" }
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["catalog", "user"] },
+            "id":   { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "name", "inferred_ingredients", "estimated_nutrition"],
+          "additionalProperties": false,
+          "properties": {
+            "type":  { "type": "string", "const": "new" },
+            "name":  { "type": "string" },
+            "occasion_tags": { "type": "array", "items": { "type": "string" } },
+            "inferred_ingredients": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["name", "grams"],
+                "additionalProperties": false,
+                "properties": {
+                  "name":  { "type": "string" },
+                  "grams": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
+            },
+            "estimated_nutrition": { "$ref": "#/definitions/Nutrition" }
+          }
+        }
+      ]
     },
     "Nutrition": {
       "type": "object",
@@ -168,13 +196,41 @@ const SUGGEST_SLOT_RESPONSE_SCHEMA: &str = r##"{
   },
   "definitions": {
     "MealRef": {
-      "type": "object",
-      "required": ["type", "id"],
-      "additionalProperties": false,
-      "properties": {
-        "type": { "type": "string", "enum": ["catalog", "user"] },
-        "id":   { "type": "string", "format": "uuid" }
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["type", "id"],
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "enum": ["catalog", "user"] },
+            "id":   { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["type", "name", "inferred_ingredients", "estimated_nutrition"],
+          "additionalProperties": false,
+          "properties": {
+            "type":  { "type": "string", "const": "new" },
+            "name":  { "type": "string" },
+            "occasion_tags": { "type": "array", "items": { "type": "string" } },
+            "inferred_ingredients": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "required": ["name", "grams"],
+                "additionalProperties": false,
+                "properties": {
+                  "name":  { "type": "string" },
+                  "grams": { "type": "number", "exclusiveMinimum": 0 }
+                }
+              }
+            },
+            "estimated_nutrition": { "$ref": "#/definitions/Nutrition" }
+          }
+        }
+      ]
     },
     "Nutrition": {
       "type": "object",
@@ -1100,6 +1156,81 @@ mod tests {
             ]
         });
         assert!(!v.is_valid(&bad));
+    }
+
+    // ── MealRef `new` variant tests ───────────────────────────────────────────
+
+    #[test]
+    fn suggest_slot_validator_accepts_new_meal_ref() {
+        let payload = serde_json::json!({
+            "date": "2026-06-15",
+            "meal_name": "dinner",
+            "meal_ref": {
+                "type": "new",
+                "name": "Spicy Peanut Tofu Bowl",
+                "occasion_tags": ["dinner"],
+                "inferred_ingredients": [{ "name": "tofu", "grams": 150.0 }],
+                "estimated_nutrition": { "kcal": 520.0, "protein_g": 28.0, "carbs_g": 40.0, "fat_g": 22.0 }
+            }
+        });
+        assert!(SUGGEST_SLOT_VALIDATOR.is_valid(&payload));
+    }
+
+    #[test]
+    fn suggest_slot_validator_rejects_malformed_new_meal_ref() {
+        // Missing estimated_nutrition (required for the `new` variant).
+        let missing_nutrition = serde_json::json!({
+            "date": "2026-06-15",
+            "meal_name": "dinner",
+            "meal_ref": {
+                "type": "new",
+                "name": "X",
+                "inferred_ingredients": [{ "name": "tofu", "grams": 150.0 }]
+            }
+        });
+        assert!(!SUGGEST_SLOT_VALIDATOR.is_valid(&missing_nutrition));
+
+        // grams: 0 violates exclusiveMinimum.
+        let zero_grams = serde_json::json!({
+            "date": "2026-06-15",
+            "meal_name": "dinner",
+            "meal_ref": {
+                "type": "new",
+                "name": "X",
+                "inferred_ingredients": [{ "name": "tofu", "grams": 0.0 }],
+                "estimated_nutrition": { "kcal": 1.0, "protein_g": 1.0, "carbs_g": 1.0, "fat_g": 1.0 }
+            }
+        });
+        assert!(!SUGGEST_SLOT_VALIDATOR.is_valid(&zero_grams));
+    }
+
+    #[test]
+    fn suggest_slot_validator_still_accepts_catalog_ref() {
+        let payload = serde_json::json!({
+            "date": "2026-06-15",
+            "meal_name": "dinner",
+            "meal_ref": { "type": "catalog", "id": "00000000-0000-0000-0000-000000000001" }
+        });
+        assert!(SUGGEST_SLOT_VALIDATOR.is_valid(&payload));
+    }
+
+    #[test]
+    fn meal_plan_validator_accepts_new_meal_ref_in_entry() {
+        let payload = serde_json::json!({
+            "plan_start": "2026-06-15",
+            "meals": [{
+                "date": "2026-06-15",
+                "meal_name": "dinner",
+                "meal_ref": {
+                    "type": "new",
+                    "name": "Spicy Peanut Tofu Bowl",
+                    "occasion_tags": ["dinner"],
+                    "inferred_ingredients": [{ "name": "tofu", "grams": 150.0 }],
+                    "estimated_nutrition": { "kcal": 520.0, "protein_g": 28.0, "carbs_g": 40.0, "fat_g": 22.0 }
+                }
+            }]
+        });
+        assert!(MEAL_PLAN_VALIDATOR.is_valid(&payload));
     }
 
     #[test]
