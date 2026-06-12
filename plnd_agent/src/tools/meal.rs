@@ -520,15 +520,7 @@ impl Tool for RebalanceMealPlanTool {
                                 "type": "string",
                                 "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                             },
-                            "meal_ref": {
-                                "type": "object",
-                                "required": ["type", "id"],
-                                "additionalProperties": false,
-                                "properties": {
-                                    "type": { "type": "string", "enum": ["catalog", "user"] },
-                                    "id":   { "type": "string", "format": "uuid" }
-                                }
-                            },
+                            "meal_ref": meal_ref_schema(),
                             "estimated_nutrition": {
                                 "type": "object",
                                 "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
@@ -604,15 +596,7 @@ impl Tool for SuggestSlotMealTool {
                     "type": "string",
                     "description": "Name of the meal slot from the active day type for this date (e.g. 'breakfast', 'lunch', 'dinner', or any user-defined slot name)"
                 },
-                "meal_ref": {
-                    "type": "object",
-                    "required": ["type", "id"],
-                    "additionalProperties": false,
-                    "properties": {
-                        "type": { "type": "string", "enum": ["catalog", "user"] },
-                        "id":   { "type": "string", "format": "uuid" }
-                    }
-                },
+                "meal_ref": meal_ref_schema(),
                 "estimated_nutrition": {
                     "type": "object",
                     "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
@@ -959,6 +943,64 @@ fn estimate_nutrition_from_description_schema() -> serde_json::Value {
                 }
             }
         }
+    })
+}
+
+/// The `meal_ref` shape used by the slot/rebalance terminal tools. Either an
+/// existing reference (`catalog`/`user` + UUID) or a `new` proposal the API
+/// layer promotes into the catalog after the run.
+fn meal_ref_schema() -> serde_json::Value {
+    serde_json::json!({
+        "oneOf": [
+            {
+                "type": "object",
+                "required": ["type", "id"],
+                "additionalProperties": false,
+                "properties": {
+                    "type": { "type": "string", "enum": ["catalog", "user"] },
+                    "id":   { "type": "string", "format": "uuid" }
+                }
+            },
+            {
+                "type": "object",
+                "required": ["type", "name", "inferred_ingredients", "estimated_nutrition"],
+                "additionalProperties": false,
+                "properties": {
+                    "type": { "type": "string", "const": "new" },
+                    "name": { "type": "string", "description": "Display name of the meal you are inventing." },
+                    "occasion_tags": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Occasions this meal fits (e.g. 'breakfast', 'dinner')."
+                    },
+                    "inferred_ingredients": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "required": ["name", "grams"],
+                            "additionalProperties": false,
+                            "properties": {
+                                "name":  { "type": "string" },
+                                "grams": { "type": "number", "exclusiveMinimum": 0 }
+                            }
+                        },
+                        "description": "Ingredients you believe make up this meal, for catalog lookup."
+                    },
+                    "estimated_nutrition": {
+                        "type": "object",
+                        "required": ["kcal", "protein_g", "carbs_g", "fat_g"],
+                        "additionalProperties": false,
+                        "properties": {
+                            "kcal":      { "type": "number" },
+                            "protein_g": { "type": "number" },
+                            "carbs_g":   { "type": "number" },
+                            "fat_g":     { "type": "number" }
+                        }
+                    }
+                }
+            }
+        ]
     })
 }
 
@@ -2151,6 +2193,30 @@ mod tests {
         async fn delete(&self, _: uuid::Uuid, _: uuid::Uuid) -> Result<bool, plnd_data::Error> {
             unimplemented!("stub")
         }
+    }
+
+    #[test]
+    fn suggest_slot_meal_ref_allows_new_variant() {
+        let schema = SuggestSlotMealTool.schema();
+        let meal_ref = &schema["properties"]["meal_ref"];
+        // The widened schema is a oneOf of {existing ref} | {new proposal}.
+        let variants = meal_ref["oneOf"].as_array().expect("meal_ref must be a oneOf");
+        assert_eq!(variants.len(), 2, "expected existing + new variants");
+        let has_new = variants.iter().any(|v| {
+            v["properties"]["type"]["const"] == "new"
+                || v["properties"]["type"]["enum"].as_array().is_some_and(|e| e.iter().any(|x| x == "new"))
+        });
+        assert!(has_new, "one variant must accept type=new");
+    }
+
+    #[test]
+    fn rebalance_meal_ref_allows_new_variant() {
+        let schema = RebalanceMealPlanTool.schema();
+        let meal_ref = &schema["properties"]["meals"]["items"]["properties"]["meal_ref"];
+        let variants = meal_ref["oneOf"].as_array().expect("rebalance meal_ref must be a oneOf");
+        assert_eq!(variants.len(), 2, "expected existing + new variants");
+        let has_new = variants.iter().any(|v| v["properties"]["type"]["const"] == "new");
+        assert!(has_new, "one variant must accept type=new");
     }
 
     #[test]
