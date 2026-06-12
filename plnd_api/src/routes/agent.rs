@@ -781,12 +781,16 @@ pub async fn post_meal_plan(
     let locked_for_ctx = Arc::new(locked_entries.clone());
     let prefs_for_ctx = Arc::new(prefs_blob.clone());
     let concurrency = state.meal_plan_concurrency;
+    let state_for_slots = Arc::clone(&state);
 
     let (mut chosen, failed) = fill_slots_parallel(open_slots, concurrency, move |slot| {
         let agent = agent.clone();
         let locked = Arc::clone(&locked_for_ctx);
         let prefs = Arc::clone(&prefs_for_ctx);
+        let state = Arc::clone(&state_for_slots);
         async move {
+            let slot_date = slot.date;
+            let slot_name = slot.meal_name.clone();
             let ctx = build_suggest_slot_ctx(user_id, &slot, &prefs, &locked, &[]);
             match agent.run(&ctx).await {
                 Ok(output) => {
@@ -794,20 +798,34 @@ pub async fn post_meal_plan(
                     // even though it ultimately succeeded — still a congestion
                     // signal for the AIMD gate.
                     let rate_limited = output.rate_limited;
-                    let result = match serde_json::from_str::<MealEntry>(&output.content) {
-                        // Trust the agent for the meal_ref/nutrition only; the slot
-                        // identity is authoritative from the open slot we asked it to fill.
-                        Ok(meal) => Ok(stamp_slot_identity(meal, slot.date, &slot.meal_name)),
+                    let result = match serde_json::from_str::<serde_json::Value>(&output.content) {
+                        Ok(value) => {
+                            resolve_slot_meal(
+                                &state,
+                                user_id,
+                                slot_date,
+                                &slot_name,
+                                &value,
+                                || {
+                                    let mut c = build_suggest_slot_ctx(
+                                        user_id, &slot, &prefs, &locked, &[],
+                                    );
+                                    c.constrained_to_existing = true;
+                                    c
+                                },
+                            )
+                            .await
+                        }
                         Err(e) => {
                             tracing::warn!(
                                 error = %e,
-                                date = %slot.date,
-                                meal_name = %slot.meal_name,
+                                date = %slot_date,
+                                meal_name = %slot_name,
                                 "meal-plan: failed to parse slot suggestion"
                             );
                             Err(FailedSlot {
-                                date: slot.date,
-                                meal_name: slot.meal_name,
+                                date: slot_date,
+                                meal_name: slot_name,
                                 reason: e.to_string(),
                             })
                         }
@@ -941,19 +959,50 @@ pub async fn post_meal_plan(
                 build_suggest_slot_ctx(user_id, &swap_slot, &prefs_blob, &locked_entries, &chosen);
 
             match state.agent.run(&resuggestion_ctx).await {
-                Ok(out) => match serde_json::from_str::<MealEntry>(&out.content) {
-                    Ok(new_meal) => {
-                        tracing::info!(
-                            date = %change.date,
-                            meal_name = %change.meal_name,
-                            reason = %change.reason,
-                            "meal-plan: review pass replaced slot"
-                        );
-                        // Preserve the slot's authoritative identity (the flagged meal's
-                        // own date/meal_name) rather than trusting the re-suggestion's echo.
+                Ok(out) => match serde_json::from_str::<serde_json::Value>(&out.content) {
+                    Ok(value) => {
+                        // Authoritative identity = the flagged meal's own date/name.
                         let slot_date = chosen[pos].date;
                         let slot_name = chosen[pos].meal_name.clone();
-                        chosen[pos] = stamp_slot_identity(new_meal, slot_date, &slot_name);
+                        match resolve_slot_meal(
+                            &state,
+                            user_id,
+                            slot_date,
+                            &slot_name,
+                            &value,
+                            || {
+                                let mut c = build_suggest_slot_ctx(
+                                    user_id,
+                                    &swap_slot,
+                                    &prefs_blob,
+                                    &locked_entries,
+                                    &chosen,
+                                );
+                                c.constrained_to_existing = true;
+                                c
+                            },
+                        )
+                        .await
+                        {
+                            Ok(new_meal) => {
+                                tracing::info!(
+                                    date = %change.date,
+                                    meal_name = %change.meal_name,
+                                    reason = %change.reason,
+                                    "meal-plan: review pass replaced slot"
+                                );
+                                // resolve_slot_meal already stamped slot identity.
+                                chosen[pos] = new_meal;
+                            }
+                            Err(f) => {
+                                tracing::warn!(
+                                    reason = %f.reason,
+                                    date = %change.date,
+                                    meal_name = %change.meal_name,
+                                    "meal-plan: review re-suggestion could not resolve; keeping original"
+                                );
+                            }
+                        }
                     }
                     Err(e) => {
                         tracing::warn!(
