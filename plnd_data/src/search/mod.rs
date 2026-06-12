@@ -279,14 +279,24 @@ impl ProviderSearchService {
             exclude_allergens: vec![],
         };
         for provider in &self.recipe_providers {
-            let Ok(results) = provider.search_dishes(&query).await else {
-                continue;
+            let source = provider.source_name().to_string();
+            // Reuse the shared TTL cache for the search step (same key scheme as the
+            // streaming search_dishes) so synchronous promotion avoids redundant calls.
+            let cache_key = make_cache_key("dish", &source, &query);
+            let results = if let Some(cached) = self.cache.get(&cache_key).await {
+                cached
+            } else {
+                let Ok(fetched) = provider.search_dishes(&query).await else {
+                    continue;
+                };
+                self.cache.insert(cache_key, fetched.clone()).await;
+                fetched
             };
             let Some(top) = results.into_iter().next() else {
                 continue;
             };
             if let Ok(Some(dish)) = provider.get_dish_by_id(&top.external_id).await {
-                return Some((provider.source_name().to_string(), dish));
+                return Some((source, dish));
             }
         }
         None
@@ -301,14 +311,24 @@ impl ProviderSearchService {
             exclude_allergens: vec![],
         };
         for provider in &self.nutrition_providers {
-            let Ok(results) = provider.search_ingredients(&query).await else {
-                continue;
+            let source = provider.source_name().to_string();
+            // Reuse the shared TTL cache for the search step (same key scheme as the
+            // streaming search_ingredients) so synchronous promotion avoids redundant calls.
+            let cache_key = make_cache_key("ingredient", &source, &query);
+            let results = if let Some(cached) = self.cache.get(&cache_key).await {
+                cached
+            } else {
+                let Ok(fetched) = provider.search_ingredients(&query).await else {
+                    continue;
+                };
+                self.cache.insert(cache_key, fetched.clone()).await;
+                fetched
             };
             let Some(top) = results.into_iter().next() else {
                 continue;
             };
             if let Ok(Some(ing)) = provider.get_ingredient_by_id(&top.external_id).await {
-                return Some((provider.source_name().to_string(), ing));
+                return Some((source, ing));
             }
         }
         None

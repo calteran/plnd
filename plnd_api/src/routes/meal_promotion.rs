@@ -86,6 +86,9 @@ pub enum PromotionOutcome {
 /// The slug is intentionally lossy: distinct names sharing the same alphanumeric
 /// content (e.g. "a  b" and "a-b") collapse to the same key, which is the desired
 /// dedup behavior. Runs of separators are coalesced to a single `-`.
+///
+/// The slug is truncated so the full `llm-` + slug stays within the
+/// `catalog_*.external_id` VARCHAR(100) column limit (migration 0012).
 fn llm_composed_external_id(name: &str) -> String {
     let mut slug = String::new();
     let mut prev_sep = false;
@@ -98,7 +101,10 @@ fn llm_composed_external_id(name: &str) -> String {
             prev_sep = true;
         }
     }
-    format!("llm-{}", slug.trim_matches('-'))
+    // "llm-" prefix is 4 chars; cap the slug at 96 so the column's 100-char limit holds.
+    let trimmed = slug.trim_matches('-');
+    let capped: String = trimmed.chars().take(96).collect();
+    format!("llm-{capped}")
 }
 
 /// Promote a `new` meal proposal into the shared catalog.
@@ -144,17 +150,23 @@ pub async fn promote_new_meal(
                 });
             }
         }
+        // Carry the provider's real recipe data onto the catalog row rather than
+        // hardcoding defaults. `servings` is Copy so it can be reused below.
+        let dish_servings = dish.servings;
         let Ok(dish_id) = ingest
             .ingest_dish(IngestDishInput {
                 external_source: source.clone(),
                 external_id: dish.external_id.clone(),
                 name: dish.name.clone(),
                 description: None,
-                instructions: None,
-                servings: Decimal::from(1),
-                allergens: vec![],
+                instructions: dish.instructions.clone(),
+                servings: dish_servings,
+                allergens: dish.allergens.clone(),
                 occasion_tags: proposal.occasion_tags.clone(),
-                nutrition: None,
+                nutrition: dish
+                    .nutrition
+                    .as_ref()
+                    .and_then(|n| serde_json::to_value(n).ok()),
                 contributed_by_user_id: None,
                 ingredients: links,
             })
@@ -169,6 +181,7 @@ pub async fn promote_new_meal(
             dish.name,
             proposal,
             dish_id,
+            dish_servings,
             None,
         )
         .await;
@@ -228,6 +241,7 @@ pub async fn promote_new_meal(
         proposal.name.clone(),
         proposal,
         dish_id,
+        Decimal::from(1),
         Some(user_id),
     )
     .await
@@ -260,6 +274,7 @@ async fn wrap_dish_in_meal(
     name: String,
     proposal: &NewMealProposal,
     dish_id: Uuid,
+    servings: Decimal,
     contributed_by_user_id: Option<Uuid>,
 ) -> PromotionOutcome {
     match ingest
@@ -268,7 +283,7 @@ async fn wrap_dish_in_meal(
             external_id,
             name,
             description: None,
-            servings: Decimal::from(1),
+            servings,
             allergens: vec![],
             occasion_tags: proposal.occasion_tags.clone(),
             tags: vec![],
