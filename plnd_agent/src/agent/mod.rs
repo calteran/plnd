@@ -108,13 +108,16 @@ pub(crate) const MAX_SCHEMA_RETRIES: u32 = 3;
 /// etc.) to diagnose *why* validation failed rather than just *that* it did.
 const SCHEMA_LOG_CONTENT_LIMIT: usize = 1000;
 
-/// Truncate raw agent output for logging, returning the snippet and whether it
-/// was shortened. Counts by character (not byte) so multi-byte content is never
-/// split mid-codepoint, and caps at [`SCHEMA_LOG_CONTENT_LIMIT`].
-fn content_snippet(content: &str) -> (String, bool) {
-    let snippet: String = content.chars().take(SCHEMA_LOG_CONTENT_LIMIT).collect();
-    let truncated = content.chars().count() > SCHEMA_LOG_CONTENT_LIMIT;
-    (snippet, truncated)
+/// Borrow a logging-safe prefix of raw agent output — at most
+/// [`SCHEMA_LOG_CONTENT_LIMIT`] characters — plus whether it was shortened.
+/// Slices on a character boundary (never mid-codepoint) and stops scanning at
+/// the limit, so it allocates nothing and does no work proportional to the full
+/// response length.
+fn content_snippet(content: &str) -> (&str, bool) {
+    match content.char_indices().nth(SCHEMA_LOG_CONTENT_LIMIT) {
+        Some((idx, _)) => (&content[..idx], true),
+        None => (content, false),
+    }
 }
 
 /// Validates `content` (a JSON string produced by the agent loop) against a
@@ -1824,8 +1827,9 @@ mod tests {
         assert!(truncated);
     }
 
-    /// Truncation counts characters, not bytes, so multi-byte content is never
-    /// split mid-codepoint (which would panic on a `String`).
+    /// Truncation lands on a character boundary, so multi-byte content yields
+    /// exactly the limit in characters and never slices mid-codepoint (which
+    /// would panic when indexing the `&str`).
     #[test]
     fn test_content_snippet_counts_chars_not_bytes() {
         let raw = "🍽".repeat(SCHEMA_LOG_CONTENT_LIMIT + 10);
