@@ -1177,10 +1177,57 @@ pub async fn post_meal_plan_rebalance(
         }
     })?;
 
-    let mut response: MealPlanResponse = serde_json::from_str(&output.content).map_err(|e| {
+    // Parse as a permissive Value: some meal_refs may be `type: "new"` (invented),
+    // which would fail a direct MealPlanResponse parse before promotion.
+    let plan: serde_json::Value = serde_json::from_str(&output.content).map_err(|e| {
         tracing::error!(error = %e, content = %output.content, "failed to parse rebalanced meal plan output");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+
+    // Context for the constrained re-invocation used when a provider lookup misses.
+    let prefs_blob = preload_meal_pref_context(&state.repos, user_id).await;
+    let locked_entries: Vec<MealEntry> = body
+        .current_state
+        .approved
+        .iter()
+        .chain(body.current_state.custom.iter())
+        .cloned()
+        .collect();
+
+    // Promote each meal entry: existing refs pass through; `new` refs are ingested
+    // into the catalog; a provider miss triggers one constrained re-suggestion.
+    let mut resolved_meals: Vec<MealEntry> = Vec::new();
+    let mut failed: Vec<FailedSlot> = Vec::new();
+    for entry in plan["meals"].as_array().cloned().unwrap_or_default() {
+        let date: chrono::NaiveDate =
+            serde_json::from_value(entry["date"].clone()).unwrap_or(plan_start);
+        let meal_name = entry["meal_name"].as_str().unwrap_or_default().to_string();
+        let slot = plnd_data::models::OpenSlot { date, meal_name: meal_name.clone() };
+        match resolve_slot_meal(&state, user_id, date, &meal_name, &entry, || {
+            let mut c = build_suggest_slot_ctx(user_id, &slot, &prefs_blob, &locked_entries, &[]);
+            c.constrained_to_existing = true;
+            c
+        })
+        .await
+        {
+            Ok(m) => resolved_meals.push(m),
+            Err(f) => failed.push(f),
+        }
+    }
+
+    let response_plan_start: chrono::NaiveDate =
+        serde_json::from_value(plan["plan_start"].clone()).unwrap_or(plan_start);
+    let nutrition_summary = plan
+        .get("nutrition_summary")
+        .and_then(|v| serde_json::from_value(v.clone()).ok());
+
+    let mut response = MealPlanResponse {
+        plan_start: response_plan_start,
+        meals: resolved_meals,
+        nutrition_summary,
+        failed_slots: failed,
+        unplannable_reason: None,
+    };
 
     // Normalize the agent's free-form slot names to the authoritative day-type slots so the
     // client can find each cell by exact (date, meal_name) key. Best-effort: on lookup
