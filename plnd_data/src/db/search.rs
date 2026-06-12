@@ -27,10 +27,17 @@ pub async fn search_ingredients(
               SELECT 1 FROM user_ingredient_prefs
               WHERE user_id = $4 AND catalog_ingredient_id = ingredient_id AND preference_score = -2
           ))
-        ORDER BY ts_rank(
+        ORDER BY
+          (CASE
+             WHEN lower(name) = lower($1)           THEN 3
+             WHEN lower(name) LIKE lower($1) || '%'  THEN 2
+             ELSE 0
+           END) DESC,
+          ts_rank(
             to_tsvector('english', name || ' ' || COALESCE(description, '')),
             plainto_tsquery('english', $1)
-        ) DESC
+          ) DESC,
+          length(name) ASC
         LIMIT $2
         "#,
     )
@@ -276,6 +283,29 @@ mod tests {
         assert!(
             results.is_empty(),
             "should exclude rows with null nutrition"
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn search_ingredients_ranks_clean_name_above_branded(pool: PgPool) {
+        sqlx::query(
+            "INSERT INTO catalog_ingredients (name, description, allergens, occasion_tags) VALUES \
+             ('ALFREDO BROCCOLI Fettuccine & Broccoli in a Parmesan & Romano Cheese Sauce', \
+              'frozen dinner', '{}', '{}'), \
+             ('Cheese, cheddar', 'dairy', '{}', '{}')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let results = search_ingredients(&pool, "cheese", 10, &[], None)
+            .await
+            .unwrap();
+
+        assert!(results.len() >= 2, "both rows should match the FTS predicate");
+        assert_eq!(
+            results[0].name, "Cheese, cheddar",
+            "clean prefix/short name must outrank the long branded composite"
         );
     }
 }
