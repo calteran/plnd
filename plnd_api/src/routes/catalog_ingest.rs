@@ -67,6 +67,73 @@ pub async fn ingest_ingredient(
     ))
 }
 
+/// Map a provider's full ingredient detail into the catalog ingest input.
+/// Nutrition is serialized to JSON; a serialization failure degrades to `None`
+/// rather than failing the whole promotion.
+pub(crate) fn ingest_input_from_detail(
+    external_source: &str,
+    detail: plnd_data::providers::dtos::ExternalIngredient,
+) -> IngestIngredientInput {
+    IngestIngredientInput {
+        external_source: external_source.to_string(),
+        external_id: detail.external_id,
+        name: detail.name,
+        description: None,
+        serving_size_g: detail.serving_size_g,
+        nutrition: detail
+            .nutrition
+            .as_ref()
+            .and_then(|n| serde_json::to_value(n).ok()),
+        allergens: detail.allergens,
+        occasion_tags: detail.occasion_tags,
+    }
+}
+
+#[derive(Deserialize, utoipa::ToSchema)]
+pub struct PromoteIngredientBody {
+    pub external_source: String,
+    pub external_id: String,
+}
+
+#[utoipa::path(
+    post,
+    path = "/catalog/ingredients/promote",
+    tag = "Catalog",
+    request_body = PromoteIngredientBody,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 201, description = "External ingredient promoted into catalog", body = IngestIngredientResponse),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "No provider matched source, or external id not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[tracing::instrument(skip_all, fields(external_source = %body.external_source, external_id = %body.external_id))]
+pub async fn promote_ingredient(
+    State(state): State<Arc<AppState>>,
+    Extension(_claims): Extension<Claims>,
+    Json(body): Json<PromoteIngredientBody>,
+) -> Result<(StatusCode, Json<IngestIngredientResponse>), StatusCode> {
+    let detail = state
+        .provider_search
+        .fetch_ingredient_detail(&body.external_source, &body.external_id)
+        .await
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let id = state
+        .repos
+        .catalog_ingest
+        .ingest_ingredient(ingest_input_from_detail(&body.external_source, detail))
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "promote_ingredient ingest error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    Ok((
+        StatusCode::CREATED,
+        Json(IngestIngredientResponse { ingredient_id: id }),
+    ))
+}
+
 #[derive(Deserialize, utoipa::ToSchema)]
 pub struct ContributeIngredientBody {
     pub name: String,
@@ -143,5 +210,23 @@ mod tests {
         let resp = ContributeIngredientResponse { ingredient_id };
         let v = serde_json::to_value(&resp).expect("serialize");
         assert_eq!(v, serde_json::json!({ "ingredient_id": ingredient_id }));
+    }
+
+    #[test]
+    fn ingest_input_from_detail_maps_nutrition_and_ids() {
+        use plnd_data::providers::dtos::ExternalIngredient;
+        let detail = ExternalIngredient {
+            external_id: "173945".into(),
+            name: "Bananas, dehydrated, or banana powder".into(),
+            serving_size_g: None,
+            nutrition: None,
+            allergens: vec!["none".into()],
+            occasion_tags: vec![],
+        };
+        let input = ingest_input_from_detail("usda_fdc", detail);
+        assert_eq!(input.external_source, "usda_fdc");
+        assert_eq!(input.external_id, "173945");
+        assert_eq!(input.name, "Bananas, dehydrated, or banana powder");
+        assert_eq!(input.allergens, vec!["none".to_string()]);
     }
 }

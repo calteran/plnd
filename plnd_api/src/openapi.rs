@@ -23,7 +23,7 @@ use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
     catalog_ingest::{
         ContributeIngredientBody, ContributeIngredientResponse, IngestIngredientBody,
-        IngestIngredientResponse,
+        IngestIngredientResponse, PromoteIngredientBody,
     },
     day_types::{CreateDayTypeRequest, UpdateDayTypeRequest},
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
@@ -91,6 +91,7 @@ impl Modify for BearerSecurityAddon {
         // Catalog
         crate::routes::catalog_ingest::contribute_ingredient,
         crate::routes::catalog_ingest::ingest_ingredient,
+        crate::routes::catalog_ingest::promote_ingredient,
         crate::routes::catalog_details::get_ingredient,
         crate::routes::catalog_details::get_dish,
         crate::routes::catalog_details::get_meal,
@@ -175,6 +176,7 @@ impl Modify for BearerSecurityAddon {
         MealDetailApiResponse,
         IngestIngredientBody,
         IngestIngredientResponse,
+        PromoteIngredientBody,
         ContributeIngredientBody,
         ContributeIngredientResponse,
         // Tasks

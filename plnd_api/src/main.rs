@@ -317,6 +317,10 @@ async fn main() {
             post(catalog_ingest::ingest_ingredient),
         )
         .route(
+            "/catalog/ingredients/promote",
+            post(catalog_ingest::promote_ingredient),
+        )
+        .route(
             "/catalog/ingredients/{id}",
             get(catalog_details::get_ingredient),
         )
