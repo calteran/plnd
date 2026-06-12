@@ -523,4 +523,110 @@ mod tests {
         assert_eq!(*repo.dishes.lock().unwrap(), 1, "expected exactly 1 dish ingested");
         assert_eq!(*repo.meals.lock().unwrap(), 1, "expected exactly 1 meal ingested");
     }
+
+    // ── Task 13: integration test over real captured provider fixtures ────────
+
+    #[derive(Default)]
+    struct RecordingIngestRepo {
+        // (external_source, external_id, name) of each ingest_dish / ingest_meal call
+        dishes: Mutex<Vec<(String, String, String)>>,
+        meals: Mutex<Vec<(String, String, String)>>,
+    }
+
+    #[async_trait::async_trait]
+    impl CatalogIngestRepository for RecordingIngestRepo {
+        async fn ingest_ingredient(
+            &self,
+            _i: IngestIngredientInput,
+        ) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+        async fn contribute_ingredient(
+            &self,
+            _i: ContributeIngredientInput,
+        ) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+        async fn ingest_dish(&self, i: IngestDishInput) -> Result<Uuid, plnd_data::Error> {
+            self.dishes
+                .lock()
+                .unwrap()
+                .push((i.external_source.clone(), i.external_id.clone(), i.name.clone()));
+            Ok(Uuid::new_v4())
+        }
+        async fn ingest_meal(&self, i: IngestMealInput) -> Result<Uuid, plnd_data::Error> {
+            self.meals
+                .lock()
+                .unwrap()
+                .push((i.external_source.clone(), i.external_id.clone(), i.name.clone()));
+            Ok(Uuid::new_v4())
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    async fn promote_ingests_real_themealdb_fixture_recipe() {
+        use plnd_data::providers::{FixtureNutritionProvider, TheMealDbFixtureProvider};
+        use std::path::PathBuf;
+
+        // TheMealDbFixtureProvider understands the raw TheMealDB JSON format used
+        // in the captured fixtures (idMeal / strMeal / strIngredient1-20 etc.).
+        // FixtureRecipeProvider expects pre-translated ExternalDish JSON, which is
+        // a different schema — so we must use TheMealDbFixtureProvider here.
+        let recipe = TheMealDbFixtureProvider::new(
+            PathBuf::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../plnd_data/fixtures/recipe/themealdb/search.json"
+            )),
+            PathBuf::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../plnd_data/fixtures/recipe/themealdb/lookup.json"
+            )),
+        )
+        .unwrap();
+        let nutrition = FixtureNutritionProvider::new(
+            "usda_fdc",
+            PathBuf::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../plnd_data/fixtures/nutrition/usda_fdc/search.json"
+            )),
+            PathBuf::from(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../plnd_data/fixtures/nutrition/usda_fdc/lookup.json"
+            )),
+        )
+        .unwrap();
+
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(nutrition)],
+            vec![Arc::new(recipe)],
+            vec![],
+            plnd_data::cache::SearchCache::new(36),
+        );
+        let repo = RecordingIngestRepo::default();
+
+        let proposal = NewMealProposal {
+            name: "chicken".into(),
+            occasion_tags: vec!["dinner".into()],
+            inferred_ingredients: vec![],
+        };
+
+        let outcome = promote_new_meal(&svc, &repo, Uuid::new_v4(), &proposal).await;
+
+        // The TheMealDB fixture resolves "chicken" → "Chicken Handi" (id 52795),
+        // so promotion takes the recipe branch and ingests a catalog dish + meal
+        // keyed to the real provider source/id.
+        assert!(
+            matches!(&outcome, PromotionOutcome::Resolved { meal_type, .. } if meal_type == "catalog"),
+            "expected catalog Resolved, got {outcome:?}"
+        );
+        let dishes = repo.dishes.lock().unwrap();
+        let meals = repo.meals.lock().unwrap();
+        assert_eq!(dishes.len(), 1, "exactly one dish ingested");
+        assert_eq!(meals.len(), 1, "exactly one meal ingested");
+        assert_eq!(dishes[0].0, "themealdb", "dish external_source");
+        assert_eq!(dishes[0].1, "52795", "dish external_id = the TheMealDB recipe id");
+        assert_eq!(meals[0].0, "themealdb", "meal external_source");
+        assert_eq!(meals[0].1, "52795", "meal external_id");
+    }
 }
