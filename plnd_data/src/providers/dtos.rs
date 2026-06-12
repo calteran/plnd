@@ -40,7 +40,7 @@ pub struct ExternalIngredient {
 }
 
 /// An ingredient line within an `ExternalDish`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ExternalDishIngredient {
     pub name: String,
     pub external_ingredient_id: Option<String>,
@@ -51,7 +51,7 @@ pub struct ExternalDishIngredient {
 }
 
 /// A complete dish (recipe) as returned by a `RecipeProvider`.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ExternalDish {
     pub external_id: String,
     pub name: String,
@@ -83,7 +83,7 @@ pub struct ExternalExercise {
 }
 
 /// Lightweight summary used by all three provider `search_*` methods.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct SearchResult {
     pub external_id: String,
     pub name: String,

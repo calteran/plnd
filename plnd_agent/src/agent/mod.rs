@@ -467,7 +467,10 @@ impl AgentService {
         };
 
         // Step 3: Resolve system prompt.
-        let base_system = ctx.use_case.system_prompt().to_string();
+        let base_system = apply_existing_constraint(
+            ctx.use_case.system_prompt().to_string(),
+            ctx.constrained_to_existing,
+        );
 
         // Step 4: Inject memories into system prompt preamble if present.
         let system = match memory_entries {
@@ -644,6 +647,21 @@ fn build_provider(config: &crate::config::LlmModelConfig) -> Box<dyn LlmProvider
             OpenAiCompatibleProvider::new(&config.base_url, &config.api_key, &config.model)
                 .with_max_retry_wait(max_retry_wait),
         ),
+    }
+}
+
+// ── Existing-constraint prompt directive ─────────────────────────────────────
+
+/// Directive appended to the system prompt when a run is constrained to existing
+/// catalog/user meals (used by the provider-miss re-invocation path).
+const CONSTRAINED_TO_EXISTING_DIRECTIVE: &str = "\n\nIMPORTANT CONSTRAINT: A previous attempt to source a novel meal failed. For this request you MUST select an existing meal from the catalog or the user's library (meal_ref type 'catalog' or 'user'). Do NOT invent a meal; do NOT emit a meal_ref with type 'new'.";
+
+/// Append the existing-only constraint directive to a base system prompt when requested.
+fn apply_existing_constraint(base: String, constrained: bool) -> String {
+    if constrained {
+        format!("{base}{CONSTRAINED_TO_EXISTING_DIRECTIVE}")
+    } else {
+        base
     }
 }
 
@@ -1192,6 +1210,7 @@ mod tests {
             input: "add milk to grocery list".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -1250,6 +1269,7 @@ mod tests {
             input: "add milk to grocery list".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -1310,6 +1330,7 @@ mod tests {
             input: "add task".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         service.run(&ctx).await.unwrap();
@@ -1377,6 +1398,7 @@ mod tests {
             input: "plan my meals".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         service.run(&ctx).await.unwrap();
@@ -1427,6 +1449,7 @@ mod tests {
             input: "replace vacuum filter".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -1475,6 +1498,7 @@ mod tests {
             input: "book dentist".to_string(),
             prior_context: Some(prior.clone()),
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -1703,6 +1727,7 @@ mod tests {
             input: "add task".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -1746,6 +1771,7 @@ mod tests {
             input: "add task".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -1784,6 +1810,7 @@ mod tests {
             input: "add task".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -1868,6 +1895,7 @@ mod tests {
             input: "add task".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         service.run(&ctx).await.unwrap();
@@ -1943,6 +1971,7 @@ mod tests {
             input: "Renew passport".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         service.run(&ctx).await.unwrap();
@@ -2001,6 +2030,7 @@ mod tests {
             input: "add task".to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
 
         let result = service.run(&ctx).await;
@@ -2053,6 +2083,7 @@ mod tests {
             input: injection.to_string(),
             prior_context: None,
             extra: None,
+            constrained_to_existing: false,
         };
         service.run(&ctx).await.unwrap();
 
@@ -2092,6 +2123,20 @@ mod tests {
             entry.contains("&lt;/entry&gt;&lt;/memory&gt;"),
             "injection characters must be escaped"
         );
+    }
+
+    #[test]
+    fn apply_existing_constraint_appends_directive_when_constrained() {
+        let out = apply_existing_constraint("BASE".to_string(), true);
+        assert!(out.starts_with("BASE"));
+        assert!(out.contains("MUST select an existing meal"));
+        assert!(out.contains("type 'new'"));
+    }
+
+    #[test]
+    fn apply_existing_constraint_noop_when_unconstrained() {
+        let out = apply_existing_constraint("BASE".to_string(), false);
+        assert_eq!(out, "BASE");
     }
 }
 

@@ -44,4 +44,20 @@ Score 0 (neutral) is the default and is not included in any list.
 - **Respect restrictions**: never propose a blocked meal or one containing allergens.
 - **Security**: `user_id` is managed by the system — never include it in any tool argument.
 
+## Inventing a meal
+
+Prefer an existing catalog or user-library match. If — and only if — nothing in
+the catalog or the user's library is a good fit for this slot, you may invent a
+meal by returning a `meal_ref` of `type: "new"` with:
+
+- `name`: the meal's display name
+- `occasion_tags`: occasions it fits (e.g. `["dinner"]`)
+- `inferred_ingredients`: the ingredients you believe compose it, each with an
+  estimated portion in `grams`
+- `estimated_nutrition`: your best estimate of the per-serving macros
+
+The system will look up your invented meal against real recipe and nutrition
+data and add it to the shared catalog. Do not invent a meal when a reasonable
+existing option is available.
+
 <user_input>
