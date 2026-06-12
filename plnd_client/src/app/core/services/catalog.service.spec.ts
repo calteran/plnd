@@ -101,4 +101,17 @@ describe('CatalogService', () => {
     req.flush({ local: [], external: [], providers_queried: [], providers_from_cache: [] });
     expect(req.request.method).toBe('GET');
   });
+
+  it('promoteIngredient POSTs source+id and returns ingredient_id', () => {
+    let result: { ingredient_id: string } | undefined;
+    service.promoteIngredient({ external_source: 'usda_fdc', external_id: '173945' })
+      .subscribe(r => (result = r));
+
+    const req = httpMock.expectOne(r => r.url.endsWith('/catalog/ingredients/promote'));
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ external_source: 'usda_fdc', external_id: '173945' });
+    req.flush({ ingredient_id: 'ing-99' });
+
+    expect(result).toEqual({ ingredient_id: 'ing-99' });
+  });
 });

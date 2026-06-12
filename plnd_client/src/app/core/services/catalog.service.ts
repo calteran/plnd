@@ -12,9 +12,21 @@ export interface LocalIngredientResult {
   external_source: string | null;
 }
 
+export interface ExternalIngredientResult {
+  external_id: string;
+  name: string;
+  description: string | null;
+  thumbnail_url: string | null;
+}
+
+export interface PromoteIngredientBody {
+  external_source: string;
+  external_id: string;
+}
+
 export interface IngredientSearchResponse {
   local: LocalIngredientResult[];
-  external: unknown[];
+  external: ExternalIngredientResult[];
   providers_queried: string[];
   providers_from_cache: string[];
 }
@@ -63,6 +75,13 @@ export class CatalogService {
   ingestIngredient(body: IngestIngredientBody): Observable<IngestIngredientResponse> {
     return this.http.post<IngestIngredientResponse>(
       `${this.apiBase}/catalog/ingredients/ingest`,
+      body
+    );
+  }
+
+  promoteIngredient(body: PromoteIngredientBody): Observable<IngestIngredientResponse> {
+    return this.http.post<IngestIngredientResponse>(
+      `${this.apiBase}/catalog/ingredients/promote`,
       body
     );
   }
