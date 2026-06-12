@@ -820,6 +820,10 @@ test.describe('Onboarding', () => {
       await cheeseResult.click();
 
       await expect(search).toHaveValue(/Cheese/i);
+      // Selecting a result clears ingredientSearchResults in the component, so the
+      // dropdown closing proves the selection handler actually ran (not just that
+      // the input mirrored the typed text).
+      await expect(dropdown).not.toBeVisible();
     });
   });
 
