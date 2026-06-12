@@ -24,7 +24,11 @@ export default defineConfig({
   webServer: {
     command: 'npx ng serve --configuration development',
     url: 'http://localhost:4200',
-    reuseExistingServer: true,
+    // In CI/`just verify` always start a fresh server from THIS worktree — never
+    // adopt whatever `ng serve` happens to occupy :4200 (a stale or another
+    // worktree's build), which silently runs e2e against the wrong frontend.
+    // Locally, reuse a developer's running `ng serve` for fast iteration.
+    reuseExistingServer: !process.env['CI'],
     timeout: 120_000,
     stdout: 'ignore',
     stderr: 'pipe',
