@@ -2,7 +2,7 @@ import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, computed
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Subject, forkJoin, from, mergeMap, of } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter, map, switchMap, take } from 'rxjs/operators';
-import { CatalogService, ExternalIngredientResult, IngredientSearchResponse, LocalIngredientResult } from '../../../../../core/services/catalog.service';
+import { CatalogService, ExternalIngredientResult, IngredientSearchResponse } from '../../../../../core/services/catalog.service';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { UserIngredientPrefsService } from '../../../../../core/services/user-ingredient-prefs.service';
 import { UserMealsService } from '../../../../../core/services/user-meals.service';

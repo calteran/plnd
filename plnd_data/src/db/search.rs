@@ -302,7 +302,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(results.len() >= 2, "both rows should match the FTS predicate");
+        assert!(
+            results.len() >= 2,
+            "both rows should match the FTS predicate"
+        );
         assert_eq!(
             results[0].name, "Cheese, cheddar",
             "clean prefix/short name must outrank the long branded composite"

@@ -387,7 +387,11 @@ impl ProviderSearchService {
             .nutrition_providers
             .iter()
             .find(|p| p.source_name() == source)?;
-        provider.get_ingredient_by_id(external_id).await.ok().flatten()
+        provider
+            .get_ingredient_by_id(external_id)
+            .await
+            .ok()
+            .flatten()
     }
 }
 
@@ -660,6 +664,10 @@ mod resolve_tests {
             vec![],
             SearchCache::new(36),
         );
-        assert!(svc.fetch_ingredient_detail("not_a_source", "i1").await.is_none());
+        assert!(
+            svc.fetch_ingredient_detail("not_a_source", "i1")
+                .await
+                .is_none()
+        );
     }
 }
