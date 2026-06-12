@@ -445,6 +445,27 @@ describe('ScheduleService', () => {
     httpMock.expectNone('http://localhost:3000/schedule/entries/meal-1/one-shot');
   });
 
+  it('setEntryOneShot PATCHes and updates a during-meal task nested in a meal anchor', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock);
+    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
+      id: 'm1', name: 'Breakfast', emoji: '🥣',
+      status: 'planned', duringMealTasks: [
+        { id: 't-dm3', type: 'medication', label: 'Take pill with breakfast', status: 'pending', oneShot: false }
+      ]
+    }]);
+
+    svc.setEntryOneShot('t-dm3', true);
+
+    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/t-dm3/one-shot');
+    expect(req.request.method).toBe('PATCH');
+    expect(req.request.body).toEqual({ one_shot: true });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+
+    const meal = svc.scheduleItems()[0] as MealAnchor;
+    expect(meal.duringMealTasks[0].oneShot).toBe(true);
+  });
+
   it('addItem appends a ScheduleTask to scheduleItems', () => {
     const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending', oneShot: false };
     svc.addItem(task);
