@@ -121,6 +121,12 @@ describe('TaskRowComponent', () => {
     expect(indicator.nativeElement.textContent).not.toContain('⤓');
   });
 
+  it('makes the indicator keyboard-focusable so the label can be revealed on focus', async () => {
+    const f = await setup(oneShotTask);
+    const indicator = f.debugElement.query(By.css('.one-shot-indicator')).nativeElement;
+    expect(indicator.getAttribute('tabindex')).toBe('0');
+  });
+
   it('shows the plain-language "skip if missed" label on the indicator', async () => {
     const f = await setup(oneShotTask);
     const label = f.debugElement.query(By.css('.one-shot-label'));

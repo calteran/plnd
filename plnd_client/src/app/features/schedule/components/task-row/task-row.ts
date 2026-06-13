@@ -43,6 +43,7 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
         <span
           class="one-shot-indicator"
           role="img"
+          tabindex="0"
           [attr.aria-label]="oneShotLabel()"
           [attr.title]="oneShotLabel()"
         >
