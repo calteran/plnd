@@ -82,9 +82,15 @@ Mitigations baked in:
   completion toggles** — the two actions stay spatially separate so an edit and a "mark done"
   never get crossed.
 - **Only one editor open at a time.** Opening a second row closes the first.
-- **Dismiss:** tapping a de-emphasized row closes the current editor (and may open that row);
-  pressing `Escape` closes and returns focus to the originating row. There is no modal
-  "Cancel" — edits persist as made (see §5, save behavior).
+- **Focus on open:** focus moves into the title field so keyboard/AT users land inside the form.
+- **Dismiss:** the **Done** button or pressing **`Escape`** (from any control in the form) closes
+  the editor and returns focus to the originating row. There is no modal "Cancel" — edits persist
+  as made (see §5, save behavior).
+- **Resolved contradiction (inert vs. tap-to-dismiss):** an earlier draft also said "tapping a
+  de-emphasized row dismisses the editor." That cannot coexist with making the dimmed rows
+  **`inert`** (which removes their pointer/focus events) — and `inert` is the stronger
+  accessibility choice. We keep `inert`; the dismissal paths are therefore **Done** and
+  **`Escape`**, not tapping a dimmed row.
 
 ## 4. Architecture & components
 
