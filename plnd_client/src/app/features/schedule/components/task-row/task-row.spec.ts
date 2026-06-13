@@ -144,4 +144,24 @@ describe('TaskRowComponent', () => {
     expect(aria.toLowerCase()).toContain('carry over');
     expect(aria.toLowerCase()).not.toContain('one-time');
   });
+
+  const baseTask = (): ScheduleTask =>
+    ({ id: 'edit-1', type: 'general', label: 'Plan the week', status: 'pending', oneShot: false, floating: false });
+
+  it('emits editRequested with the entry id when the label is tapped', async () => {
+    const f = await setup(baseTask());
+    let requested: string | undefined;
+    f.componentInstance.editRequested.subscribe((id: string) => (requested = id));
+    f.nativeElement.querySelector('.label').dispatchEvent(new Event('click'));
+    expect(requested).toBe(baseTask().id);
+  });
+
+  it('renders the edit form only when editing is true', async () => {
+    const f = await setup(baseTask());
+    expect(f.nativeElement.querySelector('app-task-edit-form')).toBeNull();
+
+    f.componentRef.setInput('editing', true);
+    f.detectChanges();
+    expect(f.nativeElement.querySelector('app-task-edit-form')).toBeTruthy();
+  });
 });

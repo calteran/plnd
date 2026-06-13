@@ -1,5 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
-import { ItemType, ScheduleTask } from '../../../../core/models/schedule';
+import { ItemType, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
+import { TaskEditFormComponent } from '../task-edit-form/task-edit-form';
 
 const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
   work:        'work',
@@ -12,6 +13,7 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
 @Component({
   selector: 'app-task-row',
   standalone: true,
+  imports: [TaskEditFormComponent],
   template: `
     <div class="task-row" [class.done]="item().status === 'done'">
       <div class="gutter">
@@ -35,7 +37,11 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
           </svg>
         }
       </button>
-      <span class="label" [class.struck]="item().status === 'done'">{{ item().label }}</span>
+      <span class="label" role="button" tabindex="0"
+            [class.struck]="item().status === 'done'"
+            (click)="editRequested.emit(item().id)"
+            (keydown.enter)="editRequested.emit(item().id)"
+            (keydown.space)="$event.preventDefault(); editRequested.emit(item().id)">{{ item().label }}</span>
       @if (typeBadge()) {
         <span class="type-badge type-badge--{{ item().type }}">{{ typeBadge() }}</span>
       }
@@ -57,12 +63,20 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
         </span>
       }
     </div>
+    @if (editing()) {
+      <app-task-edit-form [task]="item()" (save)="save.emit($event)" (close)="close.emit()" />
+    }
   `,
   styleUrl: './task-row.scss'
 })
 export class TaskRowComponent {
   readonly item    = input.required<ScheduleTask>();
   readonly toggled = output<string>();
+
+  readonly editing       = input(false);
+  readonly editRequested = output<string>();
+  readonly save          = output<TaskEditPatch>();
+  readonly close         = output<void>();
 
   protected readonly typeBadge = computed(() => TYPE_BADGE_LABELS[this.item().type] ?? null);
 
