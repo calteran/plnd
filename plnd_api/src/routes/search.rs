@@ -139,6 +139,9 @@ pub async fn search_ingredients_handler(
         ..Default::default()
     };
     // Canonical-source (clean generic name) results lead; branded sources follow.
+    // Within each bucket, order is provider-arrival order (non-deterministic across
+    // concurrent providers); relevance ordering of canonical results is out of scope
+    // here and tracked in #918.
     let mut canonical_external: Vec<SearchResult> = Vec::new();
     let mut branded_external: Vec<SearchResult> = Vec::new();
     while let Some(ev) = stream.next().await {
