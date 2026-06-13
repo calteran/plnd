@@ -28,16 +28,10 @@ async fn main() -> anyhow::Result<()> {
     let recipe_providers: Vec<Arc<dyn RecipeProvider>> =
         vec![Arc::new(TheMealDbProvider::new(&mdb_key))];
 
-    let corpus_path = std::env::var("APP_USDA_CORPUS_PATH")
-        .unwrap_or_else(|_| plnd_seed::ingredients::USDA_CORPUS_PATH.to_string());
+    let corpus_path = plnd_seed::ingredients::resolve_corpus_path();
 
     println!("Running catalog seed from vendored USDA corpus...");
-    plnd_seed::seed(
-        &pool,
-        &recipe_providers,
-        std::path::Path::new(&corpus_path),
-    )
-    .await?;
+    plnd_seed::seed(&pool, &recipe_providers, &corpus_path).await?;
 
     println!("Running dev user seed...");
     plnd_seed::dev_user::seed_dev_user(&pool).await?;

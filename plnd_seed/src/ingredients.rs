@@ -1,15 +1,45 @@
 use std::io::{BufRead, BufReader};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use flate2::read::GzDecoder;
 use plnd_data::providers::dtos::ExternalIngredient;
 use sqlx::PgConnection;
+use uuid::Uuid;
 
 use crate::error::SeedError;
 
-/// Default location of the vendored USDA canonical corpus, relative to the repo
-/// root (the API and seed bin both run with the repo root as CWD).
+/// Path to the vendored USDA canonical corpus, relative to the workspace root.
+/// Callers run from different working directories (the seed bin from the repo
+/// root, the API binary from `plnd_api/`), so resolve via [`resolve_corpus_path`]
+/// rather than using this constant directly.
 pub const USDA_CORPUS_PATH: &str = "plnd_data/corpus/usda_canonical.jsonl.gz";
+
+/// Environment override for the corpus location (absolute path), used by
+/// deployments where the workspace layout does not apply.
+pub const USDA_CORPUS_PATH_ENV: &str = "APP_USDA_CORPUS_PATH";
+
+/// Resolve the corpus file location independent of the caller's working
+/// directory. Precedence:
+/// 1. `APP_USDA_CORPUS_PATH` if set (absolute path for containers/prod).
+/// 2. The workspace-relative default from the current directory (e.g. `just seed`
+///    runs from the repo root).
+/// 3. The same path one level up (the API binary runs from `plnd_api/`).
+/// If none exist, returns the CWD-relative default so the loader surfaces a clear
+/// "file not found" error rather than guessing.
+pub fn resolve_corpus_path() -> PathBuf {
+    if let Ok(p) = std::env::var(USDA_CORPUS_PATH_ENV) {
+        return PathBuf::from(p);
+    }
+    let from_cwd = PathBuf::from(USDA_CORPUS_PATH);
+    if from_cwd.is_file() {
+        return from_cwd;
+    }
+    let from_parent = Path::new("..").join(USDA_CORPUS_PATH);
+    if from_parent.is_file() {
+        return from_parent;
+    }
+    from_cwd
+}
 
 /// Load the vendored USDA canonical corpus: a gzipped JSONL of `ExternalIngredient`
 /// records. Every row is tagged source `usda_fdc`. Offline and deterministic.
@@ -37,8 +67,6 @@ pub async fn insert_ingredients(
     tx: &mut PgConnection,
     ingredients: &[(String, ExternalIngredient)],
 ) -> Result<usize, SeedError> {
-    use uuid::Uuid;
-
     let mut inserted = 0usize;
     for chunk in ingredients.chunks(1000) {
         let mut qb = sqlx::QueryBuilder::new(
@@ -144,5 +172,32 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(count, 2);
+
+        // The nutrition JSONB must round-trip for a nutrition-bearing record
+        // (guards the `serde_json::to_value(..).ok()` NULL fallback in the insert).
+        let nutrition_present: bool = sqlx::query_scalar(
+            "SELECT nutrition IS NOT NULL FROM catalog_ingredients \
+             WHERE external_source = 'usda_fdc' AND external_id = '1'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert!(nutrition_present, "Oats record carried nutrition and must persist it");
+    }
+
+    #[test]
+    fn resolve_corpus_path_prefers_env_override() {
+        // SAFETY: single-threaded test; we set and restore the override.
+        let key = USDA_CORPUS_PATH_ENV;
+        let prev = std::env::var(key).ok();
+        unsafe { std::env::set_var(key, "/tmp/explicit/usda.jsonl.gz") };
+        assert_eq!(
+            resolve_corpus_path(),
+            std::path::PathBuf::from("/tmp/explicit/usda.jsonl.gz")
+        );
+        match prev {
+            Some(v) => unsafe { std::env::set_var(key, v) },
+            None => unsafe { std::env::remove_var(key) },
+        }
     }
 }
