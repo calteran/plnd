@@ -677,7 +677,8 @@ mod tests {
                 "/../plnd_data/fixtures/nutrition/usda_fdc/lookup.json"
             )),
         )
-        .unwrap();
+        .unwrap()
+        .canonical(true);
 
         let svc = ProviderSearchService::new(
             vec![Arc::new(nutrition)],

@@ -138,9 +138,23 @@ pub async fn search_ingredients_handler(
         local,
         ..Default::default()
     };
+    // Canonical-source (clean generic name) results lead; branded sources follow.
+    // Within each bucket, order is provider-arrival order (non-deterministic across
+    // concurrent providers); relevance ordering of canonical results is out of scope
+    // here and tracked in #918.
+    let mut canonical_external: Vec<SearchResult> = Vec::new();
+    let mut branded_external: Vec<SearchResult> = Vec::new();
     while let Some(ev) = stream.next().await {
         match ev {
-            ProviderSearchEvent::Results { results, .. } => resp.external.extend(results),
+            ProviderSearchEvent::Results {
+                source, results, ..
+            } => {
+                if state.provider_search.is_canonical_source(&source) {
+                    canonical_external.extend(results);
+                } else {
+                    branded_external.extend(results);
+                }
+            }
             ProviderSearchEvent::Done {
                 providers_queried,
                 providers_from_cache,
@@ -151,6 +165,8 @@ pub async fn search_ingredients_handler(
             ProviderSearchEvent::Error { .. } => {}
         }
     }
+    canonical_external.append(&mut branded_external);
+    resp.external = canonical_external;
     Ok(Json(resp))
 }
 

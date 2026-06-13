@@ -7,6 +7,12 @@ use crate::providers::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, Se
 use crate::providers::error::ExternalProviderError;
 use crate::providers::nutrition::NutritionProvider;
 
+/// USDA FDC data types that carry clean, generic ingredient names. `Branded` and
+/// `Survey (FNDDS)` are excluded — they yield branded composites or mixed dishes.
+fn is_canonical_data_type(data_type: Option<&str>) -> bool {
+    matches!(data_type, Some("Foundation") | Some("SR Legacy"))
+}
+
 pub struct UsdaFdcProvider {
     http: Client,
     api_key: String,
@@ -37,6 +43,8 @@ struct FdcSearchFood {
     description: String,
     #[serde(rename = "foodCategory")]
     food_category: Option<String>,
+    #[serde(rename = "dataType")]
+    data_type: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -121,6 +129,10 @@ impl NutritionProvider for UsdaFdcProvider {
         "usda_fdc"
     }
 
+    fn is_canonical_source(&self) -> bool {
+        true
+    }
+
     #[tracing::instrument(
         name = "provider::usda_fdc::search_ingredients",
         skip(self),
@@ -142,6 +154,8 @@ impl NutritionProvider for UsdaFdcProvider {
             .query(&[
                 ("query", query.query.as_str()),
                 ("pageSize", &query.limit.to_string()),
+                ("dataType", "Foundation"),
+                ("dataType", "SR Legacy"),
                 ("api_key", self.api_key.as_str()),
             ])
             .send()
@@ -174,6 +188,7 @@ impl NutritionProvider for UsdaFdcProvider {
         let results = body
             .foods
             .into_iter()
+            .filter(|f| is_canonical_data_type(f.data_type.as_deref()))
             .map(|f| SearchResult {
                 external_id: f.fdc_id.to_string(),
                 name: f.description,
@@ -421,6 +436,38 @@ mod tests {
             matches!(result, Err(ExternalProviderError::ConfigurationError(_))),
             "expected ConfigurationError, got: {:?}",
             result
+        );
+    }
+
+    #[test]
+    fn usda_is_a_canonical_source() {
+        assert!(
+            UsdaFdcProvider::new("key").is_canonical_source(),
+            "USDA Foundation/SR Legacy supplies clean canonical names"
+        );
+    }
+
+    #[test]
+    fn canonical_data_types_are_foundation_and_sr_legacy() {
+        assert!(is_canonical_data_type(Some("Foundation")));
+        assert!(is_canonical_data_type(Some("SR Legacy")));
+        assert!(!is_canonical_data_type(Some("Branded")));
+        assert!(!is_canonical_data_type(Some("Survey (FNDDS)")));
+        assert!(!is_canonical_data_type(None));
+    }
+
+    #[test]
+    fn search_food_deserializes_data_type() {
+        let json = r#"{
+            "fdcId": 1,
+            "description": "ALFREDO BROCCOLI ...",
+            "dataType": "Branded"
+        }"#;
+        let food: FdcSearchFood = serde_json::from_str(json).expect("deserialize");
+        assert_eq!(food.data_type.as_deref(), Some("Branded"));
+        assert!(
+            !is_canonical_data_type(food.data_type.as_deref()),
+            "branded composite must be classified non-canonical"
         );
     }
 }

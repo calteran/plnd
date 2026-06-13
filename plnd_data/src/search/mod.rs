@@ -374,6 +374,16 @@ impl ProviderSearchService {
         None
     }
 
+    /// Whether the given source name belongs to a nutrition provider that yields
+    /// canonical (generic) ingredient names. Unknown sources are treated as
+    /// non-canonical so they sort after canonical results in merged output.
+    pub fn is_canonical_source(&self, source: &str) -> bool {
+        self.nutrition_providers
+            .iter()
+            .find(|p| p.source_name() == source)
+            .is_some_and(|p| p.is_canonical_source())
+    }
+
     /// Fetch the full detail for a specific external ingredient by `(source, external_id)`.
     /// Used by the promote-on-select flow: the caller already holds the exact id the
     /// user picked, so this fetches that id directly rather than re-running a search.
@@ -392,6 +402,35 @@ impl ProviderSearchService {
             .await
             .ok()
             .flatten()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cache::SearchCache;
+    use std::sync::Arc;
+
+    #[test]
+    fn is_canonical_source_reflects_provider_marker() {
+        use crate::providers::{OpenFoodFactsProvider, UsdaFdcProvider};
+
+        let svc = ProviderSearchService::new(
+            vec![
+                Arc::new(UsdaFdcProvider::new("key")),
+                Arc::new(OpenFoodFactsProvider::default()),
+            ],
+            vec![],
+            vec![],
+            SearchCache::new(36),
+        );
+
+        assert!(svc.is_canonical_source("usda_fdc"));
+        assert!(!svc.is_canonical_source("openfoodfacts"));
+        assert!(
+            !svc.is_canonical_source("unknown"),
+            "unknown sources default to non-canonical"
+        );
     }
 }
 

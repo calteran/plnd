@@ -59,6 +59,13 @@ pub async fn fetch_ingredients(
     let mut results: Vec<(String, ExternalIngredient)> = Vec::new();
 
     for provider in providers {
+        if !provider.is_canonical_source() {
+            tracing::info!(
+                provider = provider.source_name(),
+                "catalog seed: skipping non-canonical source (branded names not seeded)"
+            );
+            continue;
+        }
         let source = provider.source_name().to_string();
         let query_limit = 3;
 
@@ -147,7 +154,76 @@ pub async fn insert_ingredients(
 
 #[cfg(test)]
 mod tests {
-    use super::INGREDIENT_TERMS;
+    use super::*;
+    use async_trait::async_trait;
+    use plnd_data::providers::NutritionProvider;
+    use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery, SearchResult};
+    use plnd_data::providers::error::ExternalProviderError;
+    use std::sync::Arc;
+
+    struct StubProvider {
+        source: String,
+        canonical: bool,
+    }
+
+    #[async_trait]
+    impl NutritionProvider for StubProvider {
+        fn source_name(&self) -> &str {
+            &self.source
+        }
+        fn is_canonical_source(&self) -> bool {
+            self.canonical
+        }
+        async fn search_ingredients(
+            &self,
+            _query: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            Ok(vec![SearchResult {
+                external_id: format!("{}-1", self.source),
+                name: "Stub Food".to_string(),
+                description: None,
+                thumbnail_url: None,
+            }])
+        }
+        async fn get_ingredient_by_id(
+            &self,
+            external_id: &str,
+        ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
+            Ok(Some(ExternalIngredient {
+                external_id: external_id.to_string(),
+                name: "Stub Food".to_string(),
+                serving_size_g: None,
+                nutrition: None,
+                allergens: vec![],
+                occasion_tags: vec![],
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn fetch_ingredients_skips_non_canonical_providers() {
+        let providers: Vec<Arc<dyn NutritionProvider>> = vec![
+            Arc::new(StubProvider {
+                source: "canon".to_string(),
+                canonical: true,
+            }),
+            Arc::new(StubProvider {
+                source: "branded".to_string(),
+                canonical: false,
+            }),
+        ];
+
+        let fetched = fetch_ingredients(&providers).await;
+
+        assert!(
+            !fetched.is_empty(),
+            "the canonical provider must contribute rows"
+        );
+        assert!(
+            fetched.iter().all(|(source, _)| source == "canon"),
+            "no branded-source rows may be seeded"
+        );
+    }
 
     #[test]
     fn seed_terms_include_common_ingredients_and_are_deduped() {

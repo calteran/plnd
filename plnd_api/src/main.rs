@@ -551,7 +551,7 @@ fn build_nutrition_providers(
                 })
         };
         return vec![
-            Arc::new(make("usda_fdc", "nutrition/usda_fdc")),
+            Arc::new(make("usda_fdc", "nutrition/usda_fdc").canonical(true)),
             Arc::new(make("openfoodfacts", "nutrition/open_food_facts")),
         ];
     }

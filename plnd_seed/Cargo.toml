@@ -28,6 +28,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 sqlx = { version = "0.9", features = ["macros"] }
+async-trait = "0.1"
 
 [package.metadata.cargo-machete]
 ignored = ["rust_decimal"]  # used via sqlx rust_decimal feature for Decimal Encode/Type impls

@@ -316,6 +316,14 @@ mod tests {
     }
 
     #[test]
+    fn off_is_not_a_canonical_source() {
+        assert!(
+            !OpenFoodFactsProvider::default().is_canonical_source(),
+            "Open Food Facts product names are branded composites, not canonical"
+        );
+    }
+
+    #[test]
     fn test_off_nutriments_json_round_trip_with_hyphenated_keys() {
         let json = r#"{
             "energy-kcal_100g": 95.0,

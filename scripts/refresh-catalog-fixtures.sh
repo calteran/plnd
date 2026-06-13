@@ -21,8 +21,10 @@
 #
 # Failure mode: `set -euo pipefail` means any curl or jq failure aborts the
 # whole script, leaving the fixture directory in a partially-updated state.
-# If a single provider has an outage during refresh, revert the partial
-# changes with `git checkout plnd_data/fixtures/` and retry.
+# (Exception: USDA detail-endpoint 404s are tolerated — that id is dropped from
+# the fixtures, mirroring the live provider's Ok(None) behavior.) If a single
+# provider has an outage during refresh, revert the partial changes with
+# `git checkout plnd_data/fixtures/` and retry.
 
 set -euo pipefail
 
@@ -42,6 +44,7 @@ INGREDIENT_TERMS=(
     "milk"
     "egg"
     "olive oil"
+    "cheese"
 )
 
 # Extra terms captured for the API search endpoint but NOT in INGREDIENT_TERMS,
@@ -107,7 +110,9 @@ usda_all_terms=("${INGREDIENT_TERMS[@]}" "${USDA_ONLY_TERMS[@]}")
 
 for term in "${usda_all_terms[@]}"; do
     encoded="$(urlencode_term "${term}")"
-    raw="$(curl -fsSL "https://api.nal.usda.gov/fdc/v1/foods/search?query=${encoded}&pageSize=${QUERY_LIMIT}&api_key=${USDA_KEY}")"
+    # dataType=Foundation,SR Legacy mirrors the live provider (usda_fdc.rs): only
+    # canonical generic-name entries, never Branded composites or Survey (FNDDS).
+    raw="$(curl -fsSL "https://api.nal.usda.gov/fdc/v1/foods/search?query=${encoded}&pageSize=${QUERY_LIMIT}&dataType=Foundation&dataType=SR%20Legacy&api_key=${USDA_KEY}")"
 
     # Normalize to SearchResult: { external_id, name, description, thumbnail_url }
     normalized="$(jq '[.foods[]? | {
@@ -126,7 +131,13 @@ done
 
 while IFS= read -r fdc_id; do
     [[ -z "${fdc_id}" ]] && continue
-    raw="$(curl -fsSL "https://api.nal.usda.gov/fdc/v1/food/${fdc_id}?api_key=${USDA_KEY}")"
+    # Some Foundation/SR Legacy search hits 404 on the detail endpoint. The live
+    # provider (usda_fdc.rs::get_ingredient_by_id) treats 404 as Ok(None) and the
+    # seeder skips it; mirror that here by dropping the id instead of aborting.
+    raw="$(curl -fsSL "https://api.nal.usda.gov/fdc/v1/food/${fdc_id}?api_key=${USDA_KEY}")" || {
+        echo "  warn: USDA detail fetch failed for fdcId ${fdc_id}; dropping it from fixtures" >&2
+        continue
+    }
 
     # Normalize to ExternalIngredient. USDA returns foodNutrients as a flat
     # array of {nutrient: {name, unitName}, amount}; we extract the canonical
@@ -165,6 +176,13 @@ while IFS= read -r fdc_id; do
     ' <<<"${raw}")"
     usda_lookup_acc="$(jq --argjson new "${entry}" '. * $new' <<<"${usda_lookup_acc}")"
 done <<<"$(printf '%s' "${usda_ids_raw}" | sort -u)"
+
+# Keep the search/lookup pair self-consistent: drop any search result whose
+# detail fetch was skipped above (404), so every external_id in search.json has
+# a matching lookup.json entry.
+usda_search_acc="$(jq --argjson lookup "${usda_lookup_acc}" '
+    map_values([ .[] | select($lookup[.external_id] != null) ])
+' <<<"${usda_search_acc}")"
 
 echo "${usda_search_acc}" | jq '.' > "${usda_dir}/search.json"
 echo "${usda_lookup_acc}" | jq '.' > "${usda_dir}/lookup.json"
