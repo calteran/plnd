@@ -45,11 +45,10 @@ watch-runner slot="1":
     machine=$(hostname -s | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/-*$//')
     exec orb run -m "plnd-${machine}-{{slot}}" sudo journalctl -fu "actions.runner.*"
 
-# Create a worktree and install Angular deps so the LSP resolves types immediately
-worktree-new branch:
-    git worktree add .worktrees/{{branch}} -b {{branch}}
-    cd .worktrees/{{branch}}/plnd_client && npm ci
-    @echo "✅ Worktree ready at .worktrees/{{branch}}"
+# Install Angular/Node deps in the current checkout so the LSP resolves types (run inside a fresh worktree)
+install-deps:
+    cd plnd_client && npm ci
+    @echo "✅ Client dependencies installed"
 
 # ── Daily Development ─────────────────────────────────────────────────────────
 
