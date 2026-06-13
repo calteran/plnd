@@ -103,11 +103,39 @@ describe('TaskRowComponent', () => {
     expect(badge.nativeElement.textContent.trim()).toBe('appt');
   });
 
-  it('emits oneShotToggled with the inverted value when the toggle is clicked', async () => {
-    const f = await setup({ id: 't1', type: 'general', label: 'meds', status: 'pending', oneShot: false });
-    let emitted: { id: string; oneShot: boolean } | undefined;
-    f.componentInstance.oneShotToggled.subscribe((e: { id: string; oneShot: boolean }) => (emitted = e));
-    f.debugElement.query(By.css('.one-shot-toggle')).nativeElement.click();
-    expect(emitted).toEqual({ id: 't1', oneShot: true });
+  // One-shot is surfaced as a read-only indicator in the day view: it appears only on
+  // tasks that are already one-shot, and toggling moves to a future task edit view.
+  const oneShotTask: ScheduleTask = { id: 'os1', type: 'medication', label: 'Vitamins', status: 'pending', oneShot: true };
+
+  it('renders no one-shot indicator for ordinary (carry-over) tasks', async () => {
+    const f = await setup(pending);
+    expect(f.debugElement.query(By.css('.one-shot-indicator'))).toBeNull();
+  });
+
+  it('renders a read-only one-shot indicator (not a button) for one-shot tasks', async () => {
+    const f = await setup(oneShotTask);
+    const indicator = f.debugElement.query(By.css('.one-shot-indicator'));
+    expect(indicator).toBeTruthy();
+    expect(indicator.nativeElement.tagName).not.toBe('BUTTON');
+    expect(indicator.query(By.css('svg'))).toBeTruthy();
+    expect(indicator.nativeElement.textContent).not.toContain('⤓');
+  });
+
+  it('shows the plain-language "skip if missed" label on the indicator', async () => {
+    const f = await setup(oneShotTask);
+    const label = f.debugElement.query(By.css('.one-shot-label'));
+    expect(label).toBeTruthy();
+    expect(label.nativeElement.textContent.trim()).toBe('skip if missed');
+  });
+
+  it('exposes an accessible label naming the task, without the misleading "one-time" wording', async () => {
+    const f = await setup(oneShotTask);
+    const indicator = f.debugElement.query(By.css('.one-shot-indicator')).nativeElement;
+    const aria = indicator.getAttribute('aria-label');
+    expect(indicator.getAttribute('role')).toBe('img');
+    expect(aria).toContain('Vitamins');
+    expect(aria.toLowerCase()).toContain('skip if missed');
+    expect(aria.toLowerCase()).toContain('carry over');
+    expect(aria.toLowerCase()).not.toContain('one-time');
   });
 });

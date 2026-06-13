@@ -68,26 +68,40 @@
   color: var(--color-text-primary);
 }
 
-.one-shot-toggle {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 12px;
+// Read-only marker shown only on one-shot tasks. The icon is always visible;
+// the label stays hidden to keep rows quiet and reveals on hover/focus.
+.one-shot-indicator {
   line-height: 1;
   padding: 2px 4px;
-  color: var(--color-text-muted);
-  opacity: 0.45;
+  color: var(--color-accent-dark);
   flex-shrink: 0;
   margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
 
-  &.active {
-    opacity: 1;
-    color: var(--color-accent-dark);
+  .one-shot-icon {
+    display: block;
+    flex-shrink: 0;
   }
 
-  &:focus-visible {
-    outline: 2px solid var(--color-accent-border);
-    border-radius: 4px;
+  .one-shot-label {
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    transition: max-width 0.18s ease, opacity 0.18s ease, margin-left 0.18s ease;
+  }
+
+  &:hover .one-shot-label,
+  &:focus-visible .one-shot-label,
+  &:focus-within .one-shot-label {
+    max-width: 96px;
+    opacity: 1;
+    margin-left: 4px;
   }
 }
 

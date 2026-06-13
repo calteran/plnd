@@ -92,7 +92,12 @@ export class ScheduleService {
       .subscribe({ error: () => this.loadDay(this._date()) });
   }
 
-  /** Set a task's one-shot flag (carry-over vs one-time). Optimistic; reloads on error. */
+  /**
+   * Set a task's one-shot flag (skip-if-missed vs carry-over). Optimistic; reloads on error.
+   *
+   * Retained without a caller: the day view shows one-shot as a read-only indicator (#911),
+   * so the setter moves to the upcoming task edit view (#914), which will call this method.
+   */
   setEntryOneShot(id: string, oneShot: boolean): void {
     // findItemStatus searches both top-level tasks and tasks nested inside meal
     // anchors (duringMealTasks); it returns null for a meal-anchor's own id or an

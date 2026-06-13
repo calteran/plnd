@@ -112,14 +112,6 @@ describe('MealRowComponent', () => {
     expect(emitted).toBe('dt1');
   });
 
-  it('re-emits oneShotToggled from a during-meal task row', async () => {
-    const f = await setup(withTasks);
-    let emitted: { id: string; oneShot: boolean } | undefined;
-    f.componentInstance.oneShotToggled.subscribe((e: { id: string; oneShot: boolean }) => (emitted = e));
-    f.debugElement.query(By.css('app-task-row .one-shot-toggle')).nativeElement.click();
-    expect(emitted).toEqual({ id: 'dt1', oneShot: true });
-  });
-
   it('applies the skipped modifier class for a skipped meal', async () => {
     const f = await setup(skippedMeal);
     const band = f.debugElement.query(By.css('.meal-band')).nativeElement as HTMLElement;
