@@ -1,4 +1,4 @@
-import { MealNutrition } from './week-plan';
+import { MealNutrition, EnergyLevel } from './week-plan';
 
 export type ItemStatus = 'pending' | 'done';
 export type ItemType   = 'work' | 'exercise' | 'leisure' | 'medication' | 'appointment' | 'general';
@@ -8,8 +8,22 @@ export interface ScheduleTask {
   type: ItemType;
   label: string;
   status: ItemStatus;
-  scheduledTime?: string; // e.g. '11 AM'
+  scheduledTime?: string;     // gutter display (unchanged; still unpopulated for tasks)
+  scheduledStart?: string;    // editable "HH:MM" (UTC wall-clock); undefined for floating tasks
+  durationMinutes?: number;
+  energy?: EnergyLevel;
   oneShot: boolean;
+  floating: boolean;          // true when placed in a slot (after_anchor) with no fixed time
+}
+
+/** Partial edit emitted by the task-edit form; mirrors PatchEntryRequest. */
+export interface TaskEditPatch {
+  title?: string;
+  type?: ItemType;
+  scheduledStart?: string;    // "HH:MM"
+  durationMinutes?: number;
+  energy?: EnergyLevel;
+  oneShot?: boolean;
 }
 
 export interface MealAnchor {

@@ -99,3 +99,16 @@ pub struct PlanEntryInput {
     pub energy_required: Option<String>,
     pub one_shot: Option<bool>,
 }
+
+/// Partial update for a single schedule entry. `None` fields are left unchanged.
+/// `scheduled_start` carries a UTC wall-clock time-of-day (combined with the entry's
+/// existing date by the SQL layer).
+#[derive(Debug, Clone, Default)]
+pub struct EntryPatch {
+    pub title: Option<String>,
+    pub task_type: Option<String>,
+    pub scheduled_start: Option<chrono::NaiveTime>,
+    pub duration_minutes: Option<i32>,
+    pub energy_required: Option<String>,
+    pub one_shot: Option<bool>,
+}

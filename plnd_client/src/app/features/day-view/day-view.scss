@@ -13,6 +13,13 @@
   flex-direction: column;
 }
 
+app-task-row.dimmed,
+app-meal-row.dimmed { opacity: 0.4; transition: opacity 150ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  app-task-row.dimmed,
+  app-meal-row.dimmed { transition: none; }
+}
+
 // ── Skeleton loading state ──────────────────────────────────────────
 .skeleton-list {
   padding: 16px 0;

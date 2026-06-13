@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::db::schedule;
-use crate::models::{CommitPlanInput, OpenSlot, ScheduleEntry};
+use crate::models::{CommitPlanInput, EntryPatch, OpenSlot, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 use crate::repository::schedule::ScheduleRepository;
 
@@ -72,13 +72,13 @@ impl ScheduleRepository for PgScheduleRepository {
             .map_err(Into::into)
     }
 
-    async fn update_entry_one_shot(
+    async fn update_entry(
         &self,
         user_id: Uuid,
         entry_id: Uuid,
-        one_shot: bool,
+        patch: &EntryPatch,
     ) -> Result<(), crate::Error> {
-        schedule::update_entry_one_shot(&self.pool, user_id, entry_id, one_shot)
+        schedule::update_entry(&self.pool, user_id, entry_id, patch)
             .await
             .map_err(Into::into)
     }

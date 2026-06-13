@@ -140,11 +140,17 @@ pub struct PatchEntryStatusRequest {
     pub status: String,
 }
 
-/// Body for `PATCH /schedule/entries/{id}/one-shot`. Set `one_shot = true` to mark the
-/// entry one-time (excluded from carryover if missed); `false` to let it carry over.
+/// Body for `PATCH /schedule/entries/{id}`. All fields optional; omitted fields are unchanged.
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
-pub struct PatchEntryOneShotRequest {
-    pub one_shot: bool,
+pub struct PatchEntryRequest {
+    pub title: Option<String>,
+    pub task_type: Option<String>,
+    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS".
+    #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
+    pub scheduled_start: Option<NaiveTime>,
+    pub duration_minutes: Option<i32>,
+    pub energy_required: Option<String>,
+    pub one_shot: Option<bool>,
 }
 
 /// Body for `PATCH /schedule/anchors/{id}/status`. Deserializes directly into

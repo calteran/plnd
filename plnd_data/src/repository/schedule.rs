@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use chrono::NaiveDate;
 use uuid::Uuid;
 
-use crate::models::{CommitPlanInput, OpenSlot, ScheduleEntry};
+use crate::models::{CommitPlanInput, EntryPatch, OpenSlot, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
 #[async_trait]
@@ -40,11 +40,11 @@ pub trait ScheduleRepository: Send + Sync {
         status: &str,
     ) -> Result<(), crate::Error>;
 
-    async fn update_entry_one_shot(
+    async fn update_entry(
         &self,
         user_id: Uuid,
         entry_id: Uuid,
-        one_shot: bool,
+        patch: &EntryPatch,
     ) -> Result<(), crate::Error>;
 
     async fn get_carryover(

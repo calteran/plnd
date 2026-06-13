@@ -28,6 +28,11 @@ function makeScheduleServiceMock(overrides: Partial<{
     toggleMealConsumed:  jasmine.createSpy('toggleMealConsumed'),
     setMealConsumption:  jasmine.createSpy('setMealConsumption'),
     addItem:             jasmine.createSpy('addItem'),
+    // Plain method (not a pre-installed spy) so individual tests can spyOn it.
+    updateEntry(_id: string, _patch: unknown): void {
+      // no-op stub; overridden per-test via spyOn
+      return undefined;
+    },
   };
 }
 
@@ -98,7 +103,7 @@ describe('DayViewComponent (schedule view)', () => {
   it('renders meal and task rows when items are present', async () => {
     const items: ScheduleItem[] = [
       { id: 'm1', name: 'Breakfast', emoji: '🥑', status: 'done', duringMealTasks: [] },
-      { id: 't1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false }
+      { id: 't1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false, floating: false }
     ];
     const svc = makeScheduleServiceMock({ scheduleItems: items });
     await TestBed.configureTestingModule({
@@ -197,6 +202,41 @@ describe('DayViewComponent (onItemAdded)', () => {
 
     expect(svc.loadDay).toHaveBeenCalledOnceWith('2026-03-20');
     expect(svc.addItem).not.toHaveBeenCalled();
+  });
+});
+
+describe('DayViewComponent (inline editor)', () => {
+  async function setupEditor() {
+    const svc = makeScheduleServiceMock();
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService,  useValue: svc },
+        { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        provideRouter([]),
+        { provide: ActivatedRoute,   useValue: mockActivatedRoute },
+      ],
+    }).compileComponents();
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+    return { f, component: f.componentInstance, svc };
+  }
+
+  it('opens one editor at a time and closes it', async () => {
+    const { component } = await setupEditor();
+    component.openEditor('entry-1');
+    expect(component.editingId()).toBe('entry-1');
+    component.openEditor('entry-2');
+    expect(component.editingId()).toBe('entry-2');   // switches, does not stack
+    component.closeEditor();
+    expect(component.editingId()).toBeNull();
+  });
+
+  it('routes a save patch to ScheduleService.updateEntry', async () => {
+    const { component } = await setupEditor();
+    const spy = spyOn(component['scheduleService'], 'updateEntry');
+    component.onEditSave('entry-1', { title: 'X' });
+    expect(spy).toHaveBeenCalledWith('entry-1', { title: 'X' });
   });
 });
 

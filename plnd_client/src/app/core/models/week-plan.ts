@@ -119,10 +119,12 @@ export interface ScheduleEntryDto {
   task_type: string;
   title?: string;
   date: string;
-  scheduled_start: string;
+  scheduled_start?: string | null;
   status: string;
   after_anchor?: string;
   slot_meal_anchor_id?: string;
+  duration_minutes?: number | null;
+  energy_required?: string | null;
   one_shot?: boolean;
 }
 

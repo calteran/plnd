@@ -4,7 +4,7 @@ use crate::api_response::{
 };
 use crate::auth::jwt::Claims;
 use crate::models::{
-    CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryOneShotRequest,
+    CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryRequest,
     PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest,
 };
 use crate::routes::domain_constants::{
@@ -19,7 +19,7 @@ use axum::{
 use chrono::NaiveDate;
 use plnd_data::Error;
 use plnd_data::models::{
-    CarryoverDecision, CommitPlanInput, PlanEntryInput, PlannedMealEntryStaging,
+    CarryoverDecision, CommitPlanInput, EntryPatch, PlanEntryInput, PlannedMealEntryStaging,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -316,6 +316,31 @@ pub async fn post_plan(
 
 const VALID_STATUSES: &[&str] = &["planned", "in_progress", "completed", "skipped", "deferred"];
 
+/// Validate a partial entry update. Returns `Err` with a 400 for any provided-but-invalid field.
+fn validate_patch(req: &PatchEntryRequest) -> Result<(), StatusCode> {
+    if let Some(t) = &req.task_type
+        && !VALID_TASK_TYPES.contains(&t.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if let Some(e) = &req.energy_required
+        && !VALID_ENERGY_LEVELS.contains(&e.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if let Some(d) = req.duration_minutes
+        && d <= 0
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if let Some(t) = &req.title
+        && t.trim().is_empty()
+    {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    Ok(())
+}
+
 #[utoipa::path(
     patch,
     path = "/schedule/entries/{id}/status",
@@ -360,37 +385,48 @@ pub async fn patch_entry_status(
 
 #[utoipa::path(
     patch,
-    path = "/schedule/entries/{id}/one-shot",
+    path = "/schedule/entries/{id}",
     tag = "Schedule",
     params(("id" = Uuid, Path, description = "Schedule entry ID")),
-    request_body = PatchEntryOneShotRequest,
+    request_body = PatchEntryRequest,
     security(("bearer_auth" = [])),
     responses(
-        (status = 204, description = "One-shot flag updated"),
+        (status = 204, description = "Entry updated"),
+        (status = 400, description = "Invalid field value"),
         (status = 401, description = "Unauthorized"),
         (status = 404, description = "Entry not found"),
         (status = 500, description = "Internal server error"),
     )
 )]
 #[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
-pub async fn patch_entry_one_shot(
+pub async fn patch_entry(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Path(entry_id): Path<Uuid>,
-    Json(body): Json<PatchEntryOneShotRequest>,
+    Json(body): Json<PatchEntryRequest>,
 ) -> Result<StatusCode, StatusCode> {
+    validate_patch(&body)?;
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let patch = EntryPatch {
+        title: body.title.map(|t| t.trim().to_string()),
+        task_type: body.task_type,
+        scheduled_start: body.scheduled_start,
+        duration_minutes: body.duration_minutes,
+        energy_required: body.energy_required,
+        one_shot: body.one_shot,
+    };
 
     state
         .repos
         .schedule
-        .update_entry_one_shot(user_id, entry_id, body.one_shot)
+        .update_entry(user_id, entry_id, &patch)
         .await
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| match e {
             Error::NotFound => StatusCode::NOT_FOUND,
             _ => {
-                tracing::error!(error = %e, "patch_entry_one_shot error");
+                tracing::error!(error = %e, "patch_entry error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })
@@ -514,5 +550,56 @@ mod tests {
             ..base_meal_entry()
         };
         assert_eq!(map_meal_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_patch_accepts_valid_fields() {
+        let req = PatchEntryRequest {
+            title: Some("Call dentist".into()),
+            task_type: Some("appointment".into()),
+            scheduled_start: None,
+            duration_minutes: Some(30),
+            energy_required: Some("low".into()),
+            one_shot: Some(true),
+        };
+        assert!(validate_patch(&req).is_ok());
+    }
+
+    #[test]
+    fn validate_patch_rejects_bad_type_energy_duration_and_blank_title() {
+        let bad_type = PatchEntryRequest {
+            task_type: Some("nope".into()),
+            ..empty_patch()
+        };
+        assert!(validate_patch(&bad_type).is_err());
+
+        let bad_energy = PatchEntryRequest {
+            energy_required: Some("ultra".into()),
+            ..empty_patch()
+        };
+        assert!(validate_patch(&bad_energy).is_err());
+
+        let bad_dur = PatchEntryRequest {
+            duration_minutes: Some(0),
+            ..empty_patch()
+        };
+        assert!(validate_patch(&bad_dur).is_err());
+
+        let blank = PatchEntryRequest {
+            title: Some("   ".into()),
+            ..empty_patch()
+        };
+        assert!(validate_patch(&blank).is_err());
+    }
+
+    fn empty_patch() -> PatchEntryRequest {
+        PatchEntryRequest {
+            title: None,
+            task_type: None,
+            scheduled_start: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+        }
     }
 }

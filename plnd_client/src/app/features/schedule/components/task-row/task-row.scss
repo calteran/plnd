@@ -64,6 +64,8 @@
   }
 }
 
+.label[role='button'] { cursor: pointer; }
+
 .task-row.done .label {
   color: var(--color-text-primary);
 }

@@ -1,0 +1,21 @@
+.task-edit-form {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 12px 24px 16px 76px;       // align body with task-row text column
+  background: var(--color-surface-white);
+  border-bottom: 1px solid var(--color-border-row);
+}
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field-label { font-size: 12px; font-weight: 600; color: var(--color-text-secondary); }
+.field input, .field select {
+  font: inherit; padding: 6px 8px;
+  border: 1px solid var(--color-border-row); border-radius: 6px;
+}
+.field input:disabled { opacity: 0.6; }
+.hint { font-size: 11px; color: var(--color-text-secondary); }
+.one-shot-toggle {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border: 1px solid var(--color-border-row); border-radius: 6px;
+  background: var(--color-surface-white); cursor: pointer;
+}
+.one-shot-toggle[aria-checked='true'] { border-color: var(--color-accent); color: var(--color-accent); }
+.done-edit { align-self: flex-end; padding: 6px 14px; border-radius: 6px; cursor: pointer; }

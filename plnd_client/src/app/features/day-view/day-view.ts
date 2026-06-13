@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ScheduleService, todayIso } from '../../core/services/schedule.service';
 import { BriefingService } from '../../core/services/briefing.service';
-import { isMealAnchor } from '../../core/models/schedule';
+import { isMealAnchor, TaskEditPatch } from '../../core/models/schedule';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
 import { MealRowComponent } from '../schedule/components/meal-row/meal-row';
 import { TaskRowComponent } from '../schedule/components/task-row/task-row';
@@ -56,6 +56,9 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
             @for (item of scheduleService.scheduleItems(); track item.id) {
               @if (isMealAnchor(item)) {
                 <app-meal-row
+                  [id]="'task-row-' + item.id"
+                  [class.dimmed]="editingId() !== null && editingId() !== item.id"
+                  [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null"
                   [meal]="item"
                   [date]="scheduleService.date()"
                   (toggled)="scheduleService.toggleItem($event)"
@@ -64,7 +67,14 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
                 />
               } @else {
                 <app-task-row
+                  [id]="'task-row-' + item.id"
+                  [class.dimmed]="editingId() !== null && editingId() !== item.id"
+                  [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null"
                   [item]="item"
+                  [editing]="editingId() === item.id"
+                  (editRequested)="openEditor($event)"
+                  (save)="onEditSave(item.id, $event)"
+                  (closed)="closeEditor()"
                   (toggled)="scheduleService.toggleItem($event)"
                 />
               }
@@ -105,6 +115,32 @@ export class DayViewComponent implements OnInit, OnDestroy {
 
   protected readonly toastMessage = signal<string | null>(null);
   private toastTimer?: ReturnType<typeof setTimeout>;
+
+  readonly editingId = signal<string | null>(null);
+
+  openEditor(id: string): void {
+    this.editingId.set(id);
+    queueMicrotask(() => {
+      document.getElementById(`task-row-${id}`)
+        ?.scrollIntoView({ block: 'nearest', behavior: this.prefersReducedMotion() ? 'auto' : 'smooth' });
+    });
+  }
+  closeEditor(): void {
+    // Restore focus to the originating row's label. Capture the id before
+    // clearing; once editingId is null the row is no longer inert, so the
+    // queued focus call succeeds.
+    const id = this.editingId();
+    this.editingId.set(null);
+    if (id) {
+      queueMicrotask(() =>
+        document.querySelector<HTMLElement>(`#task-row-${id} .label`)?.focus());
+    }
+  }
+  onEditSave(id: string, patch: TaskEditPatch): void { this.scheduleService.updateEntry(id, patch); }
+
+  private prefersReducedMotion(): boolean {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  }
 
   ngOnInit(): void {
     this.route.params
