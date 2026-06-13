@@ -13,8 +13,12 @@
   flex-direction: column;
 }
 
-.row-wrap.dimmed { opacity: 0.4; transition: opacity 150ms ease; }
-@media (prefers-reduced-motion: reduce) { .row-wrap.dimmed { transition: none; } }
+app-task-row.dimmed,
+app-meal-row.dimmed { opacity: 0.4; transition: opacity 150ms ease; }
+@media (prefers-reduced-motion: reduce) {
+  app-task-row.dimmed,
+  app-meal-row.dimmed { transition: none; }
+}
 
 // ── Skeleton loading state ──────────────────────────────────────────
 .skeleton-list {

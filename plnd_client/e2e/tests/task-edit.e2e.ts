@@ -38,12 +38,21 @@ test.describe('Day View — inline task edit', () => {
     await page.getByText('Call dentist').click();
 
     // Change the title and blur to commit (the form commits title on blur).
+    // Wait for the resulting PATCH so the reload can't beat the persisted write.
     const title = page.locator('input[name="title"]');
+    const titlePatch = page.waitForResponse(
+      r => /\/schedule\/entries\/[^/]+$/.test(r.url()) && r.request().method() === 'PATCH',
+    );
     await title.fill('Call orthodontist');
     await title.blur();
+    await titlePatch;
 
-    // Turn on "skip if missed" (one-shot).
+    // Turn on "skip if missed" (one-shot), awaiting its PATCH too.
+    const oneShotPatch = page.waitForResponse(
+      r => /\/schedule\/entries\/[^/]+$/.test(r.url()) && r.request().method() === 'PATCH',
+    );
     await page.getByRole('switch', { name: /skip if missed/i }).click();
+    await oneShotPatch;
 
     // Reload to force a fresh GET /schedule/period from the real backend.
     await page.reload();

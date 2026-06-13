@@ -54,29 +54,30 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
         } @else {
           <div class="schedule-list">
             @for (item of scheduleService.scheduleItems(); track item.id) {
-              <div class="row-wrap"
-                   [id]="'task-row-' + item.id"
-                   [class.dimmed]="editingId() !== null && editingId() !== item.id"
-                   [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null">
-                @if (isMealAnchor(item)) {
-                  <app-meal-row
-                    [meal]="item"
-                    [date]="scheduleService.date()"
-                    (toggled)="scheduleService.toggleItem($event)"
-                    (doneToggle)="scheduleService.toggleMealConsumed($event)"
-                    (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
-                  />
-                } @else {
-                  <app-task-row
-                    [item]="item"
-                    [editing]="editingId() === item.id"
-                    (editRequested)="openEditor($event)"
-                    (save)="onEditSave(item.id, $event)"
-                    (close)="closeEditor()"
-                    (toggled)="scheduleService.toggleItem($event)"
-                  />
-                }
-              </div>
+              @if (isMealAnchor(item)) {
+                <app-meal-row
+                  [id]="'task-row-' + item.id"
+                  [class.dimmed]="editingId() !== null && editingId() !== item.id"
+                  [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null"
+                  [meal]="item"
+                  [date]="scheduleService.date()"
+                  (toggled)="scheduleService.toggleItem($event)"
+                  (doneToggle)="scheduleService.toggleMealConsumed($event)"
+                  (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
+                />
+              } @else {
+                <app-task-row
+                  [id]="'task-row-' + item.id"
+                  [class.dimmed]="editingId() !== null && editingId() !== item.id"
+                  [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null"
+                  [item]="item"
+                  [editing]="editingId() === item.id"
+                  (editRequested)="openEditor($event)"
+                  (save)="onEditSave(item.id, $event)"
+                  (close)="closeEditor()"
+                  (toggled)="scheduleService.toggleItem($event)"
+                />
+              }
             }
           </div>
         }
