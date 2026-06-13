@@ -13,6 +13,9 @@
   flex-direction: column;
 }
 
+.row-wrap.dimmed { opacity: 0.4; transition: opacity 150ms ease; }
+@media (prefers-reduced-motion: reduce) { .row-wrap.dimmed { transition: none; } }
+
 // ── Skeleton loading state ──────────────────────────────────────────
 .skeleton-list {
   padding: 16px 0;

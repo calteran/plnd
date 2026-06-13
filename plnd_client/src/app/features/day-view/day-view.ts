@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ScheduleService, todayIso } from '../../core/services/schedule.service';
 import { BriefingService } from '../../core/services/briefing.service';
-import { isMealAnchor } from '../../core/models/schedule';
+import { isMealAnchor, TaskEditPatch } from '../../core/models/schedule';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
 import { MealRowComponent } from '../schedule/components/meal-row/meal-row';
 import { TaskRowComponent } from '../schedule/components/task-row/task-row';
@@ -54,20 +54,29 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
         } @else {
           <div class="schedule-list">
             @for (item of scheduleService.scheduleItems(); track item.id) {
-              @if (isMealAnchor(item)) {
-                <app-meal-row
-                  [meal]="item"
-                  [date]="scheduleService.date()"
-                  (toggled)="scheduleService.toggleItem($event)"
-                  (doneToggle)="scheduleService.toggleMealConsumed($event)"
-                  (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
-                />
-              } @else {
-                <app-task-row
-                  [item]="item"
-                  (toggled)="scheduleService.toggleItem($event)"
-                />
-              }
+              <div class="row-wrap"
+                   [id]="'task-row-' + item.id"
+                   [class.dimmed]="editingId() !== null && editingId() !== item.id"
+                   [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null">
+                @if (isMealAnchor(item)) {
+                  <app-meal-row
+                    [meal]="item"
+                    [date]="scheduleService.date()"
+                    (toggled)="scheduleService.toggleItem($event)"
+                    (doneToggle)="scheduleService.toggleMealConsumed($event)"
+                    (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
+                  />
+                } @else {
+                  <app-task-row
+                    [item]="item"
+                    [editing]="editingId() === item.id"
+                    (editRequested)="openEditor($event)"
+                    (save)="onEditSave(item.id, $event)"
+                    (close)="closeEditor()"
+                    (toggled)="scheduleService.toggleItem($event)"
+                  />
+                }
+              </div>
             }
           </div>
         }
@@ -105,6 +114,22 @@ export class DayViewComponent implements OnInit, OnDestroy {
 
   protected readonly toastMessage = signal<string | null>(null);
   private toastTimer?: ReturnType<typeof setTimeout>;
+
+  readonly editingId = signal<string | null>(null);
+
+  openEditor(id: string): void {
+    this.editingId.set(id);
+    queueMicrotask(() => {
+      document.getElementById(`task-row-${id}`)
+        ?.scrollIntoView({ block: 'nearest', behavior: this.prefersReducedMotion() ? 'auto' : 'smooth' });
+    });
+  }
+  closeEditor(): void { this.editingId.set(null); }
+  onEditSave(id: string, patch: TaskEditPatch): void { this.scheduleService.updateEntry(id, patch); }
+
+  private prefersReducedMotion(): boolean {
+    return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  }
 
   ngOnInit(): void {
     this.route.params
