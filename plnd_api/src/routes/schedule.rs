@@ -318,25 +318,25 @@ const VALID_STATUSES: &[&str] = &["planned", "in_progress", "completed", "skippe
 
 /// Validate a partial entry update. Returns `Err` with a 400 for any provided-but-invalid field.
 fn validate_patch(req: &PatchEntryRequest) -> Result<(), StatusCode> {
-    if let Some(t) = &req.task_type {
-        if !VALID_TASK_TYPES.contains(&t.as_str()) {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(t) = &req.task_type
+        && !VALID_TASK_TYPES.contains(&t.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(e) = &req.energy_required {
-        if !VALID_ENERGY_LEVELS.contains(&e.as_str()) {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(e) = &req.energy_required
+        && !VALID_ENERGY_LEVELS.contains(&e.as_str())
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(d) = req.duration_minutes {
-        if d <= 0 {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(d) = req.duration_minutes
+        && d <= 0
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
-    if let Some(t) = &req.title {
-        if t.trim().is_empty() {
-            return Err(StatusCode::BAD_REQUEST);
-        }
+    if let Some(t) = &req.title
+        && t.trim().is_empty()
+    {
+        return Err(StatusCode::BAD_REQUEST);
     }
     Ok(())
 }
