@@ -67,7 +67,7 @@ describe('TaskEditFormComponent', () => {
     fixture.componentRef.setInput('task', task());
     fixture.detectChanges();
     let closed = false;
-    fixture.componentInstance.close.subscribe(() => (closed = true));
+    fixture.componentInstance.closed.subscribe(() => (closed = true));
 
     const energy: HTMLSelectElement = fixture.nativeElement.querySelector('select[name="energy"]');
     energy.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));

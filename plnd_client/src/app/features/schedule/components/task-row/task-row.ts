@@ -64,7 +64,7 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
       }
     </div>
     @if (editing()) {
-      <app-task-edit-form [task]="item()" (save)="save.emit($event)" (close)="close.emit()" />
+      <app-task-edit-form [task]="item()" (save)="save.emit($event)" (closed)="closed.emit()" />
     }
   `,
   styleUrl: './task-row.scss'
@@ -76,7 +76,7 @@ export class TaskRowComponent {
   readonly editing       = input(false);
   readonly editRequested = output<string>();
   readonly save          = output<TaskEditPatch>();
-  readonly close         = output<void>();
+  readonly closed        = output<void>();
 
   protected readonly typeBadge = computed(() => TYPE_BADGE_LABELS[this.item().type] ?? null);
 

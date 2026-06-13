@@ -74,7 +74,7 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
                   [editing]="editingId() === item.id"
                   (editRequested)="openEditor($event)"
                   (save)="onEditSave(item.id, $event)"
-                  (close)="closeEditor()"
+                  (closed)="closeEditor()"
                   (toggled)="scheduleService.toggleItem($event)"
                 />
               }

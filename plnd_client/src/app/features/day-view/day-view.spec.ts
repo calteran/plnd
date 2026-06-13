@@ -29,7 +29,10 @@ function makeScheduleServiceMock(overrides: Partial<{
     setMealConsumption:  jasmine.createSpy('setMealConsumption'),
     addItem:             jasmine.createSpy('addItem'),
     // Plain method (not a pre-installed spy) so individual tests can spyOn it.
-    updateEntry(_id: string, _patch: unknown): void {},
+    updateEntry(_id: string, _patch: unknown): void {
+      // no-op stub; overridden per-test via spyOn
+      return undefined;
+    },
   };
 }
 

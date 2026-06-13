@@ -1,5 +1,5 @@
 use chrono::{NaiveDate, NaiveTime};
-use plnd_api::models::{PatchEntryOneShotRequest, PlanEntryRequest, PostSchedulePlanRequest};
+use plnd_api::models::{PatchEntryRequest, PlanEntryRequest, PostSchedulePlanRequest};
 use plnd_api::routes::schedule::PeriodQuery;
 
 use plnd_data::query_types::{
@@ -163,25 +163,17 @@ fn test_period_query_same_date_passes_guard() {
 }
 
 #[test]
-fn test_patch_entry_one_shot_request_true() {
-    let json = r#"{"one_shot":true}"#;
-    let req: PatchEntryOneShotRequest = serde_json::from_str(json).unwrap();
-    assert!(req.one_shot);
-}
+fn test_patch_entry_request_partial_deserializes() {
+    // All fields optional; omitted fields are None.
+    let json = r#"{"title":"Call dentist","one_shot":true}"#;
+    let req: PatchEntryRequest = serde_json::from_str(json).unwrap();
+    assert_eq!(req.title.as_deref(), Some("Call dentist"));
+    assert_eq!(req.one_shot, Some(true));
+    assert!(req.task_type.is_none());
+    assert!(req.duration_minutes.is_none());
 
-#[test]
-fn test_patch_entry_one_shot_request_false() {
-    let json = r#"{"one_shot":false}"#;
-    let req: PatchEntryOneShotRequest = serde_json::from_str(json).unwrap();
-    assert!(!req.one_shot);
-}
-
-#[test]
-fn test_patch_entry_one_shot_request_missing_field_fails() {
-    let json = r#"{}"#;
-    let result: Result<PatchEntryOneShotRequest, _> = serde_json::from_str(json);
-    assert!(
-        result.is_err(),
-        "missing one_shot field must fail to deserialize"
-    );
+    // Empty object is valid (no-op patch).
+    let empty: PatchEntryRequest = serde_json::from_str("{}").unwrap();
+    assert!(empty.title.is_none());
+    assert!(empty.one_shot.is_none());
 }

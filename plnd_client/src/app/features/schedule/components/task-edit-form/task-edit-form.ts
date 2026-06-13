@@ -16,7 +16,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
   imports: [TitleCasePipe],
   template: `
     <div class="task-edit-form" role="group" [attr.aria-label]="'Edit task: ' + task().label"
-         (keydown.escape)="close.emit()">
+         (keydown.escape)="closed.emit()">
       <label class="field">
         <span class="field-label">Title</span>
         <input #titleInput name="title" type="text" [value]="task().label"
@@ -63,7 +63,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
         <span class="one-shot-text" aria-hidden="true">skip if missed</span>
       </button>
 
-      <button type="button" class="done-edit" (click)="close.emit()">Done</button>
+      <button type="button" class="done-edit" (click)="closed.emit()">Done</button>
     </div>
   `,
   styleUrl: './task-edit-form.scss',
@@ -71,7 +71,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
 export class TaskEditFormComponent {
   readonly task = input.required<ScheduleTask>();
   readonly save = output<TaskEditPatch>();
-  readonly close = output<void>();
+  readonly closed = output<void>();
 
   protected readonly types = TYPES;
   protected readonly energies = ENERGIES;
