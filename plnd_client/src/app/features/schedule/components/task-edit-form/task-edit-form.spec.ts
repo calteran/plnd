@@ -63,6 +63,32 @@ describe('TaskEditFormComponent', () => {
     expect(saves).toEqual([]);
   });
 
+  it('does not emit a redundant save when the time is re-submitted unchanged', () => {
+    fixture.componentRef.setInput('task', task({ scheduledStart: '11:00' }));
+    fixture.detectChanges();
+    const saves: unknown[] = [];
+    fixture.componentInstance.save.subscribe(p => saves.push(p));
+
+    const time: HTMLInputElement = fixture.nativeElement.querySelector('input[name="time"]');
+    time.value = '11:00';
+    time.dispatchEvent(new Event('change'));
+
+    expect(saves).toEqual([]);
+  });
+
+  it('does not emit a redundant save when the duration is re-submitted unchanged', () => {
+    fixture.componentRef.setInput('task', task({ durationMinutes: 30 }));
+    fixture.detectChanges();
+    const saves: unknown[] = [];
+    fixture.componentInstance.save.subscribe(p => saves.push(p));
+
+    const duration: HTMLInputElement = fixture.nativeElement.querySelector('input[name="duration"]');
+    duration.value = '30';
+    duration.dispatchEvent(new Event('change'));
+
+    expect(saves).toEqual([]);
+  });
+
   it('emits close on Escape from a non-title control (handler is on the container)', () => {
     fixture.componentRef.setInput('task', task());
     fixture.detectChanges();

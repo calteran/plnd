@@ -43,7 +43,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
 
       <label class="field">
         <span class="field-label">Duration (min)</span>
-        <input name="duration" type="number" min="1" [value]="task().durationMinutes ?? ''"
+        <input name="duration" type="number" min="1" step="1" [value]="task().durationMinutes ?? ''"
                (change)="commitDuration($any($event.target).value)" />
       </label>
 
@@ -94,8 +94,9 @@ export class TaskEditFormComponent {
 
   protected commitTime(raw: string): void {
     // Empty value → no emit. Clearing a fixed time isn't supported here; this
-    // avoids a silent 400/revert when the field is cleared.
-    if (raw) this.save.emit({ scheduledStart: raw });
+    // avoids a silent 400/revert when the field is cleared. The value check
+    // skips a redundant PATCH when the time is re-submitted unchanged.
+    if (raw && raw !== this.task().scheduledStart) this.save.emit({ scheduledStart: raw });
   }
 
   protected commitTitle(): void {
@@ -105,6 +106,8 @@ export class TaskEditFormComponent {
 
   protected commitDuration(raw: string): void {
     const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) this.save.emit({ durationMinutes: n });
+    if (Number.isFinite(n) && n > 0 && n !== this.task().durationMinutes) {
+      this.save.emit({ durationMinutes: n });
+    }
   }
 }
