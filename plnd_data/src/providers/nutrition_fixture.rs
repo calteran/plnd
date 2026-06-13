@@ -7,9 +7,9 @@
 //!
 //! `search.json` is keyed by lowercased query term so the fixture mimics a
 //! real provider's per-query behavior — searches for terms not present in
-//! the fixture return empty results, and the catalog seeder (which iterates
-//! `plnd_seed::INGREDIENT_TERMS`) only sees what live would have returned for
-//! those specific terms.
+//! the fixture return empty results. This backs the runtime `/search/ingredients`
+//! fan-out (the Open Food Facts branded lane) under e2e; USDA canonical foods are
+//! bulk-seeded from the vendored corpus, not from these fixtures.
 
 #![cfg(debug_assertions)]
 

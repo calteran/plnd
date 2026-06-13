@@ -226,10 +226,10 @@ test.describe('Catalog Library — API Contract', () => {
   });
 
   // Path 1 — local catalog hit → preference. The verify stack runs plnd_seed
-  // at API startup against APP_EXTERNAL__FIXTURE_PATH, idempotently inserting
-  // INGREDIENT_TERMS (oats, banana, chicken breast, …) into catalog_ingredients.
-  // Searching for one of those terms is guaranteed to return a `local[]` hit
-  // without any per-test pre-seeding step.
+  // at API startup, idempotently bulk-loading the vendored USDA canonical corpus
+  // (~8k foods, e.g. "Oats, …") into catalog_ingredients. Searching for a
+  // canonical term is guaranteed to return a `local[]` hit without any per-test
+  // pre-seeding step.
   // Closes https://github.com/calteran/plnd/issues/798
   test('path-1: local catalog hit → ingredient-pref upsert returns correct shape', async ({
     page,

@@ -24,6 +24,7 @@ pub const USDA_CORPUS_PATH_ENV: &str = "APP_USDA_CORPUS_PATH";
 /// 2. The workspace-relative default from the current directory (e.g. `just seed`
 ///    runs from the repo root).
 /// 3. The same path one level up (the API binary runs from `plnd_api/`).
+///
 /// If none exist, returns the CWD-relative default so the loader surfaces a clear
 /// "file not found" error rather than guessing.
 pub fn resolve_corpus_path() -> PathBuf {

@@ -226,7 +226,8 @@ seed:
 # APP_EXTERNAL__FIXTURE_PATH is set (e.g. the e2e leg of `just verify`).
 # Run this when an upstream response shape changes or fixtures go stale.
 # Briefing feed URLs must match config/api/default.toml news_feed_urls.
-# Catalog refresh requires APP_EXTERNAL__USDA_FDC_API_KEY (via Doppler).
+# Catalog fixtures now cover only Open Food Facts + TheMealDB (no API key needed);
+# USDA canonical data comes from the vendored corpus — see `just refresh-usda-corpus`.
 refresh-fixtures:
     @echo "→ Capturing real upstream responses into plnd_data/fixtures/ ..."
     @mkdir -p plnd_data/fixtures/open-meteo
