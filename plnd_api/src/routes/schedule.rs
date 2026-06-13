@@ -19,7 +19,7 @@ use axum::{
 use chrono::NaiveDate;
 use plnd_data::Error;
 use plnd_data::models::{
-    CarryoverDecision, CommitPlanInput, PlanEntryInput, PlannedMealEntryStaging,
+    CarryoverDecision, CommitPlanInput, EntryPatch, PlanEntryInput, PlannedMealEntryStaging,
 };
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -416,6 +416,55 @@ pub async fn patch_entry_one_shot(
             Error::NotFound => StatusCode::NOT_FOUND,
             _ => {
                 tracing::error!(error = %e, "patch_entry_one_shot error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })
+}
+
+#[utoipa::path(
+    patch,
+    path = "/schedule/entries/{id}",
+    tag = "Schedule",
+    params(("id" = Uuid, Path, description = "Schedule entry ID")),
+    request_body = PatchEntryRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Entry updated"),
+        (status = 400, description = "Invalid field value"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Entry not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
+pub async fn patch_entry(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(entry_id): Path<Uuid>,
+    Json(body): Json<PatchEntryRequest>,
+) -> Result<StatusCode, StatusCode> {
+    validate_patch(&body)?;
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    let patch = EntryPatch {
+        title: body.title.map(|t| t.trim().to_string()),
+        task_type: body.task_type,
+        scheduled_start: body.scheduled_start,
+        duration_minutes: body.duration_minutes,
+        energy_required: body.energy_required,
+        one_shot: body.one_shot,
+    };
+
+    state
+        .repos
+        .schedule
+        .update_entry(user_id, entry_id, &patch)
+        .await
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| match e {
+            Error::NotFound => StatusCode::NOT_FOUND,
+            _ => {
+                tracing::error!(error = %e, "patch_entry error");
                 StatusCode::INTERNAL_SERVER_ERROR
             }
         })
