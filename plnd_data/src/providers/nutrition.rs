@@ -11,6 +11,14 @@ pub trait NutritionProvider: Send + Sync {
     /// Short identifier for this provider, written into `catalog_ingredients.external_source`.
     fn source_name(&self) -> &str;
 
+    /// Whether this provider yields clean, generic ingredient names suitable for
+    /// the canonical catalog (e.g. "Cheese, cheddar"), as opposed to branded
+    /// composite product names. Canonical sources are the only ones the startup
+    /// seeder ingests, and they sort ahead of branded sources in live search.
+    fn is_canonical_source(&self) -> bool {
+        false
+    }
+
     /// Search for ingredients matching the query.
     async fn search_ingredients(
         &self,

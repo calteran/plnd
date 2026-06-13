@@ -121,6 +121,10 @@ impl NutritionProvider for UsdaFdcProvider {
         "usda_fdc"
     }
 
+    fn is_canonical_source(&self) -> bool {
+        true
+    }
+
     #[tracing::instrument(
         name = "provider::usda_fdc::search_ingredients",
         skip(self),
@@ -421,6 +425,14 @@ mod tests {
             matches!(result, Err(ExternalProviderError::ConfigurationError(_))),
             "expected ConfigurationError, got: {:?}",
             result
+        );
+    }
+
+    #[test]
+    fn usda_is_a_canonical_source() {
+        assert!(
+            UsdaFdcProvider::new("key").is_canonical_source(),
+            "USDA Foundation/SR Legacy supplies clean canonical names"
         );
     }
 }
