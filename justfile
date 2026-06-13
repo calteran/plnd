@@ -247,6 +247,12 @@ refresh-fixtures:
 refresh-usda-corpus:
     scripts/refresh-usda-corpus.sh
 
+# Derive the small e2e/test corpus subset from the full vendored corpus.
+# Run after refresh-usda-corpus. Used by the e2e leg of `just verify` so the
+# startup seed stays cheap (see scripts/verify.sh APP_USDA_CORPUS_PATH).
+refresh-usda-test-corpus:
+    scripts/build-usda-test-corpus.sh
+
 # Clean build artifacts
 clean:
     cargo clean
