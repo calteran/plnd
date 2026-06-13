@@ -6,6 +6,8 @@
 
 **Architecture:** A new `TaskEditFormComponent` (reactive form) is hosted inside `TaskRowComponent` when its row is in edit mode. `DayViewComponent` owns an `editingId` signal, applies a dim+inert "spotlight" to non-edited rows, and routes the form's `save` patch to `ScheduleService.updateEntry()`. Persistence consolidates all six fields (including `one_shot`) onto one new `PATCH /schedule/entries/{id}` endpoint backed by a new `ScheduleRepository::update_entry` method; the redundant dedicated one-shot route/method/client-method are removed.
 
+**Staging (expand-then-contract):** Tasks 1–4 *add* the new `update_entry` path while leaving the existing `update_entry_one_shot` path intact, so every commit compiles. The client switches to `updateEntry` in Tasks 6–9 (and the client-only `setEntryOneShot` is removed there). Task 9b then removes the now-dead backend one-shot path (db fn + trait + pg + route + OpenAPI + `PatchEntryOneShotRequest` + its db test) in a single atomic commit. Do **not** remove any one-shot code in Tasks 1–4.
+
 **Tech Stack:** Rust/Axum (`plnd_api`), `plnd_data` repository layer (sqlx, Postgres), Angular (standalone components, signals, reactive forms), Playwright e2e.
 
 **Reference spec:** `docs/superpowers/specs/2026-06-13-task-edit-pane-design.md`
@@ -41,8 +43,8 @@
 
 **Files:**
 - Modify: `plnd_data/src/models/schedule.rs`
-- Modify: `plnd_data/src/db/schedule.rs:119-144` (remove one-shot fn) and add new fn near it
-- Test: `plnd_data/src/db/schedule.rs` test module (replace `update_entry_one_shot_flips_the_flag`)
+- Modify: `plnd_data/src/db/schedule.rs` (add a new fn near `update_entry_one_shot`; do NOT remove the latter)
+- Test: `plnd_data/src/db/schedule.rs` test module (add a new test alongside `update_entry_one_shot_flips_the_flag`; keep the existing one)
 
 - [ ] **Step 1: Add the DB-layer patch struct**
 
@@ -65,7 +67,7 @@ pub struct EntryPatch {
 
 - [ ] **Step 2: Write the failing DB test**
 
-In `plnd_data/src/db/schedule.rs`, replace the `update_entry_one_shot_flips_the_flag` test (lines ~1627-1660) with:
+In `plnd_data/src/db/schedule.rs`, add this test alongside (not replacing) `update_entry_one_shot_flips_the_flag`:
 
 ```rust
     // -----------------------------------------------------------------------
@@ -115,9 +117,9 @@ In `plnd_data/src/db/schedule.rs`, replace the `update_entry_one_shot_flips_the_
 Run: `cargo test -p plnd_data --lib db::schedule::tests::update_entry_changes_only_provided_fields`
 Expected: FAIL — `cannot find function update_entry`.
 
-- [ ] **Step 4: Implement `update_entry`; remove `update_entry_one_shot`**
+- [ ] **Step 4: Implement `update_entry` (leave `update_entry_one_shot` in place)**
 
-In `plnd_data/src/db/schedule.rs`, delete `update_entry_one_shot` (lines ~119-144) and add:
+In `plnd_data/src/db/schedule.rs`, add (do NOT delete `update_entry_one_shot` — that happens in Task 9b):
 
 ```rust
 #[tracing::instrument(
@@ -174,7 +176,7 @@ Expected: PASS.
 
 ```bash
 git add plnd_data/src/models/schedule.rs plnd_data/src/db/schedule.rs
-git commit -m "feat(data): update_entry partial update; drop update_entry_one_shot (db layer)"
+git commit -m "feat(data): add update_entry partial update (db layer)"
 ```
 
 ---
@@ -182,8 +184,8 @@ git commit -m "feat(data): update_entry partial update; drop update_entry_one_sh
 ## Task 2: Repository trait + pg impl — `update_entry`
 
 **Files:**
-- Modify: `plnd_data/src/repository/schedule.rs:43-48` (remove one-shot; add update_entry)
-- Modify: `plnd_data/src/repository/pg/schedule.rs:75-84` (remove one-shot; add update_entry)
+- Modify: `plnd_data/src/repository/schedule.rs` (add update_entry; keep one-shot)
+- Modify: `plnd_data/src/repository/pg/schedule.rs` (add update_entry; keep one-shot)
 
 - [ ] **Step 1: Update the trait**
 
@@ -193,7 +195,7 @@ In `plnd_data/src/repository/schedule.rs`, change the import line 5 to include `
 use crate::models::{CommitPlanInput, EntryPatch, OpenSlot, ScheduleEntry};
 ```
 
-Replace the `update_entry_one_shot` trait method (lines ~43-48) with:
+Add this trait method next to `update_entry_one_shot` (do NOT remove `update_entry_one_shot`):
 
 ```rust
     async fn update_entry(
@@ -212,7 +214,7 @@ In `plnd_data/src/repository/pg/schedule.rs`, change import line 7 to:
 use crate::models::{CommitPlanInput, EntryPatch, OpenSlot, ScheduleEntry};
 ```
 
-Replace the `update_entry_one_shot` impl (lines ~75-84) with:
+Add this impl method next to `update_entry_one_shot` (keep the latter):
 
 ```rust
     async fn update_entry(
@@ -230,13 +232,13 @@ Replace the `update_entry_one_shot` impl (lines ~75-84) with:
 - [ ] **Step 3: Compile-check (the trait change must propagate)**
 
 Run: `cargo build -p plnd_data`
-Expected: builds. (If any mock repo in `plnd_data` implements the trait, update it the same way — search `impl ScheduleRepository`.)
+Expected: builds. (If any mock/fake repo in the workspace implements `ScheduleRepository`, add the new method there too — search `impl ScheduleRepository`. Keep `update_entry_one_shot` implemented everywhere for now.)
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add plnd_data/src/repository/schedule.rs plnd_data/src/repository/pg/schedule.rs
-git commit -m "feat(data): ScheduleRepository::update_entry; drop update_entry_one_shot"
+git commit -m "feat(data): add ScheduleRepository::update_entry"
 ```
 
 ---
@@ -244,12 +246,12 @@ git commit -m "feat(data): ScheduleRepository::update_entry; drop update_entry_o
 ## Task 3: HTTP request type + validation
 
 **Files:**
-- Modify: `plnd_api/src/models.rs:143-148` (remove `PatchEntryOneShotRequest`; add `PatchEntryRequest`)
+- Modify: `plnd_api/src/models.rs` (add `PatchEntryRequest`; keep `PatchEntryOneShotRequest`)
 - Test: `plnd_api/src/routes/schedule.rs` test module (add `validate_patch` tests)
 
-- [ ] **Step 1: Add `PatchEntryRequest`; remove `PatchEntryOneShotRequest`**
+- [ ] **Step 1: Add `PatchEntryRequest` (keep `PatchEntryOneShotRequest`)**
 
-In `plnd_api/src/models.rs`, delete `PatchEntryOneShotRequest` (lines ~143-148) and add:
+In `plnd_api/src/models.rs`, add (do NOT remove `PatchEntryOneShotRequest`):
 
 ```rust
 /// Body for `PATCH /schedule/entries/{id}`. All fields optional; omitted fields are unchanged.
@@ -314,12 +316,12 @@ Expected: FAIL — `cannot find function validate_patch` / `PatchEntryRequest` n
 
 - [ ] **Step 4: Implement `validate_patch` and wire the import**
 
-In `plnd_api/src/routes/schedule.rs`, change the `crate::models` import (lines ~6-9) to swap `PatchEntryOneShotRequest` for `PatchEntryRequest`:
+In `plnd_api/src/routes/schedule.rs`, add `PatchEntryRequest` to the `crate::models` import (keep `PatchEntryOneShotRequest`):
 
 ```rust
 use crate::models::{
-    CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryRequest,
-    PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest,
+    CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryOneShotRequest,
+    PatchEntryRequest, PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest,
 };
 ```
 
@@ -363,7 +365,7 @@ Expected: PASS (both tests).
 
 ```bash
 git add plnd_api/src/models.rs plnd_api/src/routes/schedule.rs
-git commit -m "feat(api): PatchEntryRequest + validate_patch; drop PatchEntryOneShotRequest"
+git commit -m "feat(api): add PatchEntryRequest + validate_patch"
 ```
 
 ---
@@ -371,13 +373,13 @@ git commit -m "feat(api): PatchEntryRequest + validate_patch; drop PatchEntryOne
 ## Task 4: HTTP handler + route registration
 
 **Files:**
-- Modify: `plnd_api/src/routes/schedule.rs:361-397` (remove `patch_entry_one_shot`; add `patch_entry`)
-- Modify: `plnd_api/src/main.rs:383-386`
-- Modify: `plnd_api/src/openapi.rs:10,189`
+- Modify: `plnd_api/src/routes/schedule.rs` (add `patch_entry`; keep `patch_entry_one_shot`)
+- Modify: `plnd_api/src/main.rs` (add route; keep one-shot route)
+- Modify: `plnd_api/src/openapi.rs` (add path + schema; keep one-shot entries)
 
-- [ ] **Step 1: Replace the handler**
+- [ ] **Step 1: Add the handler (keep `patch_entry_one_shot`)**
 
-In `plnd_api/src/routes/schedule.rs`, delete `patch_entry_one_shot` and its `#[utoipa::path]` (lines ~361-397) and add:
+In `plnd_api/src/routes/schedule.rs`, add (do NOT delete `patch_entry_one_shot`):
 
 ```rust
 #[utoipa::path(
@@ -439,9 +441,9 @@ use plnd_data::models::{
 ```
 …and use `EntryPatch` directly (drop the fully-qualified path in the handler if you add the import).
 
-- [ ] **Step 2: Register the route; remove the old one**
+- [ ] **Step 2: Register the new route (keep the one-shot route)**
 
-In `plnd_api/src/main.rs`, replace the one-shot route block (lines ~383-386) with:
+In `plnd_api/src/main.rs`, add a route next to the existing one-shot route (do NOT remove it):
 
 ```rust
         .route(
@@ -450,9 +452,9 @@ In `plnd_api/src/main.rs`, replace the one-shot route block (lines ~383-386) wit
         )
 ```
 
-- [ ] **Step 3: Fix OpenAPI registration**
+- [ ] **Step 3: Add OpenAPI registration**
 
-In `plnd_api/src/openapi.rs`: in the `paths(...)` macro replace `schedule::patch_entry_one_shot` with `schedule::patch_entry`; in `components(schemas(...))` replace `PatchEntryOneShotRequest` with `PatchEntryRequest`.
+In `plnd_api/src/openapi.rs`: add `schedule::patch_entry` to the `paths(...)` macro and `PatchEntryRequest` to `components(schemas(...))`. Leave the existing `patch_entry_one_shot` / `PatchEntryOneShotRequest` entries in place.
 
 - [ ] **Step 4: Build + server startup smoke test**
 
@@ -465,7 +467,7 @@ Expected: server boots and is killed after 15s with no panic.
 
 ```bash
 git add plnd_api/src/routes/schedule.rs plnd_api/src/main.rs plnd_api/src/openapi.rs
-git commit -m "feat(api): PATCH /schedule/entries/{id}; remove dedicated one-shot route"
+git commit -m "feat(api): add PATCH /schedule/entries/{id}"
 ```
 
 ---
@@ -1113,6 +1115,42 @@ Expected: PASS.
 ```bash
 git add plnd_client/src/app/features/day-view/
 git commit -m "feat(client): day-view inline editor — editingId, spotlight, scroll-anchor, wiring"
+```
+
+---
+
+## Task 9b: Backend cleanup — remove the dedicated one-shot path (atomic)
+
+By now the client calls only `PATCH /schedule/entries/{id}` (Task 6 removed `setEntryOneShot`), so the dedicated one-shot path is dead. Remove it all in **one commit** so the build stays green.
+
+**Files:**
+- Modify: `plnd_data/src/db/schedule.rs` — remove `update_entry_one_shot` fn + `update_entry_one_shot_flips_the_flag` test
+- Modify: `plnd_data/src/repository/schedule.rs` — remove `update_entry_one_shot` trait method
+- Modify: `plnd_data/src/repository/pg/schedule.rs` — remove `update_entry_one_shot` impl (and any mock impl found in Task 2)
+- Modify: `plnd_api/src/models.rs` — remove `PatchEntryOneShotRequest`
+- Modify: `plnd_api/src/routes/schedule.rs` — remove `patch_entry_one_shot` handler + `#[utoipa::path]`, and drop `PatchEntryOneShotRequest` from the `crate::models` import
+- Modify: `plnd_api/src/main.rs` — remove the `/schedule/entries/{id}/one-shot` route
+- Modify: `plnd_api/src/openapi.rs` — remove `patch_entry_one_shot` from `paths(...)` and `PatchEntryOneShotRequest` from `components(schemas(...))`
+
+- [ ] **Step 1: Remove every symbol listed above**
+
+Delete each item. Do a final grep to confirm nothing references the removed names:
+
+```bash
+grep -rn "update_entry_one_shot\|patch_entry_one_shot\|PatchEntryOneShotRequest\|entries/{id}/one-shot\|setEntryOneShot" plnd_api/src plnd_data/src plnd_client/src
+```
+Expected: no matches (the only remaining references should be in docs/specs, which is fine).
+
+- [ ] **Step 2: Compile-check**
+
+Run: `just verify-build`
+Expected: workspace compiles with no unused-symbol or missing-symbol errors.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add plnd_api/src plnd_data/src
+git commit -m "refactor: remove dedicated one-shot path (folded into update_entry)"
 ```
 
 ---
