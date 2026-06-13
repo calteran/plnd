@@ -132,6 +132,12 @@ No new failure modes:
 
 ## Out of scope
 
+- **LLM-driven generic/brand normalization of branded ingredients** — using the LLM at
+  ingest to split branded composite names into a generic name + brand, with a `brand`
+  column and dedup-by-generic. This rescues coverage from the branded lane (OFF, USDA
+  Branded) that this design relegates to "fallback below." It carries its own data-model
+  decision (the dedup semantics re-open candidate #1's curated-layer shape) plus cost /
+  latency / determinism trade-offs, so it gets its own brainstorm. Tracked in **#913**.
 - A stored `data_tier` / `is_canonical` column on `catalog_ingredients` (considered, not
   chosen — in-memory classification is sufficient and avoids a schema change).
 - Any backfill or cleanup migration (no persistent data exists).
