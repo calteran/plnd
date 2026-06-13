@@ -6,7 +6,7 @@ pub mod meals;
 
 pub use error::SeedError;
 
-use plnd_data::providers::{NutritionProvider, RecipeProvider};
+use plnd_data::providers::RecipeProvider;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -14,8 +14,8 @@ use std::time::Duration;
 pub async fn run_seed(
     database_url: &str,
     max_connections: u32,
-    nutrition_providers: &[Arc<dyn NutritionProvider>],
     recipe_providers: &[Arc<dyn RecipeProvider>],
+    corpus_path: &std::path::Path,
 ) -> Result<(), SeedError> {
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(max_connections)
@@ -24,7 +24,7 @@ pub async fn run_seed(
         .connect(database_url)
         .await
         .map_err(SeedError::Database)?;
-    seed(&pool, nutrition_providers, recipe_providers).await
+    seed(&pool, recipe_providers, corpus_path).await
 }
 
 /// Seed the catalog tables with real data from external providers.
@@ -36,10 +36,10 @@ pub async fn run_seed(
 /// inserts are guarded by ON CONFLICT DO NOTHING on named unique constraints.
 pub async fn seed(
     pool: &sqlx::PgPool,
-    nutrition_providers: &[Arc<dyn NutritionProvider>],
     recipe_providers: &[Arc<dyn RecipeProvider>],
+    corpus_path: &std::path::Path,
 ) -> Result<(), SeedError> {
-    // Fast idempotency check — skip all HTTP if catalog already has seeded data
+    // Fast idempotency check — skip all corpus reads if catalog already has seeded data
     let already_seeded: bool = sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM catalog_ingredients WHERE external_source IS NOT NULL LIMIT 1)",
     )
@@ -51,14 +51,11 @@ pub async fn seed(
         return Ok(());
     }
 
-    tracing::info!(
-        provider_count = nutrition_providers.len(),
-        "catalog seed: fetching ingredients"
-    );
-    let fetched_ingredients = ingredients::fetch_ingredients(nutrition_providers).await;
+    tracing::info!("catalog seed: loading ingredients from corpus");
+    let fetched_ingredients = ingredients::load_corpus_ingredients(corpus_path)?;
     tracing::info!(
         count = fetched_ingredients.len(),
-        "catalog seed: ingredients fetched"
+        "catalog seed: ingredients loaded"
     );
 
     tracing::info!(

@@ -1,21 +1,5 @@
-use plnd_data::providers::dtos::SearchQuery;
 use plnd_seed::dishes::{AUTO_SEEDED_TAG, DISH_TERMS};
 use plnd_seed::error::SeedError;
-use plnd_seed::ingredients::INGREDIENT_TERMS;
-
-#[test]
-fn test_ingredient_terms_non_empty() {
-    assert!(
-        !INGREDIENT_TERMS.is_empty(),
-        "INGREDIENT_TERMS must have at least one entry"
-    );
-    for term in INGREDIENT_TERMS {
-        assert!(
-            !term.is_empty(),
-            "Each ingredient term must be a non-empty string"
-        );
-    }
-}
 
 #[test]
 fn test_dish_terms_non_empty() {
@@ -29,16 +13,6 @@ fn test_dish_terms_non_empty() {
             "Each dish term must be a non-empty string"
         );
     }
-}
-
-#[test]
-fn test_ingredient_search_query_limit() {
-    let q = SearchQuery {
-        query: INGREDIENT_TERMS[0].to_string(),
-        limit: 3,
-        exclude_allergens: vec![],
-    };
-    assert!(q.limit >= 1, "Search query limit must be at least 1");
 }
 
 #[test]

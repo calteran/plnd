@@ -1,6 +1,4 @@
-use plnd_data::providers::{
-    NutritionProvider, OpenFoodFactsProvider, RecipeProvider, TheMealDbProvider, UsdaFdcProvider,
-};
+use plnd_data::providers::{RecipeProvider, TheMealDbProvider};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,33 +21,23 @@ async fn main() -> anyhow::Result<()> {
         .connect(&database_url)
         .await?;
 
-    let usda_key = std::env::var("USDA_FDC_API_KEY")
-        .or_else(|_| std::env::var("APP_EXTERNAL__USDA_FDC_API_KEY"))
-        .unwrap_or_default();
     let mdb_key = std::env::var("THEMEALDB_API_KEY")
         .or_else(|_| std::env::var("APP_EXTERNAL__THEMEALDB_API_KEY"))
         .unwrap_or_else(|_| "1".to_string());
 
-    let off_base_url = std::env::var("OFF_BASE_URL")
-        .unwrap_or_else(|_| "https://world.openfoodfacts.net".to_string());
-    let off_basic_auth_user =
-        std::env::var("OFF_BASIC_AUTH_USER").unwrap_or_else(|_| "off".to_string());
-    let off_basic_auth = if off_basic_auth_user.is_empty() {
-        None
-    } else {
-        let pass = std::env::var("OFF_BASIC_AUTH_PASSWORD").unwrap_or_else(|_| "off".to_string());
-        Some((off_basic_auth_user, pass))
-    };
-
-    let nutrition_providers: Vec<Arc<dyn NutritionProvider>> = vec![
-        Arc::new(UsdaFdcProvider::new(&usda_key)),
-        Arc::new(OpenFoodFactsProvider::new(&off_base_url, off_basic_auth)),
-    ];
     let recipe_providers: Vec<Arc<dyn RecipeProvider>> =
         vec![Arc::new(TheMealDbProvider::new(&mdb_key))];
 
-    println!("Running catalog seed from external providers...");
-    plnd_seed::seed(&pool, &nutrition_providers, &recipe_providers).await?;
+    let corpus_path = std::env::var("APP_USDA_CORPUS_PATH")
+        .unwrap_or_else(|_| plnd_seed::ingredients::USDA_CORPUS_PATH.to_string());
+
+    println!("Running catalog seed from vendored USDA corpus...");
+    plnd_seed::seed(
+        &pool,
+        &recipe_providers,
+        std::path::Path::new(&corpus_path),
+    )
+    .await?;
 
     println!("Running dev user seed...");
     plnd_seed::dev_user::seed_dev_user(&pool).await?;
