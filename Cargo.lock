@@ -2442,6 +2442,7 @@ name = "plnd_seed"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "plnd_data",
  "rust_decimal",

@@ -61,6 +61,13 @@ impl NutritionProvider for FixtureNutritionProvider {
         &self.source
     }
 
+    /// Fixture providers stand in for real canonical sources (e.g. USDA FDC) in
+    /// debug builds. They must be treated as canonical so the catalog seeder
+    /// populates `catalog_ingredients` during e2e runs.
+    fn is_canonical_source(&self) -> bool {
+        true
+    }
+
     #[tracing::instrument(
         name = "provider::nutrition_fixture::search_ingredients",
         skip(self),
