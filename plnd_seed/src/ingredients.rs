@@ -1,244 +1,148 @@
-use plnd_data::providers::NutritionProvider;
-use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery};
+use std::io::{BufRead, BufReader};
+use std::path::Path;
+
+use flate2::read::GzDecoder;
+use plnd_data::providers::dtos::ExternalIngredient;
 use sqlx::PgConnection;
-use std::collections::HashSet;
-use std::sync::Arc;
-use uuid::Uuid;
 
 use crate::error::SeedError;
 
-pub const INGREDIENT_TERMS: &[&str] = &[
-    "oats",
-    "banana",
-    "chicken breast",
-    "brown rice",
-    "broccoli",
-    "milk",
-    "egg",
-    "olive oil",
-    "cheese",
-    "chicken",
-    "beef",
-    "pork",
-    "salmon",
-    "tuna",
-    "shrimp",
-    "tofu",
-    "rice",
-    "pasta",
-    "bread",
-    "butter",
-    "yogurt",
-    "spinach",
-    "tomato",
-    "onion",
-    "garlic",
-    "potato",
-    "sweet potato",
-    "carrot",
-    "apple",
-    "orange",
-    "strawberry",
-    "blueberry",
-    "almond",
-    "peanut butter",
-    "black beans",
-    "lentils",
-    "avocado",
-    "corn",
-    "lettuce",
-    "mushroom",
-];
+/// Default location of the vendored USDA canonical corpus, relative to the repo
+/// root (the API and seed bin both run with the repo root as CWD).
+pub const USDA_CORPUS_PATH: &str = "plnd_data/corpus/usda_canonical.jsonl.gz";
 
-/// Fetch ingredients from all providers for all search terms, deduplicated by
-/// (source_name, external_id). Returns a flat list ready for DB insertion.
-pub async fn fetch_ingredients(
-    providers: &[Arc<dyn NutritionProvider>],
-) -> Vec<(String, ExternalIngredient)> {
-    let mut seen: HashSet<(String, String)> = HashSet::new();
-    let mut results: Vec<(String, ExternalIngredient)> = Vec::new();
-
-    for provider in providers {
-        if !provider.is_canonical_source() {
-            tracing::info!(
-                provider = provider.source_name(),
-                "catalog seed: skipping non-canonical source (branded names not seeded)"
-            );
+/// Load the vendored USDA canonical corpus: a gzipped JSONL of `ExternalIngredient`
+/// records. Every row is tagged source `usda_fdc`. Offline and deterministic.
+pub fn load_corpus_ingredients(
+    path: &Path,
+) -> Result<Vec<(String, ExternalIngredient)>, SeedError> {
+    let file = std::fs::File::open(path)?;
+    let reader = BufReader::new(GzDecoder::new(file));
+    let mut out = Vec::new();
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() {
             continue;
         }
-        let source = provider.source_name().to_string();
-        let query_limit = 3;
-
-        for &term in INGREDIENT_TERMS {
-            let search_query = SearchQuery {
-                query: term.to_string(),
-                limit: query_limit,
-                exclude_allergens: vec![],
-            };
-
-            let search_results = match provider.search_ingredients(&search_query).await {
-                Ok(r) => r,
-                Err(e) => {
-                    tracing::warn!(term, provider = %source, error = %e, "catalog seed: ingredient search failed");
-                    continue;
-                }
-            };
-
-            for result in search_results {
-                let key = (source.clone(), result.external_id.clone());
-                if seen.contains(&key) {
-                    continue;
-                }
-
-                match provider.get_ingredient_by_id(&result.external_id).await {
-                    Ok(Some(ingredient)) => {
-                        seen.insert(key);
-                        results.push((source.clone(), ingredient));
-                    }
-                    Ok(None) => {
-                        // Provider confirmed it no longer exists — skip silently
-                    }
-                    Err(e) => {
-                        tracing::warn!(external_id = %result.external_id, provider = %source, error = %e, "catalog seed: get_ingredient_by_id failed");
-                    }
-                }
-            }
-        }
+        let ingredient: ExternalIngredient = serde_json::from_str(&line)?;
+        out.push(("usda_fdc".to_string(), ingredient));
     }
-
-    results
+    Ok(out)
 }
 
-/// Insert a batch of (source, ingredient) pairs into `catalog_ingredients`.
-/// Uses ON CONFLICT DO NOTHING for idempotency via the `uq_ingredient_external` constraint.
+/// Bulk-insert (source, ingredient) pairs into `catalog_ingredients`, batched to
+/// keep the ~8k-row corpus load fast. ON CONFLICT DO NOTHING on
+/// `uq_ingredient_external` keeps it idempotent. Returns the number inserted.
 pub async fn insert_ingredients(
     tx: &mut PgConnection,
     ingredients: &[(String, ExternalIngredient)],
 ) -> Result<usize, SeedError> {
+    use uuid::Uuid;
+
     let mut inserted = 0usize;
-
-    for (source, ingredient) in ingredients {
-        let ingredient_id = Uuid::new_v4();
-        let nutrition_json: Option<serde_json::Value> = match &ingredient.nutrition {
-            Some(n) => Some(serde_json::to_value(n)?),
-            None => None,
-        };
-
-        let rows = sqlx::query(
-            r#"
-            INSERT INTO catalog_ingredients
-                (ingredient_id, name, serving_size_g, nutrition,
-                 allergens, occasion_tags, external_id, external_source)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT ON CONSTRAINT uq_ingredient_external DO NOTHING
-            "#,
-        )
-        .bind(ingredient_id)
-        .bind(&ingredient.name)
-        .bind(ingredient.serving_size_g)
-        .bind(nutrition_json)
-        .bind(&ingredient.allergens)
-        .bind(&ingredient.occasion_tags)
-        .bind(&ingredient.external_id)
-        .bind(source)
-        .execute(&mut *tx)
-        .await?;
-
-        if rows.rows_affected() > 0 {
-            inserted += 1;
-        }
+    for chunk in ingredients.chunks(1000) {
+        let mut qb = sqlx::QueryBuilder::new(
+            "INSERT INTO catalog_ingredients \
+             (ingredient_id, name, serving_size_g, nutrition, allergens, occasion_tags, \
+              external_id, external_source) ",
+        );
+        qb.push_values(chunk, |mut b, (source, ing)| {
+            let nutrition_json = ing
+                .nutrition
+                .as_ref()
+                .and_then(|n| serde_json::to_value(n).ok());
+            b.push_bind(Uuid::new_v4())
+                .push_bind(&ing.name)
+                .push_bind(ing.serving_size_g)
+                .push_bind(nutrition_json)
+                .push_bind(&ing.allergens)
+                .push_bind(&ing.occasion_tags)
+                .push_bind(&ing.external_id)
+                .push_bind(source);
+        });
+        qb.push(" ON CONFLICT ON CONSTRAINT uq_ingredient_external DO NOTHING");
+        let res = qb.build().execute(&mut *tx).await?;
+        inserted += res.rows_affected() as usize;
     }
-
     Ok(inserted)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
-    use plnd_data::providers::NutritionProvider;
-    use plnd_data::providers::dtos::{ExternalIngredient, SearchQuery, SearchResult};
-    use plnd_data::providers::error::ExternalProviderError;
-    use std::sync::Arc;
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+    use std::io::Write;
 
-    struct StubProvider {
-        source: String,
-        canonical: bool,
+    fn write_temp_corpus(records: &[ExternalIngredient]) -> tempfile::NamedTempFile {
+        let f = tempfile::NamedTempFile::new().unwrap();
+        let mut enc = GzEncoder::new(f.reopen().unwrap(), Compression::default());
+        for r in records {
+            serde_json::to_writer(&mut enc, r).unwrap();
+            enc.write_all(b"\n").unwrap();
+        }
+        enc.finish().unwrap();
+        f
     }
 
-    #[async_trait]
-    impl NutritionProvider for StubProvider {
-        fn source_name(&self) -> &str {
-            &self.source
-        }
-        fn is_canonical_source(&self) -> bool {
-            self.canonical
-        }
-        async fn search_ingredients(
-            &self,
-            _query: &SearchQuery,
-        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
-            Ok(vec![SearchResult {
-                external_id: format!("{}-1", self.source),
-                name: "Stub Food".to_string(),
-                description: None,
-                thumbnail_url: None,
-            }])
-        }
-        async fn get_ingredient_by_id(
-            &self,
-            external_id: &str,
-        ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
-            Ok(Some(ExternalIngredient {
-                external_id: external_id.to_string(),
-                name: "Stub Food".to_string(),
+    #[test]
+    fn load_corpus_reads_gzipped_jsonl() {
+        let recs = vec![ExternalIngredient {
+            external_id: "173410".to_string(),
+            name: "Milk, whole".to_string(),
+            serving_size_g: Some(rust_decimal::Decimal::from(100u32)),
+            nutrition: None,
+            allergens: vec![],
+            occasion_tags: vec![],
+        }];
+        let f = write_temp_corpus(&recs);
+        let loaded = load_corpus_ingredients(f.path()).unwrap();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].0, "usda_fdc");
+        assert_eq!(loaded[0].1.name, "Milk, whole");
+    }
+
+    #[sqlx::test(migrations = "../plnd_data/migrations")]
+    async fn insert_ingredients_bulk_inserts_and_is_idempotent(pool: sqlx::PgPool) {
+        let recs = vec![
+            ExternalIngredient {
+                external_id: "1".to_string(),
+                name: "Oats".to_string(),
+                serving_size_g: Some(rust_decimal::Decimal::from(40u32)),
+                nutrition: Some(plnd_data::providers::dtos::NutritionFacts {
+                    calories_kcal: Some(379.0),
+                    ..Default::default()
+                }),
+                allergens: vec![],
+                occasion_tags: vec![],
+            },
+            ExternalIngredient {
+                external_id: "2".to_string(),
+                name: "Milk".to_string(),
                 serving_size_g: None,
                 nutrition: None,
                 allergens: vec![],
                 occasion_tags: vec![],
-            }))
-        }
-    }
-
-    #[tokio::test]
-    async fn fetch_ingredients_skips_non_canonical_providers() {
-        let providers: Vec<Arc<dyn NutritionProvider>> = vec![
-            Arc::new(StubProvider {
-                source: "canon".to_string(),
-                canonical: true,
-            }),
-            Arc::new(StubProvider {
-                source: "branded".to_string(),
-                canonical: false,
-            }),
+            },
         ];
+        let pairs: Vec<(String, ExternalIngredient)> =
+            recs.into_iter().map(|r| ("usda_fdc".to_string(), r)).collect();
 
-        let fetched = fetch_ingredients(&providers).await;
+        let mut tx = pool.begin().await.unwrap();
+        let n = insert_ingredients(&mut tx, &pairs).await.unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(n, 2);
 
-        assert!(
-            !fetched.is_empty(),
-            "the canonical provider must contribute rows"
-        );
-        assert!(
-            fetched.iter().all(|(source, _)| source == "canon"),
-            "no branded-source rows may be seeded"
-        );
-    }
+        let mut tx = pool.begin().await.unwrap();
+        let n2 = insert_ingredients(&mut tx, &pairs).await.unwrap();
+        tx.commit().await.unwrap();
+        assert_eq!(n2, 0);
 
-    #[test]
-    fn seed_terms_include_common_ingredients_and_are_deduped() {
-        assert!(
-            INGREDIENT_TERMS.contains(&"cheese"),
-            "cheese must be seeded (the #858 example)"
-        );
-        assert!(
-            INGREDIENT_TERMS.len() >= 30,
-            "seed list should be meaningfully widened"
-        );
-        let mut sorted = INGREDIENT_TERMS.to_vec();
-        sorted.sort_unstable();
-        let before = sorted.len();
-        sorted.dedup();
-        assert_eq!(before, sorted.len(), "seed terms must be unique");
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM catalog_ingredients WHERE external_source = 'usda_fdc'")
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 2);
     }
 }
