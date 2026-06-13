@@ -56,13 +56,17 @@ barely changes. We download rarely (only when refreshing the vendored snapshot) 
 
 A developer tool (not on the boot path), invoked via `just refresh-usda-corpus`:
 
-1. Downloads the official Foundation + SR Legacy **JSON** zips from USDA's
-   `download-datasets` endpoint (URLs pinned in the recipe; both public domain).
+1. **Auto-discovers** the latest Foundation + SR Legacy **JSON** zip URLs on every run by
+   fetching USDA's `download-datasets` page and parsing the current
+   `FoodData_Central_{foundation_food,sr_legacy_food}_json_YYYY-MM-DD.zip` links — no pinned
+   URLs, so a Foundation refresh is picked up automatically. (SR Legacy resolves to its frozen
+   `2018-04` file.) The resolved release dates are recorded in `NOTICE`. Both public domain.
 2. Parses USDA's **bulk** schema (distinct from the `food/{id}` API schema) via a parser
    exposed from `plnd_data`, projecting each food to the fields we ingest:
    - `fdcId` → `external_id`
    - `description` → `name`
-   - `foodCategory.description` → first `occasion_tags` entry
+   - `foodCategory.description` → first `occasion_tags` entry (preserves current live-provider
+     behavior for parity; the category-vs-occasion overload is flagged for cleanup in **#921**)
    - first `foodPortion.gramWeight` → `serving_size_g` (default 100 g)
    - the 14 mapped nutrient IDs → `NutritionFacts` (reusing `apply_nutrient`)
 3. Emits `plnd_data/corpus/usda_canonical.jsonl.gz`: one `ExternalIngredient`-shaped JSON
@@ -160,10 +164,12 @@ style.
 ## 8. Out of scope / follow-ups
 
 - **#913** (LLM generic/brand normalization for the OFF branded lane) — unchanged, separate.
+- **#921** — `occasion_tags` overloaded with USDA `foodCategory`; parity preserved here,
+  cleanup tracked separately.
 - **Synonyms / lemmatization** (open Q4) — only if post-corpus validation shows ranking gaps;
   open a new issue at that point.
-- **Foundation refresh automation** — manual `just refresh-usda-corpus` twice a year is
-  sufficient; no scheduled job.
+- **Foundation refresh automation** — the refresh tool auto-discovers the latest release, but
+  *running* it stays a manual `just refresh-usda-corpus` (twice a year); no scheduled job.
 
 ## 9. Acceptance
 
