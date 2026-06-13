@@ -160,33 +160,6 @@ pub async fn update_entry(
     Ok(())
 }
 
-#[tracing::instrument(
-    skip(pool),
-    fields(table = "schedule_entries", op = "update_entry_one_shot")
-)]
-pub async fn update_entry_one_shot(
-    pool: &PgPool,
-    user_id: Uuid,
-    entry_id: Uuid,
-    one_shot: bool,
-) -> Result<(), DatabaseError> {
-    let result = sqlx::query(
-        "UPDATE schedule_entries SET one_shot = $1, updated_at = NOW()
-         WHERE entry_id = $2 AND user_id = $3",
-    )
-    .bind(one_shot)
-    .bind(entry_id)
-    .bind(user_id)
-    .execute(pool)
-    .await
-    .map_err(DatabaseError::from)?;
-
-    if result.rows_affected() == 0 {
-        return Err(DatabaseError::NotFound);
-    }
-    Ok(())
-}
-
 #[derive(sqlx::FromRow)]
 struct InsertedRow {
     entry_id: Uuid,
@@ -1662,44 +1635,6 @@ mod tests {
             .await
             .unwrap();
         assert!(slots.is_empty());
-    }
-
-    // -----------------------------------------------------------------------
-    // update_entry_one_shot
-    // -----------------------------------------------------------------------
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn update_entry_one_shot_flips_the_flag(pool: PgPool) {
-        let uid = new_user(&pool).await;
-        let entry_id = Uuid::new_v4();
-        let date = NaiveDate::from_ymd_opt(2026, 6, 10).unwrap();
-
-        sqlx::query(
-            "INSERT INTO schedule_entries (entry_id, user_id, task_type, title, date, status, one_shot)
-             VALUES ($1, $2, 'general', 'evening meds', $3, 'planned', FALSE)",
-        )
-        .bind(entry_id)
-        .bind(uid)
-        .bind(date)
-        .execute(&pool)
-        .await
-        .unwrap();
-
-        update_entry_one_shot(&pool, uid, entry_id, true)
-            .await
-            .unwrap();
-
-        let row: (bool,) =
-            sqlx::query_as("SELECT one_shot FROM schedule_entries WHERE entry_id = $1")
-                .bind(entry_id)
-                .fetch_one(&pool)
-                .await
-                .unwrap();
-        assert!(row.0, "one_shot must be updated to true");
-
-        // Unknown id → NotFound
-        let err = update_entry_one_shot(&pool, uid, Uuid::new_v4(), true).await;
-        assert!(matches!(err, Err(DatabaseError::NotFound)));
     }
 
     // -----------------------------------------------------------------------

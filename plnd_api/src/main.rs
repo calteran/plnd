@@ -381,10 +381,6 @@ async fn main() {
             patch(schedule::patch_entry_status),
         )
         .route(
-            "/schedule/entries/{id}/one-shot",
-            patch(schedule::patch_entry_one_shot),
-        )
-        .route(
             "/schedule/entries/{id}",
             patch(schedule::patch_entry),
         )
