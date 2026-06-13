@@ -27,6 +27,7 @@ pub struct FixtureNutritionProvider {
     source: String,
     search_path: PathBuf,
     lookup_path: PathBuf,
+    canonical: bool,
 }
 
 impl FixtureNutritionProvider {
@@ -51,7 +52,15 @@ impl FixtureNutritionProvider {
             source: source.into(),
             search_path,
             lookup_path,
+            canonical: false,
         })
+    }
+
+    /// Mark this fixture as a canonical-name source (mirrors the real provider
+    /// it stands in for). Defaults to `false`.
+    pub fn canonical(mut self, canonical: bool) -> Self {
+        self.canonical = canonical;
+        self
     }
 }
 
@@ -61,11 +70,8 @@ impl NutritionProvider for FixtureNutritionProvider {
         &self.source
     }
 
-    /// Fixture providers stand in for real canonical sources (e.g. USDA FDC) in
-    /// debug builds. They must be treated as canonical so the catalog seeder
-    /// populates `catalog_ingredients` during e2e runs.
     fn is_canonical_source(&self) -> bool {
-        true
+        self.canonical
     }
 
     #[tracing::instrument(
@@ -278,5 +284,18 @@ mod tests {
         let provider = FixtureNutritionProvider::new("usda_fdc", search_path, lookup_path).unwrap();
         let err = provider.get_ingredient_by_id("any").await.unwrap_err();
         assert!(matches!(err, ExternalProviderError::ResponseParseError(_)));
+    }
+
+    #[test]
+    fn canonical_flag_defaults_false_and_is_set_by_builder() {
+        let (_tmp, provider) = fixture_provider();
+        assert!(
+            !provider.is_canonical_source(),
+            "fixture defaults to non-canonical"
+        );
+        assert!(
+            provider.canonical(true).is_canonical_source(),
+            "builder marks the fixture canonical"
+        );
     }
 }
