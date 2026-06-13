@@ -30,7 +30,7 @@ A tapped task row expands into a compact inline form editing six flat, scalar fi
 | Start time        | `scheduled_start`  | time input ("HH:MM"); see §6 for the floating-task boundary |
 | Duration          | `duration_minutes` | number input (minutes, optional, positive)           |
 | Energy            | `energy_required`  | select: Low / Medium / High                          |
-| Skip if missed    | `one_shot`         | toggle (the #914 setter) — plain-language copy, never the internal name |
+| Skip if missed    | `one_shot`         | toggle — plain-language copy, never the internal name |
 
 ### Out of scope — deferred to tracking issues
 
@@ -98,9 +98,8 @@ DayViewComponent
          ├─ (toggled)       — existing completion toggle (unchanged)
          └─ when editing: hosts
               app-task-edit-form [task]
-                ├─ (save)        — emits a TaskEditPatch (the five general fields)
-                ├─ (oneShotChange) — emits boolean (routed to the retained setter)
-                └─ (close)       — emits to clear editingId
+                ├─ (save)  — emits a TaskEditPatch (any of the six fields, incl. one_shot)
+                └─ (close) — emits to clear editingId
 ```
 
 - **`TaskEditFormComponent`** (new, isolated, independently testable): a reactive `FormGroup`
@@ -118,24 +117,30 @@ wiring.
 
 ## 5. Persistence
 
-Two paths, deliberately:
+**One path for all six fields.** `one_shot` is a scalar field on the same row as the others,
+with the same optimistic semantics — it is not fundamentally different, so it is **not** given
+its own persistence path. (#914's prose suggested wiring the toggle to the retained
+`setEntryOneShot`, but an issue is a transient snapshot, not a design constraint; consistency
+across fields wins.)
 
-- **`one_shot`** reuses the already-tested, #914-retained path:
-  `ScheduleService.setEntryOneShot(id, oneShot)` → `PATCH /schedule/entries/{id}/one-shot`.
-  This honors the issue's explicit instruction and finally gives the retained method a caller.
+All six fields go through a single new method
+`ScheduleService.updateEntry(id, patch)` → new `PATCH /schedule/entries/{id}`, following the
+existing **optimistic** pattern (`toggleItem`): apply the change to the `_items` signal
+immediately, PATCH, and `loadDay()` to revert on error.
 
-- **The other five fields** use a **new** general partial-update method
-  `ScheduleService.updateEntry(id, patch)` → **new** `PATCH /schedule/entries/{id}`.
+**Removal of the now-redundant dedicated one-shot path.** Folding `one_shot` into the general
+endpoint makes these redundant; leaving them would recreate the "retained without a caller"
+smell #911 left. They are **removed**, with their test coverage migrated onto the general
+endpoint:
 
-Both follow the existing **optimistic** pattern used by `toggleItem` and `setEntryOneShot`:
-apply the change to the `_items` signal immediately, PATCH, and `loadDay()` to revert on error.
+- client `ScheduleService.setEntryOneShot`
+- route `PATCH /schedule/entries/{id}/one-shot` (`patch_entry_one_shot`) + `PatchEntryOneShotRequest`
+- repository `ScheduleRepository::update_entry_one_shot` (trait + pg impl)
 
-**Save behavior (design decision — flag for review):** edits commit per-field as the user
-leaves a field — text inputs on blur (debounced), selects/number/toggle on change — consistent
-with the app's established optimistic-immediate persistence. No explicit "Save" button; closing
-the editor does not require a separate commit step. *Alternative considered:* an explicit Save
-button collecting all edits into one PATCH — rejected as inconsistent with the existing service
-philosophy and the tap-away-to-dismiss interaction, but called out here for the spec-review gate.
+**Save behavior (resolved):** edits commit **per-field, optimistically** as the user leaves a
+field — text inputs on blur (debounced), selects/number/toggle on change — consistent with the
+app's established optimistic-immediate persistence. No explicit "Save" button; closing the
+editor does not require a separate commit step.
 
 ## 6. Backend changes
 
@@ -147,17 +152,18 @@ New write surface, added the storage-isolation-compliant way (no `sqlx`/`PgPool`
 `plnd_api`):
 
 1. **HTTP** — `PatchEntryRequest` body in `plnd_api/src/models.rs` with all-optional fields:
-   `title`, `task_type`, `scheduled_start` (HH:MM), `duration_minutes`, `energy_required`.
-   (`one_shot` and `status` keep their dedicated endpoints.) A new
-   `PATCH /schedule/entries/{id}` handler in `plnd_api/src/routes/schedule.rs`, mirroring
-   `patch_entry_one_shot`'s shape (auth → repo call → 204 / 400 / 404 / 500), with
-   utoipa annotation.
+   `title`, `task_type`, `scheduled_start` (HH:MM), `duration_minutes`, `energy_required`,
+   `one_shot`. (`status` keeps its dedicated endpoint — it carries distinct lifecycle
+   validation and is not a metadata edit.) A new `PATCH /schedule/entries/{id}` handler in
+   `plnd_api/src/routes/schedule.rs` (auth → repo call → 204 / 400 / 404 / 500), with utoipa
+   annotation. The dedicated one-shot route is removed (see §5).
 2. **Validation** — `task_type` ∈ the task vocabulary (work/exercise/leisure/medication/
    appointment/general); `energy_required` ∈ {low, medium, high}; `duration_minutes` positive;
    `title` non-blank when present. Invalid → 400, mirroring `VALID_STATUSES`.
 3. **Repository** — new `ScheduleRepository::update_entry(user_id, entry_id, patch)` trait
-   method in `plnd_data` + its pg implementation. Partial update (`COALESCE`-style: only
-   provided fields change), scoped by `user_id` for ownership; `NotFound` when no row matches.
+   method in `plnd_data` + its pg implementation, covering all six fields including `one_shot`.
+   Partial update (`COALESCE`-style: only provided fields change), scoped by `user_id` for
+   ownership; `NotFound` when no row matches. The old `update_entry_one_shot` is removed (§5).
 
 ### Floating-vs-fixed boundary (design decision — flag for review)
 
@@ -195,15 +201,16 @@ into a no-slot/no-time state. This keeps the PR from pulling in placement logic.
 
 - **Angular unit (`TaskEditFormComponent`, `TaskRowComponent`, `DayViewComponent`):** label
   tap opens the editor; only one open at a time; spotlight dims + makes others inert; field
-  edits emit the right outputs; one-shot routes to `setEntryOneShot`; the other five route to
-  `updateEntry`; validation blocks blank title / bad duration; a11y attributes; `Escape`
-  closes and restores focus; `prefers-reduced-motion` path. Use provider APIs
-  (`provideHttpClientTesting`, etc.), never the deprecated testing NgModules.
-- **Service:** `updateEntry` optimistic update + reload-on-error; `setEntryOneShot` reuse.
+  edits (all six, including the one-shot toggle) emit a `TaskEditPatch` routed to `updateEntry`;
+  validation blocks blank title / bad duration; a11y attributes; `Escape` closes and restores
+  focus; `prefers-reduced-motion` path. Use provider APIs (`provideHttpClientTesting`, etc.),
+  never the deprecated testing NgModules.
+- **Service:** `updateEntry` optimistic update + reload-on-error (covers `one_shot` too). The
+  removed `setEntryOneShot` spec is deleted; its one-shot persistence assertions move here.
 - **Rust unit:** `PatchEntryRequest` validation (valid/invalid type, energy, duration, blank
   title), mirroring the existing `map_entry` test module.
-- **Rust integration:** `update_entry` repository method — partial update, ownership scoping,
-  `NotFound`.
+- **Rust integration:** `update_entry` repository method — partial update (including `one_shot`),
+  ownership scoping, `NotFound`. The removed `update_entry_one_shot` tests fold into these.
 - **E2E (real backend — schedule endpoints are not mocked):** open the inline editor from a
   seeded task, change title + type + one-shot, confirm persistence survives a reload. Seed via
   the real API helpers (`seedScheduleEntries`), per the e2e mock policy.
@@ -223,8 +230,11 @@ into a no-slot/no-time state. This keeps the PR from pulling in placement logic.
   animation; no persistent per-row clutter (the #911 concern), since editing is a deliberate
   tap, not an always-present control.
 
-## 11. Open decisions for the spec-review gate
+## 11. Resolved decisions
 
-1. **Save behavior** — optimistic per-field commit (recommended) vs. an explicit Save button.
-2. **Floating-task time field** — disabled-with-hint (recommended) vs. some other treatment,
-   pending the deferred placement work.
+1. **Persistence consistency** — all six fields (including `one_shot`) share one
+   `PATCH /schedule/entries/{id}` path; the dedicated one-shot route/method/client-method are
+   removed. (§5, §6)
+2. **Save behavior** — optimistic per-field commit (blur for text, change for the rest); no
+   Save button. (§5)
+3. **Floating-task time field** — disabled-with-hint, pending the deferred placement work. (§6)
