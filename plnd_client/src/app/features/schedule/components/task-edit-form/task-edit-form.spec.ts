@@ -50,6 +50,31 @@ describe('TaskEditFormComponent', () => {
     expect(time.disabled).toBeTrue();
   });
 
+  it('does not emit a save when the time field is cleared (empty value)', () => {
+    fixture.componentRef.setInput('task', task());
+    fixture.detectChanges();
+    const saves: unknown[] = [];
+    fixture.componentInstance.save.subscribe(p => saves.push(p));
+
+    const time: HTMLInputElement = fixture.nativeElement.querySelector('input[name="time"]');
+    time.value = '';
+    time.dispatchEvent(new Event('change'));
+
+    expect(saves).toEqual([]);
+  });
+
+  it('emits close on Escape from a non-title control (handler is on the container)', () => {
+    fixture.componentRef.setInput('task', task());
+    fixture.detectChanges();
+    let closed = false;
+    fixture.componentInstance.close.subscribe(() => (closed = true));
+
+    const energy: HTMLSelectElement = fixture.nativeElement.querySelector('select[name="energy"]');
+    energy.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(closed).toBeTrue();
+  });
+
   it('one-shot toggle has switch semantics and a state-dependent label', () => {
     fixture.componentRef.setInput('task', task());
     fixture.detectChanges();

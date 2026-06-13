@@ -161,6 +161,24 @@ describe('ScheduleService', () => {
     expect(task.label).toBe('exercise');
   });
 
+  it('marks a task floating when it has no time but is anchored to a meal slot', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e-float', task_type: 'general', title: 'Stretch',
+      status: 'planned', date: '2026-04-02', scheduled_start: null, after_anchor: 'lunch',
+    }]);
+    expect((svc.scheduleItems()[0] as ScheduleTask).floating).toBeTrue();
+  });
+
+  it('does not mark a task floating when it has neither a time nor an anchor', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e-unscheduled', task_type: 'general', title: 'Errand',
+      status: 'planned', date: '2026-04-02', scheduled_start: null,
+    }]);
+    expect((svc.scheduleItems()[0] as ScheduleTask).floating).toBeFalse();
+  });
+
   it('maps a meal anchor instance to MealAnchor with MEAL_SLOTS name and emoji', () => {
     svc.loadDay('2026-04-02');
     flushDay(httpMock, [], [{

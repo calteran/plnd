@@ -229,7 +229,9 @@ function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntr
 }
 
 function mapEntry(e: ScheduleEntryDto): ScheduleTask {
-  const floating = !e.scheduled_start;
+  // Floating = lives in a meal slot (anchored) with no fixed clock time.
+  // A task with neither a time nor an anchor is NOT floating, so its time stays editable.
+  const floating = !e.scheduled_start && !!e.after_anchor;
   return {
     id:      e.entry_id,
     type:    parseItemType(e.task_type),

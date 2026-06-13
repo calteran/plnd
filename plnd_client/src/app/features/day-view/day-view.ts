@@ -124,7 +124,17 @@ export class DayViewComponent implements OnInit, OnDestroy {
         ?.scrollIntoView({ block: 'nearest', behavior: this.prefersReducedMotion() ? 'auto' : 'smooth' });
     });
   }
-  closeEditor(): void { this.editingId.set(null); }
+  closeEditor(): void {
+    // Restore focus to the originating row's label. Capture the id before
+    // clearing; once editingId is null the row is no longer inert, so the
+    // queued focus call succeeds.
+    const id = this.editingId();
+    this.editingId.set(null);
+    if (id) {
+      queueMicrotask(() =>
+        document.querySelector<HTMLElement>(`#task-row-${id} .label`)?.focus());
+    }
+  }
   onEditSave(id: string, patch: TaskEditPatch): void { this.scheduleService.updateEntry(id, patch); }
 
   private prefersReducedMotion(): boolean {

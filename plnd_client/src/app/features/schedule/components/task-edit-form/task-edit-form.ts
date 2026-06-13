@@ -1,4 +1,4 @@
-import { Component, computed, effect, input, output, signal } from '@angular/core';
+import { Component, ElementRef, afterNextRender, computed, effect, input, output, signal, viewChild } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { ItemType, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { EnergyLevel } from '../../../../core/models/week-plan';
@@ -15,12 +15,13 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
   standalone: true,
   imports: [TitleCasePipe],
   template: `
-    <div class="task-edit-form" role="group" [attr.aria-label]="'Edit task: ' + task().label">
+    <div class="task-edit-form" role="group" [attr.aria-label]="'Edit task: ' + task().label"
+         (keydown.escape)="close.emit()">
       <label class="field">
         <span class="field-label">Title</span>
-        <input name="title" type="text" [value]="task().label"
+        <input #titleInput name="title" type="text" [value]="task().label"
                (input)="title.set($any($event.target).value)"
-               (blur)="commitTitle()" (keydown.escape)="close.emit()" />
+               (blur)="commitTitle()" />
       </label>
 
       <label class="field">
@@ -36,7 +37,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
         <input name="time" type="time" [value]="task().scheduledStart ?? ''"
                [disabled]="task().floating"
                [attr.aria-describedby]="task().floating ? 'time-hint' : null"
-               (change)="save.emit({ scheduledStart: $any($event.target).value })" />
+               (change)="commitTime($any($event.target).value)" />
         @if (task().floating) { <span id="time-hint" class="hint">set by its meal slot</span> }
       </label>
 
@@ -50,6 +51,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
         <span class="field-label">Energy</span>
         <select name="energy" [value]="task().energy ?? ''"
                 (change)="save.emit({ energy: $any($event.target).value })">
+          @if (!task().energy) { <option value="" disabled hidden>Not set</option> }
           @for (e of energies; track e) { <option [value]="e">{{ e | titlecase }}</option> }
         </select>
       </label>
@@ -75,6 +77,8 @@ export class TaskEditFormComponent {
   protected readonly energies = ENERGIES;
   protected readonly title = signal('');
 
+  private readonly titleInput = viewChild<ElementRef<HTMLInputElement>>('titleInput');
+
   protected readonly oneShotLabel = computed(() =>
     this.task().oneShot
       ? `${this.task().label} will skip if missed — won't carry over if not done. Turn off to carry over.`
@@ -83,6 +87,15 @@ export class TaskEditFormComponent {
 
   constructor() {
     effect(() => this.title.set(this.task().label));
+    // The form is re-created each time a row opens, so this focuses the title
+    // input once per open. (Focus restoration on close lives in DayViewComponent.)
+    afterNextRender(() => this.titleInput()?.nativeElement.focus());
+  }
+
+  protected commitTime(raw: string): void {
+    // Empty value → no emit. Clearing a fixed time isn't supported here; this
+    // avoids a silent 400/revert when the field is cleared.
+    if (raw) this.save.emit({ scheduledStart: raw });
   }
 
   protected commitTitle(): void {
