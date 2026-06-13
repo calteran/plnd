@@ -159,17 +159,26 @@ fn detail_to_ingredient(food: FdcDetailFood) -> ExternalIngredient {
 /// Bulk USDA dataset envelope. Foundation files wrap foods in `FoundationFoods`,
 /// SR Legacy in `SRLegacyFoods`; both share the per-food `FdcDetailFood` shape.
 /// Only those two keys are accepted — a stray top-level `foods` object does not parse.
+///
+/// Elements are `Option<FdcDetailFood>` because USDA's Foundation file embeds
+/// `null` holes in the array (32 of 395 in the 2026-04 release); those are
+/// dropped rather than failing the whole parse.
 #[derive(Deserialize)]
 struct FdcBulkDataset {
     #[serde(rename = "FoundationFoods", alias = "SRLegacyFoods")]
-    foods: Vec<FdcDetailFood>,
+    foods: Vec<Option<FdcDetailFood>>,
 }
 
 /// Parse a USDA bulk dataset JSON (Foundation or SR Legacy) into ingredients.
 /// Used by the `build_usda_corpus` dev tool; not on the request path.
 pub fn parse_bulk_dataset(json: &str) -> Result<Vec<ExternalIngredient>, serde_json::Error> {
     let ds: FdcBulkDataset = serde_json::from_str(json)?;
-    Ok(ds.foods.into_iter().map(detail_to_ingredient).collect())
+    Ok(ds
+        .foods
+        .into_iter()
+        .flatten()
+        .map(detail_to_ingredient)
+        .collect())
 }
 
 // ---------------------------------------------------------------------------
@@ -558,5 +567,22 @@ mod tests {
     fn parse_bulk_dataset_rejects_unknown_envelope() {
         let json = r#"{ "SomethingElse": [] }"#;
         assert!(parse_bulk_dataset(json).is_err());
+    }
+
+    #[test]
+    fn parse_bulk_dataset_skips_null_array_holes() {
+        // USDA's Foundation file embeds `null` entries in the foods array (32 of
+        // 395 in the 2026-04 release). They must be dropped, not abort the parse.
+        let json = r#"{
+            "FoundationFoods": [
+                null,
+                { "fdcId": 1, "description": "Real food",
+                  "foodNutrients": [ { "nutrient": { "id": 1008 }, "amount": 50.0 } ] },
+                null
+            ]
+        }"#;
+        let foods = parse_bulk_dataset(json).expect("null holes must not fail the parse");
+        assert_eq!(foods.len(), 1);
+        assert_eq!(foods[0].name, "Real food");
     }
 }
