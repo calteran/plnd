@@ -324,7 +324,7 @@ describe('ScheduleService', () => {
     (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'm1', name: 'Breakfast', emoji: '🥣',
       status: 'planned', duringMealTasks: [
-        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending', oneShot: false }
+        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending', oneShot: false, floating: false }
       ]
     }]);
     svc.toggleItem('t-dm2');
@@ -390,75 +390,69 @@ describe('ScheduleService', () => {
     expect(httpMock.match(r => r.url.includes('/schedule/entries/')).length).toBe(0);
   });
 
-  it('setEntryOneShot PATCHes the one-shot endpoint and updates state', () => {
-    svc.loadDay('2026-04-02');
+  it('updateEntry optimistically patches the item and PATCHes the entry', () => {
+    svc.loadDay('2026-06-13');
     flushDay(httpMock, [{
-      entry_id: 'e1',
+      entry_id: 'entry-1',
       task_type: 'general',
-      title: 'Take vitamins',
+      title: 'Old',
       status: 'planned',
-      date: '2026-04-02',
+      date: '2026-06-13',
       scheduled_start: null,
-      one_shot: false,
     }]);
 
-    svc.setEntryOneShot('e1', true);
+    svc.updateEntry('entry-1', { title: 'New title', oneShot: true });
 
-    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/e1/one-shot');
-    expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ one_shot: true });
+    const item = svc.scheduleItems().find(i => i.id === 'entry-1') as ScheduleTask;
+    expect(item.label).toBe('New title');
+    expect(item.oneShot).toBeTrue();
+
+    const req = httpMock.expectOne(r =>
+      r.method === 'PATCH' && r.url.endsWith('/schedule/entries/entry-1'));
+    expect(req.request.body).toEqual({ title: 'New title', one_shot: true });
     req.flush(null, { status: 204, statusText: 'No Content' });
-
-    const task = svc.scheduleItems().find(i => i.id === 'e1') as ScheduleTask;
-    expect(task.oneShot).toBe(true);
   });
 
-  it('setEntryOneShot reloads the day on PATCH error', () => {
-    svc.loadDay('2026-04-02');
+  it('updateEntry reloads the day on PATCH error', () => {
+    svc.loadDay('2026-06-13');
     flushDay(httpMock, [{
-      entry_id: 'e1',
-      task_type: 'general',
-      title: 'Take vitamins',
-      status: 'planned',
-      date: '2026-04-02',
-      scheduled_start: null,
-      one_shot: false,
+      entry_id: 'entry-1', task_type: 'general', title: 'Old',
+      status: 'planned', date: '2026-06-13', scheduled_start: null,
     }]);
 
-    svc.setEntryOneShot('e1', true);
+    svc.updateEntry('entry-1', { title: 'New title' });
 
-    httpMock.expectOne(r => r.url.includes('/schedule/entries/e1/one-shot'))
+    httpMock.expectOne(r => r.method === 'PATCH' && r.url.endsWith('/schedule/entries/entry-1'))
       .flush('error', { status: 500, statusText: 'Internal Server Error' });
 
     flushDay(httpMock);
-    expect(svc.date()).toBe('2026-04-02');
+    expect(svc.date()).toBe('2026-06-13');
   });
 
-  it('setEntryOneShot issues no PATCH for a meal-anchor id', () => {
+  it('updateEntry issues no PATCH for a meal-anchor id', () => {
     (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'meal-1', name: 'Breakfast', emoji: '🥣',
       status: 'planned', duringMealTasks: [],
     }]);
 
-    svc.setEntryOneShot('meal-1', true);
+    svc.updateEntry('meal-1', { title: 'x' });
 
-    httpMock.expectNone('http://localhost:3000/schedule/entries/meal-1/one-shot');
+    expect(httpMock.match(r => r.url.endsWith('/schedule/entries/meal-1')).length).toBe(0);
   });
 
-  it('setEntryOneShot PATCHes and updates a during-meal task nested in a meal anchor', () => {
+  it('updateEntry patches a during-meal task nested in a meal anchor', () => {
     svc.loadDay('2026-04-02');
     flushDay(httpMock);
     (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
       id: 'm1', name: 'Breakfast', emoji: '🥣',
       status: 'planned', duringMealTasks: [
-        { id: 't-dm3', type: 'medication', label: 'Take pill with breakfast', status: 'pending', oneShot: false }
+        { id: 't-dm3', type: 'medication', label: 'Take pill', status: 'pending', oneShot: false, floating: false }
       ]
     }]);
 
-    svc.setEntryOneShot('t-dm3', true);
+    svc.updateEntry('t-dm3', { oneShot: true });
 
-    const req = httpMock.expectOne('http://localhost:3000/schedule/entries/t-dm3/one-shot');
-    expect(req.request.method).toBe('PATCH');
+    const req = httpMock.expectOne(r => r.method === 'PATCH' && r.url.endsWith('/schedule/entries/t-dm3'));
     expect(req.request.body).toEqual({ one_shot: true });
     req.flush(null, { status: 204, statusText: 'No Content' });
 
@@ -467,7 +461,7 @@ describe('ScheduleService', () => {
   });
 
   it('addItem appends a ScheduleTask to scheduleItems', () => {
-    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending', oneShot: false };
+    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending', oneShot: false, floating: false };
     svc.addItem(task);
     expect(svc.scheduleItems()).toContain(task);
     expect(svc.scheduleItems().length).toBe(1);

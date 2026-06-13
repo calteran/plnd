@@ -19,7 +19,7 @@ const unplanned: MealAnchor = {
 const withTasks: MealAnchor = {
   id: 'm3', name: 'Breakfast', emoji: '🥑', status: 'planned',
   duringMealTasks: [
-    { id: 'dt1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false }
+    { id: 'dt1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false, floating: false }
   ]
 };
 const skippedMeal: MealAnchor = {

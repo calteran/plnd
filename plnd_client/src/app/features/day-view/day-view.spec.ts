@@ -98,7 +98,7 @@ describe('DayViewComponent (schedule view)', () => {
   it('renders meal and task rows when items are present', async () => {
     const items: ScheduleItem[] = [
       { id: 'm1', name: 'Breakfast', emoji: '🥑', status: 'done', duringMealTasks: [] },
-      { id: 't1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false }
+      { id: 't1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false, floating: false }
     ];
     const svc = makeScheduleServiceMock({ scheduleItems: items });
     await TestBed.configureTestingModule({

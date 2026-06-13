@@ -3,7 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
 import { ConfigService } from './config.service';
-import { ScheduleItem, MealAnchor, ScheduleTask, isMealAnchor, parseItemType } from '../models/schedule';
+import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor, parseItemType } from '../models/schedule';
 import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
 
@@ -93,33 +93,33 @@ export class ScheduleService {
   }
 
   /**
-   * Set a task's one-shot flag (skip-if-missed vs carry-over). Optimistic; reloads on error.
-   *
-   * Retained without a caller: the day view shows one-shot as a read-only indicator (#911),
-   * so the setter moves to the upcoming task edit view (#914), which will call this method.
+   * Apply a partial edit to a task entry (title/type/time/duration/energy/one_shot).
+   * Optimistic: updates the in-memory item, PATCHes, and reloads the day on error.
    */
-  setEntryOneShot(id: string, oneShot: boolean): void {
-    // findItemStatus searches both top-level tasks and tasks nested inside meal
-    // anchors (duringMealTasks); it returns null for a meal-anchor's own id or an
-    // unknown id, which short-circuits before any optimistic update or PATCH.
+  updateEntry(id: string, patch: TaskEditPatch): void {
     if (findItemStatus(this._items(), id) === null) return;
 
     this._items.update(items =>
       items.map(item => {
+        const apply = (t: ScheduleTask): ScheduleTask => ({
+          ...t,
+          label:           patch.title ?? t.label,
+          type:            patch.type ?? t.type,
+          scheduledStart:  patch.scheduledStart ?? t.scheduledStart,
+          durationMinutes: patch.durationMinutes ?? t.durationMinutes,
+          energy:          patch.energy ?? t.energy,
+          oneShot:         patch.oneShot ?? t.oneShot,
+        });
         if (isMealAnchor(item)) {
           if (!item.duringMealTasks.some(t => t.id === id)) return item;
-          return {
-            ...item,
-            duringMealTasks: item.duringMealTasks.map(t =>
-              t.id === id ? { ...t, oneShot } : t,
-            ),
-          };
+          return { ...item, duringMealTasks: item.duringMealTasks.map(t => t.id === id ? apply(t) : t) };
         }
-        return item.id === id ? { ...item, oneShot } : item;
+        return item.id === id ? apply(item) : item;
       }),
     );
+
     this.http
-      .patch(`${this.apiBase}/schedule/entries/${id}/one-shot`, { one_shot: oneShot })
+      .patch(`${this.apiBase}/schedule/entries/${id}`, toPatchBody(patch))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({ error: () => this.loadDay(this._date()) });
   }
@@ -229,11 +229,33 @@ function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntr
 }
 
 function mapEntry(e: ScheduleEntryDto): ScheduleTask {
+  const floating = !e.scheduled_start;
   return {
     id:      e.entry_id,
     type:    parseItemType(e.task_type),
     label:   e.title ?? e.task_type,
     status:  e.status === 'completed' ? 'done' : 'pending',
+    scheduledStart: e.scheduled_start ? hhmmUtc(e.scheduled_start) : undefined,
+    durationMinutes: e.duration_minutes ?? undefined,
+    energy:  (e.energy_required as ScheduleTask['energy']) ?? undefined,
     oneShot: e.one_shot ?? false,
+    floating,
   };
+}
+
+/** Extract a UTC "HH:MM" from an ISO timestamp (matches the API's wall-clock convention). */
+function hhmmUtc(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
+}
+
+function toPatchBody(p: TaskEditPatch): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (p.title !== undefined)           body['title'] = p.title;
+  if (p.type !== undefined)            body['task_type'] = p.type;
+  if (p.scheduledStart !== undefined)  body['scheduled_start'] = p.scheduledStart;
+  if (p.durationMinutes !== undefined) body['duration_minutes'] = p.durationMinutes;
+  if (p.energy !== undefined)          body['energy_required'] = p.energy;
+  if (p.oneShot !== undefined)         body['one_shot'] = p.oneShot;
+  return body;
 }

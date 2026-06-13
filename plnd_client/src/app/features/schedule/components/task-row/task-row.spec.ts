@@ -3,16 +3,16 @@ import { By } from '@angular/platform-browser';
 import { TaskRowComponent } from './task-row';
 import { ScheduleTask } from '../../../../core/models/schedule';
 
-const pending: ScheduleTask = { id: '1', type: 'general', label: '✉️ Email dentist', status: 'pending', oneShot: false };
-const done:    ScheduleTask = { id: '2', type: 'general', label: '💊 Vitamins',      status: 'done',    oneShot: false };
-const timed:   ScheduleTask = { id: '3', type: 'appointment', label: '📅 Standup', status: 'pending', scheduledTime: '11 AM', oneShot: false };
+const pending: ScheduleTask = { id: '1', type: 'general', label: '✉️ Email dentist', status: 'pending', oneShot: false, floating: false };
+const done:    ScheduleTask = { id: '2', type: 'general', label: '💊 Vitamins',      status: 'done',    oneShot: false, floating: false };
+const timed:   ScheduleTask = { id: '3', type: 'appointment', label: '📅 Standup', status: 'pending', scheduledTime: '11 AM', oneShot: false, floating: false };
 
-const workTask:  ScheduleTask = { id: '10', type: 'work',        label: 'Write report',  status: 'pending', oneShot: false };
-const leiTask:   ScheduleTask = { id: '11', type: 'leisure',     label: 'Read novel',    status: 'pending', oneShot: false };
-const medTask:   ScheduleTask = { id: '12', type: 'medication',  label: 'Vitamins',      status: 'pending', oneShot: false };
-const genTask:   ScheduleTask = { id: '13', type: 'general',     label: 'Tidy desk',     status: 'pending', oneShot: false };
-const exTask:    ScheduleTask = { id: '14', type: 'exercise',    label: 'Morning run',   status: 'pending', oneShot: false };
-const apptTask:  ScheduleTask = { id: '15', type: 'appointment', label: 'Dentist',       status: 'pending', oneShot: false };
+const workTask:  ScheduleTask = { id: '10', type: 'work',        label: 'Write report',  status: 'pending', oneShot: false, floating: false };
+const leiTask:   ScheduleTask = { id: '11', type: 'leisure',     label: 'Read novel',    status: 'pending', oneShot: false, floating: false };
+const medTask:   ScheduleTask = { id: '12', type: 'medication',  label: 'Vitamins',      status: 'pending', oneShot: false, floating: false };
+const genTask:   ScheduleTask = { id: '13', type: 'general',     label: 'Tidy desk',     status: 'pending', oneShot: false, floating: false };
+const exTask:    ScheduleTask = { id: '14', type: 'exercise',    label: 'Morning run',   status: 'pending', oneShot: false, floating: false };
+const apptTask:  ScheduleTask = { id: '15', type: 'appointment', label: 'Dentist',       status: 'pending', oneShot: false, floating: false };
 
 describe('TaskRowComponent', () => {
   async function setup(item: ScheduleTask) {
@@ -105,7 +105,7 @@ describe('TaskRowComponent', () => {
 
   // One-shot is surfaced as a read-only indicator in the day view: it appears only on
   // tasks that are already one-shot, and toggling moves to a future task edit view.
-  const oneShotTask: ScheduleTask = { id: 'os1', type: 'medication', label: 'Vitamins', status: 'pending', oneShot: true };
+  const oneShotTask: ScheduleTask = { id: 'os1', type: 'medication', label: 'Vitamins', status: 'pending', oneShot: true, floating: false };
 
   it('renders no one-shot indicator for ordinary (carry-over) tasks', async () => {
     const f = await setup(pending);
