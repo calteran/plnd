@@ -43,7 +43,7 @@ PLND ("planned") is a neurodivergent-focused planner/assistant for managing nutr
 
 ### PR Lifecycle
 - **After opening a PR**: invoke the `monitor-pr` skill to watch CI and address any review comments
-- **After a PR merges**: `git checkout main && git pull`, remove the worktree if one was used (`just worktree-new` creates them under `.worktrees/<branch>`), then delete the local branch (`git branch -d <branch>`)
+- **After a PR merges**: `git checkout main && git pull`, remove the worktree if one was used (the native worktree tool places them under `.claude/worktrees/`; clean up with `ExitWorktree` or `git worktree remove`), then delete the local branch (`git branch -d <branch>`)
 
 ### Storage Layer Isolation
 - No production crate other than `plnd_data` may depend on `sqlx`, import `PgPool`, or
@@ -81,7 +81,7 @@ just verify           # Full quality + build + tests (run before every commit)
 just test-ng-headless # Angular unit tests (headless Chrome)
 
 # Utilities
-just worktree-new     # Create a worktree with Angular deps installed (prevents LSP false positives)
+just install-deps     # Install Angular deps in the current worktree (run after the native worktree tool; prevents LSP false positives)
 ```
 
 ## Development Standards
