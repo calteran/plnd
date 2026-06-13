@@ -194,9 +194,7 @@ async fn main() {
         let seed_recipe = catalog_recipe.clone();
         tokio::spawn(async move {
             let corpus_path = plnd_seed::ingredients::resolve_corpus_path();
-            if let Err(e) =
-                plnd_seed::run_seed(&seed_url, 3, &seed_recipe, &corpus_path).await
-            {
+            if let Err(e) = plnd_seed::run_seed(&seed_url, 3, &seed_recipe, &corpus_path).await {
                 tracing::warn!(error = %e, "catalog seed failed (non-fatal)");
             }
         });

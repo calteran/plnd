@@ -515,7 +515,8 @@ mod tests {
 
     #[test]
     fn search_food_deserializes_data_type() {
-        let json = r#"{ "fdcId": 1, "description": "ALFREDO BROCCOLI ...", "dataType": "Branded" }"#;
+        let json =
+            r#"{ "fdcId": 1, "description": "ALFREDO BROCCOLI ...", "dataType": "Branded" }"#;
         let food: FdcSearchFood = serde_json::from_str(json).expect("deserialize");
         assert_eq!(food.data_type, Some(FdcDataType::Branded));
         assert!(
@@ -544,9 +545,18 @@ mod tests {
         assert_eq!(foods.len(), 1);
         assert_eq!(foods[0].external_id, "2262072");
         assert_eq!(foods[0].name, "Oats, whole grain, rolled");
-        assert_eq!(foods[0].serving_size_g, Some(rust_decimal::Decimal::try_from(40.0).unwrap()));
-        assert_eq!(foods[0].nutrition.as_ref().unwrap().calories_kcal, Some(379.0));
-        assert_eq!(foods[0].occasion_tags, vec!["Cereal Grains and Pasta".to_string()]);
+        assert_eq!(
+            foods[0].serving_size_g,
+            Some(rust_decimal::Decimal::try_from(40.0).unwrap())
+        );
+        assert_eq!(
+            foods[0].nutrition.as_ref().unwrap().calories_kcal,
+            Some(379.0)
+        );
+        assert_eq!(
+            foods[0].occasion_tags,
+            vec!["Cereal Grains and Pasta".to_string()]
+        );
     }
 
     #[test]
@@ -560,7 +570,10 @@ mod tests {
         let foods = parse_bulk_dataset(json).expect("parse");
         assert_eq!(foods.len(), 1);
         assert_eq!(foods[0].name, "Milk, whole");
-        assert_eq!(foods[0].serving_size_g, Some(rust_decimal::Decimal::from(100u32)));
+        assert_eq!(
+            foods[0].serving_size_g,
+            Some(rust_decimal::Decimal::from(100u32))
+        );
     }
 
     #[test]

@@ -2443,13 +2443,13 @@ name = "plnd_seed"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-trait",
  "chrono",
  "flate2",
  "plnd_data",
  "rust_decimal",
  "serde_json",
  "sqlx",
+ "tempfile",
  "thiserror",
  "tokio",
  "tracing",

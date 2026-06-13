@@ -154,8 +154,10 @@ mod tests {
                 occasion_tags: vec![],
             },
         ];
-        let pairs: Vec<(String, ExternalIngredient)> =
-            recs.into_iter().map(|r| ("usda_fdc".to_string(), r)).collect();
+        let pairs: Vec<(String, ExternalIngredient)> = recs
+            .into_iter()
+            .map(|r| ("usda_fdc".to_string(), r))
+            .collect();
 
         let mut tx = pool.begin().await.unwrap();
         let n = insert_ingredients(&mut tx, &pairs).await.unwrap();
@@ -167,11 +169,12 @@ mod tests {
         tx.commit().await.unwrap();
         assert_eq!(n2, 0);
 
-        let count: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM catalog_ingredients WHERE external_source = 'usda_fdc'")
-                .fetch_one(&pool)
-                .await
-                .unwrap();
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM catalog_ingredients WHERE external_source = 'usda_fdc'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(count, 2);
 
         // The nutrition JSONB must round-trip for a nutrition-bearing record
@@ -183,7 +186,10 @@ mod tests {
         .fetch_one(&pool)
         .await
         .unwrap();
-        assert!(nutrition_present, "Oats record carried nutrition and must persist it");
+        assert!(
+            nutrition_present,
+            "Oats record carried nutrition and must persist it"
+        );
     }
 
     #[test]

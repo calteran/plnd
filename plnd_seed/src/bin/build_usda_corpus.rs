@@ -21,8 +21,8 @@ fn main() -> anyhow::Result<()> {
         // The full SR Legacy file is ~205 MB uncompressed; reading it whole is
         // acceptable for an occasional dev tool.
         let json = std::fs::read_to_string(path)?;
-        let mut foods = parse_bulk_dataset(&json)
-            .map_err(|e| anyhow::anyhow!("parse {path}: {e}"))?;
+        let mut foods =
+            parse_bulk_dataset(&json).map_err(|e| anyhow::anyhow!("parse {path}: {e}"))?;
         all.append(&mut foods);
     }
 
