@@ -117,6 +117,50 @@ pub async fn update_entry_status(
 }
 
 #[tracing::instrument(
+    skip(pool, patch),
+    fields(table = "schedule_entries", op = "update_entry")
+)]
+pub async fn update_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    patch: &crate::models::EntryPatch,
+) -> Result<(), DatabaseError> {
+    // COALESCE keeps the existing value when a bind is NULL (field omitted).
+    // scheduled_start is combined with the row's existing date in UTC.
+    let result = sqlx::query(
+        "UPDATE schedule_entries SET
+             title            = COALESCE($1, title),
+             task_type        = COALESCE($2, task_type),
+             scheduled_start  = COALESCE(
+                 CASE WHEN $3::time IS NULL THEN NULL
+                      ELSE (date + $3::time) AT TIME ZONE 'UTC' END,
+                 scheduled_start),
+             duration_minutes = COALESCE($4, duration_minutes),
+             energy_required  = COALESCE($5, energy_required),
+             one_shot         = COALESCE($6, one_shot),
+             updated_at       = NOW()
+         WHERE entry_id = $7 AND user_id = $8",
+    )
+    .bind(patch.title.as_deref())
+    .bind(patch.task_type.as_deref())
+    .bind(patch.scheduled_start)
+    .bind(patch.duration_minutes)
+    .bind(patch.energy_required.as_deref())
+    .bind(patch.one_shot)
+    .bind(entry_id)
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    if result.rows_affected() == 0 {
+        return Err(DatabaseError::NotFound);
+    }
+    Ok(())
+}
+
+#[tracing::instrument(
     skip(pool),
     fields(table = "schedule_entries", op = "update_entry_one_shot")
 )]
@@ -1655,6 +1699,45 @@ mod tests {
 
         // Unknown id → NotFound
         let err = update_entry_one_shot(&pool, uid, Uuid::new_v4(), true).await;
+        assert!(matches!(err, Err(DatabaseError::NotFound)));
+    }
+
+    // -----------------------------------------------------------------------
+    // update_entry
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn update_entry_changes_only_provided_fields(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let entry_id = Uuid::new_v4();
+        let date = NaiveDate::from_ymd_opt(2026, 6, 10).unwrap();
+
+        sqlx::query(
+            "INSERT INTO schedule_entries
+               (entry_id, user_id, task_type, title, date, status, one_shot, duration_minutes, energy_required)
+             VALUES ($1, $2, 'general', 'evening meds', $3, 'planned', FALSE, 15, 'low')",
+        )
+        .bind(entry_id).bind(uid).bind(date)
+        .execute(&pool).await.unwrap();
+
+        let patch = crate::models::EntryPatch {
+            title: Some("evening medication".to_string()),
+            one_shot: Some(true),
+            ..Default::default()
+        };
+        update_entry(&pool, uid, entry_id, &patch).await.unwrap();
+
+        let row: (String, bool, Option<i32>, Option<String>) = sqlx::query_as(
+            "SELECT title, one_shot, duration_minutes, energy_required
+             FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(entry_id).fetch_one(&pool).await.unwrap();
+        assert_eq!(row.0, "evening medication");
+        assert!(row.1);
+        assert_eq!(row.2, Some(15), "duration must be unchanged");
+        assert_eq!(row.3.as_deref(), Some("low"), "energy must be unchanged");
+
+        let err = update_entry(&pool, uid, Uuid::new_v4(), &patch).await;
         assert!(matches!(err, Err(DatabaseError::NotFound)));
     }
 }
