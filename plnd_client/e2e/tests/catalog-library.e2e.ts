@@ -146,7 +146,7 @@ test.describe('Catalog Library — API Contract', () => {
       const jsonHeaders = { ...authHeader, 'Content-Type': 'application/json' };
 
       // Step 1: Search — fixture provider returns deterministic external results.
-      const searchRes = await fetch(`${apiBase}/search/ingredients?q=apple`, {
+      const searchRes = await fetch(`${apiBase}/search/ingredients?q=oats`, {
         headers: authHeader,
       });
       const searchBody = await searchRes.json();
@@ -154,10 +154,9 @@ test.describe('Catalog Library — API Contract', () => {
         return { step: 'search', searchStatus: searchRes.status, searchBody };
       }
 
-      // Pick the first external result. Under fixtures, /search/ingredients?q=apple
-      // returns only USDA hits ("apple" is captured for USDA only — see
-      // refresh-catalog-fixtures.sh USDA_ONLY_TERMS), so the hardcoded
-      // external_source: 'usda_fdc' below is always correct.
+      // Post-corpus, USDA canonical foods are local hits; the external bucket is
+      // the Open Food Facts branded lane (the only fan-out provider under fixtures).
+      // So the ingest source below is always 'openfoodfacts'.
       const hit = (
         searchBody.external as {
           external_id: string;
@@ -174,7 +173,7 @@ test.describe('Catalog Library — API Contract', () => {
         method: 'POST',
         headers: jsonHeaders,
         body: JSON.stringify({
-          external_source: 'usda_fdc',
+          external_source: 'openfoodfacts',
           external_id: hit.external_id,
           name: hit.name,
           description: hit.description ?? null,
@@ -227,10 +226,10 @@ test.describe('Catalog Library — API Contract', () => {
   });
 
   // Path 1 — local catalog hit → preference. The verify stack runs plnd_seed
-  // at API startup against APP_EXTERNAL__FIXTURE_PATH, idempotently inserting
-  // INGREDIENT_TERMS (oats, banana, chicken breast, …) into catalog_ingredients.
-  // Searching for one of those terms is guaranteed to return a `local[]` hit
-  // without any per-test pre-seeding step.
+  // at API startup, idempotently bulk-loading the vendored USDA canonical corpus
+  // (~8k foods, e.g. "Oats, …") into catalog_ingredients. Searching for a
+  // canonical term is guaranteed to return a `local[]` hit without any per-test
+  // pre-seeding step.
   // Closes https://github.com/calteran/plnd/issues/798
   test('path-1: local catalog hit → ingredient-pref upsert returns correct shape', async ({
     page,

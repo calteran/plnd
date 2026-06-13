@@ -226,7 +226,8 @@ seed:
 # APP_EXTERNAL__FIXTURE_PATH is set (e.g. the e2e leg of `just verify`).
 # Run this when an upstream response shape changes or fixtures go stale.
 # Briefing feed URLs must match config/api/default.toml news_feed_urls.
-# Catalog refresh requires APP_EXTERNAL__USDA_FDC_API_KEY (via Doppler).
+# Catalog fixtures now cover only Open Food Facts + TheMealDB (no API key needed);
+# USDA canonical data comes from the vendored corpus — see `just refresh-usda-corpus`.
 refresh-fixtures:
     @echo "→ Capturing real upstream responses into plnd_data/fixtures/ ..."
     @mkdir -p plnd_data/fixtures/open-meteo
@@ -239,6 +240,18 @@ refresh-fixtures:
         -o plnd_data/fixtures/rss/wikipedia.xml
     doppler run -- scripts/refresh-catalog-fixtures.sh
     @echo "✅ Done. Review the diff (git diff plnd_data/fixtures/) and commit if intentional."
+
+# Regenerate the vendored USDA canonical corpus (plnd_data/corpus/). Auto-discovers
+# the latest Foundation + SR Legacy releases. Public-domain data; no key needed.
+# Run twice a year when USDA publishes a new Foundation release.
+refresh-usda-corpus:
+    scripts/refresh-usda-corpus.sh
+
+# Derive the small e2e/test corpus subset from the full vendored corpus.
+# Run after refresh-usda-corpus. Used by the e2e leg of `just verify` so the
+# startup seed stays cheap (see scripts/verify.sh APP_USDA_CORPUS_PATH).
+refresh-usda-test-corpus:
+    scripts/build-usda-test-corpus.sh
 
 # Clean build artifacts
 clean:

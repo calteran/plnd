@@ -7,10 +7,25 @@ use crate::providers::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, Se
 use crate::providers::error::ExternalProviderError;
 use crate::providers::nutrition::NutritionProvider;
 
-/// USDA FDC data types that carry clean, generic ingredient names. `Branded` and
-/// `Survey (FNDDS)` are excluded — they yield branded composites or mixed dishes.
-fn is_canonical_data_type(data_type: Option<&str>) -> bool {
-    matches!(data_type, Some("Foundation") | Some("SR Legacy"))
+/// USDA FDC data types. `Foundation` + `SR Legacy` carry clean generic names;
+/// everything else (including unknown/renamed types via `#[serde(other)]`) is
+/// non-canonical, so the client-side filter fails closed if USDA renames a type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum FdcDataType {
+    Foundation,
+    #[serde(rename = "SR Legacy")]
+    SrLegacy,
+    Branded,
+    #[serde(rename = "Survey (FNDDS)")]
+    SurveyFndds,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FdcDataType {
+    fn is_canonical(self) -> bool {
+        matches!(self, FdcDataType::Foundation | FdcDataType::SrLegacy)
+    }
 }
 
 pub struct UsdaFdcProvider {
@@ -44,7 +59,7 @@ struct FdcSearchFood {
     #[serde(rename = "foodCategory")]
     food_category: Option<String>,
     #[serde(rename = "dataType")]
-    data_type: Option<String>,
+    data_type: Option<FdcDataType>,
 }
 
 #[derive(Deserialize)]
@@ -119,6 +134,53 @@ fn build_nutrition_from_detail(nutrients: &[FdcDetailNutrient]) -> NutritionFact
     facts
 }
 
+/// Map a parsed USDA food (detail-endpoint or bulk-dataset shape) to an
+/// `ExternalIngredient`. Shared by the live `get_ingredient_by_id` path and the
+/// offline bulk-corpus parser so the two cannot drift.
+fn detail_to_ingredient(food: FdcDetailFood) -> ExternalIngredient {
+    let serving_size_g = food
+        .food_portions
+        .as_deref()
+        .and_then(|p| p.first())
+        .and_then(|p| Decimal::try_from(p.gram_weight).ok())
+        .unwrap_or(Decimal::from(100u32));
+    let nutrition = build_nutrition_from_detail(&food.food_nutrients);
+    let category = food.food_category.map(|c| c.description);
+    ExternalIngredient {
+        external_id: food.fdc_id.to_string(),
+        name: food.description,
+        serving_size_g: Some(serving_size_g),
+        nutrition: Some(nutrition),
+        allergens: vec![], // USDA FDC does not provide allergen data
+        occasion_tags: category.into_iter().collect(),
+    }
+}
+
+/// Bulk USDA dataset envelope. Foundation files wrap foods in `FoundationFoods`,
+/// SR Legacy in `SRLegacyFoods`; both share the per-food `FdcDetailFood` shape.
+/// Only those two keys are accepted — a stray top-level `foods` object does not parse.
+///
+/// Elements are `Option<FdcDetailFood>` because USDA's Foundation file embeds
+/// `null` holes in the array (32 of 395 in the 2026-04 release); those are
+/// dropped rather than failing the whole parse.
+#[derive(Deserialize)]
+struct FdcBulkDataset {
+    #[serde(rename = "FoundationFoods", alias = "SRLegacyFoods")]
+    foods: Vec<Option<FdcDetailFood>>,
+}
+
+/// Parse a USDA bulk dataset JSON (Foundation or SR Legacy) into ingredients.
+/// Used by the `build_usda_corpus` dev tool; not on the request path.
+pub fn parse_bulk_dataset(json: &str) -> Result<Vec<ExternalIngredient>, serde_json::Error> {
+    let ds: FdcBulkDataset = serde_json::from_str(json)?;
+    Ok(ds
+        .foods
+        .into_iter()
+        .flatten()
+        .map(detail_to_ingredient)
+        .collect())
+}
+
 // ---------------------------------------------------------------------------
 // NutritionProvider impl
 // ---------------------------------------------------------------------------
@@ -188,7 +250,7 @@ impl NutritionProvider for UsdaFdcProvider {
         let results = body
             .foods
             .into_iter()
-            .filter(|f| is_canonical_data_type(f.data_type.as_deref()))
+            .filter(|f| f.data_type.map(FdcDataType::is_canonical).unwrap_or(false))
             .map(|f| SearchResult {
                 external_id: f.fdc_id.to_string(),
                 name: f.description,
@@ -246,24 +308,7 @@ impl NutritionProvider for UsdaFdcProvider {
             .await
             .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
-        let serving_size_g = food
-            .food_portions
-            .as_deref()
-            .and_then(|p| p.first())
-            .and_then(|p| Decimal::try_from(p.gram_weight).ok())
-            .unwrap_or(Decimal::from(100u32));
-
-        let nutrition = build_nutrition_from_detail(&food.food_nutrients);
-        let category = food.food_category.map(|c| c.description);
-
-        Ok(Some(ExternalIngredient {
-            external_id: food.fdc_id.to_string(),
-            name: food.description,
-            serving_size_g: Some(serving_size_g),
-            nutrition: Some(nutrition),
-            allergens: vec![], // USDA FDC does not provide allergen data
-            occasion_tags: category.into_iter().collect(),
-        }))
+        Ok(Some(detail_to_ingredient(food)))
     }
 }
 
@@ -448,26 +493,109 @@ mod tests {
     }
 
     #[test]
-    fn canonical_data_types_are_foundation_and_sr_legacy() {
-        assert!(is_canonical_data_type(Some("Foundation")));
-        assert!(is_canonical_data_type(Some("SR Legacy")));
-        assert!(!is_canonical_data_type(Some("Branded")));
-        assert!(!is_canonical_data_type(Some("Survey (FNDDS)")));
-        assert!(!is_canonical_data_type(None));
+    fn fdc_data_type_classifies_canonical_and_fails_closed() {
+        assert!(FdcDataType::Foundation.is_canonical());
+        assert!(FdcDataType::SrLegacy.is_canonical());
+        assert!(!FdcDataType::Branded.is_canonical());
+        assert!(!FdcDataType::SurveyFndds.is_canonical());
+        // Unknown/renamed types fail closed (non-canonical).
+        assert!(!FdcDataType::Unknown.is_canonical());
+    }
+
+    #[test]
+    fn fdc_data_type_deserializes_wire_strings() {
+        let parse = |s: &str| serde_json::from_str::<FdcDataType>(&format!("\"{s}\"")).unwrap();
+        assert_eq!(parse("Foundation"), FdcDataType::Foundation);
+        assert_eq!(parse("SR Legacy"), FdcDataType::SrLegacy);
+        assert_eq!(parse("Branded"), FdcDataType::Branded);
+        assert_eq!(parse("Survey (FNDDS)"), FdcDataType::SurveyFndds);
+        // A renamed/unknown type maps to Unknown rather than failing to parse.
+        assert_eq!(parse("Standard Reference Legacy"), FdcDataType::Unknown);
     }
 
     #[test]
     fn search_food_deserializes_data_type() {
-        let json = r#"{
-            "fdcId": 1,
-            "description": "ALFREDO BROCCOLI ...",
-            "dataType": "Branded"
-        }"#;
+        let json =
+            r#"{ "fdcId": 1, "description": "ALFREDO BROCCOLI ...", "dataType": "Branded" }"#;
         let food: FdcSearchFood = serde_json::from_str(json).expect("deserialize");
-        assert_eq!(food.data_type.as_deref(), Some("Branded"));
+        assert_eq!(food.data_type, Some(FdcDataType::Branded));
         assert!(
-            !is_canonical_data_type(food.data_type.as_deref()),
+            !food.data_type.map(|d| d.is_canonical()).unwrap_or(false),
             "branded composite must be classified non-canonical"
         );
+    }
+
+    #[test]
+    fn parse_bulk_foundation_envelope_maps_food() {
+        let json = r#"{
+            "FoundationFoods": [
+                {
+                    "fdcId": 2262072,
+                    "description": "Oats, whole grain, rolled",
+                    "foodCategory": { "description": "Cereal Grains and Pasta" },
+                    "foodPortions": [{ "gramWeight": 40.0 }],
+                    "foodNutrients": [
+                        { "nutrient": { "id": 1008 }, "amount": 379.0 },
+                        { "nutrient": { "id": 1003 }, "amount": 13.2 }
+                    ]
+                }
+            ]
+        }"#;
+        let foods = parse_bulk_dataset(json).expect("parse");
+        assert_eq!(foods.len(), 1);
+        assert_eq!(foods[0].external_id, "2262072");
+        assert_eq!(foods[0].name, "Oats, whole grain, rolled");
+        assert_eq!(
+            foods[0].serving_size_g,
+            Some(rust_decimal::Decimal::try_from(40.0).unwrap())
+        );
+        assert_eq!(
+            foods[0].nutrition.as_ref().unwrap().calories_kcal,
+            Some(379.0)
+        );
+        assert_eq!(
+            foods[0].occasion_tags,
+            vec!["Cereal Grains and Pasta".to_string()]
+        );
+    }
+
+    #[test]
+    fn parse_bulk_sr_legacy_envelope_maps_food() {
+        let json = r#"{
+            "SRLegacyFoods": [
+                { "fdcId": 173410, "description": "Milk, whole",
+                  "foodNutrients": [ { "nutrient": { "id": 1008 }, "amount": 61.0 } ] }
+            ]
+        }"#;
+        let foods = parse_bulk_dataset(json).expect("parse");
+        assert_eq!(foods.len(), 1);
+        assert_eq!(foods[0].name, "Milk, whole");
+        assert_eq!(
+            foods[0].serving_size_g,
+            Some(rust_decimal::Decimal::from(100u32))
+        );
+    }
+
+    #[test]
+    fn parse_bulk_dataset_rejects_unknown_envelope() {
+        let json = r#"{ "SomethingElse": [] }"#;
+        assert!(parse_bulk_dataset(json).is_err());
+    }
+
+    #[test]
+    fn parse_bulk_dataset_skips_null_array_holes() {
+        // USDA's Foundation file embeds `null` entries in the foods array (32 of
+        // 395 in the 2026-04 release). They must be dropped, not abort the parse.
+        let json = r#"{
+            "FoundationFoods": [
+                null,
+                { "fdcId": 1, "description": "Real food",
+                  "foodNutrients": [ { "nutrient": { "id": 1008 }, "amount": 50.0 } ] },
+                null
+            ]
+        }"#;
+        let foods = parse_bulk_dataset(json).expect("null holes must not fail the parse");
+        assert_eq!(foods.len(), 1);
+        assert_eq!(foods[0].name, "Real food");
     }
 }

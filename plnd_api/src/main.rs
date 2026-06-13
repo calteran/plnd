@@ -191,10 +191,10 @@ async fn main() {
     // startup failure.
     {
         let seed_url = config.database.url.clone();
-        let seed_nutrition = catalog_nutrition.clone();
         let seed_recipe = catalog_recipe.clone();
         tokio::spawn(async move {
-            if let Err(e) = plnd_seed::run_seed(&seed_url, 3, &seed_nutrition, &seed_recipe).await {
+            let corpus_path = plnd_seed::ingredients::resolve_corpus_path();
+            if let Err(e) = plnd_seed::run_seed(&seed_url, 3, &seed_recipe, &corpus_path).await {
                 tracing::warn!(error = %e, "catalog seed failed (non-fatal)");
             }
         });
@@ -547,10 +547,9 @@ fn build_nutrition_providers(
                     std::process::exit(1);
                 })
         };
-        return vec![
-            Arc::new(make("usda_fdc", "nutrition/usda_fdc").canonical(true)),
-            Arc::new(make("openfoodfacts", "nutrition/open_food_facts")),
-        ];
+        // USDA canonical foods are seeded from the vendored corpus (local hits),
+        // so the debug fan-out only needs the Open Food Facts branded lane.
+        return vec![Arc::new(make("openfoodfacts", "nutrition/open_food_facts"))];
     }
     vec![usda, off]
 }

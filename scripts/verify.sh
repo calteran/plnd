@@ -202,7 +202,11 @@ cd "$PROJECT_ROOT/plnd_api"
 # APP_EXTERNAL__FIXTURE_PATH switches the briefing providers to file-backed
 # stubs so e2e never hits Open-Meteo or live RSS feeds. The flag is honored
 # only in debug builds (#[cfg(debug_assertions)]); release binaries ignore it.
+# APP_USDA_CORPUS_PATH points the startup catalog seed at the small test subset
+# (~dozens of rows) instead of the full ~8k-row corpus, so the background bulk
+# insert doesn't contend with e2e's parallel auth handshakes at boot.
 APP_EXTERNAL__FIXTURE_PATH="$PROJECT_ROOT/plnd_data/fixtures" \
+APP_USDA_CORPUS_PATH="$PROJECT_ROOT/plnd_data/corpus/usda_canonical.test.jsonl.gz" \
     doppler run -- ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- 9>&- &
 API_PID=$!
 cd "$PROJECT_ROOT"

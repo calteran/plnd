@@ -1,0 +1,6 @@
+USDA FoodData Central — Foundation Foods + SR Legacy.
+Source: https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_foundation_food_json_2026-04-30.zip
+        https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_json_2018-04.zip
+These data are produced by the U.S. Department of Agriculture and are in the
+public domain (17 U.S.C. § 105). Slimmed to the fields PLND ingests via
+plnd_seed/src/bin/build_usda_corpus.rs.

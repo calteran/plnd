@@ -137,8 +137,12 @@ Food is modeled as a three-layer composition: **Ingredient → Dish → Meal**. 
 
 The catalog is **lazy-populated**: it requires no pre-seeding step to function correctly in any
 environment. Catalog content can accumulate from background seeding at API startup (`plnd_seed`),
-from user activity, or it can start empty — the system works either way. Items enter through one
-of three paths:
+from user activity, or it can start empty — the system works either way. The canonical ingredient
+layer is additionally **bulk-seeded** at startup from a vendored snapshot of the authoritative
+public nutrition dataset, so the catalog holds the full canonical namespace and ranks it locally
+rather than depending on an upstream search engine's relevance; the external-provider fan-out
+(path 2 below) remains the fallback for terms not yet present. Items enter through one of three
+paths:
 
 1. **Local hit** — the catalog already has a matching row from a prior discovery or contribution.
    The search API returns the existing `ingredient_id` directly.

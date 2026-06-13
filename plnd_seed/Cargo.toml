@@ -13,6 +13,10 @@ path = "src/lib.rs"
 name = "seed"
 path = "src/bin/seed.rs"
 
+[[bin]]
+name = "build_usda_corpus"
+path = "src/bin/build_usda_corpus.rs"
+
 [dependencies]
 plnd_data = { path = "../plnd_data" }
 sqlx = { version = "0.9", features = ["postgres", "uuid", "runtime-tokio", "json", "rust_decimal", "chrono"] }
@@ -23,12 +27,13 @@ rust_decimal = { version = "1", features = ["db-postgres"] }
 tokio = { version = "1", features = ["full"] }
 thiserror = "2.0"
 anyhow = "1.0"
+flate2 = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 sqlx = { version = "0.9", features = ["macros"] }
-async-trait = "0.1"
+tempfile = "3"
 
 [package.metadata.cargo-machete]
 ignored = ["rust_decimal"]  # used via sqlx rust_decimal feature for Decimal Encode/Type impls
