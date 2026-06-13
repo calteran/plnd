@@ -380,10 +380,7 @@ async fn main() {
             "/schedule/entries/{id}/status",
             patch(schedule::patch_entry_status),
         )
-        .route(
-            "/schedule/entries/{id}",
-            patch(schedule::patch_entry),
-        )
+        .route("/schedule/entries/{id}", patch(schedule::patch_entry))
         .route(
             "/schedule/anchors",
             get(schedule_anchors::list_for_date).post(schedule_anchors::create),

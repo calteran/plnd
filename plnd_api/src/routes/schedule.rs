@@ -567,23 +567,39 @@ mod tests {
 
     #[test]
     fn validate_patch_rejects_bad_type_energy_duration_and_blank_title() {
-        let bad_type = PatchEntryRequest { task_type: Some("nope".into()), ..empty_patch() };
+        let bad_type = PatchEntryRequest {
+            task_type: Some("nope".into()),
+            ..empty_patch()
+        };
         assert!(validate_patch(&bad_type).is_err());
 
-        let bad_energy = PatchEntryRequest { energy_required: Some("ultra".into()), ..empty_patch() };
+        let bad_energy = PatchEntryRequest {
+            energy_required: Some("ultra".into()),
+            ..empty_patch()
+        };
         assert!(validate_patch(&bad_energy).is_err());
 
-        let bad_dur = PatchEntryRequest { duration_minutes: Some(0), ..empty_patch() };
+        let bad_dur = PatchEntryRequest {
+            duration_minutes: Some(0),
+            ..empty_patch()
+        };
         assert!(validate_patch(&bad_dur).is_err());
 
-        let blank = PatchEntryRequest { title: Some("   ".into()), ..empty_patch() };
+        let blank = PatchEntryRequest {
+            title: Some("   ".into()),
+            ..empty_patch()
+        };
         assert!(validate_patch(&blank).is_err());
     }
 
     fn empty_patch() -> PatchEntryRequest {
         PatchEntryRequest {
-            title: None, task_type: None, scheduled_start: None,
-            duration_minutes: None, energy_required: None, one_shot: None,
+            title: None,
+            task_type: None,
+            scheduled_start: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
         }
     }
 }

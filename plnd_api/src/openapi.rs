@@ -14,11 +14,10 @@ use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealPatternEntryRequest,
     CreateScheduleAnchorRequest, FailedSlot, MealAdhocResolveRequest, MealAdhocResolveResponse,
     MealEntry, MealEntryRequest, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
-    MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryRequest,
-    PatchEntryStatusRequest, PlaceTasksEntry, PlaceTasksRequest, PlanEntryRequest,
-    PostSchedulePlanRequest, ReadyStatus, SetAnchorStatusRequest, SlotRef, TaskEntryRequest,
-    TaskEntryResponse, UnplannableReason, UpdateMealPatternEntryRequest,
-    UpdateScheduleAnchorRequest,
+    MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryRequest, PatchEntryStatusRequest,
+    PlaceTasksEntry, PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus,
+    SetAnchorStatusRequest, SlotRef, TaskEntryRequest, TaskEntryResponse, UnplannableReason,
+    UpdateMealPatternEntryRequest, UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},

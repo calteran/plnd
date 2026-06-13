@@ -1666,7 +1666,10 @@ mod tests {
             "SELECT title, one_shot, duration_minutes, energy_required
              FROM schedule_entries WHERE entry_id = $1",
         )
-        .bind(entry_id).fetch_one(&pool).await.unwrap();
+        .bind(entry_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(row.0, "evening medication");
         assert!(row.1);
         assert_eq!(row.2, Some(15), "duration must be unchanged");
