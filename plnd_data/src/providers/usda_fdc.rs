@@ -119,6 +119,43 @@ fn build_nutrition_from_detail(nutrients: &[FdcDetailNutrient]) -> NutritionFact
     facts
 }
 
+/// Map a parsed USDA food (detail-endpoint or bulk-dataset shape) to an
+/// `ExternalIngredient`. Shared by the live `get_ingredient_by_id` path and the
+/// offline bulk-corpus parser so the two cannot drift.
+fn detail_to_ingredient(food: FdcDetailFood) -> ExternalIngredient {
+    let serving_size_g = food
+        .food_portions
+        .as_deref()
+        .and_then(|p| p.first())
+        .and_then(|p| Decimal::try_from(p.gram_weight).ok())
+        .unwrap_or(Decimal::from(100u32));
+    let nutrition = build_nutrition_from_detail(&food.food_nutrients);
+    let category = food.food_category.map(|c| c.description);
+    ExternalIngredient {
+        external_id: food.fdc_id.to_string(),
+        name: food.description,
+        serving_size_g: Some(serving_size_g),
+        nutrition: Some(nutrition),
+        allergens: vec![], // USDA FDC does not provide allergen data
+        occasion_tags: category.into_iter().collect(),
+    }
+}
+
+/// Bulk USDA dataset envelope. Foundation files wrap foods in `FoundationFoods`,
+/// SR Legacy in `SRLegacyFoods`; both share the per-food `FdcDetailFood` shape.
+#[derive(Deserialize)]
+struct FdcBulkDataset {
+    #[serde(alias = "FoundationFoods", alias = "SRLegacyFoods")]
+    foods: Vec<FdcDetailFood>,
+}
+
+/// Parse a USDA bulk dataset JSON (Foundation or SR Legacy) into ingredients.
+/// Used by the `build_usda_corpus` dev tool; not on the request path.
+pub fn parse_bulk_dataset(json: &str) -> Result<Vec<ExternalIngredient>, serde_json::Error> {
+    let ds: FdcBulkDataset = serde_json::from_str(json)?;
+    Ok(ds.foods.into_iter().map(detail_to_ingredient).collect())
+}
+
 // ---------------------------------------------------------------------------
 // NutritionProvider impl
 // ---------------------------------------------------------------------------
@@ -246,24 +283,7 @@ impl NutritionProvider for UsdaFdcProvider {
             .await
             .map_err(|e| ExternalProviderError::ResponseParseError(e.to_string()))?;
 
-        let serving_size_g = food
-            .food_portions
-            .as_deref()
-            .and_then(|p| p.first())
-            .and_then(|p| Decimal::try_from(p.gram_weight).ok())
-            .unwrap_or(Decimal::from(100u32));
-
-        let nutrition = build_nutrition_from_detail(&food.food_nutrients);
-        let category = food.food_category.map(|c| c.description);
-
-        Ok(Some(ExternalIngredient {
-            external_id: food.fdc_id.to_string(),
-            name: food.description,
-            serving_size_g: Some(serving_size_g),
-            nutrition: Some(nutrition),
-            allergens: vec![], // USDA FDC does not provide allergen data
-            occasion_tags: category.into_iter().collect(),
-        }))
+        Ok(Some(detail_to_ingredient(food)))
     }
 }
 
@@ -469,5 +489,44 @@ mod tests {
             !is_canonical_data_type(food.data_type.as_deref()),
             "branded composite must be classified non-canonical"
         );
+    }
+
+    #[test]
+    fn parse_bulk_foundation_envelope_maps_food() {
+        let json = r#"{
+            "FoundationFoods": [
+                {
+                    "fdcId": 2262072,
+                    "description": "Oats, whole grain, rolled",
+                    "foodCategory": { "description": "Cereal Grains and Pasta" },
+                    "foodPortions": [{ "gramWeight": 40.0 }],
+                    "foodNutrients": [
+                        { "nutrient": { "id": 1008 }, "amount": 379.0 },
+                        { "nutrient": { "id": 1003 }, "amount": 13.2 }
+                    ]
+                }
+            ]
+        }"#;
+        let foods = parse_bulk_dataset(json).expect("parse");
+        assert_eq!(foods.len(), 1);
+        assert_eq!(foods[0].external_id, "2262072");
+        assert_eq!(foods[0].name, "Oats, whole grain, rolled");
+        assert_eq!(foods[0].serving_size_g, Some(rust_decimal::Decimal::try_from(40.0).unwrap()));
+        assert_eq!(foods[0].nutrition.as_ref().unwrap().calories_kcal, Some(379.0));
+        assert_eq!(foods[0].occasion_tags, vec!["Cereal Grains and Pasta".to_string()]);
+    }
+
+    #[test]
+    fn parse_bulk_sr_legacy_envelope_maps_food() {
+        let json = r#"{
+            "SRLegacyFoods": [
+                { "fdcId": 173410, "description": "Milk, whole",
+                  "foodNutrients": [ { "nutrient": { "id": 1008 }, "amount": 61.0 } ] }
+            ]
+        }"#;
+        let foods = parse_bulk_dataset(json).expect("parse");
+        assert_eq!(foods.len(), 1);
+        assert_eq!(foods[0].name, "Milk, whole");
+        assert_eq!(foods[0].serving_size_g, Some(rust_decimal::Decimal::from(100u32)));
     }
 }
