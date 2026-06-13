@@ -7,10 +7,25 @@ use crate::providers::dtos::{ExternalIngredient, NutritionFacts, SearchQuery, Se
 use crate::providers::error::ExternalProviderError;
 use crate::providers::nutrition::NutritionProvider;
 
-/// USDA FDC data types that carry clean, generic ingredient names. `Branded` and
-/// `Survey (FNDDS)` are excluded — they yield branded composites or mixed dishes.
-fn is_canonical_data_type(data_type: Option<&str>) -> bool {
-    matches!(data_type, Some("Foundation") | Some("SR Legacy"))
+/// USDA FDC data types. `Foundation` + `SR Legacy` carry clean generic names;
+/// everything else (including unknown/renamed types via `#[serde(other)]`) is
+/// non-canonical, so the client-side filter fails closed if USDA renames a type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+pub enum FdcDataType {
+    Foundation,
+    #[serde(rename = "SR Legacy")]
+    SrLegacy,
+    Branded,
+    #[serde(rename = "Survey (FNDDS)")]
+    SurveyFndds,
+    #[serde(other)]
+    Unknown,
+}
+
+impl FdcDataType {
+    fn is_canonical(self) -> bool {
+        matches!(self, FdcDataType::Foundation | FdcDataType::SrLegacy)
+    }
 }
 
 pub struct UsdaFdcProvider {
@@ -44,7 +59,7 @@ struct FdcSearchFood {
     #[serde(rename = "foodCategory")]
     food_category: Option<String>,
     #[serde(rename = "dataType")]
-    data_type: Option<String>,
+    data_type: Option<FdcDataType>,
 }
 
 #[derive(Deserialize)]
@@ -226,7 +241,7 @@ impl NutritionProvider for UsdaFdcProvider {
         let results = body
             .foods
             .into_iter()
-            .filter(|f| is_canonical_data_type(f.data_type.as_deref()))
+            .filter(|f| f.data_type.map(FdcDataType::is_canonical).unwrap_or(false))
             .map(|f| SearchResult {
                 external_id: f.fdc_id.to_string(),
                 name: f.description,
@@ -469,25 +484,33 @@ mod tests {
     }
 
     #[test]
-    fn canonical_data_types_are_foundation_and_sr_legacy() {
-        assert!(is_canonical_data_type(Some("Foundation")));
-        assert!(is_canonical_data_type(Some("SR Legacy")));
-        assert!(!is_canonical_data_type(Some("Branded")));
-        assert!(!is_canonical_data_type(Some("Survey (FNDDS)")));
-        assert!(!is_canonical_data_type(None));
+    fn fdc_data_type_classifies_canonical_and_fails_closed() {
+        assert!(FdcDataType::Foundation.is_canonical());
+        assert!(FdcDataType::SrLegacy.is_canonical());
+        assert!(!FdcDataType::Branded.is_canonical());
+        assert!(!FdcDataType::SurveyFndds.is_canonical());
+        // Unknown/renamed types fail closed (non-canonical).
+        assert!(!FdcDataType::Unknown.is_canonical());
+    }
+
+    #[test]
+    fn fdc_data_type_deserializes_wire_strings() {
+        let parse = |s: &str| serde_json::from_str::<FdcDataType>(&format!("\"{s}\"")).unwrap();
+        assert_eq!(parse("Foundation"), FdcDataType::Foundation);
+        assert_eq!(parse("SR Legacy"), FdcDataType::SrLegacy);
+        assert_eq!(parse("Branded"), FdcDataType::Branded);
+        assert_eq!(parse("Survey (FNDDS)"), FdcDataType::SurveyFndds);
+        // A renamed/unknown type maps to Unknown rather than failing to parse.
+        assert_eq!(parse("Standard Reference Legacy"), FdcDataType::Unknown);
     }
 
     #[test]
     fn search_food_deserializes_data_type() {
-        let json = r#"{
-            "fdcId": 1,
-            "description": "ALFREDO BROCCOLI ...",
-            "dataType": "Branded"
-        }"#;
+        let json = r#"{ "fdcId": 1, "description": "ALFREDO BROCCOLI ...", "dataType": "Branded" }"#;
         let food: FdcSearchFood = serde_json::from_str(json).expect("deserialize");
-        assert_eq!(food.data_type.as_deref(), Some("Branded"));
+        assert_eq!(food.data_type, Some(FdcDataType::Branded));
         assert!(
-            !is_canonical_data_type(food.data_type.as_deref()),
+            !food.data_type.map(|d| d.is_canonical()).unwrap_or(false),
             "branded composite must be classified non-canonical"
         );
     }
