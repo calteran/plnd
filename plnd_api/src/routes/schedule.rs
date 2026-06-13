@@ -5,7 +5,7 @@ use crate::api_response::{
 use crate::auth::jwt::Claims;
 use crate::models::{
     CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryOneShotRequest,
-    PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest,
+    PatchEntryRequest, PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest,
 };
 use crate::routes::domain_constants::{
     VALID_ENERGY_LEVELS, VALID_MEAL_REF_TYPES, VALID_TASK_TYPES,
@@ -316,6 +316,31 @@ pub async fn post_plan(
 
 const VALID_STATUSES: &[&str] = &["planned", "in_progress", "completed", "skipped", "deferred"];
 
+/// Validate a partial entry update. Returns `Err` with a 400 for any provided-but-invalid field.
+fn validate_patch(req: &PatchEntryRequest) -> Result<(), StatusCode> {
+    if let Some(t) = &req.task_type {
+        if !VALID_TASK_TYPES.contains(&t.as_str()) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+    if let Some(e) = &req.energy_required {
+        if !VALID_ENERGY_LEVELS.contains(&e.as_str()) {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+    if let Some(d) = req.duration_minutes {
+        if d <= 0 {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+    if let Some(t) = &req.title {
+        if t.trim().is_empty() {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    }
+    Ok(())
+}
+
 #[utoipa::path(
     patch,
     path = "/schedule/entries/{id}/status",
@@ -514,5 +539,40 @@ mod tests {
             ..base_meal_entry()
         };
         assert_eq!(map_meal_entry(e).unwrap_err(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn validate_patch_accepts_valid_fields() {
+        let req = PatchEntryRequest {
+            title: Some("Call dentist".into()),
+            task_type: Some("appointment".into()),
+            scheduled_start: None,
+            duration_minutes: Some(30),
+            energy_required: Some("low".into()),
+            one_shot: Some(true),
+        };
+        assert!(validate_patch(&req).is_ok());
+    }
+
+    #[test]
+    fn validate_patch_rejects_bad_type_energy_duration_and_blank_title() {
+        let bad_type = PatchEntryRequest { task_type: Some("nope".into()), ..empty_patch() };
+        assert!(validate_patch(&bad_type).is_err());
+
+        let bad_energy = PatchEntryRequest { energy_required: Some("ultra".into()), ..empty_patch() };
+        assert!(validate_patch(&bad_energy).is_err());
+
+        let bad_dur = PatchEntryRequest { duration_minutes: Some(0), ..empty_patch() };
+        assert!(validate_patch(&bad_dur).is_err());
+
+        let blank = PatchEntryRequest { title: Some("   ".into()), ..empty_patch() };
+        assert!(validate_patch(&blank).is_err());
+    }
+
+    fn empty_patch() -> PatchEntryRequest {
+        PatchEntryRequest {
+            title: None, task_type: None, scheduled_start: None,
+            duration_minutes: None, energy_required: None, one_shot: None,
+        }
     }
 }
