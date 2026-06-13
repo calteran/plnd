@@ -666,19 +666,22 @@ mod tests {
             )),
         )
         .unwrap();
+        // USDA fixture files were removed; the corpus seeds USDA canonical foods
+        // directly. Use the Open Food Facts fixture for the nutrition lane —
+        // this test only exercises the recipe (TheMealDB) branch so the choice
+        // of nutrition provider does not affect the outcome.
         let nutrition = FixtureNutritionProvider::new(
-            "usda_fdc",
+            "openfoodfacts",
             PathBuf::from(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../plnd_data/fixtures/nutrition/usda_fdc/search.json"
+                "/../plnd_data/fixtures/nutrition/open_food_facts/search.json"
             )),
             PathBuf::from(concat!(
                 env!("CARGO_MANIFEST_DIR"),
-                "/../plnd_data/fixtures/nutrition/usda_fdc/lookup.json"
+                "/../plnd_data/fixtures/nutrition/open_food_facts/lookup.json"
             )),
         )
-        .unwrap()
-        .canonical(true);
+        .unwrap();
 
         let svc = ProviderSearchService::new(
             vec![Arc::new(nutrition)],

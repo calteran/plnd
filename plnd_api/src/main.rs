@@ -549,10 +549,9 @@ fn build_nutrition_providers(
                     std::process::exit(1);
                 })
         };
-        return vec![
-            Arc::new(make("usda_fdc", "nutrition/usda_fdc").canonical(true)),
-            Arc::new(make("openfoodfacts", "nutrition/open_food_facts")),
-        ];
+        // USDA canonical foods are seeded from the vendored corpus (local hits),
+        // so the debug fan-out only needs the Open Food Facts branded lane.
+        return vec![Arc::new(make("openfoodfacts", "nutrition/open_food_facts"))];
     }
     vec![usda, off]
 }

@@ -2,7 +2,7 @@
 #
 # Capture nutrition + recipe upstream responses into plnd_data/fixtures/.
 # Called by `just refresh-fixtures` (which wraps this in `doppler run` so the
-# USDA API key is available in env).
+# TheMealDB API key is available in env).
 #
 # Each provider gets two files:
 #   - search.json: a JSON array shaped like the provider's adapter emits
@@ -14,47 +14,23 @@
 # search.json has a matching entry in lookup.json. This is what the catalog
 # seeder needs at boot when APP_EXTERNAL__FIXTURE_PATH is set.
 #
+# NOTE: USDA canonical ingredient data is now sourced from the vendored corpus
+# (plnd_data/corpus/), not from fixtures. Only the Open Food Facts branded lane
+# and TheMealDB recipe lane are captured here.
+#
 # Required tools: bash, curl, jq.
-# Required env: APP_EXTERNAL__USDA_FDC_API_KEY (USDA FDC), optionally
-#               APP_EXTERNAL__THEMEALDB_API_KEY (defaults to "1" — the public
-#               TheMealDB test key).
+# Required env: optionally APP_EXTERNAL__THEMEALDB_API_KEY (defaults to "1" —
+#               the public TheMealDB test key).
 #
 # Failure mode: `set -euo pipefail` means any curl or jq failure aborts the
 # whole script, leaving the fixture directory in a partially-updated state.
-# (Exception: USDA detail-endpoint 404s are tolerated — that id is dropped from
-# the fixtures, mirroring the live provider's Ok(None) behavior.) If a single
-# provider has an outage during refresh, revert the partial changes with
-# `git checkout plnd_data/fixtures/` and retry.
+# If a single provider has an outage during refresh, revert the partial changes
+# with `git checkout plnd_data/fixtures/` and retry.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FIXTURES_ROOT="${REPO_ROOT}/plnd_data/fixtures"
-
-# Mirrors INGREDIENT_TERMS in plnd_seed/src/ingredients.rs. Update both if you
-# add or remove terms — the seeder iterates this list at boot, and the fixture
-# provider keys search results by query term, so these must match for the
-# seeder to find any rows under fixtures.
-INGREDIENT_TERMS=(
-    "oats"
-    "banana"
-    "chicken breast"
-    "brown rice"
-    "broccoli"
-    "milk"
-    "egg"
-    "olive oil"
-    "cheese"
-)
-
-# Extra terms captured for the API search endpoint but NOT in INGREDIENT_TERMS,
-# so the seeder doesn't ingest them. Used by e2e tests (e.g. path-2) that need
-# a "fresh external" to ingest into the local catalog. USDA only — keeping OFF
-# off this list means /search/ingredients?q=apple returns only USDA hits, which
-# the tests can rely on for source determinism.
-USDA_ONLY_TERMS=(
-    "apple"
-)
 
 # Mirrors DISH_TERMS in plnd_seed/src/dishes.rs:10. Update both if you add or
 # remove terms — the seeder iterates this list at boot, and the fixture
@@ -69,123 +45,22 @@ DISH_TERMS=(
 )
 
 QUERY_LIMIT=3
-USDA_KEY="${APP_EXTERNAL__USDA_FDC_API_KEY:-}"
 MEALDB_KEY="${APP_EXTERNAL__THEMEALDB_API_KEY:-1}"
-
-if [[ -z "${USDA_KEY}" ]]; then
-    echo "ERROR: APP_EXTERNAL__USDA_FDC_API_KEY must be set." >&2
-    echo "       Run via 'just refresh-fixtures' (wraps doppler run) or export the key manually." >&2
-    exit 1
-fi
 
 if ! command -v jq >/dev/null 2>&1; then
     echo "ERROR: jq is required but not found in PATH." >&2
     exit 1
 fi
 
-usda_dir="${FIXTURES_ROOT}/nutrition/usda_fdc"
 off_dir="${FIXTURES_ROOT}/nutrition/open_food_facts"
 mdb_dir="${FIXTURES_ROOT}/recipe/themealdb"
-mkdir -p "${usda_dir}" "${off_dir}" "${mdb_dir}"
+mkdir -p "${off_dir}" "${mdb_dir}"
 
 # Common URL-encode helper: prints args joined by '+' with spaces collapsed.
 urlencode_term() {
     # jq -sRr @uri is the simplest portable encoder.
     printf '%s' "$1" | jq -sRr @uri
 }
-
-# ── USDA FDC ──────────────────────────────────────────────────────────────────
-# Search: https://api.nal.usda.gov/fdc/v1/foods/search?query=<term>&pageSize=N&api_key=KEY
-# Detail: https://api.nal.usda.gov/fdc/v1/food/<fdcId>?api_key=KEY
-#
-# We collect every term's search hits, normalize to SearchResult shape, and
-# union the fdcIds for the lookup pass.
-echo "→ USDA FDC: capturing search.json and lookup.json"
-usda_search_acc='{}'  # keyed by lowercased query term
-usda_lookup_acc='{}'  # keyed by fdcId
-usda_ids_raw=""       # newline-separated; deduped with sort -u before the lookup pass
-
-# Combined term list for USDA: seeder terms + e2e-only terms.
-usda_all_terms=("${INGREDIENT_TERMS[@]}" "${USDA_ONLY_TERMS[@]}")
-
-for term in "${usda_all_terms[@]}"; do
-    encoded="$(urlencode_term "${term}")"
-    # dataType=Foundation,SR Legacy mirrors the live provider (usda_fdc.rs): only
-    # canonical generic-name entries, never Branded composites or Survey (FNDDS).
-    raw="$(curl -fsSL "https://api.nal.usda.gov/fdc/v1/foods/search?query=${encoded}&pageSize=${QUERY_LIMIT}&dataType=Foundation&dataType=SR%20Legacy&api_key=${USDA_KEY}")"
-
-    # Normalize to SearchResult: { external_id, name, description, thumbnail_url }
-    normalized="$(jq '[.foods[]? | {
-        external_id: (.fdcId | tostring),
-        name: (.description // ""),
-        description: (.foodCategory // null),
-        thumbnail_url: null
-    }]' <<<"${raw}")"
-
-    term_lower="$(printf '%s' "${term}" | tr '[:upper:]' '[:lower:]')"
-    usda_search_acc="$(jq --arg key "${term_lower}" --argjson new "${normalized}" '. + {($key): $new}' <<<"${usda_search_acc}")"
-
-    usda_ids_raw="${usda_ids_raw}$(jq -r '.foods[]?.fdcId' <<<"${raw}")
-"
-done
-
-while IFS= read -r fdc_id; do
-    [[ -z "${fdc_id}" ]] && continue
-    # Some Foundation/SR Legacy search hits 404 on the detail endpoint. The live
-    # provider (usda_fdc.rs::get_ingredient_by_id) treats 404 as Ok(None) and the
-    # seeder skips it; mirror that here by dropping the id instead of aborting.
-    raw="$(curl -fsSL "https://api.nal.usda.gov/fdc/v1/food/${fdc_id}?api_key=${USDA_KEY}")" || {
-        echo "  warn: USDA detail fetch failed for fdcId ${fdc_id}; dropping it from fixtures" >&2
-        continue
-    }
-
-    # Normalize to ExternalIngredient. USDA returns foodNutrients as a flat
-    # array of {nutrient: {name, unitName}, amount}; we extract the canonical
-    # macros our NutritionFacts struct cares about.
-    # Match nutrients by USDA nutrient ID — the same IDs the live provider uses
-    # (see plnd_data/src/providers/usda_fdc.rs:83-101). Matching by `name` is
-    # ambiguous: e.g. "Energy" exists as both kcal (id 1008) and kJ (id 1062)
-    # for many foods, and `select(.name == "Energy") | first` could pick either.
-    entry="$(jq --arg id "${fdc_id}" '
-        def nutrient_amount(nid): [.foodNutrients[]? | select(.nutrient.id == nid) | .amount][0];
-        {
-            ($id): {
-                external_id: $id,
-                name: (.description // ""),
-                serving_size_g: "100",
-                nutrition: {
-                    calories_kcal: nutrient_amount(1008),
-                    protein_g: nutrient_amount(1003),
-                    carbohydrates_g: nutrient_amount(1005),
-                    fat_g: nutrient_amount(1004),
-                    fiber_g: nutrient_amount(1079),
-                    sugar_g: nutrient_amount(2000),
-                    sodium_mg: nutrient_amount(1093),
-                    potassium_mg: nutrient_amount(1092),
-                    calcium_mg: nutrient_amount(1087),
-                    iron_mg: nutrient_amount(1089),
-                    vitamin_c_mg: nutrient_amount(1162),
-                    vitamin_d_iu: nutrient_amount(1110),
-                    saturated_fat_g: nutrient_amount(1258),
-                    cholesterol_mg: nutrient_amount(1253)
-                },
-                allergens: [],
-                occasion_tags: []
-            }
-        }
-    ' <<<"${raw}")"
-    usda_lookup_acc="$(jq --argjson new "${entry}" '. * $new' <<<"${usda_lookup_acc}")"
-done <<<"$(printf '%s' "${usda_ids_raw}" | sort -u)"
-
-# Keep the search/lookup pair self-consistent: drop any search result whose
-# detail fetch was skipped above (404), so every external_id in search.json has
-# a matching lookup.json entry.
-usda_search_acc="$(jq --argjson lookup "${usda_lookup_acc}" '
-    map_values([ .[] | select($lookup[.external_id] != null) ])
-' <<<"${usda_search_acc}")"
-
-echo "${usda_search_acc}" | jq '.' > "${usda_dir}/search.json"
-echo "${usda_lookup_acc}" | jq '.' > "${usda_dir}/lookup.json"
 
 # ── Open Food Facts ───────────────────────────────────────────────────────────
 # Search: https://world.openfoodfacts.net/cgi/search.pl?search_terms=<term>&page_size=N&action=process&json=1&lc=en&cc=us
@@ -195,7 +70,16 @@ off_search_acc='{}'  # keyed by lowercased query term
 off_lookup_acc='{}'  # keyed by product code
 off_ids_raw=""
 
-for term in "${INGREDIENT_TERMS[@]}"; do
+# Terms captured from Open Food Facts for the runtime /search/ingredients fan-out
+# fixture (the branded lane). USDA canonical foods come from the vendored corpus,
+# not fixtures, so they are not listed here.
+OFF_TERMS=(
+    "oats"
+    "banana"
+    "milk"
+)
+
+for term in "${OFF_TERMS[@]}"; do
     encoded="$(urlencode_term "${term}")"
     raw="$(curl -fsSL "https://world.openfoodfacts.net/cgi/search.pl?search_terms=${encoded}&page_size=${QUERY_LIMIT}&action=process&json=1&lc=en&cc=us")"
 
