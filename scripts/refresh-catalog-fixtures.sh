@@ -21,8 +21,10 @@
 #
 # Failure mode: `set -euo pipefail` means any curl or jq failure aborts the
 # whole script, leaving the fixture directory in a partially-updated state.
-# If a single provider has an outage during refresh, revert the partial
-# changes with `git checkout plnd_data/fixtures/` and retry.
+# (Exception: USDA detail-endpoint 404s are tolerated — that id is dropped from
+# the fixtures, mirroring the live provider's Ok(None) behavior.) If a single
+# provider has an outage during refresh, revert the partial changes with
+# `git checkout plnd_data/fixtures/` and retry.
 
 set -euo pipefail
 
