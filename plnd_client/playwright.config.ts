@@ -8,8 +8,13 @@ export default defineConfig({
   // Set by `scripts/verify.sh` and implied by CI runners (which also set `CI`).
   forbidOnly: !!process.env['PLAYWRIGHT_STRICT'] || !!process.env['CI'],
   // `retries` and `reporter` are CI-runner concerns (flake tolerance + GHA
-  // annotation format); leave them gated on `CI`.
-  retries: process.env['CI'] ? 1 : 0,
+  // annotation format); leave them gated on `CI`. The auth-infra tests
+  // (settings/profile/schedule) share one real backend and, under `fullyParallel`,
+  // race the mock-OAuth handshake + API startup during the first seconds — a
+  // transient `/auth/token` / `/test/seed` 500/401 window that a single retry
+  // doesn't always clear. Allow extra retries so this environmental startup
+  // flake doesn't fail an otherwise-green run.
+  retries: process.env['CI'] ? 2 : 1,
   reporter: process.env['CI'] ? 'github' : 'list',
   globalSetup: require.resolve('./e2e/global-setup.ts'),
   use: {
