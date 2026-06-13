@@ -240,6 +240,12 @@ refresh-fixtures:
     doppler run -- scripts/refresh-catalog-fixtures.sh
     @echo "✅ Done. Review the diff (git diff plnd_data/fixtures/) and commit if intentional."
 
+# Regenerate the vendored USDA canonical corpus (plnd_data/corpus/). Auto-discovers
+# the latest Foundation + SR Legacy releases. Public-domain data; no key needed.
+# Run twice a year when USDA publishes a new Foundation release.
+refresh-usda-corpus:
+    scripts/refresh-usda-corpus.sh
+
 # Clean build artifacts
 clean:
     cargo clean

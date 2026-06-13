@@ -13,6 +13,10 @@ path = "src/lib.rs"
 name = "seed"
 path = "src/bin/seed.rs"
 
+[[bin]]
+name = "build_usda_corpus"
+path = "src/bin/build_usda_corpus.rs"
+
 [dependencies]
 plnd_data = { path = "../plnd_data" }
 sqlx = { version = "0.9", features = ["postgres", "uuid", "runtime-tokio", "json", "rust_decimal", "chrono"] }
