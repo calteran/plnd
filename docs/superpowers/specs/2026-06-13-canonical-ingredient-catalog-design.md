@@ -20,8 +20,18 @@ exact-match > prefix-match > FTS rank > `length(name)`, so a clean short name ou
 branded composite **when both rows exist**. #906's residual root cause is that the clean
 row often is never created in the first place.
 
-**Acceptance:** A clean, canonical ingredient is the primary result for common searches,
-independent of which provider supplied the underlying nutrition data.
+**Acceptance (as shipped):** No branded composite names enter the catalog or lead live
+search; every catalog ingredient is a clean canonical USDA name.
+
+> **Scope correction (discovered during implementation).** The original acceptance —
+> "a clean, canonical ingredient is the *primary result* for common searches" — turned out
+> to conflate two problems. The dataType filter fully solves *cleanliness* (no branded
+> composites). It does **not** make the plain ingredient the primary result for every common
+> term, because USDA's `foods/search` relevance buries plain entries under prepared-food
+> variants (e.g. for `oats` the top canonical hit is "Oil, oat"; plain "Oats, whole grain,
+> steel cut" is rank 18). That is a distinct USDA-search-relevance problem, not a catalog
+> cleanliness problem — tracked in **#918** (bulk-ingest the USDA canonical corpus and rank
+> it with our own #858 ranking). #906 ships the cleanliness win; #918 owns relevance.
 
 ## Decisions (settled before design)
 
@@ -132,6 +142,11 @@ No new failure modes:
 
 ## Out of scope
 
+- **Canonical-discovery relevance (bulk-ingest USDA + local ranking)** — surfacing the plain
+  ingredient as the primary result, by ingesting the full USDA Foundation + SR Legacy corpus
+  locally and ranking it with our own #858 ranking instead of relying on USDA's `foods/search`
+  relevance. This is the real fix for the relevance gap noted in the scope correction above.
+  Tracked in **#918**.
 - **LLM-driven generic/brand normalization of branded ingredients** — using the LLM at
   ingest to split branded composite names into a generic name + brand, with a `brand`
   column and dedup-by-generic. This rescues coverage from the branded lane (OFF, USDA
