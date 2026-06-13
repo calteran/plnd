@@ -143,9 +143,10 @@ fn detail_to_ingredient(food: FdcDetailFood) -> ExternalIngredient {
 
 /// Bulk USDA dataset envelope. Foundation files wrap foods in `FoundationFoods`,
 /// SR Legacy in `SRLegacyFoods`; both share the per-food `FdcDetailFood` shape.
+/// Only those two keys are accepted — a stray top-level `foods` object does not parse.
 #[derive(Deserialize)]
 struct FdcBulkDataset {
-    #[serde(alias = "FoundationFoods", alias = "SRLegacyFoods")]
+    #[serde(rename = "FoundationFoods", alias = "SRLegacyFoods")]
     foods: Vec<FdcDetailFood>,
 }
 
@@ -528,5 +529,11 @@ mod tests {
         assert_eq!(foods.len(), 1);
         assert_eq!(foods[0].name, "Milk, whole");
         assert_eq!(foods[0].serving_size_g, Some(rust_decimal::Decimal::from(100u32)));
+    }
+
+    #[test]
+    fn parse_bulk_dataset_rejects_unknown_envelope() {
+        let json = r#"{ "SomethingElse": [] }"#;
+        assert!(parse_bulk_dataset(json).is_err());
     }
 }
