@@ -52,7 +52,6 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
             <app-task-row
               [item]="task"
               (toggled)="toggled.emit($event)"
-              (oneShotToggled)="oneShotToggled.emit($event)"
             />
           }
         </div>
@@ -67,7 +66,6 @@ export class MealRowComponent {
   readonly toggled         = output<string>();
   readonly doneToggle      = output<string>();
   readonly skipped         = output<string>();
-  readonly oneShotToggled  = output<{ id: string; oneShot: boolean }>();
 
   readonly reviewOpen = signal(false);
 
