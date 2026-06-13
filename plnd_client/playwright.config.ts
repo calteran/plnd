@@ -7,14 +7,19 @@ export default defineConfig({
   // `PLAYWRIGHT_STRICT` gates pre-commit/CI policy (currently: forbid `.only`).
   // Set by `scripts/verify.sh` and implied by CI runners (which also set `CI`).
   forbidOnly: !!process.env['PLAYWRIGHT_STRICT'] || !!process.env['CI'],
-  // `retries` and `reporter` are CI-runner concerns (flake tolerance + GHA
-  // annotation format); leave them gated on `CI`. The auth-infra tests
-  // (settings/profile/schedule) share one real backend and, under `fullyParallel`,
-  // race the mock-OAuth handshake + API startup during the first seconds — a
-  // transient `/auth/token` / `/test/seed` 500/401 window that a single retry
-  // doesn't always clear. Allow extra retries so this environmental startup
-  // flake doesn't fail an otherwise-green run.
-  retries: process.env['CI'] ? 2 : 1,
+  // The auth-infra tests (settings/profile/schedule) share one real backend and,
+  // under `fullyParallel`, race the mock-OAuth handshake + API startup during the
+  // first seconds — a transient `/auth/token` / `/test/seed` 500/401 window that a
+  // single retry doesn't always clear. Retries absorb this environmental flake.
+  //
+  // Note `just verify` runs e2e via `npm run e2e:ci`, which sets `CI=true` — so
+  // `process.env['CI']` is truthy under both GitHub Actions and local `just verify`.
+  // Only GitHub Actions sets `GITHUB_ACTIONS`, so the tiers are:
+  //   - GitHub Actions (noisier shared runners): 2 retries
+  //   - local `just verify`:                     1 retry
+  //   - bare `npm run e2e` (fast dev iteration):  0 retries
+  retries: process.env['GITHUB_ACTIONS'] ? 2 : process.env['CI'] ? 1 : 0,
+  // `reporter` is a CI-runner concern (GHA annotation format); gate on `CI`.
   reporter: process.env['CI'] ? 'github' : 'list',
   globalSetup: require.resolve('./e2e/global-setup.ts'),
   use: {
