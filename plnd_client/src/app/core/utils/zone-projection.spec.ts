@@ -32,4 +32,15 @@ describe('classifyDay', () => {
     expect(v.kind).toBe('same');
     expect(v.incomingZone).toBeNull();
   });
+
+  it('breaks (date,time) ties by created_at — later created_at wins (mirrors backend zone_at)', () => {
+    // Two whole-day anchors on the same prior date; the later-created one governs.
+    const anchors = [
+      anchor('2026-07-01', 'America/New_York', null, { created_at: '2026-06-01T10:00:00Z' }),
+      anchor('2026-07-01', 'America/Denver',   null, { created_at: '2026-06-02T10:00:00Z' }),
+    ];
+    // Pass them in the "wrong" order to prove the sort, not array order, decides.
+    const v = classifyDay([anchors[1], anchors[0]], '2026-07-10', 'America/New_York');
+    expect(v.incomingZone).toBe('America/Denver');
+  });
 });

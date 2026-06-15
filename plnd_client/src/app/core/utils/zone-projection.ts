@@ -8,12 +8,16 @@ export interface DayZoneView {
   switch?: DaySwitch;            // present iff kind === 'travel' (first intra-day switch)
 }
 
-/** Anchors sorted by (effective_date, effective_time NULLS FIRST) — mirrors the backend order. */
+/** Anchors sorted by (effective_date, effective_time NULLS FIRST, created_at) —
+ *  mirrors the backend order, including the created_at tiebreak for anchors that
+ *  share an exact (date, time) so client resolution matches `zone_at` last-wins. */
 function ordered(anchors: TimezoneAnchorDto[]): TimezoneAnchorDto[] {
-  return [...anchors].sort((a, b) =>
-    a.effective_date !== b.effective_date
-      ? a.effective_date.localeCompare(b.effective_date)
-      : (a.effective_time ?? '').localeCompare(b.effective_time ?? ''));
+  return [...anchors].sort((a, b) => {
+    if (a.effective_date !== b.effective_date) return a.effective_date.localeCompare(b.effective_date);
+    const t = (a.effective_time ?? '').localeCompare(b.effective_time ?? '');
+    if (t !== 0) return t;
+    return (a.created_at ?? '').localeCompare(b.created_at ?? '');
+  });
 }
 
 /** Zone at the START of `date`: most recent anchor strictly before `date`, plus any
