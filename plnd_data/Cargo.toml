@@ -7,8 +7,9 @@ license = "MIT"
 
 [dependencies]
 async-trait = "0.1"
-chrono = { version = "0.4", features = ["serde"] }
-feed-rs = "2"
+chrono    = { version = "0.4",  features = ["serde"] }
+chrono-tz = { version = "0.10", features = ["serde"] }
+feed-rs   = "2"
 futures = "0.3"
 moka = { version = "0.12", features = ["future"] }
 reqwest = { version = "0.13", default-features = false, features = ["json", "query", "native-tls"] }
