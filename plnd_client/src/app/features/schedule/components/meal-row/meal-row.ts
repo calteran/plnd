@@ -1,5 +1,5 @@
 import { Component, input, output, signal } from '@angular/core';
-import { MealAnchor, TaskEditPatch } from '../../../../core/models/schedule';
+import { MealAnchor, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { TaskRowComponent } from '../task-row/task-row';
 import { MealReviewPaneComponent } from '../../../day-view/components/meal-review-pane/meal-review-pane';
 
@@ -51,6 +51,8 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
           @for (task of meal().duringMealTasks; track task.id) {
             <app-task-row
               [id]="'task-row-' + task.id"
+              [class.dimmed]="isTaskDimmed(task)"
+              [attr.inert]="isTaskDimmed(task) ? '' : null"
               [item]="task"
               [editing]="editingId() === task.id"
               (editRequested)="editRequested.emit($event)"
@@ -83,6 +85,20 @@ export class MealRowComponent {
   readonly closed          = output<void>();
 
   readonly reviewOpen = signal(false);
+
+  /**
+   * Spotlight a during-meal task only while a *sibling* in the same meal is
+   * being edited — dim and inert the others, keep the edited one lit. Gated on
+   * the edit target being one of this meal's tasks so we don't double-dim: when
+   * a top-level row (or another meal's task) is edited, the whole meal-row host
+   * is already dimmed/inert by the day view, and stacking opacity here would
+   * darken these rows past every other dimmed row.
+   */
+  protected isTaskDimmed(task: ScheduleTask): boolean {
+    const editing = this.editingId();
+    if (editing === null || editing === task.id) return false;
+    return this.meal().duringMealTasks.some(t => t.id === editing);
+  }
 
   closePane(): void { this.reviewOpen.set(false); }
 

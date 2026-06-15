@@ -79,6 +79,15 @@
   border-top: 1px solid color-mix(in srgb, var(--color-border-meal) 50%, transparent);
 }
 
+// Spotlight: dim during-meal tasks while a sibling in the same band is edited.
+// Mirrors the day-view row spotlight (day-view.scss); scoped here because that
+// rule can't reach task-rows nested inside this component's template.
+app-task-row.dimmed { opacity: 0.4; transition: opacity 150ms ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  app-task-row.dimmed { transition: none; }
+}
+
 // Override task-row background when inside meal band
 .during-meal ::ng-deep .task-row {
   background: transparent;

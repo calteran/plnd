@@ -146,6 +146,36 @@ describe('MealRowComponent', () => {
     expect(closed).toBeTrue();
   });
 
+  it('dims and inerts sibling during-meal tasks while one is being edited', async () => {
+    const twoTasks: MealAnchor = {
+      id: 'm5', name: 'Lunch', emoji: '🥗', status: 'planned',
+      duringMealTasks: [
+        { id: 'dt1', type: 'general', label: 'Vitamins', status: 'pending', oneShot: false, floating: false },
+        { id: 'dt2', type: 'general', label: 'Water', status: 'pending', oneShot: false, floating: false },
+      ],
+    };
+    const f = await setup(twoTasks);
+    f.componentRef.setInput('editingId', 'dt1');
+    f.detectChanges();
+    const rows = f.debugElement.queryAll(By.css('app-task-row'));
+    const [edited, sibling] = rows.map(r => r.nativeElement as HTMLElement);
+    expect(edited.classList).not.toContain('dimmed');   // the edited task stays lit
+    expect(edited.hasAttribute('inert')).toBeFalse();
+    expect(sibling.classList).toContain('dimmed');       // its sibling is spotlit out
+    expect(sibling.hasAttribute('inert')).toBeTrue();
+  });
+
+  it('does not dim during-meal tasks when the edit target is outside this meal', async () => {
+    const f = await setup(withTasks);
+    f.componentRef.setInput('editingId', 'top-level-task');
+    f.detectChanges();
+    const row = f.debugElement.query(By.css('app-task-row')).nativeElement as HTMLElement;
+    // The day view dims the whole meal-row host in this case; dimming here too
+    // would stack opacity, so the nested row must stay un-dimmed.
+    expect(row.classList).not.toContain('dimmed');
+    expect(row.hasAttribute('inert')).toBeFalse();
+  });
+
   it('applies the skipped modifier class for a skipped meal', async () => {
     const f = await setup(skippedMeal);
     const band = f.debugElement.query(By.css('.meal-band')).nativeElement as HTMLElement;
