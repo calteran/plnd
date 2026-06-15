@@ -141,15 +141,17 @@ describe('DayTypesMealsService', () => {
       expect(service.mealsForDate('2026-03-24')).toEqual([]);
     });
 
-    it('uses UTC day-of-week — is not fooled when getDay() returns the wrong weekday', () => {
+    it('resolves the weekday from the calendar date itself, immune to device timezone (#931)', () => {
       loadFull();
-      // Simulate a timezone where local noon on a Saturday reads as Tuesday.
-      // If the service calls getDay(), it gets 2 (Tue) → matches Workday (bitmask 62) → wrong meals.
-      // After fix: service delegates to the utility which calls getUTCDay(), unaffected by this spy.
-      const getDay = spyOn(Date.prototype, 'getDay').and.returnValue(2); // fake Tuesday
-      const meals = service.mealsForDate('2026-03-28'); // actual Saturday UTC
-      expect(meals.map(m => m.name)).toEqual(['brunch', 'dinner']); // Saturday = Weekend meals
-      getDay.and.callThrough(); // restore
+      // Weekday derivation flows through the noon-anchored date-only helper
+      // (parseDateOnly), which builds the Date from local calendar components, so
+      // the resolved weekday reflects the date string in every timezone. The helper's
+      // cross-timezone/DST correctness is covered in date-only.spec.ts; here we assert
+      // the service keys off the calendar weekday — a weekend date yields weekend meals
+      // and a mid-week date yields workday meals (Weekend bitmask 65 = Sun+Sat,
+      // Workday bitmask 62 = Mon–Fri).
+      expect(service.mealsForDate('2026-03-29').map(m => m.name)).toEqual(['brunch', 'dinner']);        // Sunday
+      expect(service.mealsForDate('2026-03-25').map(m => m.name)).toEqual(['breakfast', 'lunch', 'dinner']); // Wednesday
     });
   });
 
