@@ -127,7 +127,7 @@ export class WeekPlanService {
             title: entry.title ?? entry.task_type,
             energy: 'medium' as const,
             task_type: entry.task_type,
-            scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
+            scheduled_start: entry.scheduled_start ?? undefined,
           }));
 
           // Pre-fill planned meals from the anchor-enriched planned_meals list.
@@ -429,7 +429,3 @@ export class WeekPlanService {
   }
 }
 
-/** Extracts "HH:MM" from an ISO timestamp string using UTC hours/minutes. */
-function utcHHMM(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 16);
-}

@@ -259,7 +259,7 @@ function mapEntry(e: ScheduleEntryDto): ScheduleTask {
     type:    parseItemType(e.task_type),
     label:   e.title ?? e.task_type,
     status:  e.status === 'completed' ? 'done' : 'pending',
-    scheduledStart: e.scheduled_start ? hhmmUtc(e.scheduled_start) : undefined,
+    scheduledStart: e.scheduled_start ?? undefined,
     durationMinutes: e.duration_minutes ?? undefined,
     energy:  (e.energy_required as ScheduleTask['energy']) ?? undefined,
     oneShot: e.one_shot ?? false,
@@ -267,11 +267,6 @@ function mapEntry(e: ScheduleEntryDto): ScheduleTask {
   };
 }
 
-/** Extract a UTC "HH:MM" from an ISO timestamp (matches the API's wall-clock convention). */
-function hhmmUtc(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-}
 
 function toPatchBody(p: TaskEditPatch): Record<string, unknown> {
   const body: Record<string, unknown> = {};
