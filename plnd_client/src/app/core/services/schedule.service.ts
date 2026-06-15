@@ -6,6 +6,7 @@ import { ConfigService } from './config.service';
 import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor, parseItemType } from '../models/schedule';
 import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
+import { toDateOnly } from '../utils/date-only';
 
 export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
 
@@ -171,11 +172,9 @@ export class ScheduleService {
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
+/** Local `YYYY-MM-DD` for a Date. Delegates to the canonical date-only helper. */
 export function localIsoDate(d: Date): string {
-  const y  = d.getFullYear();
-  const m  = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
+  return toDateOnly(d);
 }
 
 export function todayIso(): string {
