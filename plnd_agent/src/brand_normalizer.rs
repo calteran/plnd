@@ -172,7 +172,25 @@ impl BrandNormalizer for LlmBrandNormalizer {
             return None;
         }
         match serde_json::from_value::<Normalization>(call.arguments) {
-            Ok(n) => Some(n),
+            Ok(n) => {
+                // Guard against pathological LLM output exceeding the catalog
+                // column widths (name VARCHAR(200), brand VARCHAR(100)); fall
+                // back to the original name rather than failing the ingest.
+                const MAX_GENERIC_NAME_LEN: usize = 200;
+                const MAX_BRAND_LEN: usize = 100;
+                if n.generic_name.chars().count() > MAX_GENERIC_NAME_LEN
+                    || n.brand
+                        .as_ref()
+                        .is_some_and(|b| b.chars().count() > MAX_BRAND_LEN)
+                {
+                    tracing::warn!(
+                        branded_name,
+                        "brand normalization output exceeds catalog column limits; discarding"
+                    );
+                    return None;
+                }
+                Some(n)
+            }
             Err(e) => {
                 tracing::warn!(error = %e, branded_name, "brand normalization parse failed");
                 None
@@ -271,6 +289,19 @@ mod tests {
         });
         let norm = LlmBrandNormalizer::new(Arc::new(mock));
         assert!(norm.normalize("anything").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn llm_normalizer_returns_none_when_output_exceeds_column_limits() {
+        let mock = MockLlmProvider::new("fast");
+        let long_brand = "x".repeat(101);
+        mock.push_response(tool_call_response(serde_json::json!({
+            "generic_name": "Cheddar cheese",
+            "brand": long_brand,
+            "confidence": 0.95
+        })));
+        let norm = LlmBrandNormalizer::new(Arc::new(mock));
+        assert!(norm.normalize("Some Branded Thing").await.is_none());
     }
 
     #[test]
