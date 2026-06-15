@@ -29,6 +29,7 @@ impl TimezonePendingObservationRepository for PgTimezonePendingObservationReposi
         user_id: Uuid,
         observed_zone: Tz,
         observation_count: i32,
+        first_seen: DateTime<Utc>,
         last_seen: DateTime<Utc>,
     ) -> Result<TimezonePendingObservation, crate::Error> {
         db::upsert(
@@ -36,6 +37,7 @@ impl TimezonePendingObservationRepository for PgTimezonePendingObservationReposi
             user_id,
             observed_zone,
             observation_count,
+            first_seen,
             last_seen,
         )
         .await

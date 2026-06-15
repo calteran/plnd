@@ -86,12 +86,14 @@ impl Tool for InferTimezoneChangeTool {
         // ── Optional: effective_time ──────────────────────────────────────────
         let effective_time: Option<NaiveTime> =
             match input.get("effective_time").and_then(|v| v.as_str()) {
-                Some(s) => Some(NaiveTime::parse_from_str(s, "%H:%M").map_err(|_| {
-                    ToolError::InvalidInput {
-                        tool: name.to_string(),
-                        reason: format!("'effective_time' is not a valid HH:MM time: {s}"),
-                    }
-                })?),
+                Some(s) => Some(
+                    NaiveTime::parse_from_str(s, "%H:%M")
+                        .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M:%S"))
+                        .map_err(|_| ToolError::InvalidInput {
+                            tool: name.to_string(),
+                            reason: format!("'effective_time' is not a valid HH:MM time: {s}"),
+                        })?,
+                ),
                 None => None,
             };
 
@@ -132,12 +134,14 @@ impl Tool for InferTimezoneChangeTool {
                 })?;
 
             let rt: Option<NaiveTime> = match input.get("return_time").and_then(|v| v.as_str()) {
-                Some(s) => Some(NaiveTime::parse_from_str(s, "%H:%M").map_err(|_| {
-                    ToolError::InvalidInput {
-                        tool: name.to_string(),
-                        reason: format!("'return_time' is not a valid HH:MM time: {s}"),
-                    }
-                })?),
+                Some(s) => Some(
+                    NaiveTime::parse_from_str(s, "%H:%M")
+                        .or_else(|_| NaiveTime::parse_from_str(s, "%H:%M:%S"))
+                        .map_err(|_| ToolError::InvalidInput {
+                            tool: name.to_string(),
+                            reason: format!("'return_time' is not a valid HH:MM time: {s}"),
+                        })?,
+                ),
                 None => None,
             };
 

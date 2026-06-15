@@ -13,14 +13,17 @@ pub trait TimezonePendingObservationRepository: Send + Sync {
     /// Insert or update the pending observation for `user_id` and return it.
     ///
     /// On conflict the row is updated with the new `observed_zone`,
-    /// `observation_count`, and `last_seen`; `first_seen` and `created_at` are
-    /// preserved. The caller supplies `observation_count` — it is not
-    /// incremented in SQL.
+    /// `observation_count`, `first_seen`, and `last_seen`. The caller supplies
+    /// the correct `first_seen` value (preserved from the existing row for a
+    /// same-zone increment, or reset to `now_instant` on a zone flip) so the
+    /// SQL layer never has to decide which case applies. The caller also
+    /// supplies `observation_count` — it is not incremented in SQL.
     async fn upsert(
         &self,
         user_id: Uuid,
         observed_zone: Tz,
         observation_count: i32,
+        first_seen: DateTime<Utc>,
         last_seen: DateTime<Utc>,
     ) -> Result<TimezonePendingObservation, crate::Error>;
 

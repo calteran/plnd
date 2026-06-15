@@ -506,11 +506,14 @@ pub async fn device_affirm(
             current.map(|z| z.name().to_string()),
             None,
         ),
-        plnd_data::timezone::DeviceAffirmDecision::Corroborate { new_count } => {
+        plnd_data::timezone::DeviceAffirmDecision::Corroborate {
+            new_count,
+            first_seen,
+        } => {
             state
                 .repos
                 .timezone_pending_observation
-                .upsert(user_id, reported, new_count, now_instant)
+                .upsert(user_id, reported, new_count, first_seen, now_instant)
                 .await
                 .map_err(|e| {
                     tracing::error!(error = %e, "device_affirm: upsert pending error");
@@ -522,11 +525,14 @@ pub async fn device_affirm(
                 None,
             )
         }
-        plnd_data::timezone::DeviceAffirmDecision::RaiseStandoff { new_count } => {
+        plnd_data::timezone::DeviceAffirmDecision::RaiseStandoff {
+            new_count,
+            first_seen,
+        } => {
             state
                 .repos
                 .timezone_pending_observation
-                .upsert(user_id, reported, new_count, now_instant)
+                .upsert(user_id, reported, new_count, first_seen, now_instant)
                 .await
                 .map_err(|e| {
                     tracing::error!(error = %e, "device_affirm: upsert pending for standoff error");

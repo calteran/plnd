@@ -43,10 +43,16 @@ pub enum DeviceAffirmDecision {
     /// Inside a known round-trip bracket: ignore the contradicting reading.
     Distrust,
     /// Open-ended contradiction below threshold: upsert pending with `new_count`.
-    Corroborate { new_count: i32 },
+    Corroborate {
+        new_count: i32,
+        first_seen: DateTime<Utc>,
+    },
     /// Corroboration threshold crossed while the higher-trust zone is still
     /// active: raise the one-time gentle confirm.
-    RaiseStandoff { new_count: i32 },
+    RaiseStandoff {
+        new_count: i32,
+        first_seen: DateTime<Utc>,
+    },
 }
 
 /// Decide how to respond to a device reading (spec D9). Pure — no I/O.
@@ -113,9 +119,15 @@ pub fn decide_device_affirm(
 
     let dwell_ok = now_instant - first_seen >= CORROBORATION_MIN_DWELL;
     if new_count >= CORROBORATION_MIN_OBSERVATIONS && dwell_ok {
-        DeviceAffirmDecision::RaiseStandoff { new_count }
+        DeviceAffirmDecision::RaiseStandoff {
+            new_count,
+            first_seen,
+        }
     } else {
-        DeviceAffirmDecision::Corroborate { new_count }
+        DeviceAffirmDecision::Corroborate {
+            new_count,
+            first_seen,
+        }
     }
 }
 
@@ -327,7 +339,13 @@ mod tests {
             t(9, 0),
             ts(2026, 6, 5, 15, 0),
         );
-        assert_eq!(got, DeviceAffirmDecision::Corroborate { new_count: 1 });
+        assert_eq!(
+            got,
+            DeviceAffirmDecision::Corroborate {
+                new_count: 1,
+                first_seen: ts(2026, 6, 5, 15, 0),
+            }
+        );
     }
 
     #[test]
@@ -357,7 +375,13 @@ mod tests {
             t(9, 0),
             now,
         );
-        assert_eq!(got, DeviceAffirmDecision::Corroborate { new_count: 2 });
+        assert_eq!(
+            got,
+            DeviceAffirmDecision::Corroborate {
+                new_count: 2,
+                first_seen: now - Duration::hours(1),
+            }
+        );
     }
 
     #[test]
@@ -387,7 +411,13 @@ mod tests {
             t(9, 0),
             now,
         );
-        assert_eq!(got, DeviceAffirmDecision::RaiseStandoff { new_count: 2 });
+        assert_eq!(
+            got,
+            DeviceAffirmDecision::RaiseStandoff {
+                new_count: 2,
+                first_seen: now - Duration::hours(4),
+            }
+        );
     }
 
     #[test]
@@ -455,7 +485,13 @@ mod tests {
             t(9, 0),
             now,
         );
-        assert_eq!(got, DeviceAffirmDecision::Corroborate { new_count: 1 });
+        assert_eq!(
+            got,
+            DeviceAffirmDecision::Corroborate {
+                new_count: 1,
+                first_seen: now,
+            }
+        );
     }
 
     #[test]
@@ -485,7 +521,13 @@ mod tests {
             t(9, 0),
             now,
         );
-        assert_eq!(got, DeviceAffirmDecision::Corroborate { new_count: 1 });
+        assert_eq!(
+            got,
+            DeviceAffirmDecision::Corroborate {
+                new_count: 1,
+                first_seen: now,
+            }
+        );
     }
 
     // ---- Extra: User-sourced open-ended behaves like Inferred ----------
@@ -510,7 +552,13 @@ mod tests {
             t(9, 0),
             ts(2026, 6, 5, 15, 0),
         );
-        assert_eq!(got, DeviceAffirmDecision::Corroborate { new_count: 1 });
+        assert_eq!(
+            got,
+            DeviceAffirmDecision::Corroborate {
+                new_count: 1,
+                first_seen: ts(2026, 6, 5, 15, 0),
+            }
+        );
     }
 
     // ---- Extra: a PAST group member does not form a bracket ------------
@@ -547,6 +595,12 @@ mod tests {
             t(9, 0),
             ts(2026, 6, 5, 15, 0),
         );
-        assert_eq!(got, DeviceAffirmDecision::Corroborate { new_count: 1 });
+        assert_eq!(
+            got,
+            DeviceAffirmDecision::Corroborate {
+                new_count: 1,
+                first_seen: ts(2026, 6, 5, 15, 0),
+            }
+        );
     }
 }

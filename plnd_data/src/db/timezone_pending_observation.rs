@@ -74,10 +74,12 @@ pub async fn get(
 /// Insert or update the pending observation for `user_id` and return it.
 ///
 /// On conflict (same `user_id`) the row is updated with the new
-/// `observed_zone`, `observation_count`, and `last_seen`; `first_seen` and
-/// `created_at` are preserved. The caller is responsible for supplying the
-/// correct `observation_count` (e.g. prior count + 1 after reading the
-/// existing row).
+/// `observed_zone`, `observation_count`, `first_seen`, and `last_seen`.
+/// The caller supplies the correct `first_seen` — preserved from the
+/// existing row for a same-zone increment, or reset to `now_instant` on
+/// a zone flip — so the SQL layer never has to make that decision.
+/// The caller also supplies `observation_count` — it is not incremented
+/// in SQL.
 #[tracing::instrument(
     skip(pool),
     fields(table = "timezone_pending_observations", op = "upsert")
@@ -87,15 +89,17 @@ pub async fn upsert(
     user_id: Uuid,
     observed_zone: Tz,
     observation_count: i32,
+    first_seen: DateTime<Utc>,
     last_seen: DateTime<Utc>,
 ) -> Result<TimezonePendingObservation, DatabaseError> {
     let row = sqlx::query(sqlx::AssertSqlSafe(format!(
         "INSERT INTO timezone_pending_observations \
-            (user_id, observed_zone, observation_count, last_seen) \
-         VALUES ($1, $2, $3, $4) \
+            (user_id, observed_zone, observation_count, first_seen, last_seen) \
+         VALUES ($1, $2, $3, $4, $5) \
          ON CONFLICT (user_id) DO UPDATE SET \
             observed_zone = EXCLUDED.observed_zone, \
             observation_count = EXCLUDED.observation_count, \
+            first_seen = EXCLUDED.first_seen, \
             last_seen = EXCLUDED.last_seen, \
             updated_at = NOW() \
          RETURNING {COLUMNS}"
@@ -103,6 +107,7 @@ pub async fn upsert(
     .bind(user_id)
     .bind(observed_zone.name())
     .bind(observation_count)
+    .bind(first_seen)
     .bind(last_seen)
     .fetch_one(pool)
     .await
@@ -142,4 +147,68 @@ pub async fn clear(pool: &PgPool, user_id: Uuid) -> Result<(), DatabaseError> {
         .await
         .map(|_| ())
         .map_err(DatabaseError::from)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::users;
+    use chrono::TimeZone as _;
+    use chrono_tz::America::{Chicago, New_York};
+
+    /// Create a throwaway user row so the FK on `timezone_pending_observations`
+    /// is satisfied. Mirrors the pattern used in `plnd_data/src/db/preferences.rs`.
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    /// Verify that `upsert` stores the supplied `first_seen` on insert, preserves
+    /// it across a same-zone update, and resets it on a zone-flip — i.e. that the
+    /// SQL actually writes `EXCLUDED.first_seen` rather than keeping the original.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn upsert_resets_first_seen_on_zone_change(pool: PgPool) {
+        let uid = new_user(&pool).await;
+
+        let t0 = chrono::Utc.with_ymd_and_hms(2026, 6, 1, 8, 0, 0).unwrap();
+        let t1 = chrono::Utc.with_ymd_and_hms(2026, 6, 1, 12, 0, 0).unwrap();
+
+        // (1) Fresh insert: first_seen should be exactly t0.
+        let row = upsert(&pool, uid, New_York, 1, t0, t0).await.unwrap();
+        assert_eq!(
+            row.first_seen, t0,
+            "fresh insert must store supplied first_seen"
+        );
+        assert_eq!(row.observation_count, 1);
+
+        // (2) Same zone, count incremented — caller passes the preserved t0.
+        //     first_seen must remain t0 (not silently become t1).
+        let row = upsert(&pool, uid, New_York, 2, t0, t1).await.unwrap();
+        assert_eq!(
+            row.first_seen, t0,
+            "same-zone update must keep the original first_seen"
+        );
+        assert_eq!(row.observation_count, 2);
+
+        // (3) Zone flip to Chicago — caller passes fresh t1 as first_seen.
+        //     first_seen must become t1 (the dwell clock is reset).
+        let row = upsert(&pool, uid, Chicago, 1, t1, t1).await.unwrap();
+        assert_eq!(
+            row.first_seen, t1,
+            "zone-flip must reset first_seen to the newly supplied value"
+        );
+        assert_eq!(row.observation_count, 1);
+        assert_eq!(row.observed_zone, Chicago);
+    }
 }
