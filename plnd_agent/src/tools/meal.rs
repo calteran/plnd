@@ -1543,6 +1543,7 @@ mod tests {
                         occasion_tags: vec![],
                         external_id: None,
                         external_source: None,
+                        brand: None,
                         contributed_by_user_id: None,
                         created_at: Utc::now(),
                         updated_at: Utc::now(),

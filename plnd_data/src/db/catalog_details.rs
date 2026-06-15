@@ -17,7 +17,7 @@ pub async fn get_ingredient(
 ) -> Result<Option<CatalogIngredient>, DatabaseError> {
     sqlx::query_as::<_, CatalogIngredient>(
         "SELECT ingredient_id, name, description, serving_size_g, nutrition, allergens, occasion_tags, \
-         external_id, external_source, contributed_by_user_id, created_at, updated_at \
+         external_id, external_source, brand, contributed_by_user_id, created_at, updated_at \
          FROM catalog_ingredients WHERE ingredient_id = $1",
     )
     .bind(ingredient_id)
