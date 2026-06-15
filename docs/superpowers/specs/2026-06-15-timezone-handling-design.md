@@ -93,7 +93,7 @@ A `device` reading is ground-truth for *now* only when reliable; right after arr
 - **Difference that contradicts a still-active higher-trust assertion → distrust.** While inside a round-trip **bracket** (between an `inferred`/`user` depart and return anchor), a contradicting device reading is *not* applied. For an **open-ended** assertion (no return anchor), a contradicting reading must **corroborate** — persist across sessions / a dwell period — before it can supersede; a single stale reading cannot flip the zone.
 - **Genuine standoff → one-time gentle confirm.** When device and intended zone keep disagreeing past the corroboration threshold, surface a single quiet prompt (e.g. *"Back in Eastern time, or is your device clock off?"*). Resolving it creates the appropriate `user` anchor (or dismisses the standoff); it is not re-asked for the same standoff. This is the only prompt the timezone feature raises — everywhere else relies on silent auto-apply plus the `(why?)` control.
 
-Exact bracket/corroboration thresholds are an implementation-plan detail.
+**Corroboration thresholds (finalized):** a contradicting device reading must be observed on **≥ 2 separate device-affirm calls** AND **≥ 3 hours must elapse** from the first sighting before the one-time standoff confirm is raised. A single stale reading (count 1, or fewer than 3 hours elapsed) can never flip or flag. "Inside a round-trip bracket" is determined by the governing anchor sharing an `inference_group` with a later, future-dated anchor (the known return still lies ahead); a one-way or open-ended assertion (a group with no future member, or no group at all) takes the corroboration path.
 
 ## 3. Data model
 
@@ -105,6 +105,8 @@ A timezone-change anchor is persisted as an instance-level, schedule-scoped reco
 - `source` — `device` | `user` | `inferred`.
 - `source_ref` — for `inferred`, the originating task/calendar item.
 - `inference_group` — links the depart/return pair so a dismissal removes both.
+
+**Corroboration/standoff state** is persisted separately from the committed anchor timeline. A dedicated per-user record (at most one per user) tracks the in-flight contradicting device reading: its corroboration count, how long it has been observed, and whether the one-time standoff prompt has been raised. This record is created when a contradicting reading first arrives and deleted on resolution — either when the reading is promoted to a real `device` anchor or when the standoff is dismissed. It is never part of the timezone-change anchor sequence that governs zone resolution.
 
 Storage is reached **only** through a repository trait in `plnd_data` (per the storage-isolation rule in CLAUDE.md); no `sqlx`/`PgPool` in `plnd_api` or `plnd_agent`, and no public re-export of `sqlx` types.
 
