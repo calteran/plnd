@@ -10,6 +10,8 @@
 //! - `POST /timezone/anchors` — create a `user`-source anchor.
 //! - `DELETE /timezone/anchors/{id}` — delete a single anchor.
 //! - `DELETE /timezone/anchors/group/{inference_group}` — delete a whole group.
+//! - `POST /timezone/device` — device-affirm (enact D9 policy).
+//! - `POST /timezone/standoff/dismiss` — dismiss D9 standoff confirm.
 
 use crate::api_response::TimezoneAnchorResponse;
 use crate::auth::jwt::Claims;
@@ -100,6 +102,46 @@ pub struct CreateTimezoneAnchorRequest {
 pub struct DeleteGroupResponse {
     /// Number of anchors that were deleted.
     pub deleted: u64,
+}
+
+/// Request body for `POST /timezone/device`.
+#[derive(Debug, Deserialize, utoipa::ToSchema)]
+pub struct DeviceAffirmRequest {
+    /// IANA zone reported by the device (`Intl.DateTimeFormat().resolvedOptions().timeZone`).
+    pub zone: String,
+}
+
+/// Outcome of a device-affirm call.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceAffirmOutcome {
+    /// Device zone matched, was distrusted inside a bracket, or standoff already raised.
+    NoChange,
+    /// A device anchor was appended (self-heal — no higher-trust zone or device-sourced anchor).
+    Appended,
+    /// Contradiction recorded toward corroboration threshold; no anchor written yet.
+    Recording,
+    /// Corroboration threshold crossed; one-time gentle confirm raised. `confirm` is populated.
+    Standoff,
+}
+
+/// Response for `POST /timezone/device`.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct DeviceAffirmResponse {
+    pub outcome: DeviceAffirmOutcome,
+    /// IANA zone in effect at "now" after the call (or null if none).
+    pub effective_zone: Option<String>,
+    /// Populated only when outcome == Standoff.
+    pub confirm: Option<StandoffConfirm>,
+}
+
+/// Payload the client uses to render the one-time gentle confirm (D9).
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct StandoffConfirm {
+    /// Higher-trust zone currently in effect (the one the user previously set).
+    pub intended_zone: String,
+    /// The zone the device keeps reporting.
+    pub device_zone: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -214,7 +256,7 @@ pub async fn create_anchor(
         StatusCode::BAD_REQUEST
     })?;
 
-    state
+    let anchor = state
         .repos
         .timezone_anchor
         .add(
@@ -227,16 +269,26 @@ pub async fn create_anchor(
             body.inference_group,
         )
         .await
-        .map(|anchor| {
-            (
-                StatusCode::CREATED,
-                Json(TimezoneAnchorResponse::from(anchor)),
-            )
-        })
         .map_err(|e| {
             tracing::error!(error = %e, "create_anchor error");
             map_repo_error(e)
-        })
+        })?;
+
+    // Picking a zone resolves any pending D9 standoff.
+    state
+        .repos
+        .timezone_pending_observation
+        .clear(user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "create_anchor: clear pending error");
+            map_repo_error(e)
+        })?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(TimezoneAnchorResponse::from(anchor)),
+    ))
 }
 
 /// Delete a single timezone anchor (user-scoped).
@@ -313,6 +365,237 @@ pub async fn delete_anchor_group(
         })?;
 
     Ok(Json(DeleteGroupResponse { deleted }))
+}
+
+/// Process a device-reported timezone (spec D9 policy).
+///
+/// The client should call this on each app foreground with the device's current
+/// IANA zone. The handler decides — without any UI interaction — whether to
+/// self-heal, record a contradiction, or raise a one-time gentle confirm. When
+/// `outcome == "standoff"` the client should surface the confirm dialog using
+/// the `confirm` payload; the user's response then goes to
+/// `POST /timezone/anchors` (accept device zone) or
+/// `POST /timezone/standoff/dismiss` (keep current zone).
+#[utoipa::path(
+    post,
+    path = "/timezone/device",
+    tag = "Timezone",
+    security(("bearer_auth" = [])),
+    request_body = DeviceAffirmRequest,
+    responses(
+        (status = 200, description = "Decision applied; see outcome field", body = DeviceAffirmResponse),
+        (status = 400, description = "Invalid IANA zone name"),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
+pub async fn device_affirm(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Json(body): Json<DeviceAffirmRequest>,
+) -> Result<Json<DeviceAffirmResponse>, StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    // Validate the IANA zone name before touching the DB.
+    let reported: chrono_tz::Tz = body.zone.parse().map_err(|_| {
+        tracing::warn!(zone = %body.zone, "device_affirm: invalid IANA timezone");
+        StatusCode::BAD_REQUEST
+    })?;
+
+    // Compute "now" in the reported zone's wall clock.
+    let now_instant = chrono::Utc::now();
+    let local = now_instant.with_timezone(&reported);
+    let now_date = local.date_naive();
+    let now_time = local.time();
+
+    let anchors = state
+        .repos
+        .timezone_anchor
+        .list_through(user_id, now_date)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "device_affirm: list_through error");
+            map_repo_error(e)
+        })?;
+
+    let pending_row = state
+        .repos
+        .timezone_pending_observation
+        .get(user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "device_affirm: get pending error");
+            map_repo_error(e)
+        })?;
+
+    let pending = pending_row
+        .as_ref()
+        .map(|p| plnd_data::timezone::PendingState {
+            observed_zone: p.observed_zone,
+            observation_count: p.observation_count,
+            first_seen: p.first_seen,
+            standoff_raised: p.standoff_raised_at.is_some(),
+        });
+
+    let decision = plnd_data::timezone::decide_device_affirm(
+        &anchors,
+        pending,
+        reported,
+        now_date,
+        now_time,
+        now_instant,
+    );
+
+    // Pre-existing effective zone (before any writes).
+    let current = plnd_data::timezone::zone_at(&anchors, now_date, Some(now_time));
+
+    let (outcome, effective_zone, confirm) = match decision {
+        plnd_data::timezone::DeviceAffirmDecision::NoOp { clear_pending } => {
+            if clear_pending {
+                state
+                    .repos
+                    .timezone_pending_observation
+                    .clear(user_id)
+                    .await
+                    .map_err(|e| {
+                        tracing::error!(error = %e, "device_affirm: clear pending error");
+                        map_repo_error(e)
+                    })?;
+            }
+            (
+                DeviceAffirmOutcome::NoChange,
+                current.map(|z| z.name().to_string()),
+                None,
+            )
+        }
+        plnd_data::timezone::DeviceAffirmDecision::Append => {
+            state
+                .repos
+                .timezone_anchor
+                .add(
+                    user_id,
+                    now_date,
+                    Some(now_time),
+                    reported,
+                    TimezoneSource::Device,
+                    None,
+                    None,
+                )
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "device_affirm: add anchor error");
+                    map_repo_error(e)
+                })?;
+            state
+                .repos
+                .timezone_pending_observation
+                .clear(user_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "device_affirm: clear pending after append error");
+                    map_repo_error(e)
+                })?;
+            (
+                DeviceAffirmOutcome::Appended,
+                Some(reported.name().to_string()),
+                None,
+            )
+        }
+        plnd_data::timezone::DeviceAffirmDecision::Distrust => (
+            DeviceAffirmOutcome::NoChange,
+            current.map(|z| z.name().to_string()),
+            None,
+        ),
+        plnd_data::timezone::DeviceAffirmDecision::Corroborate {
+            new_count,
+            first_seen,
+        } => {
+            state
+                .repos
+                .timezone_pending_observation
+                .upsert(user_id, reported, new_count, first_seen, now_instant)
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "device_affirm: upsert pending error");
+                    map_repo_error(e)
+                })?;
+            (
+                DeviceAffirmOutcome::Recording,
+                current.map(|z| z.name().to_string()),
+                None,
+            )
+        }
+        plnd_data::timezone::DeviceAffirmDecision::RaiseStandoff {
+            new_count,
+            first_seen,
+        } => {
+            state
+                .repos
+                .timezone_pending_observation
+                .upsert(user_id, reported, new_count, first_seen, now_instant)
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "device_affirm: upsert pending for standoff error");
+                    map_repo_error(e)
+                })?;
+            state
+                .repos
+                .timezone_pending_observation
+                .mark_standoff(user_id)
+                .await
+                .map_err(|e| {
+                    tracing::error!(error = %e, "device_affirm: mark_standoff error");
+                    map_repo_error(e)
+                })?;
+            let zone_name = current.map(|z| z.name().to_string());
+            let confirm = zone_name.as_ref().map(|z| StandoffConfirm {
+                intended_zone: z.clone(),
+                device_zone: reported.name().to_string(),
+            });
+            (DeviceAffirmOutcome::Standoff, zone_name, confirm)
+        }
+    };
+
+    Ok(Json(DeviceAffirmResponse {
+        outcome,
+        effective_zone,
+        confirm,
+    }))
+}
+
+/// Dismiss the pending D9 standoff confirm (user chose to keep their current zone).
+///
+/// Clears the pending observation so the gentle confirm is not re-raised until
+/// the corroboration threshold is crossed again. This is idempotent — calling it
+/// when no standoff is pending is a no-op (the DELETE is naturally safe to repeat).
+#[utoipa::path(
+    post,
+    path = "/timezone/standoff/dismiss",
+    tag = "Timezone",
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Standoff dismissed (or was already cleared)"),
+        (status = 401, description = "Unauthorized"),
+    )
+)]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
+pub async fn dismiss_standoff(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+) -> Result<StatusCode, StatusCode> {
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    state
+        .repos
+        .timezone_pending_observation
+        .clear(user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "dismiss_standoff: clear error");
+            map_repo_error(e)
+        })?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // ---------------------------------------------------------------------------
@@ -424,5 +707,64 @@ mod tests {
         let resp = DeleteGroupResponse { deleted: 3 };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"deleted\":3"));
+    }
+
+    // ---- DeviceAffirmRequest / DeviceAffirmResponse serde ---------------
+
+    #[test]
+    fn device_affirm_request_deserializes() {
+        let json = r#"{"zone":"America/Denver"}"#;
+        let req: DeviceAffirmRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.zone, "America/Denver");
+    }
+
+    #[test]
+    fn device_affirm_outcome_serializes_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&DeviceAffirmOutcome::NoChange).unwrap(),
+            "\"no_change\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DeviceAffirmOutcome::Appended).unwrap(),
+            "\"appended\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DeviceAffirmOutcome::Recording).unwrap(),
+            "\"recording\""
+        );
+        assert_eq!(
+            serde_json::to_string(&DeviceAffirmOutcome::Standoff).unwrap(),
+            "\"standoff\""
+        );
+    }
+
+    #[test]
+    fn device_affirm_response_with_standoff_serializes() {
+        let resp = DeviceAffirmResponse {
+            outcome: DeviceAffirmOutcome::Standoff,
+            effective_zone: Some("America/Denver".to_string()),
+            confirm: Some(StandoffConfirm {
+                intended_zone: "America/Denver".to_string(),
+                device_zone: "America/New_York".to_string(),
+            }),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"outcome\":\"standoff\""));
+        assert!(json.contains("\"effective_zone\":\"America/Denver\""));
+        assert!(json.contains("\"confirm\":"));
+        assert!(json.contains("\"intended_zone\":\"America/Denver\""));
+        assert!(json.contains("\"device_zone\":\"America/New_York\""));
+    }
+
+    #[test]
+    fn device_affirm_response_no_confirm_serializes_null() {
+        let resp = DeviceAffirmResponse {
+            outcome: DeviceAffirmOutcome::NoChange,
+            effective_zone: Some("America/New_York".to_string()),
+            confirm: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"outcome\":\"no_change\""));
+        assert!(json.contains("\"confirm\":null"));
     }
 }

@@ -404,6 +404,11 @@ async fn main() {
             delete(timezone::delete_anchor_group),
         )
         .route("/timezone/resolve", get(timezone::resolve_zone))
+        .route("/timezone/device", post(timezone::device_affirm))
+        .route(
+            "/timezone/standoff/dismiss",
+            post(timezone::dismiss_standoff),
+        )
         .route(
             "/routines",
             get(routine::list_routines).post(routine::create_routine),

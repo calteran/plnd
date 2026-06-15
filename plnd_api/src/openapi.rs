@@ -29,7 +29,10 @@ use crate::routes::{
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
     routine::CreateRoutineRequest,
     search::{DishSearchResponse, ExerciseSearchResponse, IngredientSearchResponse},
-    timezone::{CreateTimezoneAnchorRequest, DeleteGroupResponse, ResolveResponse},
+    timezone::{
+        CreateTimezoneAnchorRequest, DeleteGroupResponse, DeviceAffirmOutcome, DeviceAffirmRequest,
+        DeviceAffirmResponse, ResolveResponse, StandoffConfirm,
+    },
     user_dish_prefs::{AddIngredientBody, CreateDishBody, PatchDishBody},
     user_ingredient_prefs::UpsertIngredientPrefBody,
     user_meal_prefs::{AddDishBody, CreateMealBody, PatchMealBody},
@@ -159,6 +162,8 @@ impl Modify for BearerSecurityAddon {
         crate::routes::timezone::create_anchor,
         crate::routes::timezone::delete_anchor,
         crate::routes::timezone::delete_anchor_group,
+        crate::routes::timezone::device_affirm,
+        crate::routes::timezone::dismiss_standoff,
     ),
     components(schemas(
         // Existing
@@ -256,6 +261,10 @@ impl Modify for BearerSecurityAddon {
         CreateTimezoneAnchorRequest,
         ResolveResponse,
         DeleteGroupResponse,
+        DeviceAffirmRequest,
+        DeviceAffirmResponse,
+        DeviceAffirmOutcome,
+        StandoffConfirm,
     )),
     modifiers(&BearerSecurityAddon),
     tags(

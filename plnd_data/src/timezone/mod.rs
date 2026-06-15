@@ -17,6 +17,35 @@ use chrono_tz::Tz;
 
 use crate::models::TimezoneAnchor;
 
+pub mod device;
+
+pub use device::{
+    CORROBORATION_MIN_DWELL, CORROBORATION_MIN_OBSERVATIONS, DeviceAffirmDecision, PendingState,
+    decide_device_affirm,
+};
+
+/// The anchor governing the point `(date, time)`: among all anchors at or
+/// before that point, the one with the greatest
+/// `(effective_date, effective_time, created_at)` key. `None` if no anchor is
+/// at or before the query point.
+///
+/// This is the single source of truth for anchor selection — both [`zone_at`]
+/// and the device-affirm decision logic ([`device::decide_device_affirm`])
+/// select through it, so the "which anchor wins" rule lives in exactly one
+/// place. See [`zone_at`] for the ordering rationale (whole-day vs timed
+/// anchors, the `created_at` tie-break, and the no-sorting-assumed guarantee).
+pub(crate) fn governing_anchor(
+    anchors: &[TimezoneAnchor],
+    date: NaiveDate,
+    time: Option<NaiveTime>,
+) -> Option<&TimezoneAnchor> {
+    let query_key = (date, time);
+    anchors
+        .iter()
+        .filter(|a| (a.effective_date, a.effective_time) <= query_key)
+        .max_by_key(|a| (a.effective_date, a.effective_time, a.created_at))
+}
+
 /// The IANA zone in effect at the point `(date, time)`.
 ///
 /// An anchor `A` is *at or before* the query point iff
@@ -43,12 +72,7 @@ use crate::models::TimezoneAnchor;
 /// computed defensively. The repository returns anchors sorted ascending, but
 /// correctness here is independent of that precondition.
 pub fn zone_at(anchors: &[TimezoneAnchor], date: NaiveDate, time: Option<NaiveTime>) -> Option<Tz> {
-    let query_key = (date, time);
-    anchors
-        .iter()
-        .filter(|a| (a.effective_date, a.effective_time) <= query_key)
-        .max_by_key(|a| (a.effective_date, a.effective_time, a.created_at))
-        .map(|a| a.zone)
+    governing_anchor(anchors, date, time).map(|a| a.zone)
 }
 
 /// Maximum window we will roll a non-existent wall time forward through before

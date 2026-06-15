@@ -19,6 +19,7 @@ pub mod schedule;
 pub mod session;
 pub mod task;
 pub mod timezone_anchor;
+pub mod timezone_pending_observation;
 pub mod user;
 pub mod user_dish_pref;
 pub mod user_ingredient_pref;
@@ -41,6 +42,7 @@ pub use schedule::ScheduleRepository;
 pub use session::SessionRepository;
 pub use task::TaskRepository;
 pub use timezone_anchor::TimezoneAnchorRepository;
+pub use timezone_pending_observation::TimezonePendingObservationRepository;
 pub use user::UserRepository;
 pub use user_dish_pref::{AddIngredientParams, UserDishPrefRepository};
 pub use user_ingredient_pref::UserIngredientPrefRepository;
@@ -67,6 +69,7 @@ pub struct Repositories {
     pub session: Arc<dyn SessionRepository>,
     pub task: Arc<dyn TaskRepository>,
     pub timezone_anchor: Arc<dyn TimezoneAnchorRepository>,
+    pub timezone_pending_observation: Arc<dyn TimezonePendingObservationRepository>,
     pub user: Arc<dyn UserRepository>,
     pub user_dish_pref: Arc<dyn UserDishPrefRepository>,
     pub user_ingredient_pref: Arc<dyn UserIngredientPrefRepository>,
@@ -109,6 +112,11 @@ impl Repositories {
             timezone_anchor: Arc::new(pg::timezone_anchor::PgTimezoneAnchorRepository::new(
                 pool.clone(),
             )),
+            timezone_pending_observation: Arc::new(
+                pg::timezone_pending_observation::PgTimezonePendingObservationRepository::new(
+                    pool.clone(),
+                ),
+            ),
             user: Arc::new(pg::user::PgUserRepository::new(pool.clone())),
             user_dish_pref: Arc::new(pg::user_dish_pref::PgUserDishPrefRepository::new(
                 pool.clone(),
