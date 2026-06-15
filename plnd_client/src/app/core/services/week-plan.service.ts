@@ -12,6 +12,7 @@ import type { MealEntryRequest } from '../models/planned-meal-entry';
 import { TaskType } from '../models/routine';
 import { DayTypesMealsService } from './day-types-meals.service';
 import { preferredTimeHHMM } from '../models/meal-pattern';
+import { addDaysDateOnly } from '../utils/date-only';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
 
@@ -126,7 +127,7 @@ export class WeekPlanService {
             title: entry.title ?? entry.task_type,
             energy: 'medium' as const,
             task_type: entry.task_type,
-            scheduled_start: entry.scheduled_start ? utcHHMM(entry.scheduled_start) : undefined,
+            scheduled_start: entry.scheduled_start ?? undefined,
           }));
 
           // Pre-fill planned meals from the anchor-enriched planned_meals list.
@@ -351,17 +352,8 @@ export class WeekPlanService {
     const start = this.planStartSignal();
     const end   = this.planEndSignal();
     if (!start || !end) return [];
-    // Parse as local-noon to avoid UTC-offset day rollback
-    const cur     = new Date(`${start}T12:00:00`);
-    const endDate = new Date(`${end}T12:00:00`);
     const days: string[] = [];
-    while (cur <= endDate) {
-      const y = cur.getFullYear();
-      const m = String(cur.getMonth() + 1).padStart(2, '0');
-      const d = String(cur.getDate()).padStart(2, '0');
-      days.push(`${y}-${m}-${d}`);
-      cur.setDate(cur.getDate() + 1);
-    }
+    for (let cur = start; cur <= end; cur = addDaysDateOnly(cur, 1)) days.push(cur);
     return days;
   });
 
@@ -437,7 +429,3 @@ export class WeekPlanService {
   }
 }
 
-/** Extracts "HH:MM" from an ISO timestamp string using UTC hours/minutes. */
-function utcHHMM(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 16);
-}

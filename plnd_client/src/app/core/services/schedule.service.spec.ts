@@ -99,7 +99,7 @@ describe('ScheduleService', () => {
       title: 'Morning run',
       status: 'completed',
       date: '2026-04-02',
-      scheduled_start: '2026-04-02T07:00:00Z',
+      scheduled_start: '07:00',
     }]);
 
     const items = svc.scheduleItems();
@@ -256,7 +256,7 @@ describe('ScheduleService', () => {
       httpMock,
       [{
         entry_id: 't1', task_type: 'exercise', title: 'Run',
-        status: 'planned', date: '2026-04-02', scheduled_start: '2026-04-02T07:00:00Z',
+        status: 'planned', date: '2026-04-02', scheduled_start: '07:00',
       }],
       [{
         id: 'm1', user_id: 'u1', date: '2026-04-02',
@@ -320,7 +320,7 @@ describe('ScheduleService', () => {
         { entry_id: 'dt1', task_type: 'medication', title: 'Vitamins',
           status: 'planned', date: '2026-04-02', scheduled_start: null, slot_meal_anchor_id: 'm1' },
         { entry_id: 'std', task_type: 'work', title: 'Standalone',
-          status: 'planned', date: '2026-04-02', scheduled_start: '2026-04-02T09:00:00Z' },
+          status: 'planned', date: '2026-04-02', scheduled_start: '09:00' },
       ],
       [anchorDto('m1', 'breakfast')],
     );
@@ -384,7 +384,7 @@ describe('ScheduleService', () => {
       title: 'Reply to dentist email',
       status: 'planned',
       date: '2026-04-02',
-      scheduled_start: '2026-04-02T10:00:00Z',
+      scheduled_start: '10:00',
     }]);
     const task = svc.scheduleItems()[0] as ScheduleTask;
     expect(task.status).toBe('pending');
@@ -571,6 +571,20 @@ describe('ScheduleService', () => {
     }]);
     const task = svc.scheduleItems().find(t => t.id === 'e2') as ScheduleTask;
     expect(task.oneShot).toBe(false);
+  });
+
+  it('passes an HH:MM scheduled_start through mapEntry unchanged as scheduledStart', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [{
+      entry_id: 'e-hhmm',
+      task_type: 'general',
+      title: 'Morning routine',
+      status: 'planned',
+      date: '2026-04-02',
+      scheduled_start: '09:00',
+    }]);
+    const task = svc.scheduleItems().find(i => i.id === 'e-hhmm') as ScheduleTask;
+    expect(task.scheduledStart).toBe('09:00');
   });
 
   it('maps a consumed anchor to status done', () => {

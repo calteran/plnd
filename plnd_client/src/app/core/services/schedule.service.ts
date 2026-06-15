@@ -6,6 +6,7 @@ import { ConfigService } from './config.service';
 import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor, parseItemType } from '../models/schedule';
 import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
+import { toDateOnly } from '../utils/date-only';
 
 export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
 
@@ -171,15 +172,9 @@ export class ScheduleService {
 
 // ── Utilities ────────────────────────────────────────────────────────────────
 
-export function toIsoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
+/** Local `YYYY-MM-DD` for a Date. Delegates to the canonical date-only helper. */
 export function localIsoDate(d: Date): string {
-  const y  = d.getFullYear();
-  const m  = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${dd}`;
+  return toDateOnly(d);
 }
 
 export function todayIso(): string {
@@ -259,7 +254,7 @@ function mapEntry(e: ScheduleEntryDto): ScheduleTask {
     type:    parseItemType(e.task_type),
     label:   e.title ?? e.task_type,
     status:  e.status === 'completed' ? 'done' : 'pending',
-    scheduledStart: e.scheduled_start ? hhmmUtc(e.scheduled_start) : undefined,
+    scheduledStart: e.scheduled_start ?? undefined,
     durationMinutes: e.duration_minutes ?? undefined,
     energy:  (e.energy_required as ScheduleTask['energy']) ?? undefined,
     oneShot: e.one_shot ?? false,
@@ -267,11 +262,6 @@ function mapEntry(e: ScheduleEntryDto): ScheduleTask {
   };
 }
 
-/** Extract a UTC "HH:MM" from an ISO timestamp (matches the API's wall-clock convention). */
-function hhmmUtc(iso: string): string {
-  const d = new Date(iso);
-  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`;
-}
 
 function toPatchBody(p: TaskEditPatch): Record<string, unknown> {
   const body: Record<string, unknown> = {};

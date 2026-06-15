@@ -405,7 +405,8 @@ pub struct TaskResponse {
     pub user_id: Uuid,
     pub title: String,
     pub task_type: String,
-    pub scheduled_start: Option<DateTime<Utc>>,
+    /// Wall-clock `HH:MM` (planned time-of-day); storage migration tracked in #936.
+    pub scheduled_start: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: String,
     pub status: String,
@@ -421,7 +422,7 @@ impl From<Task> for TaskResponse {
             user_id: t.user_id,
             title: t.title,
             task_type: t.task_type,
-            scheduled_start: t.scheduled_start,
+            scheduled_start: t.scheduled_start.map(|dt| dt.format("%H:%M").to_string()),
             duration_minutes: t.duration_minutes,
             energy_required: t.energy_required,
             status: t.status,
@@ -445,8 +446,9 @@ pub struct ScheduleEntryResponse {
     pub task_type: String,
     pub title: Option<String>,
     pub date: NaiveDate,
-    pub scheduled_start: Option<DateTime<Utc>>,
-    pub scheduled_end: Option<DateTime<Utc>>,
+    /// Wall-clock `HH:MM` (planned time-of-day); storage migration tracked in #936.
+    pub scheduled_start: Option<String>,
+    pub scheduled_end: Option<String>,
     pub status: String,
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
@@ -469,8 +471,8 @@ impl From<ScheduleEntry> for ScheduleEntryResponse {
             task_type: e.task_type,
             title: e.title,
             date: e.date,
-            scheduled_start: e.scheduled_start,
-            scheduled_end: e.scheduled_end,
+            scheduled_start: e.scheduled_start.map(|dt| dt.format("%H:%M").to_string()),
+            scheduled_end: e.scheduled_end.map(|dt| dt.format("%H:%M").to_string()),
             status: e.status,
             actual_start: e.actual_start,
             actual_end: e.actual_end,
@@ -876,6 +878,34 @@ mod tests {
 
         let resp = ScheduleEntryResponse::from(entry);
         assert!(resp.one_shot);
+    }
+
+    #[test]
+    fn schedule_entry_response_emits_wall_clock_hhmm() {
+        use chrono::{TimeZone, Utc};
+        let entry = ScheduleEntry {
+            entry_id: Uuid::nil(),
+            user_id: Uuid::nil(),
+            routine_id: None,
+            task_type: "general".into(),
+            title: None,
+            date: NaiveDate::from_ymd_opt(2026, 6, 15).unwrap(),
+            scheduled_start: Some(Utc.with_ymd_and_hms(2026, 6, 15, 9, 0, 0).unwrap()),
+            scheduled_end: None,
+            status: "planned".into(),
+            actual_start: None,
+            actual_end: None,
+            after_anchor: None,
+            slot_meal_anchor_id: None,
+            deviation_note: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        let resp = ScheduleEntryResponse::from(entry);
+        assert_eq!(resp.scheduled_start.as_deref(), Some("09:00"));
     }
 
     #[test]

@@ -1,18 +1,6 @@
 import { DayTypeResponse } from '../models/day-type';
 import { MealPatternEntry } from '../models/meal-pattern';
-
-// Returns the day-of-week bit (0=Sun…6=Sat) for a YYYY-MM-DD string.
-// Uses noon UTC to avoid DST edge cases when parsing the date.
-function dayOfWeekBit(date: string): number {
-  return 1 << new Date(date + 'T12:00:00Z').getUTCDay();
-}
-
-// Whole-day difference between two YYYY-MM-DD strings, parsed at noon UTC.
-function daysBetween(later: string, earlier: string): number {
-  const ms = new Date(later + 'T12:00:00Z').getTime()
-           - new Date(earlier + 'T12:00:00Z').getTime();
-  return Math.round(ms / (24 * 60 * 60 * 1000));
-}
+import { dayOfWeekBit, daysBetweenDateOnly } from './date-only';
 
 // True if a cycle-mode day type covers `date`. Mirrors the Rust resolver:
 // computes (date − anchor) mod cycle_length as a non-negative position and
@@ -20,7 +8,7 @@ function daysBetween(later: string, earlier: string): number {
 // missing length or anchor (should be unreachable post-validation).
 export function cycleMatchesDate(dt: DayTypeResponse, date: string): boolean {
   if (!dt.cycle_length || dt.cycle_length <= 0 || !dt.anchor_date) return false;
-  const offset = daysBetween(date, dt.anchor_date);
+  const offset = daysBetweenDateOnly(date, dt.anchor_date);
   // JS `%` returns the sign of the dividend, so normalize to [0, length).
   const position = ((offset % dt.cycle_length) + dt.cycle_length) % dt.cycle_length;
   return (dt.cycle_bitmask & (1 << position)) !== 0;

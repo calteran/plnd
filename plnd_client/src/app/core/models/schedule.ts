@@ -9,7 +9,7 @@ export interface ScheduleTask {
   label: string;
   status: ItemStatus;
   scheduledTime?: string;     // gutter display (unchanged; still unpopulated for tasks)
-  scheduledStart?: string;    // editable "HH:MM" (UTC wall-clock); undefined for floating tasks
+  scheduledStart?: string;    // editable "HH:MM" (wall-clock); undefined for floating tasks
   durationMinutes?: number;
   energy?: EnergyLevel;
   oneShot: boolean;
