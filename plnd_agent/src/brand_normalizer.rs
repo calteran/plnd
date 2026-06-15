@@ -7,9 +7,14 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde::Deserialize;
+
+use crate::provider::{
+    CompletionRequest, LlmProvider, Message, MessageContent, MessageRole, ToolDefinition,
+};
 
 /// Minimum LLM confidence required to replace a branded name with its generic
 /// form. Below this (or when no brand is detected) the original name is kept.
@@ -88,9 +93,185 @@ impl BrandNormalizer for FixtureBrandNormalizer {
     }
 }
 
+/// System prompt instructing the model to split a branded food name.
+const NORMALIZE_SYSTEM_PROMPT: &str = "You normalize branded grocery product names into a generic food name plus a brand. \
+Given a single product name, call the report_normalization tool exactly once. \
+The generic_name must be the plain food (e.g. \"Cheddar cheese\"), with no brand, size, or marketing words. \
+The brand is the manufacturer or store brand (e.g. \"Great Value\"); use null if the name has no brand. \
+confidence is your certainty (0.0-1.0) that the split is correct.";
+
+fn report_normalization_tool() -> ToolDefinition {
+    ToolDefinition {
+        name: "report_normalization".to_string(),
+        description: "Report the generic name, brand, and confidence for a product name."
+            .to_string(),
+        schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "generic_name": { "type": "string" },
+                "brand": { "type": ["string", "null"] },
+                "confidence": { "type": "number" }
+            },
+            "required": ["generic_name", "confidence"]
+        }),
+    }
+}
+
+/// Live normalizer backed by a `Fast`-tier LLM provider. One completion per call.
+pub struct LlmBrandNormalizer {
+    provider: Arc<dyn LlmProvider>,
+    max_tokens: u32,
+}
+
+impl LlmBrandNormalizer {
+    pub fn new(provider: Arc<dyn LlmProvider>) -> Self {
+        Self {
+            provider,
+            max_tokens: 256,
+        }
+    }
+}
+
+#[async_trait]
+impl BrandNormalizer for LlmBrandNormalizer {
+    async fn normalize(&self, branded_name: &str) -> Option<Normalization> {
+        let request = CompletionRequest {
+            system: NORMALIZE_SYSTEM_PROMPT.to_string(),
+            messages: vec![Message {
+                role: MessageRole::User,
+                content: MessageContent::Text(branded_name.to_string()),
+                tool_calls: vec![],
+            }],
+            tools: vec![report_normalization_tool()],
+            max_tokens: self.max_tokens,
+        };
+
+        let completion = match self.provider.complete(request).await {
+            Ok(c) => c,
+            Err(e) => {
+                tracing::warn!(error = %e, branded_name, "brand normalization LLM call failed");
+                return None;
+            }
+        };
+
+        let stop_reason = completion.response.stop_reason.clone();
+        let Some(call) = completion.response.tool_calls.into_iter().next() else {
+            tracing::warn!(
+                branded_name,
+                ?stop_reason,
+                "brand normalization: model returned no tool call"
+            );
+            return None;
+        };
+        if call.name != "report_normalization" {
+            tracing::warn!(
+                tool_name = %call.name,
+                branded_name,
+                "brand normalization: unexpected tool name"
+            );
+            return None;
+        }
+        match serde_json::from_value::<Normalization>(call.arguments) {
+            Ok(n) => Some(n),
+            Err(e) => {
+                tracing::warn!(error = %e, branded_name, "brand normalization parse failed");
+                None
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::provider::mock::MockLlmProvider;
+    use crate::provider::{CompletionResponse, LlmError, StopReason, ToolCall};
+
+    fn tool_call_response(args: serde_json::Value) -> CompletionResponse {
+        CompletionResponse {
+            content: None,
+            tool_calls: vec![ToolCall {
+                id: "call-1".into(),
+                name: "report_normalization".into(),
+                arguments: args,
+            }],
+            stop_reason: StopReason::ToolUse,
+            usage: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn llm_normalizer_parses_tool_call() {
+        let mock = MockLlmProvider::new("fast");
+        mock.push_response(tool_call_response(serde_json::json!({
+            "generic_name": "Cheddar cheese",
+            "brand": "Great Value",
+            "confidence": 0.9
+        })));
+        let norm = LlmBrandNormalizer::new(Arc::new(mock));
+        let result = norm.normalize("Great Value Shredded Cheddar Cheese").await;
+        assert_eq!(
+            result,
+            Some(Normalization {
+                generic_name: "Cheddar cheese".into(),
+                brand: Some("Great Value".into()),
+                confidence: 0.9,
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn llm_normalizer_returns_none_on_error() {
+        let mock = MockLlmProvider::new("fast");
+        mock.push_error(LlmError::Api {
+            status: 500,
+            message: "boom".into(),
+        });
+        let norm = LlmBrandNormalizer::new(Arc::new(mock));
+        assert!(norm.normalize("anything").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn llm_normalizer_returns_none_when_no_tool_call() {
+        let mock = MockLlmProvider::new("fast");
+        mock.push_response(CompletionResponse {
+            content: Some("I cannot".into()),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+        let norm = LlmBrandNormalizer::new(Arc::new(mock));
+        assert!(norm.normalize("anything").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn llm_normalizer_returns_none_on_parse_failure() {
+        let mock = MockLlmProvider::new("fast");
+        // Missing required generic_name/confidence → Normalization deserialization fails.
+        mock.push_response(tool_call_response(serde_json::json!({
+            "brand": "Great Value"
+        })));
+        let norm = LlmBrandNormalizer::new(Arc::new(mock));
+        assert!(norm.normalize("anything").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn llm_normalizer_returns_none_on_unexpected_tool_name() {
+        let mock = MockLlmProvider::new("fast");
+        mock.push_response(CompletionResponse {
+            content: None,
+            tool_calls: vec![ToolCall {
+                id: "c".into(),
+                name: "other_tool".into(),
+                arguments: serde_json::json!({"generic_name": "x", "confidence": 0.9}),
+            }],
+            stop_reason: StopReason::ToolUse,
+            usage: None,
+        });
+        let norm = LlmBrandNormalizer::new(Arc::new(mock));
+        assert!(norm.normalize("anything").await.is_none());
+    }
 
     #[test]
     fn gated_accepts_confident_branded_split() {
