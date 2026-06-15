@@ -88,7 +88,6 @@ pub struct ExternalIngredient {
     pub serving_size_g: Option<Decimal>,
     pub nutrition: Option<NutritionFacts>,
     pub allergens: Vec<String>,
-    pub occasion_tags: Vec<String>,
 }
 
 /// An ingredient line within an `ExternalDish`.

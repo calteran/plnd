@@ -124,7 +124,6 @@ fn product_to_ingredient(p: OffProduct) -> ExternalIngredient {
         serving_size_g: Some(Decimal::from(100u32)),
         nutrition,
         allergens,
-        occasion_tags: vec![],
     }
 }
 

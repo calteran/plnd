@@ -479,7 +479,6 @@ mod tests {
                 serving_size_g: None,
                 nutrition: None,
                 allergens: vec![],
-                occasion_tags: vec![],
             }))
         }
     }
@@ -791,7 +790,6 @@ mod tests {
                     ..Default::default()
                 }),
                 allergens: vec![],
-                occasion_tags: vec![],
             }))
         }
     }

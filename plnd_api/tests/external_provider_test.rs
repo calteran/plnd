@@ -139,7 +139,6 @@ fn test_external_ingredient_round_trip() {
             ..Default::default()
         }),
         allergens: vec!["gluten".to_string()],
-        occasion_tags: vec!["breakfast".to_string()],
     };
     let json = serde_json::to_string(&ingredient).expect("serialize");
     let back: ExternalIngredient = serde_json::from_str(&json).expect("deserialize");

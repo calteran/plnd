@@ -72,9 +72,11 @@ pub async fn insert_ingredients(
     for chunk in ingredients.chunks(1000) {
         let mut qb = sqlx::QueryBuilder::new(
             "INSERT INTO catalog_ingredients \
-             (ingredient_id, name, serving_size_g, nutrition, allergens, occasion_tags, \
+             (ingredient_id, name, serving_size_g, nutrition, allergens, \
               external_id, external_source) ",
         );
+        // occasion_tags is omitted: it defaults to '{}'. USDA ingredients carry no
+        // occasion data — a food category is a taxonomy, not an occasion (#921).
         qb.push_values(chunk, |mut b, (source, ing)| {
             let nutrition_json = ing
                 .nutrition
@@ -85,7 +87,6 @@ pub async fn insert_ingredients(
                 .push_bind(ing.serving_size_g)
                 .push_bind(nutrition_json)
                 .push_bind(&ing.allergens)
-                .push_bind(&ing.occasion_tags)
                 .push_bind(&ing.external_id)
                 .push_bind(source);
         });
@@ -122,7 +123,6 @@ mod tests {
             serving_size_g: Some(rust_decimal::Decimal::from(100u32)),
             nutrition: None,
             allergens: vec![],
-            occasion_tags: vec![],
         }];
         let f = write_temp_corpus(&recs);
         let loaded = load_corpus_ingredients(f.path()).unwrap();
@@ -143,7 +143,6 @@ mod tests {
                     ..Default::default()
                 }),
                 allergens: vec![],
-                occasion_tags: vec![],
             },
             ExternalIngredient {
                 external_id: "2".to_string(),
@@ -151,7 +150,6 @@ mod tests {
                 serving_size_g: None,
                 nutrition: None,
                 allergens: vec![],
-                occasion_tags: vec![],
             },
         ];
         let pairs: Vec<(String, ExternalIngredient)> = recs

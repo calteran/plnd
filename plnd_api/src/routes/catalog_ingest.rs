@@ -85,7 +85,10 @@ pub(crate) fn ingest_input_from_detail(
             .as_ref()
             .and_then(|n| serde_json::to_value(n).ok()),
         allergens: detail.allergens,
-        occasion_tags: detail.occasion_tags,
+        // Provider-promoted ingredients carry no occasion data: a food category
+        // is a taxonomy, not an occasion (#921). Occasion tags on an ingredient
+        // come only from explicit user input via the manual ingest/contribute APIs.
+        occasion_tags: vec![],
     }
 }
 
@@ -221,7 +224,6 @@ mod tests {
             serving_size_g: None,
             nutrition: None,
             allergens: vec!["none".into()],
-            occasion_tags: vec![],
         };
         let input = ingest_input_from_detail("usda_fdc", detail);
         assert_eq!(input.external_source, "usda_fdc");
@@ -243,7 +245,6 @@ mod tests {
                 ..Default::default()
             }),
             allergens: vec![],
-            occasion_tags: vec![],
         };
         let input = ingest_input_from_detail("usda_fdc", detail);
         let nutrition = input.nutrition.expect("nutrition serialized to Some");
