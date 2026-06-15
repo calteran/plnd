@@ -59,6 +59,7 @@ export class MainLayoutComponent implements OnInit {
               this.standoff.set(r.confirm);
             }
           },
+          // eslint-disable-next-line @typescript-eslint/no-empty-function
           error: () => {},
         });
     }

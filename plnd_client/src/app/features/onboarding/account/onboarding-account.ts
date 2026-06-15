@@ -331,6 +331,7 @@ export class OnboardingAccountComponent implements OnInit {
           this.deviceZoneSeeded = true;
           this.tz.reportDeviceZone(this.tz.deviceZone())
             .pipe(takeUntilDestroyed(this.destroyRef))
+            // eslint-disable-next-line @typescript-eslint/no-empty-function
             .subscribe({ next: () => {}, error: () => {} }); // fire-and-forget; never block onboarding
         }
       },

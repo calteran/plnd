@@ -3,7 +3,6 @@ import { By } from '@angular/platform-browser';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { signal } from '@angular/core';
 import { OAuthModule } from 'angular-oauth2-oidc';
 import { MainLayoutComponent } from './main-layout';
 import { AuthService } from '../../core/services/auth.service';
@@ -73,15 +72,18 @@ const mockConfig: EnvironmentConfig = {
 const authStub = { isAuthenticated: () => true };
 
 /** Minimal PreferencesService stub — loadPreferences is a no-op; preferences() returns null (skip effect). */
+// eslint-disable-next-line @typescript-eslint/no-empty-function
 const prefsStub = { loadPreferences: () => {}, preferences: () => null };
 
 /** Minimal WeekPlanService stub. */
 const weekPlanStub = {
   hasUnplannedHorizon: () => false,
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   checkPlanStatus: () => {},
 };
 
 /** Minimal UserService stub — loadUser is a no-op so no /users/me request fires. */
+// eslint-disable-next-line @typescript-eslint/no-empty-function
 const userStub = { user: () => null, loadUser: () => {} };
 
 describe('MainLayoutComponent — device-zone / standoff', () => {

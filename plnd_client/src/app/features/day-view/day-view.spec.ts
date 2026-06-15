@@ -1,11 +1,13 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { DayViewComponent } from './day-view';
 import { ScheduleService } from '../../core/services/schedule.service';
 import { BriefingService } from '../../core/services/briefing.service';
+import { TimezoneService } from '../../core/services/timezone.service';
 import { ScheduleItem } from '../../core/models/schedule';
+import { TimezoneAnchorDto } from '../../core/models/timezone';
 import { signal } from '@angular/core';
 
 function makeScheduleServiceMock(overrides: Partial<{
@@ -48,6 +50,41 @@ function makeBriefingServiceMock() {
   };
 }
 
+/** Build a minimal timezone service mock. Defaults to no anchors and a fixed device zone. */
+function makeTimezoneServiceMock(overrides: {
+  anchors?: TimezoneAnchorDto[];
+  deviceZone?: string;
+} = {}) {
+  const anchors = overrides.anchors ?? [];
+  const zone    = overrides.deviceZone ?? 'America/New_York';
+  return {
+    listAnchors: jasmine.createSpy('listAnchors').and.returnValue(of(anchors)),
+    deviceZone:  jasmine.createSpy('deviceZone').and.returnValue(zone),
+    createAnchor:  jasmine.createSpy('createAnchor').and.returnValue(of({})),
+    deleteAnchor:  jasmine.createSpy('deleteAnchor').and.returnValue(of(undefined)),
+    deleteGroup:   jasmine.createSpy('deleteGroup').and.returnValue(of({ deleted: 1 })),
+    reportDeviceZone: jasmine.createSpy('reportDeviceZone').and.returnValue(of({})),
+    resolve:          jasmine.createSpy('resolve').and.returnValue(of({ zone: null })),
+    dismissStandoff:  jasmine.createSpy('dismissStandoff').and.returnValue(of(undefined)),
+  };
+}
+
+function makeAnchor(overrides: Partial<TimezoneAnchorDto> = {}): TimezoneAnchorDto {
+  return {
+    id: 'anchor-1',
+    user_id: 'user-1',
+    effective_date: '2026-03-20',
+    effective_time: null,
+    zone: 'America/Denver',
+    source: 'user',
+    source_ref: null,
+    inference_group: null,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...overrides,
+  };
+}
+
 const TEST_DATE = '2026-03-20';
 const mockActivatedRoute = { params: of({ date: TEST_DATE }) };
 
@@ -59,6 +96,7 @@ describe('DayViewComponent (schedule view)', () => {
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
@@ -75,6 +113,7 @@ describe('DayViewComponent (schedule view)', () => {
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
@@ -91,6 +130,7 @@ describe('DayViewComponent (schedule view)', () => {
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
@@ -111,6 +151,7 @@ describe('DayViewComponent (schedule view)', () => {
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
@@ -128,6 +169,7 @@ describe('DayViewComponent (schedule view)', () => {
       providers: [
         { provide: ScheduleService, useValue: svc },
         { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute, useValue: mockActivatedRoute }
       ]
@@ -150,6 +192,7 @@ describe('DayViewComponent (isToday wiring)', () => {
       providers: [
         { provide: ScheduleService,  useValue: svc },
         { provide: BriefingService,  useValue: briefing },
+        { provide: TimezoneService,  useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute,   useValue: { params: of({ date }) } },
       ],
@@ -189,6 +232,7 @@ describe('DayViewComponent (onItemAdded)', () => {
       providers: [
         { provide: ScheduleService,  useValue: svc },
         { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService,  useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute,   useValue: mockActivatedRoute },
       ],
@@ -213,6 +257,7 @@ describe('DayViewComponent (inline editor)', () => {
       providers: [
         { provide: ScheduleService,  useValue: svc },
         { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService,  useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute,   useValue: mockActivatedRoute },
       ],
@@ -273,6 +318,7 @@ describe('DayViewComponent (toast)', () => {
       providers: [
         { provide: ScheduleService,  useValue: svc },
         { provide: BriefingService,  useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService,  useValue: makeTimezoneServiceMock() },
         provideRouter([]),
         { provide: ActivatedRoute,   useValue: mockActivatedRoute },
       ],
@@ -333,4 +379,142 @@ describe('DayViewComponent (toast)', () => {
     // Timer should also be cleared — no pending macrotask
     tick(5000);
   }));
+});
+
+// ── Timezone surfacing tests ──────────────────────────────────────────────────
+
+describe('DayViewComponent (timezone: divergent day)', () => {
+  const TRAVEL_DATE = '2026-01-15';
+
+  it('calls tz.listAnchors for the loaded date', async () => {
+    const tzSvc = makeTimezoneServiceMock();
+    const svc   = makeScheduleServiceMock({ date: TRAVEL_DATE });
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: tzSvc },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: TRAVEL_DATE }) } },
+      ],
+    }).compileComponents();
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+    expect(tzSvc.listAnchors).toHaveBeenCalledWith(TRAVEL_DATE);
+  });
+
+  it('sets zoneView to "divergent" when anchor zone differs from device zone', async () => {
+    // Anchor zone: America/Denver. Device zone: America/New_York (different).
+    // effective_date before the loaded date → governs the whole day as incoming zone.
+    const anchors: TimezoneAnchorDto[] = [
+      makeAnchor({ effective_date: '2026-01-01', zone: 'America/Denver', effective_time: null }),
+    ];
+    const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
+    const svc   = makeScheduleServiceMock({ date: TRAVEL_DATE });
+
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: tzSvc },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: TRAVEL_DATE }) } },
+      ],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+
+    // zoneView signal should reflect divergent kind.
+    expect(f.componentInstance.zoneView()?.kind).toBe('divergent');
+    // Day header should receive the zoneView — the chip text should appear.
+    const banner = f.debugElement.query(By.css('.tz-banner'));
+    expect(banner).toBeTruthy();
+  });
+
+  it('does not break when timezone API errors', async () => {
+    const tzSvc = makeTimezoneServiceMock();
+    (tzSvc.listAnchors as jasmine.Spy).and.returnValue(throwError(() => new Error('network')));
+    const svc = makeScheduleServiceMock();
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: tzSvc },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: mockActivatedRoute },
+      ],
+    }).compileComponents();
+    const f = TestBed.createComponent(DayViewComponent);
+    // Should not throw; zoneView stays null.
+    expect(() => f.detectChanges()).not.toThrow();
+    expect(f.componentInstance.zoneView()).toBeNull();
+  });
+});
+
+describe('DayViewComponent (timezone: travel day)', () => {
+  const TRAVEL_DATE = '2026-06-20';
+
+  it('renders app-timezone-switch-row when zoneView kind is "travel"', async () => {
+    // Intra-day anchor on the travel date → classifyDay returns travel.
+    const items: ScheduleItem[] = [
+      { id: 't1', type: 'general', label: 'Flight', status: 'pending', oneShot: false, floating: false },
+    ];
+    const anchors: TimezoneAnchorDto[] = [
+      makeAnchor({
+        id: 'anchor-travel',
+        effective_date: TRAVEL_DATE,
+        effective_time: '14:00:00',  // intra-day → travel kind
+        zone: 'Pacific/Honolulu',
+      }),
+    ];
+    // Device zone differs from anchor zone; incoming zone = null (no prior anchor).
+    const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
+    const svc   = makeScheduleServiceMock({ scheduleItems: items, date: TRAVEL_DATE });
+
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: tzSvc },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: TRAVEL_DATE }) } },
+      ],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+
+    expect(f.componentInstance.zoneView()?.kind).toBe('travel');
+    expect(f.debugElement.query(By.css('app-timezone-switch-row'))).toBeTruthy();
+  });
+
+  it('does not render app-timezone-switch-row when no anchors (same kind)', async () => {
+    const items: ScheduleItem[] = [
+      { id: 't1', type: 'general', label: 'Walk', status: 'pending', oneShot: false, floating: false },
+    ];
+    const tzSvc = makeTimezoneServiceMock({ anchors: [], deviceZone: 'America/New_York' });
+    const svc   = makeScheduleServiceMock({ scheduleItems: items, date: TRAVEL_DATE });
+
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: tzSvc },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: TRAVEL_DATE }) } },
+      ],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+
+    expect(f.componentInstance.zoneView()?.kind).toBe('same');
+    expect(f.debugElement.query(By.css('app-timezone-switch-row'))).toBeNull();
+  });
 });
