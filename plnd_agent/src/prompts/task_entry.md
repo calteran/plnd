@@ -164,3 +164,7 @@ The terminal tools (`create_task` and `request_clarification`) produce the final
 ```
 
 Your only responsibility is to supply the correct tool arguments (especially `confirmation` for `create_task` and `ui_signals` for `request_clarification`). The tool handles `actions_taken` automatically using the database-returned `task_id`.
+
+## Timezone inference
+
+When the task **explicitly** describes timezone-changing travel — a flight, a hotel/lodging booking, or a clearly stated destination with a travel date — call `infer_timezone_change` **before** `create_task`, passing `destination_zone` (IANA name, e.g. `"America/Denver"`) and `effective_date` (arrival date). For a known round trip, include `return_zone` and `return_date` in the same call so both anchors are recorded together. If the task merely mentions a city, describes a remote call, or expresses aspirational travel without a date, do not call `infer_timezone_change`.

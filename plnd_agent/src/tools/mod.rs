@@ -12,6 +12,9 @@ pub(crate) mod schedule;
 pub(crate) use schedule::register_place_tasks_tools;
 pub(crate) use schedule::register_schedule_tools;
 
+pub(crate) mod timezone;
+pub(crate) use timezone::register_timezone_inference_tools;
+
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -174,6 +177,7 @@ pub(crate) fn build_tool_registry(
                 Arc::clone(&repos.schedule),
                 Arc::clone(&repos.meal_anchor_instance),
             );
+            register_timezone_inference_tools(&mut registry, Arc::clone(&repos.timezone_anchor));
         }
         UseCase::MealRebalance => {
             register_meal_read_tools(
