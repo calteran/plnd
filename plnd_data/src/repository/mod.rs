@@ -106,9 +106,9 @@ impl Repositories {
             routine: Arc::new(pg::routine::PgRoutineRepository::new(pool.clone())),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),
             task: Arc::new(pg::task::PgTaskRepository::new(pool.clone())),
-            timezone_anchor: Arc::new(
-                pg::timezone_anchor::PgTimezoneAnchorRepository::new(pool.clone()),
-            ),
+            timezone_anchor: Arc::new(pg::timezone_anchor::PgTimezoneAnchorRepository::new(
+                pool.clone(),
+            )),
             user: Arc::new(pg::user::PgUserRepository::new(pool.clone())),
             user_dish_pref: Arc::new(pg::user_dish_pref::PgUserDishPrefRepository::new(
                 pool.clone(),

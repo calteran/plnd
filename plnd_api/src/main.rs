@@ -398,10 +398,7 @@ async fn main() {
             "/timezone/anchors",
             get(timezone::list_anchors).post(timezone::create_anchor),
         )
-        .route(
-            "/timezone/anchors/{id}",
-            delete(timezone::delete_anchor),
-        )
+        .route("/timezone/anchors/{id}", delete(timezone::delete_anchor))
         .route(
             "/timezone/anchors/group/{inference_group}",
             delete(timezone::delete_anchor_group),

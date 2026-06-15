@@ -33,6 +33,10 @@ CREATE TABLE timezone_change_anchors (
     source_ref        UUID,
     inference_group   UUID,
     created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    -- Anchors are immutable: the repository layer only inserts and deletes
+    -- (a superseding zone is a new anchor, not an update). `updated_at` is set
+    -- at insert and has no update trigger by design. If an UPDATE path is ever
+    -- added, introduce a moddatetime trigger to keep this column accurate.
     updated_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 

@@ -25,8 +25,8 @@ fn map_row(row: sqlx::postgres::PgRow) -> Result<TimezoneAnchor, DatabaseError> 
     let source_str: String = row
         .try_get("source")
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
-    let source = TimezoneSource::try_from(source_str.as_str())
-        .map_err(DatabaseError::QueryError)?;
+    let source =
+        TimezoneSource::try_from(source_str.as_str()).map_err(DatabaseError::QueryError)?;
 
     Ok(TimezoneAnchor {
         id: row
@@ -85,10 +85,7 @@ pub async fn list_through(
 }
 
 /// Insert a new anchor and return it.
-#[tracing::instrument(
-    skip(pool),
-    fields(table = "timezone_change_anchors", op = "add")
-)]
+#[tracing::instrument(skip(pool), fields(table = "timezone_change_anchors", op = "add"))]
 #[allow(clippy::too_many_arguments)]
 pub async fn add(
     pool: &PgPool,
@@ -124,20 +121,15 @@ pub async fn add(
 ///
 /// Returns `true` if a row was deleted, `false` if it did not exist or belongs
 /// to a different user.
-#[tracing::instrument(
-    skip(pool),
-    fields(table = "timezone_change_anchors", op = "delete")
-)]
+#[tracing::instrument(skip(pool), fields(table = "timezone_change_anchors", op = "delete"))]
 pub async fn delete(pool: &PgPool, id: Uuid, user_id: Uuid) -> Result<bool, DatabaseError> {
-    sqlx::query(
-        "DELETE FROM timezone_change_anchors WHERE id = $1 AND user_id = $2",
-    )
-    .bind(id)
-    .bind(user_id)
-    .execute(pool)
-    .await
-    .map(|r| r.rows_affected() > 0)
-    .map_err(DatabaseError::from)
+    sqlx::query("DELETE FROM timezone_change_anchors WHERE id = $1 AND user_id = $2")
+        .bind(id)
+        .bind(user_id)
+        .execute(pool)
+        .await
+        .map(|r| r.rows_affected() > 0)
+        .map_err(DatabaseError::from)
 }
 
 /// Delete all anchors belonging to `inference_group`, scoped to `user_id`.

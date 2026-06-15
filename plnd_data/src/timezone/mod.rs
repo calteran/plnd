@@ -31,8 +31,13 @@ use crate::models::TimezoneAnchor;
 ///   start-of-day query (its key is strictly greater).
 ///
 /// Among all at-or-before anchors, the zone of the one with the **greatest**
-/// `(effective_date, effective_time)` key is returned. Returns `None` if no
-/// anchor is at or before the query point.
+/// `(effective_date, effective_time, created_at)` key is returned. Returns
+/// `None` if no anchor is at or before the query point.
+///
+/// When two anchors share the same `(effective_date, effective_time)` position,
+/// the one recorded most recently (greatest `created_at`) wins — matching the
+/// model's "a later signal supersedes an earlier one" rule and keeping
+/// resolution deterministic rather than dependent on row/iteration order.
 ///
 /// This function does **not** assume `anchors` is sorted — the maximum is
 /// computed defensively. The repository returns anchors sorted ascending, but
@@ -42,7 +47,7 @@ pub fn zone_at(anchors: &[TimezoneAnchor], date: NaiveDate, time: Option<NaiveTi
     anchors
         .iter()
         .filter(|a| (a.effective_date, a.effective_time) <= query_key)
-        .max_by_key(|a| (a.effective_date, a.effective_time))
+        .max_by_key(|a| (a.effective_date, a.effective_time, a.created_at))
         .map(|a| a.zone)
 }
 
@@ -148,6 +153,26 @@ mod tests {
         ];
         assert_eq!(zone_at(&anchors, d(2026, 6, 5), None), Some(New_York));
         assert_eq!(zone_at(&anchors, d(2026, 6, 15), None), Some(Denver));
+    }
+
+    #[test]
+    fn zone_at_same_position_tie_broken_by_created_at() {
+        // Two anchors at the identical (date, time) position with different
+        // zones. The one recorded later (greater created_at) must win,
+        // regardless of slice order, so resolution is deterministic.
+        let earlier = Utc.with_ymd_and_hms(2026, 6, 1, 8, 0, 0).unwrap();
+        let later = Utc.with_ymd_and_hms(2026, 6, 1, 9, 0, 0).unwrap();
+
+        let mut a_old = anchor(d(2026, 6, 1), None, New_York);
+        a_old.created_at = earlier;
+        let mut a_new = anchor(d(2026, 6, 1), None, Denver);
+        a_new.created_at = later;
+
+        // Newer wins whether it appears first or last in the slice.
+        let order1 = [a_old.clone(), a_new.clone()];
+        let order2 = [a_new, a_old];
+        assert_eq!(zone_at(&order1, d(2026, 6, 2), None), Some(Denver));
+        assert_eq!(zone_at(&order2, d(2026, 6, 2), None), Some(Denver));
     }
 
     #[test]

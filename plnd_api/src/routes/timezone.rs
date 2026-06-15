@@ -227,7 +227,12 @@ pub async fn create_anchor(
             body.inference_group,
         )
         .await
-        .map(|anchor| (StatusCode::CREATED, Json(TimezoneAnchorResponse::from(anchor))))
+        .map(|anchor| {
+            (
+                StatusCode::CREATED,
+                Json(TimezoneAnchorResponse::from(anchor)),
+            )
+        })
         .map_err(|e| {
             tracing::error!(error = %e, "create_anchor error");
             map_repo_error(e)
@@ -316,6 +321,7 @@ pub async fn delete_anchor_group(
 
 fn map_repo_error(e: Error) -> StatusCode {
     match e {
+        Error::Conflict => StatusCode::CONFLICT,
         Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
         e => {
             tracing::error!(error = %e, "timezone repo error");
@@ -376,7 +382,10 @@ mod tests {
             }}"#
         );
         let req: CreateTimezoneAnchorRequest = serde_json::from_str(&json).unwrap();
-        assert_eq!(req.effective_time, Some(NaiveTime::from_hms_opt(14, 30, 0).unwrap()));
+        assert_eq!(
+            req.effective_time,
+            Some(NaiveTime::from_hms_opt(14, 30, 0).unwrap())
+        );
         assert_eq!(req.source_ref, Some(src_ref));
         assert_eq!(req.inference_group, Some(group));
     }

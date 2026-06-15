@@ -38,9 +38,6 @@ pub trait TimezoneAnchorRepository: Send + Sync {
     /// Delete all anchors in `inference_group`, scoped to `user_id`.
     ///
     /// Returns the number of rows deleted.
-    async fn delete_group(
-        &self,
-        user_id: Uuid,
-        inference_group: Uuid,
-    ) -> Result<u64, crate::Error>;
+    async fn delete_group(&self, user_id: Uuid, inference_group: Uuid)
+    -> Result<u64, crate::Error>;
 }
