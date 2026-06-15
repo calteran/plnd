@@ -18,7 +18,7 @@ pub async fn search_ingredients(
     sqlx::query_as::<_, LocalIngredientResult>(
         r#"
         SELECT ingredient_id, name, description,
-               allergens, occasion_tags, external_source
+               allergens, occasion_tags, external_source, brand
         FROM catalog_ingredients
         WHERE to_tsvector('english', name || ' ' || COALESCE(brand, '') || ' ' || COALESCE(description, ''))
               @@ plainto_tsquery('english', $1)
@@ -284,6 +284,25 @@ mod tests {
             results.is_empty(),
             "should exclude rows with null nutrition"
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn search_ingredients_matches_brand_token_and_returns_brand(pool: PgPool) {
+        sqlx::query(
+            "INSERT INTO catalog_ingredients (name, brand, external_source, external_id, allergens, occasion_tags) \
+             VALUES ('Cheddar cheese', 'Great Value', 'openfoodfacts', 'off-1', '{}', '{}')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Brand token alone must match via the brand-aware FTS index/query.
+        let by_brand = search_ingredients(&pool, "Great Value", 10, &[], None)
+            .await
+            .unwrap();
+        assert_eq!(by_brand.len(), 1, "brand token should match");
+        assert_eq!(by_brand[0].name, "Cheddar cheese");
+        assert_eq!(by_brand[0].brand.as_deref(), Some("Great Value"));
     }
 
     #[sqlx::test(migrations = "./migrations")]
