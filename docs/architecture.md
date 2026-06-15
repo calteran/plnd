@@ -261,9 +261,9 @@ Both are first-class, not edge cases.
 
 Consequences for the rest of the model:
 
-- The implicit start-of-day anchor and end-of-day anchor (§4.7) may resolve to clock times on different calendar dates. The slot model (§4.8) is unaffected because slots depend on anchor *order*, not the calendar date of the anchor.
+- The implicit start-of-day anchor and end-of-day anchor (§4.7) may resolve to clock times on different calendar dates. The slot model (§4.9) is unaffected because slots depend on anchor *order*, not the calendar date of the anchor.
 - A meal's `preferred_time` (§4.6) is a wall-clock value evaluated within the day's wake-to-sleep envelope. For a midnight-crossing day, a meal preferred at 02:00 may resolve to 02:00 of the calendar date *after* the user's wake date.
-- Day-view UI labeling — which calendar date (or both dates) represents "this user's day" — is a presentation concern the data model does not constrain. The day-view design owns it.
+- Day-view UI labeling — which calendar date (or both dates) represents "this user's day" — is a presentation concern the data model does not constrain. The day-view design owns it. All wall-clock values within the daily rhythm are interpreted against the user's effective timezone, which is resolved by the time-and-timezone resolution model described in §4.8; local-time coherence is not left as an unspecified concern of the display layer.
 
 #### Day-type → date mapping
 
@@ -290,7 +290,7 @@ Every task always carries:
 
 - **Duration** — how long it will take. Typically inferred by the LLM from the task description and historical patterns; the user can override.
 - **Energy level** (`low | medium | high`) — the cognitive/physical demand. Typically inferred by the LLM.
-- **`one_shot` flag** — whether the task is meaningful only within its scheduled window (e.g., daily teeth brushing — missed yesterday is not relevant today) or remains relevant if missed (e.g., "call the dentist"). Inferred by the LLM at task creation; the user can override. Drives carryover behavior (§4.10): one-shot tasks left incomplete at window close are silently dropped; the rest surface in the next carryover review.
+- **`one_shot` flag** — whether the task is meaningful only within its scheduled window (e.g., daily teeth brushing — missed yesterday is not relevant today) or remains relevant if missed (e.g., "call the dentist"). Inferred by the LLM at task creation; the user can override. Drives carryover behavior (§4.11): one-shot tasks left incomplete at window close are silently dropped; the rest surface in the next carryover review.
 
 A task may also carry:
 
@@ -298,9 +298,9 @@ A task may also carry:
 - **A pairing with a meal** — making it a **paired task** that runs concurrently with the meal (e.g., reading a report at lunch, listening to a podcast over breakfast). One or more tasks may be paired with the same meal. Pairing is allowed only with meals; scheduled tasks cannot host paired tasks. See also §4.6.
 - **A categorical type** — `work | exercise | leisure | medication | appointment | general` — used for filtering, badging, and tone (the agent picks differently when proposing leisure vs. work tasks). The category is orthogonal to whether the task is scheduled or paired.
 
-Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.10). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
+Energy is a first-class field, not a tag, because it drives scheduling decisions the system actively makes (see §4.11). Stacking two `high` tasks back-to-back is something the LLM should avoid; placing a `high` task in a user's known low-energy window is something the LLM should question.
 
-**All task metadata is user-editable.** Title, duration, energy level, `one_shot` flag, type, start time, meal pairing, and date can be adjusted at any time — in either planning surface (the onboarding wizard or the recurring planning wizard, see §4.9) and on the day itself (in the day view). Every edit is captured by the memory system (§3.5), so the agent's future inferences improve from observed user preferences.
+**All task metadata is user-editable.** Title, duration, energy level, `one_shot` flag, type, start time, meal pairing, and date can be adjusted at any time — in either planning surface (the onboarding wizard or the recurring planning wizard, see §4.10) and on the day itself (in the day view). Every edit is captured by the memory system (§3.5), so the agent's future inferences improve from observed user preferences.
 
 ### 4.5 Routines
 
@@ -333,7 +333,7 @@ A user has, **for each day type**, an ordered list of named meals. The default d
 
 Meals carry two independent axes that together determine how the system surfaces meal content. Both are evaluated against **the active day type for the date**:
 
-- **Anchor presence** (data axis). Whether the date's **materialized meal anchor instances** contain any entries. Each date materializes its instances from the active day type's meal template on first need (planning agent or user edit); thereafter, the date's instances are independent of the template. When the date has at least one instance, those instances are **meal anchors** in the day's sequence (§4.7) and define **slot boundaries** (§4.8). When the date has zero instances — because the template was empty *or* the user removed every anchor for that date — the date has no meal anchors at all; the slot model still works on the remaining anchor sources (start-of-day, end-of-day, and any scheduled tasks). Anchor presence is a property of the date, not of the day type alone — two dates that resolve to the same day type may have different anchor presence if the user has edited one of them.
+- **Anchor presence** (data axis). Whether the date's **materialized meal anchor instances** contain any entries. Each date materializes its instances from the active day type's meal template on first need (planning agent or user edit); thereafter, the date's instances are independent of the template. When the date has at least one instance, those instances are **meal anchors** in the day's sequence (§4.7) and define **slot boundaries** (§4.9). When the date has zero instances — because the template was empty *or* the user removed every anchor for that date — the date has no meal anchors at all; the slot model still works on the remaining anchor sources (start-of-day, end-of-day, and any scheduled tasks). Anchor presence is a property of the date, not of the day type alone — two dates that resolve to the same day type may have different anchor presence if the user has edited one of them.
 
 - **Advance planning** (preference axis). Whether the user wants the system to propose specific dishes or meals ahead of time. Controlled by `user_preferences.advance_meal_planning_enabled` (default `true`); the flag is global, not per-day-type. **Meal planning runs only when both axes permit it for the date: the date has at least one meal anchor instance AND the flag is `true`.** When the flag is `false` (with anchors present): the planning wizard's meals step is skipped entirely; meal-planning agent use cases (`MealPlanning`, `MealRebalance`, `MealSuggestSlot`) are not invoked; the food-preferences onboarding spoke is hidden; meal anchors in the day view render without planned-dish payload (the band shows the meal name, not an assigned meal). When anchors are absent for a date, meal planning does not run for that date regardless of the flag — there is nothing to plan against. The dietary-restrictions onboarding spoke is unaffected by either axis — restrictions remain useful as health data and for any future meal-logging feature.
 
@@ -385,15 +385,28 @@ The four operations act on the **anchor** layer. Whether the resulting anchors a
 
 ### 4.7 Anchors
 
-An **anchor** is a milestone in the day's sequence around which other tasks position themselves. Anchors come from three sources:
+An **anchor** is a milestone in the day's sequence around which other tasks position themselves. Anchors come from four sources:
 
 - **Every meal anchor instance** materialized for the date (§4.6) is an anchor.
 - **Every scheduled task** (a task with a fixed start time) is an anchor.
 - **Start-of-day and end-of-day** are implicit anchors. They bound the day's first and last slots, and their clock times come from the day's day type (§4.3) — the type's wake time becomes the start-of-day anchor; its sleep time becomes the end-of-day anchor (which may fall on the following calendar date for midnight-crossing day types).
+- **Timezone-change anchors** are milestones that mark the point in the day's ordered sequence at which the user's effective timezone changes — for example, when travel takes effect. Like other anchors, a timezone-change anchor participates in the day's ordering. It establishes the timezone in effect for itself and for every anchor that follows it in sequence. See §4.8.
 
 Anchors define the *order* of the day. Their times may be fixed (a 9am standup, a 6pm dose) or partly elastic (lunch happens between breakfast and dinner without a precise minute). The slot model below depends on anchor *order*, not anchor *time*.
 
-### 4.8 Slots
+### 4.8 Time and timezone resolution
+
+Planned times in PLND are stored as **wall-clock values** — a time such as "08:00" or "19:30" without an embedded offset. The timezone that applies to a wall-clock value is resolved separately, as the *effective zone* at that position in the day's sequence. Absolute instants (moments on the global timeline) are computed only when genuinely required — for example, to send a notification at the right moment or to determine whether an anchor falls before or after the present.
+
+**No single canonical home zone.** A user is not assigned a home timezone that applies uniformly. People split time between locations, and a single stored zone would be wrong for any day on which the user travels. Instead, the effective zone at any point in a day's ordered sequence is determined by the most recent timezone-change anchor at or before that point. The timezone-change anchor (§4.7) carries the zone into effect from that position forward; every anchor that follows it in sequence, until the next timezone-change anchor, is interpreted against that zone.
+
+**Signals and precedence.** Timezone changes arise from several signals: the user's device, which reflects the present moment directly and is treated as ground truth for the current time; explicit user action, when the user states a future timezone change (for example, travel plans); and system inference, when the planning agent detects a change from schedule context. All three signals are expressed uniformly as timezone-change anchors in the day's sequence. When multiple signals apply to the same position, a later, higher-trust signal supersedes an earlier one simply by placing a more recent anchor — no special override mechanism is required.
+
+**Resolution is positional.** The day's sequence is ordered independently of clock values (§4.7 — anchor order, not anchor time, is the structural primitive). Resolving the effective zone for any item is therefore a matter of its position relative to timezone-change anchors in that sequence. This avoids the ambiguity that arises when an offset shift causes wall-clock comparisons to be unreliable — a problem inherent in any model that tries to impose a single timezone on a day that spans a boundary.
+
+**Daylight-saving and boundary instants.** When a wall-clock value must be converted to an absolute instant, two edge cases arise from offset transitions. Ambiguous local times — those that occur twice during a fall-back overlap — resolve to the earlier offset (the pre-transition side). Non-existent local times — those that are skipped during a spring-forward gap — advance to the first valid instant after the gap. Both rules apply deterministically without user intervention.
+
+### 4.9 Slots
 
 A **slot** is the space between two adjacent anchors. Because start-of-day and end-of-day are implicit anchors, every day has at least one slot — the whole day, if there are no other anchors.
 
@@ -403,7 +416,7 @@ Slot boundaries are **positional** — defined by anchor order, not by exact tim
 
 The upper boundary of a slot is **derived, not stored**. Given a slot's lower anchor, the upper boundary is the next anchor in the day's sequence — determined by the date's meal anchor instances' `sort_order` for meal anchors, or by `scheduled_start` for task anchors in a committed schedule. The implicit start-of-day and end-of-day anchors (§4.7) bound the sequence on both ends, so every slot has a well-defined upper boundary. There is no `slot_end_anchor_id` column; persisting one would be redundant because the value is fully determined by the existing anchor ordering.
 
-### 4.9 Planning windows
+### 4.10 Planning windows
 
 A **planning window** is the temporal span the user plans at one time. The default window is one week (7 days); shorter or longer windows are user-configurable.
 
@@ -420,7 +433,7 @@ The two surfaces share **capability parity**: every action and concept supported
 
 The surfaces have **different navigation shapes**, deliberately:
 
-- **The planning wizard is linear.** Planning is a small set of spokes that all must complete — carryover review (§4.10), tasks, meals, and exercise. With this many spokes and a hard completion requirement, sequencing them is a feature, not a constraint: the user is guided through what's needed without having to decide where to start. Per-step sub-navigation (e.g., per-day card grids within a single step) is an allowed internal pattern and does not violate the linear shape; the linear contract governs how steps sequence, not how content within a step is displayed.
+- **The planning wizard is linear.** Planning is a small set of spokes that all must complete — carryover review (§4.11), tasks, meals, and exercise. With this many spokes and a hard completion requirement, sequencing them is a feature, not a constraint: the user is guided through what's needed without having to decide where to start. Per-step sub-navigation (e.g., per-day card grids within a single step) is an allowed internal pattern and does not violate the linear shape; the linear contract governs how steps sequence, not how content within a step is displayed.
 - **The onboarding wizard is hub-and-spoke.** Setup concerns (account, dietary restrictions, food preferences, daily rhythm, accessibility settings) and the planning portion of onboarding are each delivered as spokes from a common hub. Capability parity with the planning wizard (above) remains firm; navigation parity is not required. Within onboarding's spokes, the same scheduling-model distinctions apply as elsewhere — meals are a separate domain from tasks (§4.6); scheduled tasks act as anchors (§4.7) and may be templated as routines (§4.5) — and are not redefined by the wizard.
 
 **Scope-empty steps skip themselves.** The "all spokes must complete" framing of the linear planning wizard does not require rendering a step whose scope has no data. Carryover skips entirely when there are no incomplete tasks; the meals step skips entirely when no day type active in the planning window carries any meals, or when `advance_meal_planning_enabled` is `false` (§4.6). When some dates in the window have meals and others do not (e.g. a Rest day with an empty meal list), the meals step renders only the relevant dates. The user is not asked to click "Skip" through content they will not plan — the step simply does not exist for that session. The wizard's linear contract governs the order of *required* steps, not which steps are required.
@@ -429,7 +442,7 @@ The surfaces have **different navigation shapes**, deliberately:
 
 **The onboarding wizard's first window starts the day after onboarding.** A user finishing onboarding is not asked to plan a day already underway; the first plannable day is the day after they finish. From that start the window runs to the end of the user's current week — bounded by their chosen week-start day and plan length. When a user finishes late in their week, with little of it left to plan, the window instead extends through the following week, so the first plan is substantive rather than a one- or two-day stub. The recurring planning wizard carries no equivalent rule: it always plans a full window beginning on the next week-start and is future-dated by construction.
 
-### 4.10 The planning process
+### 4.11 The planning process
 
 Building a schedule for a planning window proceeds in four conceptual passes:
 
@@ -450,7 +463,7 @@ The user retains final agency. Every LLM proposal is a draft the user can accept
 
 **Empty-scope graceful skipping.** Each pass above skips itself when its scope contains no relevant items. Carryover skips when there are zero incomplete tasks (above). Inventory yields nothing when no tasks belong to the window — neither carried-over tasks, captured tasks, nor routine instances. Distribution and memory placement do not run when inventory is empty. The wizard's meals step is independently gated by §4.6 — skipped when meal anchors are absent or advance planning is disabled. The user encounters only the passes their data and preferences require, consistent with §1.2 (*Honor user intention regardless of expression*).
 
-### 4.11 Worked example (illustrative)
+### 4.12 Worked example (illustrative)
 
 A user's Tuesday during a planning window might end up looking like this. Anchors are in **bold**, slots are between them.
 
@@ -473,7 +486,7 @@ A user's Tuesday during a planning window might end up looking like this. Anchor
 
 The user typed three tasks ("write design doc," "fold laundry + triage inbox," "deep-work block"); one came from a routine ("vacuum filter swap"); the meals come from the day type that applies to this Tuesday — wake (06:30), meals, and sleep (22:00) all live on that day type (§4.3). The appointments came from the user's calendar or were captured directly. The LLM proposed which slot each floating task falls into, balancing the energy gradient and historical patterns.
 
-### 4.12 Non-goals
+### 4.13 Non-goals
 
 - **No full DAG.** Tasks do not declare arbitrary dependencies on other tasks. Sequencing within a slot is at most local — the LLM may suggest an order; the user may pin one.
 - **No multi-day placements.** A task lives on one specific day. "This week sometime" resolves to a specific day at planning time.
@@ -961,13 +974,13 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Advance meal planning.** The preference axis (`user_preferences.advance_meal_planning_enabled`, default `true`) controlling whether the system proposes specific dishes or meals ahead of time. When `false`, the planning wizard's meals step is skipped, meal-planning agent use cases are not invoked, and the food-preferences onboarding spoke is hidden. Independent of whether **meal anchors** exist; meal anchors can structure the day even with planning disabled. See [§4.6](#46-meals).
 
-**Anchor.** A milestone in the day's sequence around which tasks position themselves. Anchors come from three sources: every meal anchor instance materialized for the date (§4.6), every scheduled task (one with a fixed start time), and the implicit start-of-day and end-of-day. Anchor *order* — not anchor *time* — defines slot boundaries. See [§4.7](#47-anchors).
+**Anchor.** A milestone in the day's sequence around which tasks position themselves. Anchors come from four sources: every meal anchor instance materialized for the date (§4.6), every scheduled task (one with a fixed start time), the implicit start-of-day and end-of-day, and timezone-change anchors (§4.8). Anchor *order* — not anchor *time* — defines slot boundaries. See [§4.7](#47-anchors).
 
 **Appointment.** Informal synonym for **scheduled task**. See *Scheduled task*.
 
-**Carry.** A user-issued carryover decision: include this incomplete task in the new planning window. See [§4.10](#410-the-planning-process).
+**Carry.** A user-issued carryover decision: include this incomplete task in the new planning window. See [§4.11](#411-the-planning-process).
 
-**Carryover.** A task not completed in its planning window that becomes eligible for surfacing in the next planning window's carryover review. There is no lookback horizon. Tasks bearing `one_shot = true` (§4.4) never enter carryover — they are silently dropped at window close. See [§4.10](#410-the-planning-process).
+**Carryover.** A task not completed in its planning window that becomes eligible for surfacing in the next planning window's carryover review. There is no lookback horizon. Tasks bearing `one_shot = true` (§4.4) never enter carryover — they are silently dropped at window close. See [§4.11](#411-the-planning-process).
 
 **Catalog.** The shared, externally-seeded library of ingredients, dishes, meals, and exercises. Used by the LLM as a search and matching surface; **not browsed directly by users**. See [§3.2](#32-content-libraries--catalog-and-personal).
 
@@ -977,17 +990,17 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Default day type.** The day type that covers any calendar date not claimed by another day type. Every user has at least one. See [§4.3](#43-daily-rhythm).
 
-**Defer.** A user-issued carryover decision: push the task forward without including it in this window; it will resurface in the next carryover review. See [§4.10](#410-the-planning-process).
+**Defer.** A user-issued carryover decision: push the task forward without including it in this window; it will resurface in the next carryover review. See [§4.11](#411-the-planning-process).
 
 **Dietary restriction.** A user-declared constraint: allergy, intolerance, preference, or cultural/religious. Allergies and intolerances are enforced; preferences are advisory. See [§3.1](#31-identity--user-scoped-configuration).
 
 **Displaced-meal flag.** A flag set on a meal when day-level placement forces it outside its window (`preferred_time ± tolerance_minutes`), typically because a scheduled task occupied the window. Surfaced in both the planning view and the day view. See [§4.6](#46-meals) and [§8.4](#84-design-language).
 
-**Drop.** A user-issued carryover decision: remove the task from the system entirely. The user may optionally provide a one-tap reason; reasons are never synthesized by the agent. See [§4.10](#410-the-planning-process).
+**Drop.** A user-issued carryover decision: remove the task from the system entirely. The user may optionally provide a one-tap reason; reasons are never synthesized by the agent. See [§4.11](#411-the-planning-process).
 
 **Energy required.** Per-task field in `{low, medium, high}` capturing cognitive/physical demand. A first-class scheduling axis used by the LLM during planning. See [§4.4](#44-tasks).
 
-**Floating task.** A task without a fixed start time; lives in a slot between anchors. The user or the LLM decides which slot. See [§4.8](#48-slots).
+**Floating task.** A task without a fixed start time; lives in a slot between anchors. The user or the LLM decides which slot. See [§4.9](#49-slots).
 
 **Fork.** The act of copying a catalog item into a personal library, after which the user's copy is independent. See [§3.2.3](#323-publicpersonal-split-and-the-fork-pattern).
 
@@ -995,7 +1008,7 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Meal.** A thing the user eats. Modeled as its own domain, **separate from tasks**. Each meal lives on a day type as a **template** entry (§4.3); the template generates per-date **meal anchor instances** at materialization (§4.6). When the date's instances are non-empty, each acts as both a **meal anchor** in the day's sequence (structural axis) and the host for a planned-dish payload when **advance meal planning** is enabled (content axis). Each meal carries a `preferred_time` and a `tolerance_minutes` value that together define its **meal window**. The LLM reasons about windows, not clock-minute placements. See [§4.6](#46-meals).
 
-**Meal anchor.** A materialized meal anchor instance for a specific date, in its role as a milestone in the day's sequence (§4.7). The date's instances are generated from the active day type's meal anchor template at materialization (§4.6); once materialized, instances are independent of the template and editable per date. Meal anchors define slot boundaries (§4.8) regardless of whether **advance meal planning** is enabled. See [§4.6](#46-meals) and [§4.7](#47-anchors).
+**Meal anchor.** A materialized meal anchor instance for a specific date, in its role as a milestone in the day's sequence (§4.7). The date's instances are generated from the active day type's meal anchor template at materialization (§4.6); once materialized, instances are independent of the template and editable per date. Meal anchors define slot boundaries (§4.9) regardless of whether **advance meal planning** is enabled. See [§4.6](#46-meals) and [§4.7](#47-anchors).
 
 **Meal anchor instance.** A materialized meal anchor for a specific date. Generated from the active day type's meal anchor template on first need (planning agent run or user edit). Once materialized, independent of the template; user-editable per date via add, remove, rename, and retime. See [§4.6](#46-meals).
 
@@ -1017,7 +1030,7 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Personal library.** A user's own forked-and-editable copy of catalog items (`user_dishes`, `user_meals`, `user_exercises`). See [§3.2](#32-content-libraries--catalog-and-personal).
 
-**Planning window.** The temporal span the user plans at one time (default 1 week; capped at 14 days as a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.9](#49-planning-windows).
+**Planning window.** The temporal span the user plans at one time (default 1 week; capped at 14 days as a configuration choice, not a model constraint). Used by both the planning wizard and the onboarding wizard. See [§4.10](#410-planning-windows).
 
 **Preferred time.** Per-meal wall-clock time at the *center* of the meal's window, stored on the meal entry within its day type. Used (with `tolerance_minutes`) to construct the **meal window** and, separately, as the reference point for budgeting task time between adjacent meals (preferred-to-preferred spacing). Established at onboarding from the user's stated habits and adapted over time by the memory system as the agent observes when meals actually occur. Not a routinely user-facing control. See [§4.6](#46-meals).
 
@@ -1033,11 +1046,13 @@ Terms used throughout this document. Where a term is **deprecated**, the replace
 
 **Sleep time.** Per-day-type wall-clock time at which the day's implicit end-of-day anchor sits. Independent of `wake_time`; may fall before or after it on the 24-hour clock (and on the following calendar date for midnight-crossing day types). See [§4.3](#43-daily-rhythm).
 
-**Slot.** The space between two adjacent anchors (including the implicit start- and end-of-day anchors). Each slot can hold zero or more floating tasks. Slot boundaries are positional, not time-pinned. See [§4.8](#48-slots).
+**Slot.** The space between two adjacent anchors (including the implicit start- and end-of-day anchors). Each slot can hold zero or more floating tasks. Slot boundaries are positional, not time-pinned. See [§4.9](#49-slots).
 
 **Task.** A unit of intent the user means to do — work, exercise, leisure, errands, medication, etc. Always carries duration, energy_required, and `one_shot` (all typically LLM-inferred). May carry a start time, in which case it is also a "scheduled task." See [§4.4](#44-tasks).
 
 **Terminal tool.** A tool whose execution ends the agent loop. A use case may register one or more terminal tools, each representing a distinct way the loop can end with a structured result (e.g., `TaskEntry` registers both `create_task` and `request_clarification`). See [§5.4](#54-tools).
+
+**Timezone-change anchor.** An anchor that marks the point in the day's ordered sequence at which the user's effective timezone changes. Like other anchors, it participates in the day's ordering. It establishes the timezone in effect for itself and for every subsequent anchor in the sequence until the next timezone-change anchor. See [§4.7](#47-anchors) and [§4.8](#48-time-and-timezone-resolution).
 
 **Tolerance (meal).** Per-meal `tolerance_minutes` value defining the half-width of the **meal window** around `preferred_time`, stored on the meal entry within its day type. Inside the window, the meal is undisplaced regardless of its precise clock placement; outside the window, it is marked `displaced`. See [§4.6](#46-meals).
 
@@ -1067,7 +1082,7 @@ Files under `docs/superpowers/specs/` and `docs/superpowers/plans/` are **point-
 
 - Opinionated and clear. Hedged language ("perhaps", "might", "could possibly") obscures intent.
 - Lead with the *why*, follow with the *what*. A reader should understand the motivation before the mechanics.
-- Concrete examples beat abstract descriptions where the reader needs to internalize a model (see the Tuesday worked example in §4.11).
+- Concrete examples beat abstract descriptions where the reader needs to internalize a model (see the Tuesday worked example in §4.12).
 - File paths and identifier names are quoted in backticks. Tables for matrix data; bullet lists for enumeration; prose for reasoning.
 
 ---
@@ -1089,3 +1104,4 @@ A log of substantive changes to this document.
 | 2026-05-13 | Claude Code | 1.8 - I had to delete several implementation & PR/Issue details from the document because I failed to follow instructions.  I was reminded *several times* not to include such details in this document but did it anyway.  This note is here to publicize my shame and ensure I don't do it again. |
 | 2026-05-13 | Robert Chambers | 1.9 — Documented the lazy-catalog model and three-path ingredient discovery flow. §3.2.1: catalog requires no pre-seeding to function; items enter via local hit, external-provider ingest, or user contribution — all three paths return an `ingredient_id` and are transparent to the user. `plnd_seed` provides background startup seeding (idempotent) and richer local data but is not a hard dependency. §3.2.3: corrected "externally seeded" framing; clarified `plnd_seed` role. §9.7: added catalog ingredient discovery subsection specifying that e2e tests must cover all three discovery paths, with fixture-based provider replay for path 2. |
 | 2026-05-16 | Robert Chambers | 1.10 — Introduced the **Template + Instance** model for meal anchors in §4.3 and §4.6. The day type's meal list is now framed as a **template** that generates per-date **meal anchor instances** at materialization (lazy on first need — planning agent run or user edit); once materialized, instances are independent of the template, and later changes to the template do not propagate to materialized dates. Added four user operations on a date's instances (add, remove, rename, retime); cascade-delete on remove; past-date edits are record-keeping only. Anchor-presence axis is now evaluated per date against the date's materialized instances rather than the active day type's meal list — two dates that resolve to the same day type may have different anchor presence if one has been edited. The conjunction rule with **advance meal planning** is preserved and applies per date. Removed the prior "no override layer" assertions in §4.3 and §4.6, and absorbed the older "per-date override for time pinning" capability into the **retime** operation. Glossary: updated *Meal*, *Meal anchor*, and *Meal pattern* (deprecated) entries; added *Meal anchor template* and *Meal anchor instance*. |
+| 2026-06-15 | Robert Chambers | 1.11 — Established the timezone foundation as part of the scheduling model. §4.3 (*Daily rhythm*): clarified that wall-clock values in the daily rhythm are interpreted against the user's effective timezone, resolved by the model introduced in §4.8, rather than leaving local-time coherence as an unspecified presentation concern. §4.7 (*Anchors*): added **timezone-change anchor** as a fourth anchor source — a milestone marking the point in the day's sequence at which the effective timezone changes, establishing the zone for itself and all following anchors in sequence. §4.8 (new — *Time and timezone resolution*): documents the wall-clock + resolved-zone model (planned times stored without an embedded offset; absolute instants computed only when required); the positional resolution rule (effective zone derived from the most recent timezone-change anchor at or before a point in the sequence); signal sources and precedence (device, user action, system inference — all expressed as timezone-change anchors; later supersedes earlier); and daylight-saving boundary rules (fall-back → earlier offset; spring-forward → first valid instant). Subsequent §4 subsections renumbered by +1 (Slots is now §4.9, Planning windows §4.10, The planning process §4.11, Worked example §4.12, Non-goals §4.13); all internal cross-references updated accordingly. Glossary: updated *Anchor* (four sources); added *Timezone-change anchor*. |
