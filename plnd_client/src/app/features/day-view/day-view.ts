@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ScheduleService, todayIso } from '../../core/services/schedule.service';
 import { BriefingService } from '../../core/services/briefing.service';
-import { isMealAnchor, TaskEditPatch } from '../../core/models/schedule';
+import { isMealAnchor, ScheduleItem, TaskEditPatch } from '../../core/models/schedule';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
 import { MealRowComponent } from '../schedule/components/meal-row/meal-row';
 import { TaskRowComponent } from '../schedule/components/task-row/task-row';
@@ -57,10 +57,14 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
               @if (isMealAnchor(item)) {
                 <app-meal-row
                   [id]="'task-row-' + item.id"
-                  [class.dimmed]="editingId() !== null && editingId() !== item.id"
-                  [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null"
+                  [class.dimmed]="isSpotlightDimmed(item)"
+                  [attr.inert]="isSpotlightDimmed(item) ? '' : null"
                   [meal]="item"
                   [date]="scheduleService.date()"
+                  [editingId]="editingId()"
+                  (editRequested)="openEditor($event)"
+                  (save)="onEditSave(editingId()!, $event)"
+                  (closed)="closeEditor()"
                   (toggled)="scheduleService.toggleItem($event)"
                   (doneToggle)="scheduleService.toggleMealConsumed($event)"
                   (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
@@ -68,8 +72,8 @@ import { YesterdaySnapshotComponent } from './components/yesterday-snapshot/yest
               } @else {
                 <app-task-row
                   [id]="'task-row-' + item.id"
-                  [class.dimmed]="editingId() !== null && editingId() !== item.id"
-                  [attr.inert]="editingId() !== null && editingId() !== item.id ? '' : null"
+                  [class.dimmed]="isSpotlightDimmed(item)"
+                  [attr.inert]="isSpotlightDimmed(item) ? '' : null"
                   [item]="item"
                   [editing]="editingId() === item.id"
                   (editRequested)="openEditor($event)"
@@ -117,6 +121,19 @@ export class DayViewComponent implements OnInit, OnDestroy {
   private toastTimer?: ReturnType<typeof setTimeout>;
 
   readonly editingId = signal<string | null>(null);
+
+  /**
+   * Spotlight rule: a row dims (and goes inert) while *another* row is being
+   * edited. A meal row stays lit when the editor targets the meal itself or one
+   * of its during-meal tasks, so the hosted edit form remains interactive.
+   * Task rows have no nested tasks, so the anchor check is a no-op for them.
+   */
+  protected isSpotlightDimmed(item: ScheduleItem): boolean {
+    const editing = this.editingId();
+    if (editing === null || editing === item.id) return false;
+    if (isMealAnchor(item) && item.duringMealTasks.some(t => t.id === editing)) return false;
+    return true;
+  }
 
   openEditor(id: string): void {
     this.editingId.set(id);

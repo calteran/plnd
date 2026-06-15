@@ -272,6 +272,65 @@ describe('ScheduleService', () => {
     expect(isMealAnchor(items[1])).toBeFalse();
   });
 
+  it('nests an entry linked by slot_meal_anchor_id into its anchor as a during-meal task', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(
+      httpMock,
+      [{
+        entry_id: 'dt1', task_type: 'medication', title: 'Vitamins',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+        after_anchor: 'breakfast', slot_meal_anchor_id: 'm1',
+      }],
+      [anchorDto('m1', 'breakfast')],
+    );
+
+    const items = svc.scheduleItems();
+    // The paired task renders inside the meal, not as a top-level row.
+    expect(items.length).toBe(1);
+    const meal = items[0] as MealAnchor;
+    expect(meal.duringMealTasks.length).toBe(1);
+    expect(meal.duringMealTasks[0].id).toBe('dt1');
+    expect(meal.duringMealTasks[0].label).toBe('Vitamins');
+  });
+
+  it('keeps an entry top-level when its slot_meal_anchor_id matches no anchor in the period', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(
+      httpMock,
+      [{
+        entry_id: 'orphan', task_type: 'general', title: 'Stray',
+        status: 'planned', date: '2026-04-02', scheduled_start: null,
+        slot_meal_anchor_id: 'no-such-anchor',
+      }],
+      [anchorDto('m1', 'breakfast')],
+    );
+
+    const items = svc.scheduleItems();
+    expect(items.length).toBe(2);
+    const meal = items[0] as MealAnchor;
+    expect(meal.duringMealTasks.length).toBe(0);
+    expect((items[1] as ScheduleTask).id).toBe('orphan');
+  });
+
+  it('separates paired and standalone entries by slot_meal_anchor_id', () => {
+    svc.loadDay('2026-04-02');
+    flushDay(
+      httpMock,
+      [
+        { entry_id: 'dt1', task_type: 'medication', title: 'Vitamins',
+          status: 'planned', date: '2026-04-02', scheduled_start: null, slot_meal_anchor_id: 'm1' },
+        { entry_id: 'std', task_type: 'work', title: 'Standalone',
+          status: 'planned', date: '2026-04-02', scheduled_start: '2026-04-02T09:00:00Z' },
+      ],
+      [anchorDto('m1', 'breakfast')],
+    );
+
+    const items = svc.scheduleItems();
+    expect(items.length).toBe(2);
+    expect((items[0] as MealAnchor).duringMealTasks.map(t => t.id)).toEqual(['dt1']);
+    expect((items[1] as ScheduleTask).id).toBe('std');
+  });
+
   it('sets items to [] and clears loading on HTTP error in period', () => {
     svc.loadDay('2026-04-02');
     httpMock.expectOne(r => r.url.includes('/schedule/period'))

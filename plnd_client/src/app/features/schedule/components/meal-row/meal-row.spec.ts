@@ -112,6 +112,40 @@ describe('MealRowComponent', () => {
     expect(emitted).toBe('dt1');
   });
 
+  it('hosts the task-edit form for the during-meal task named by editingId', async () => {
+    const f = await setup(withTasks);
+    expect(f.debugElement.query(By.css('app-task-edit-form'))).toBeNull();
+    f.componentRef.setInput('editingId', 'dt1');
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('app-task-edit-form'))).toBeTruthy();
+  });
+
+  it('does not host the edit form when editingId names a different task', async () => {
+    const f = await setup(withTasks);
+    f.componentRef.setInput('editingId', 'other');
+    f.detectChanges();
+    expect(f.debugElement.query(By.css('app-task-edit-form'))).toBeNull();
+  });
+
+  it('re-emits editRequested from a during-meal task row', async () => {
+    const f = await setup(withTasks);
+    let emitted: string | undefined;
+    f.componentInstance.editRequested.subscribe((id: string) => emitted = id);
+    f.debugElement.query(By.css('app-task-row .label')).nativeElement.click();
+    expect(emitted).toBe('dt1');
+  });
+
+  it('re-emits closed when the hosted edit form closes', async () => {
+    const f = await setup(withTasks);
+    f.componentRef.setInput('editingId', 'dt1');
+    f.detectChanges();
+    let closed = false;
+    f.componentInstance.closed.subscribe(() => closed = true);
+    f.debugElement.query(By.css('app-task-edit-form'))
+      .triggerEventHandler('closed', undefined);
+    expect(closed).toBeTrue();
+  });
+
   it('applies the skipped modifier class for a skipped meal', async () => {
     const f = await setup(skippedMeal);
     const band = f.debugElement.query(By.css('.meal-band')).nativeElement as HTMLElement;

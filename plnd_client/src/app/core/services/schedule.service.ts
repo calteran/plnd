@@ -52,9 +52,27 @@ export class ScheduleService {
       const mealByAnchor = new Map<string, PlannedMealEntryDto>(
         (schedule.data.planned_meals ?? []).map(pm => [pm.meal_anchor_instance_id, pm]),
       );
+      // Partition entries: those linked to an anchor instance (slot_meal_anchor_id)
+      // render *inside* that meal row as during-meal tasks; the rest are top-level
+      // rows. Keying off the FK (not the free-form after_anchor label) ties a task
+      // to the concrete meal instance on this day.
+      const anchorIds = new Set(anchors.map(a => a.id));
+      const tasksByAnchor = new Map<string, ScheduleTask[]>();
+      const topLevel: ScheduleTask[] = [];
+      for (const e of schedule.data.entries) {
+        const task = mapEntry(e);
+        const anchorId = e.slot_meal_anchor_id;
+        if (anchorId && anchorIds.has(anchorId)) {
+          const tasks = tasksByAnchor.get(anchorId) ?? [];
+          tasks.push(task);
+          tasksByAnchor.set(anchorId, tasks);
+        } else {
+          topLevel.push(task);
+        }
+      }
       this._items.set([
-        ...anchors.map(a => mapAnchorInstance(a, mealByAnchor.get(a.id))),
-        ...schedule.data.entries.map(mapEntry),
+        ...anchors.map(a => mapAnchorInstance(a, mealByAnchor.get(a.id), tasksByAnchor.get(a.id) ?? [])),
+        ...topLevel,
       ]);
       this._loading.set(false);
     });
@@ -216,7 +234,11 @@ function toMealUiStatus(
   return description ? 'planned' : 'unplanned';
 }
 
-function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntryDto): MealAnchor {
+function mapAnchorInstance(
+  dto: MealAnchorInstanceDto,
+  planned?: PlannedMealEntryDto,
+  duringMealTasks: ScheduleTask[] = [],
+): MealAnchor {
   const slot = MEAL_SLOTS[dto.name.toLowerCase()];
   return {
     id:    dto.id,
@@ -224,7 +246,7 @@ function mapAnchorInstance(dto: MealAnchorInstanceDto, planned?: PlannedMealEntr
     emoji: slot?.emoji ?? '🍴',
     status:      toMealUiStatus(dto.status, planned?.title ?? undefined),
     description: planned?.title ?? undefined,
-    duringMealTasks: [],
+    duringMealTasks,
   };
 }
 

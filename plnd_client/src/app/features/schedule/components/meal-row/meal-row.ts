@@ -1,5 +1,5 @@
 import { Component, input, output, signal } from '@angular/core';
-import { MealAnchor } from '../../../../core/models/schedule';
+import { MealAnchor, TaskEditPatch } from '../../../../core/models/schedule';
 import { TaskRowComponent } from '../task-row/task-row';
 import { MealReviewPaneComponent } from '../../../day-view/components/meal-review-pane/meal-review-pane';
 
@@ -50,7 +50,12 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
         <div class="during-meal">
           @for (task of meal().duringMealTasks; track task.id) {
             <app-task-row
+              [id]="'task-row-' + task.id"
               [item]="task"
+              [editing]="editingId() === task.id"
+              (editRequested)="editRequested.emit($event)"
+              (save)="save.emit($event)"
+              (closed)="closed.emit()"
               (toggled)="toggled.emit($event)"
             />
           }
@@ -66,6 +71,16 @@ export class MealRowComponent {
   readonly toggled         = output<string>();
   readonly doneToggle      = output<string>();
   readonly skipped         = output<string>();
+
+  // Inline edit contract for during-meal tasks, mirroring TaskRowComponent.
+  // `editingId` is the id of the task currently being edited (null when none);
+  // the matching during-meal task-row hosts `app-task-edit-form`. The day view
+  // resolves the save target from its own editingId, so save re-emits the patch
+  // unchanged — no id plumbing needed here.
+  readonly editingId       = input<string | null>(null);
+  readonly editRequested   = output<string>();
+  readonly save            = output<TaskEditPatch>();
+  readonly closed          = output<void>();
 
   readonly reviewOpen = signal(false);
 
