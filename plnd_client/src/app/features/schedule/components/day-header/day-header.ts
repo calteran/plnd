@@ -1,5 +1,6 @@
 import { Component, computed, input, output } from '@angular/core';
-import { todayIso, toIsoDate } from '../../../../core/services/schedule.service';
+import { todayIso } from '../../../../core/services/schedule.service';
+import { parseDateOnly, addDaysDateOnly } from '../../../../core/utils/date-only';
 
 @Component({
   selector: 'app-day-header',
@@ -23,8 +24,9 @@ export class DayHeaderComponent {
   readonly dateChange = output<string>();
 
   readonly formattedDate = computed(() => {
-    const d = new Date(this.date() + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+    return parseDateOnly(this.date()).toLocaleDateString('en-US', {
+      weekday: 'long', month: 'short', day: 'numeric',
+    });
   });
 
   readonly isToday = computed(() => this.date() === todayIso());
@@ -42,8 +44,6 @@ export class DayHeaderComponent {
   }
 
   private offset(days: number): string {
-    const [y, m, d] = this.date().split('-').map(Number);
-    const date = new Date(Date.UTC(y, m - 1, d + days));
-    return toIsoDate(date);
+    return addDaysDateOnly(this.date(), days);
   }
 }

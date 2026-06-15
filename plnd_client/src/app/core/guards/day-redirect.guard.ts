@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivateFn, Router } from '@angular/router';
 import { todayIso, offsetIso } from '../services/schedule.service';
+import { parseDateOnly } from '../utils/date-only';
 
 export const todayRedirectGuard: CanActivateFn = () =>
   inject(Router).createUrlTree(['/day', todayIso()]);
@@ -14,7 +15,7 @@ export const tomorrowRedirectGuard: CanActivateFn = () =>
 function isValidIsoDate(s: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
   const [y, m, d] = s.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
+  const date = parseDateOnly(s);
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
 }
 
