@@ -67,17 +67,10 @@ struct FdcDetailFood {
     #[serde(rename = "fdcId")]
     fdc_id: i64,
     description: String,
-    #[serde(rename = "foodCategory")]
-    food_category: Option<FdcFoodCategory>,
     #[serde(rename = "foodPortions")]
     food_portions: Option<Vec<FdcFoodPortion>>,
     #[serde(rename = "foodNutrients")]
     food_nutrients: Vec<FdcDetailNutrient>,
-}
-
-#[derive(Deserialize)]
-struct FdcFoodCategory {
-    description: String,
 }
 
 #[derive(Deserialize)]
@@ -145,14 +138,12 @@ fn detail_to_ingredient(food: FdcDetailFood) -> ExternalIngredient {
         .and_then(|p| Decimal::try_from(p.gram_weight).ok())
         .unwrap_or(Decimal::from(100u32));
     let nutrition = build_nutrition_from_detail(&food.food_nutrients);
-    let category = food.food_category.map(|c| c.description);
     ExternalIngredient {
         external_id: food.fdc_id.to_string(),
         name: food.description,
         serving_size_g: Some(serving_size_g),
         nutrition: Some(nutrition),
         allergens: vec![], // USDA FDC does not provide allergen data
-        occasion_tags: category.into_iter().collect(),
     }
 }
 
@@ -445,10 +436,6 @@ mod tests {
         let food: FdcDetailFood = serde_json::from_str(json).expect("deserialize");
         assert_eq!(food.fdc_id, 1750340);
         assert_eq!(food.description, "APPLE, RAW");
-        assert_eq!(
-            food.food_category.unwrap().description,
-            "Fruits and Fruit Juices"
-        );
         assert!((food.food_portions.unwrap()[0].gram_weight - 182.0).abs() < 0.001);
         assert_eq!(food.food_nutrients[0].nutrient.id, 1008);
         assert_eq!(food.food_nutrients[0].amount, Some(95.0));
@@ -553,10 +540,8 @@ mod tests {
             foods[0].nutrition.as_ref().unwrap().calories_kcal,
             Some(379.0)
         );
-        assert_eq!(
-            foods[0].occasion_tags,
-            vec!["Cereal Grains and Pasta".to_string()]
-        );
+        // The `foodCategory` in the input is intentionally dropped, not mapped
+        // into occasion data — `ExternalIngredient` has no occasion field (#921).
     }
 
     #[test]

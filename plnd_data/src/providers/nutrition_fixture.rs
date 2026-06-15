@@ -151,8 +151,7 @@ mod tests {
                 "saturated_fat_g": null,
                 "cholesterol_mg": null
             },
-            "allergens": [],
-            "occasion_tags": []
+            "allergens": []
         }
     }"#;
 

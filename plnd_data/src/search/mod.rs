@@ -512,7 +512,6 @@ mod resolve_tests {
                 serving_size_g: None,
                 nutrition: None,
                 allergens: vec![],
-                occasion_tags: vec![],
             }))
         }
     }
@@ -660,7 +659,6 @@ mod resolve_tests {
                 serving_size_g: None,
                 nutrition: None,
                 allergens: vec![],
-                occasion_tags: vec![],
             }))
         }
     }
