@@ -7,7 +7,7 @@ use crate::api_response::{
     DishDetailApiResponse, MealAnchorInstanceResponse, MealDetailApiResponse,
     MealPatternEntryResponse, MealSuggestionResponse, PlanStatusApiResponse,
     PlannedMealEntryResponse, PostSchedulePlanApiResponse, RoutineResponse, ScheduleEntryResponse,
-    SchedulePeriodApiResponse, TaskResponse, UserDishPrefDetailResponse,
+    SchedulePeriodApiResponse, TaskResponse, TimezoneAnchorResponse, UserDishPrefDetailResponse,
     UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
@@ -29,6 +29,7 @@ use crate::routes::{
     dietary_restrictions::{CreateRestrictionRequest, UpdateRestrictionRequest},
     routine::CreateRoutineRequest,
     search::{DishSearchResponse, ExerciseSearchResponse, IngredientSearchResponse},
+    timezone::{CreateTimezoneAnchorRequest, DeleteGroupResponse, ResolveResponse},
     user_dish_prefs::{AddIngredientBody, CreateDishBody, PatchDishBody},
     user_ingredient_prefs::UpsertIngredientPrefBody,
     user_meal_prefs::{AddDishBody, CreateMealBody, PatchMealBody},
@@ -152,6 +153,12 @@ impl Modify for BearerSecurityAddon {
         crate::routes::agent::post_meal_plan_suggest,
         crate::routes::agent::post_meal_plan_resolve,
         crate::routes::agent::post_place_tasks,
+        // Timezone
+        crate::routes::timezone::list_anchors,
+        crate::routes::timezone::resolve_zone,
+        crate::routes::timezone::create_anchor,
+        crate::routes::timezone::delete_anchor,
+        crate::routes::timezone::delete_anchor_group,
     ),
     components(schemas(
         // Existing
@@ -244,6 +251,11 @@ impl Modify for BearerSecurityAddon {
         // Task Placement
         PlaceTasksRequest,
         PlaceTasksEntry,
+        // Timezone
+        TimezoneAnchorResponse,
+        CreateTimezoneAnchorRequest,
+        ResolveResponse,
+        DeleteGroupResponse,
     )),
     modifiers(&BearerSecurityAddon),
     tags(
@@ -265,6 +277,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Routines", description = "Recurring routine management"),
         (name = "Day Types", description = "User day type management — named daily rhythm patterns with wake/sleep times and date mapping"),
         (name = "Agent", description = "LLM-backed task parsing and meal planning (stubs — Phase 3.2/3.3)"),
+        (name = "Timezone", description = "Timezone anchor management — record and resolve the user's timezone over time"),
     )
 )]
 pub struct ApiDoc;
