@@ -10,7 +10,7 @@ use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 use chrono_tz::Tz;
 
 use crate::models::{TimezoneAnchor, TimezoneSource};
-use crate::timezone::{governing_anchor, zone_at};
+use crate::timezone::governing_anchor;
 
 /// A contradicting device reading must be seen on at least this many separate
 /// device-affirm calls before a standoff can be raised (≈ "persists across
@@ -71,7 +71,12 @@ pub fn decide_device_affirm(
     now_time: NaiveTime,
     now_instant: DateTime<Utc>,
 ) -> DeviceAffirmDecision {
-    let current = zone_at(anchors, now_date, Some(now_time));
+    // Identify the anchor governing "now" once via the shared selection helper
+    // (so policy and resolution can never diverge) and derive the current zone
+    // from it — avoiding a second pass over `anchors` that calling `zone_at`
+    // separately would incur.
+    let governing = governing_anchor(anchors, now_date, Some(now_time));
+    let current = governing.map(|a| a.zone);
 
     // (1) Match → no-op. Clear a stale pending row for a different zone.
     if current == Some(reported) {
@@ -79,9 +84,7 @@ pub fn decide_device_affirm(
         return DeviceAffirmDecision::NoOp { clear_pending };
     }
 
-    // Identify the anchor governing "now" (the one `zone_at` selected) via the
-    // shared selection helper, so policy and resolution can never diverge.
-    let Some(gov) = governing_anchor(anchors, now_date, Some(now_time)) else {
+    let Some(gov) = governing else {
         return DeviceAffirmDecision::Append; // nothing higher-trust to protect
     };
 
