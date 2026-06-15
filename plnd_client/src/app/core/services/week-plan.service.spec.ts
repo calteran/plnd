@@ -339,6 +339,8 @@ describe('WeekPlanService', () => {
       const withTitle = tasks.find(t => t.task_type === 'exercise');
       expect(withTitle?.title).toBe('Morning run');
       expect(withTitle?.task_type).toBe('exercise');
+      // Wall-clock HH:MM from the wire flows through unchanged (no UTC strip).
+      expect(withTitle?.scheduled_start).toBe('07:00');
 
       const noTitle = tasks.find(t => t.task_type === 'general');
       expect(noTitle?.title).toBe('general');  // task_type used as title fallback
