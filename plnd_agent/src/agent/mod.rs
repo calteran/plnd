@@ -631,6 +631,12 @@ impl AgentService {
 
 // ── Provider factory ──────────────────────────────────────────────────────────
 
+/// Build a standalone fast-tier LLM provider (used by the brand normalizer in
+/// `plnd_api`, which needs a provider without the full `AgentService`/registry).
+pub fn build_fast_provider(config: &LlmConfig) -> Box<dyn LlmProvider> {
+    build_provider(&config.fast)
+}
+
 fn build_provider(config: &crate::config::LlmModelConfig) -> Box<dyn LlmProvider> {
     let max_retry_wait = std::time::Duration::from_secs(config.max_retry_wait_secs);
     match config.provider.as_str() {
