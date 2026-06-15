@@ -99,6 +99,7 @@ mod tests {
                 nutrition: None,
                 allergens: &[],
                 occasion_tags: &[],
+                brand: None,
             },
         )
         .await

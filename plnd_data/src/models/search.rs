@@ -13,6 +13,7 @@ pub struct LocalIngredientResult {
     pub allergens: Vec<String>,
     pub occasion_tags: Vec<String>,
     pub external_source: Option<String>,
+    pub brand: Option<String>,
 }
 
 #[derive(sqlx::FromRow, Serialize, Deserialize, Clone, Debug)]

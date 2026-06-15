@@ -58,6 +58,8 @@ pub async fn ingest_ingredient(
             nutrition: body.nutrition,
             allergens: body.allergens.unwrap_or_default(),
             occasion_tags: body.occasion_tags.unwrap_or_default(),
+            // brand is populated only by the promote-path normalizer (#913), not via this direct-ingest body.
+            brand: None,
         })
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -67,17 +69,45 @@ pub async fn ingest_ingredient(
     ))
 }
 
+/// Resolve the `(name, brand)` to persist for a promoted ingredient.
+///
+/// Canonical sources (USDA Foundation/SR Legacy) already carry clean names, so
+/// they bypass normalization. Branded sources are split via the normalizer and
+/// passed through the confidence gate; any failure keeps the original name.
+async fn resolve_name_brand(
+    is_canonical: bool,
+    original_name: &str,
+    normalizer: &dyn plnd_agent::BrandNormalizer,
+) -> (String, Option<String>) {
+    if is_canonical {
+        return (original_name.to_string(), None);
+    }
+    let (name, brand) = match normalizer.normalize(original_name).await {
+        Some(n) => n.gated(original_name),
+        None => (original_name.to_string(), None),
+    };
+    tracing::debug!(
+        original_name,
+        resolved_name = %name,
+        brand = ?brand,
+        "brand normalization resolved for branded source"
+    );
+    (name, brand)
+}
+
 /// Map a provider's full ingredient detail into the catalog ingest input.
 /// Nutrition is serialized to JSON; a serialization failure degrades to `None`
 /// rather than failing the whole promotion.
 pub(crate) fn ingest_input_from_detail(
     external_source: &str,
     detail: plnd_data::providers::dtos::ExternalIngredient,
+    name: String,
+    brand: Option<String>,
 ) -> IngestIngredientInput {
     IngestIngredientInput {
         external_source: external_source.to_string(),
         external_id: detail.external_id,
-        name: detail.name,
+        name,
         description: None,
         serving_size_g: detail.serving_size_g,
         nutrition: detail
@@ -89,6 +119,7 @@ pub(crate) fn ingest_input_from_detail(
         // is a taxonomy, not an occasion (#921). Occasion tags on an ingredient
         // come only from explicit user input via the manual ingest/contribute APIs.
         occasion_tags: vec![],
+        brand,
     }
 }
 
@@ -122,10 +153,20 @@ pub async fn promote_ingredient(
         .fetch_ingredient_detail(&body.external_source, &body.external_id)
         .await
         .ok_or(StatusCode::NOT_FOUND)?;
+    let is_canonical = state
+        .provider_search
+        .is_canonical_source(&body.external_source);
+    let (name, brand) =
+        resolve_name_brand(is_canonical, &detail.name, state.brand_normalizer.as_ref()).await;
     let id = state
         .repos
         .catalog_ingest
-        .ingest_ingredient(ingest_input_from_detail(&body.external_source, detail))
+        .ingest_ingredient(ingest_input_from_detail(
+            &body.external_source,
+            detail,
+            name,
+            brand,
+        ))
         .await
         .map_err(|e| {
             tracing::error!(error = %e, "promote_ingredient ingest error");
@@ -225,11 +266,17 @@ mod tests {
             nutrition: None,
             allergens: vec!["none".into()],
         };
-        let input = ingest_input_from_detail("usda_fdc", detail);
+        let input = ingest_input_from_detail(
+            "usda_fdc",
+            detail,
+            "Bananas, dehydrated, or banana powder".to_string(),
+            None,
+        );
         assert_eq!(input.external_source, "usda_fdc");
         assert_eq!(input.external_id, "173945");
         assert_eq!(input.name, "Bananas, dehydrated, or banana powder");
         assert_eq!(input.allergens, vec!["none".to_string()]);
+        assert_eq!(input.brand, None);
     }
 
     #[test]
@@ -246,12 +293,63 @@ mod tests {
             }),
             allergens: vec![],
         };
-        let input = ingest_input_from_detail("usda_fdc", detail);
+        let input = ingest_input_from_detail(
+            "usda_fdc",
+            detail,
+            "Bananas, dehydrated, or banana powder".to_string(),
+            None,
+        );
         let nutrition = input.nutrition.expect("nutrition serialized to Some");
         assert!(
             nutrition.get("calories_kcal").is_some(),
             "serialized nutrition JSON should contain calories_kcal: {nutrition}"
         );
         assert_eq!(nutrition.get("calories_kcal").unwrap(), 346.0);
+    }
+
+    // FixtureBrandNormalizer is debug-only (#[cfg(debug_assertions)]), so the
+    // shared helper and the resolve_* tests below are gated to match.
+    #[cfg(debug_assertions)]
+    fn fixture_normalizer() -> plnd_agent::FixtureBrandNormalizer {
+        use plnd_agent::{FixtureBrandNormalizer, Normalization};
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        map.insert(
+            "Great Value Shredded Cheddar Cheese".to_string(),
+            Normalization {
+                generic_name: "Cheddar cheese".into(),
+                brand: Some("Great Value".into()),
+                confidence: 0.95,
+            },
+        );
+        FixtureBrandNormalizer::from_entries(map)
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    async fn resolve_skips_normalization_for_canonical_source() {
+        let norm = fixture_normalizer();
+        let (name, brand) = resolve_name_brand(true, "Cheddar cheese, low moisture", &norm).await;
+        assert_eq!(name, "Cheddar cheese, low moisture");
+        assert_eq!(brand, None);
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    async fn resolve_splits_branded_source() {
+        let norm = fixture_normalizer();
+        let (name, brand) =
+            resolve_name_brand(false, "Great Value Shredded Cheddar Cheese", &norm).await;
+        assert_eq!(name, "Cheddar cheese");
+        assert_eq!(brand.as_deref(), Some("Great Value"));
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    async fn resolve_keeps_original_when_no_fixture_entry() {
+        let norm = fixture_normalizer();
+        let (name, brand) = resolve_name_brand(false, "Unmapped Branded Thing", &norm).await;
+        assert_eq!(name, "Unmapped Branded Thing");
+        assert_eq!(brand, None);
     }
 }

@@ -18,9 +18,9 @@ pub async fn search_ingredients(
     sqlx::query_as::<_, LocalIngredientResult>(
         r#"
         SELECT ingredient_id, name, description,
-               allergens, occasion_tags, external_source
+               allergens, occasion_tags, external_source, brand
         FROM catalog_ingredients
-        WHERE to_tsvector('english', name || ' ' || COALESCE(description, ''))
+        WHERE to_tsvector('english', name || ' ' || COALESCE(brand, '') || ' ' || COALESCE(description, ''))
               @@ plainto_tsquery('english', $1)
           AND ($3::text[] = '{}' OR NOT allergens && $3::text[])
           AND ($4::uuid IS NULL OR NOT EXISTS (
@@ -34,7 +34,7 @@ pub async fn search_ingredients(
              ELSE 0
            END) DESC,
           ts_rank(
-            to_tsvector('english', name || ' ' || COALESCE(description, '')),
+            to_tsvector('english', name || ' ' || COALESCE(brand, '') || ' ' || COALESCE(description, '')),
             plainto_tsquery('english', $1)
           ) DESC,
           length(name) ASC
@@ -126,14 +126,14 @@ pub async fn search_ingredient_nutrition(
     sqlx::query_as::<_, crate::models::CatalogIngredient>(
         r#"
         SELECT ingredient_id, name, description, serving_size_g, nutrition,
-               allergens, occasion_tags, external_id, external_source,
+               allergens, occasion_tags, external_id, external_source, brand,
                contributed_by_user_id, created_at, updated_at
         FROM catalog_ingredients
-        WHERE to_tsvector('english', name || ' ' || COALESCE(description, ''))
+        WHERE to_tsvector('english', name || ' ' || COALESCE(brand, '') || ' ' || COALESCE(description, ''))
               @@ plainto_tsquery('english', $1)
           AND nutrition IS NOT NULL
         ORDER BY ts_rank(
-            to_tsvector('english', name || ' ' || COALESCE(description, '')),
+            to_tsvector('english', name || ' ' || COALESCE(brand, '') || ' ' || COALESCE(description, '')),
             plainto_tsquery('english', $1)
         ) DESC
         LIMIT $2
@@ -284,6 +284,25 @@ mod tests {
             results.is_empty(),
             "should exclude rows with null nutrition"
         );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn search_ingredients_matches_brand_token_and_returns_brand(pool: PgPool) {
+        sqlx::query(
+            "INSERT INTO catalog_ingredients (name, brand, external_source, external_id, allergens, occasion_tags) \
+             VALUES ('Cheddar cheese', 'Great Value', 'openfoodfacts', 'off-1', '{}', '{}')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Brand token alone must match via the brand-aware FTS index/query.
+        let by_brand = search_ingredients(&pool, "Great Value", 10, &[], None)
+            .await
+            .unwrap();
+        assert_eq!(by_brand.len(), 1, "brand token should match");
+        assert_eq!(by_brand[0].name, "Cheddar cheese");
+        assert_eq!(by_brand[0].brand.as_deref(), Some("Great Value"));
     }
 
     #[sqlx::test(migrations = "./migrations")]

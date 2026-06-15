@@ -36,6 +36,7 @@ impl CatalogIngestRepository for PgCatalogIngestRepository {
                 nutrition: input.nutrition,
                 allergens: &input.allergens,
                 occasion_tags: &input.occasion_tags,
+                brand: input.brand.as_deref(),
             },
         )
         .await

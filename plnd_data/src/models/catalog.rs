@@ -19,6 +19,9 @@ pub struct CatalogIngredient {
     pub occasion_tags: Vec<String>,
     pub external_id: Option<String>,
     pub external_source: Option<String>, // 'usda_fdc' | 'openfoodfacts' | null
+    /// Generic-name normalization: the brand extracted from a branded source
+    /// (e.g. "Great Value"). NULL for canonical and user-contributed rows.
+    pub brand: Option<String>,
     pub contributed_by_user_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

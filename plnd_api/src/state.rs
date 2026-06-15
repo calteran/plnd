@@ -1,7 +1,7 @@
 use crate::auth::{JwksCache, JwtService, SessionService};
 use crate::briefing::BriefingState;
 use governor::DefaultKeyedRateLimiter;
-use plnd_agent::AgentService;
+use plnd_agent::{AgentService, BrandNormalizer};
 use plnd_data::Repositories;
 use plnd_data::search::ProviderSearchService;
 use std::sync::Arc;
@@ -26,6 +26,8 @@ pub struct AppState {
     pub agent_task_limiter: Arc<DefaultKeyedRateLimiter<String>>,
     /// Agent service for LLM-backed task and meal-plan generation.
     pub agent: AgentService,
+    /// Splits branded ingredient names into generic name + brand on promotion (#913).
+    pub brand_normalizer: Arc<dyn BrandNormalizer>,
     /// Max parallel LLM calls per POST /agent/meal-plan request.
     /// Bounded by a per-request semaphore; parallel slots see only locked context.
     pub meal_plan_concurrency: usize,

@@ -230,6 +230,7 @@ async fn main() {
 
     let session = SessionService::with_repo(repos.session.clone());
     let agent = plnd_agent::AgentService::new(&config.llm, repos.clone());
+    let brand_normalizer = build_brand_normalizer(&config.external_providers, &config.llm);
 
     let state = Arc::new(AppState {
         repos,
@@ -242,6 +243,7 @@ async fn main() {
         client_error_limiter,
         agent_task_limiter,
         agent,
+        brand_normalizer,
         meal_plan_concurrency: config.agent.meal_plan_concurrency,
     });
 
@@ -596,4 +598,31 @@ fn build_recipe_providers(
         return vec![Arc::new(provider)];
     }
     vec![mdb]
+}
+
+/// Constructs the brand normalizer for the promote path (#913).
+///
+/// In debug builds, if `external.fixture_path` is set, returns the file-backed
+/// `FixtureBrandNormalizer` (deterministic, offline) so e2e never makes a live
+/// LLM call. Otherwise (and always in release builds) returns the LLM-backed
+/// normalizer using the fast-tier provider.
+fn build_brand_normalizer(
+    external: &plnd_api::config::settings::ExternalProvidersConfig,
+    llm: &plnd_agent::LlmConfig,
+) -> Arc<dyn plnd_agent::BrandNormalizer> {
+    #[cfg(debug_assertions)]
+    if let Some(fixture_root) = &external.fixture_path {
+        tracing::warn!(
+            path = %fixture_root.display(),
+            "USING FIXTURE BRAND NORMALIZER for /catalog/ingredients/promote — debug builds only; never enable in prod"
+        );
+        let path = fixture_root.join("brand_normalization.json");
+        let normalizer = plnd_agent::FixtureBrandNormalizer::from_path(&path).unwrap_or_else(|e| {
+            tracing::error!(error = %e, "failed to load brand-normalization fixture");
+            std::process::exit(1);
+        });
+        return Arc::new(normalizer);
+    }
+    let provider = Arc::from(plnd_agent::build_fast_provider(llm));
+    Arc::new(plnd_agent::LlmBrandNormalizer::new(provider))
 }
