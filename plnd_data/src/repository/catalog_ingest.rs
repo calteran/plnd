@@ -12,6 +12,7 @@ pub struct IngestIngredientInput {
     pub nutrition: Option<Value>,
     pub allergens: Vec<String>,
     pub occasion_tags: Vec<String>,
+    pub brand: Option<String>,
 }
 
 pub struct ContributeIngredientInput {

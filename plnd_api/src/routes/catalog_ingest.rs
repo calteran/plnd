@@ -58,6 +58,8 @@ pub async fn ingest_ingredient(
             nutrition: body.nutrition,
             allergens: body.allergens.unwrap_or_default(),
             occasion_tags: body.occasion_tags.unwrap_or_default(),
+            // brand is populated only by the promote-path normalizer (#913), not via this direct-ingest body.
+            brand: None,
         })
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -89,6 +91,7 @@ pub(crate) fn ingest_input_from_detail(
         // is a taxonomy, not an occasion (#921). Occasion tags on an ingredient
         // come only from explicit user input via the manual ingest/contribute APIs.
         occasion_tags: vec![],
+        brand: None,
     }
 }
 

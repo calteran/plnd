@@ -14,6 +14,7 @@ pub struct IngestIngredientParams<'a> {
     pub nutrition: Option<Value>,
     pub allergens: &'a [String],
     pub occasion_tags: &'a [String],
+    pub brand: Option<&'a str>,
 }
 
 #[tracing::instrument(
@@ -31,15 +32,15 @@ pub async fn ingest_ingredient(
         WITH ins AS (
             INSERT INTO catalog_ingredients
                 (name, description, serving_size_g, nutrition, allergens, occasion_tags,
-                 external_source, external_id)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                 brand, external_source, external_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
             ON CONFLICT (external_source, external_id) DO NOTHING
             RETURNING ingredient_id
         )
         SELECT ingredient_id FROM ins
         UNION ALL
         SELECT ingredient_id FROM catalog_ingredients
-        WHERE external_source = $7 AND external_id = $8
+        WHERE external_source = $8 AND external_id = $9
         LIMIT 1
         "#,
     )
@@ -49,6 +50,7 @@ pub async fn ingest_ingredient(
     .bind(params.nutrition)
     .bind(params.allergens)
     .bind(params.occasion_tags)
+    .bind(params.brand)
     .bind(params.external_source)
     .bind(params.external_id)
     .fetch_one(pool)
@@ -371,6 +373,7 @@ mod tests {
                 nutrition: Some(serde_json::json!({"calories_kcal": 18})),
                 allergens: &[],
                 occasion_tags: &[],
+                brand: None,
             },
         )
         .await
@@ -555,5 +558,68 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(link_count, 1);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn ingest_ingredient_stores_brand_and_brands_share_generic_name(pool: PgPool) {
+        let great_value = ingest_ingredient(
+            &pool,
+            IngestIngredientParams {
+                external_source: "openfoodfacts",
+                external_id: "off-1",
+                name: "Cheddar cheese",
+                description: None,
+                serving_size_g: None,
+                nutrition: None,
+                allergens: &[],
+                occasion_tags: &[],
+                brand: Some("Great Value"),
+            },
+        )
+        .await
+        .unwrap();
+
+        let kraft = ingest_ingredient(
+            &pool,
+            IngestIngredientParams {
+                external_source: "openfoodfacts",
+                external_id: "off-2",
+                name: "Cheddar cheese",
+                description: None,
+                serving_size_g: None,
+                nutrition: None,
+                allergens: &[],
+                occasion_tags: &[],
+                brand: Some("Kraft"),
+            },
+        )
+        .await
+        .unwrap();
+
+        assert_ne!(great_value, kraft, "distinct external ids → distinct rows");
+
+        let brand: Option<String> =
+            sqlx::query_scalar("SELECT brand FROM catalog_ingredients WHERE ingredient_id = $1")
+                .bind(great_value)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(brand.as_deref(), Some("Great Value"));
+
+        let kraft_brand: Option<String> =
+            sqlx::query_scalar("SELECT brand FROM catalog_ingredients WHERE ingredient_id = $1")
+                .bind(kraft)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(kraft_brand.as_deref(), Some("Kraft"));
+
+        let shared: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM catalog_ingredients WHERE name = 'Cheddar cheese'",
+        )
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(shared, 2, "both brands coexist under one generic name");
     }
 }

@@ -285,6 +285,7 @@ fn ingredient_input_from(
             .and_then(|n| serde_json::to_value(n).ok()),
         allergens: vec![],
         occasion_tags: vec![],
+        brand: None,
     }
 }
 
