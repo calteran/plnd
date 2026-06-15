@@ -238,6 +238,31 @@ describe('DayViewComponent (inline editor)', () => {
     component.onEditSave('entry-1', { title: 'X' });
     expect(spy).toHaveBeenCalledWith('entry-1', { title: 'X' });
   });
+
+  it('dims a row only while a different row is being edited', async () => {
+    const { component } = await setupEditor();
+    const task: ScheduleItem = { id: 't1', type: 'general', label: 'Task', status: 'pending', oneShot: false, floating: false };
+    component.editingId.set(null);
+    expect(component['isSpotlightDimmed'](task)).toBeFalse();      // nothing editing
+    component.editingId.set('t1');
+    expect(component['isSpotlightDimmed'](task)).toBeFalse();      // editing self
+    component.editingId.set('other');
+    expect(component['isSpotlightDimmed'](task)).toBeTrue();       // editing another row
+  });
+
+  it('keeps a meal row lit while one of its during-meal tasks is being edited', async () => {
+    const { component } = await setupEditor();
+    const meal: ScheduleItem = {
+      id: 'm1', name: 'Breakfast', emoji: '🥑', status: 'planned',
+      duringMealTasks: [
+        { id: 'dt1', type: 'general', label: 'Vitamins', status: 'pending', oneShot: false, floating: false },
+      ],
+    };
+    component.editingId.set('dt1');
+    expect(component['isSpotlightDimmed'](meal)).toBeFalse();
+    component.editingId.set('elsewhere');
+    expect(component['isSpotlightDimmed'](meal)).toBeTrue();
+  });
 });
 
 describe('DayViewComponent (toast)', () => {
