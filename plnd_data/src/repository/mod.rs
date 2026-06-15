@@ -18,6 +18,7 @@ pub mod routine;
 pub mod schedule;
 pub mod session;
 pub mod task;
+pub mod timezone_anchor;
 pub mod user;
 pub mod user_dish_pref;
 pub mod user_ingredient_pref;
@@ -39,6 +40,7 @@ pub use routine::RoutineRepository;
 pub use schedule::ScheduleRepository;
 pub use session::SessionRepository;
 pub use task::TaskRepository;
+pub use timezone_anchor::TimezoneAnchorRepository;
 pub use user::UserRepository;
 pub use user_dish_pref::{AddIngredientParams, UserDishPrefRepository};
 pub use user_ingredient_pref::UserIngredientPrefRepository;
@@ -64,6 +66,7 @@ pub struct Repositories {
     pub routine: Arc<dyn RoutineRepository>,
     pub session: Arc<dyn SessionRepository>,
     pub task: Arc<dyn TaskRepository>,
+    pub timezone_anchor: Arc<dyn TimezoneAnchorRepository>,
     pub user: Arc<dyn UserRepository>,
     pub user_dish_pref: Arc<dyn UserDishPrefRepository>,
     pub user_ingredient_pref: Arc<dyn UserIngredientPrefRepository>,
@@ -103,6 +106,9 @@ impl Repositories {
             routine: Arc::new(pg::routine::PgRoutineRepository::new(pool.clone())),
             session: Arc::new(pg::session::PgSessionRepository::new(pool.clone())),
             task: Arc::new(pg::task::PgTaskRepository::new(pool.clone())),
+            timezone_anchor: Arc::new(
+                pg::timezone_anchor::PgTimezoneAnchorRepository::new(pool.clone()),
+            ),
             user: Arc::new(pg::user::PgUserRepository::new(pool.clone())),
             user_dish_pref: Arc::new(pg::user_dish_pref::PgUserDishPrefRepository::new(
                 pool.clone(),
