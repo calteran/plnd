@@ -3,7 +3,7 @@ import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
 import { of, throwError } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { OnboardingAccountComponent } from './onboarding-account';
 import { OnboardingStateService } from '../onboarding-state.service';
 import { UserService } from '../../../core/services/user.service';
@@ -59,6 +59,7 @@ describe('OnboardingAccountComponent', () => {
   let prefsMock: ReturnType<typeof makePrefsServiceMock>;
   let stateMock: ReturnType<typeof makeStateMock>;
   let router: Router;
+  let httpMock: HttpTestingController;
 
   beforeEach(async () => {
     userMock = makeUserServiceMock();
@@ -78,8 +79,16 @@ describe('OnboardingAccountComponent', () => {
     }).compileComponents();
 
     router = TestBed.inject(Router);
+    httpMock = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(OnboardingAccountComponent);
     fixture.detectChanges();
+  });
+
+  afterEach(() => {
+    // Drain any pending requests (e.g. the fire-and-forget device-zone POST) so
+    // verify() does not flag them as unexpected.
+    httpMock.match(() => true).forEach(r => r.flush({}));
+    httpMock.verify();
   });
 
   it('should create', () => {
@@ -146,5 +155,36 @@ describe('OnboardingAccountComponent', () => {
     prefsMock.patchPreferences.and.returnValue(throwError(() => new Error('fail')));
     fixture.componentInstance.onSave();
     expect(fixture.componentInstance.saveError()).toBeTrue();
+  });
+
+  describe('device-zone seeding', () => {
+    it('POSTs to /timezone/device with the device zone on successful save', () => {
+      fixture.componentInstance.onSave();
+
+      const req = httpMock.expectOne('http://localhost:3000/timezone/device');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toEqual({ zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
+
+      req.flush({ outcome: 'no_change', effective_zone: null, confirm: null });
+    });
+
+    it('does not POST to /timezone/device a second time when onSave is called again', () => {
+      // First save — should fire the device-zone POST once.
+      fixture.componentInstance.onSave();
+      httpMock.expectOne('http://localhost:3000/timezone/device')
+        .flush({ outcome: 'no_change', effective_zone: null, confirm: null });
+
+      // Second save — guard flag must prevent a second POST.
+      fixture.componentInstance.onSave();
+      const second = httpMock.match('http://localhost:3000/timezone/device');
+      expect(second.length).toBe(0);
+    });
+
+    it('does not POST to /timezone/device when save fails', () => {
+      prefsMock.patchPreferences.and.returnValue(throwError(() => new Error('fail')));
+      fixture.componentInstance.onSave();
+      const requests = httpMock.match('http://localhost:3000/timezone/device');
+      expect(requests.length).toBe(0);
+    });
   });
 });

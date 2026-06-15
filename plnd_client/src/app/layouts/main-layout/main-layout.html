@@ -1,6 +1,15 @@
 <!-- main-layout.html -->
 <div class="main-layout">
 
+  @if (standoff(); as s) {
+    <app-timezone-standoff
+      [intendedZone]="s.intended_zone"
+      [deviceZone]="s.device_zone"
+      (moved)="onMoved(s)"
+      (clockOff)="onClockOff()"
+    />
+  }
+
   <header class="top-bar">
     <span class="app-title">PLND</span>
     <app-navbar-avatar />
