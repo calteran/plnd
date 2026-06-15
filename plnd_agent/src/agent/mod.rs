@@ -2138,6 +2138,229 @@ mod tests {
         let out = apply_existing_constraint("BASE".to_string(), false);
         assert_eq!(out, "BASE");
     }
+
+    // ── infer_timezone_change DB-backed integration tests (D4) ────────────────
+    //
+    // NOTE: whether the model decides to call `infer_timezone_change` at all —
+    // the confidence judgment that clears the D4 bar (an EXPLICIT travel signal
+    // vs. a passing mention of a city) — is governed by the prompt and the tool
+    // description, not by deterministic code. A `MockLlmProvider` cannot
+    // exercise that judgment. These tests therefore script the model's decision
+    // directly and verify the *wiring* and *tool behavior*: when the tool is
+    // invoked it writes the correct anchor pair sharing one inference_group;
+    // when it is not invoked, nothing is written; and dismissing a group removes
+    // exactly that pair.
+    //
+    // All three require `DATABASE_URL` (provided by `just verify`) and self-skip
+    // otherwise.
+
+    use chrono::NaiveDate;
+    use plnd_data::models::TimezoneSource;
+
+    /// A scripted `infer_timezone_change` call with both departure and return
+    /// must persist exactly two `Inferred` anchors sharing one `inference_group`.
+    #[tokio::test]
+    async fn test_infer_timezone_change_creates_anchor_pair() {
+        let repos = match test_db().await {
+            Some(repos) => repos,
+            None => return,
+        };
+        let user_id = new_user(&repos).await;
+
+        let mock = MockLlmProvider::new("test");
+        // First turn: the model calls the inference tool with a round trip.
+        mock.push_response(CompletionResponse {
+            content: None,
+            tool_calls: vec![ToolCall {
+                id: "tc_tz".to_string(),
+                name: "infer_timezone_change".to_string(),
+                arguments: serde_json::json!({
+                    "destination_zone": "America/Denver",
+                    "effective_date": "2026-07-10",
+                    "return_zone": "America/New_York",
+                    "return_date": "2026-07-17",
+                }),
+            }],
+            stop_reason: StopReason::ToolUse,
+            usage: None,
+        });
+        // Second turn: terminate with a schema-conforming TaskEntry response.
+        // (TaskEntry has a response validator; plain prose would fail it.)
+        mock.push_response(CompletionResponse {
+            content: Some(
+                r#"{"actions_taken":[],"ui_signals":[],"confirmation":"Recorded your trip."}"#
+                    .to_string(),
+            ),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+
+        // TaskEntry registry over the real repos is built inside `run` from
+        // `ctx.use_case` + `repos`, so the tool's `add` hits the real DB.
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos.clone());
+        let ctx = AgentContext {
+            user_id,
+            use_case: UseCase::TaskEntry,
+            input: "Flight to Denver July 10, back to NYC July 17".to_string(),
+            prior_context: None,
+            extra: None,
+            constrained_to_existing: false,
+        };
+
+        service.run(&ctx).await.expect("agent run should succeed");
+
+        let inferred: Vec<_> = repos
+            .timezone_anchor
+            .list_through(user_id, NaiveDate::from_ymd_opt(2026, 12, 31).unwrap())
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|a| a.source == TimezoneSource::Inferred)
+            .collect();
+
+        assert_eq!(
+            inferred.len(),
+            2,
+            "a round trip must create exactly two inferred anchors"
+        );
+        let group = inferred[0].inference_group;
+        assert!(
+            group.is_some(),
+            "inferred anchors must carry an inference_group"
+        );
+        assert_eq!(
+            inferred[1].inference_group, group,
+            "both anchors must share the same inference_group"
+        );
+    }
+
+    /// When the model does not call the tool, no inferred anchors are written.
+    #[tokio::test]
+    async fn test_no_inference_when_tool_not_called() {
+        let repos = match test_db().await {
+            Some(repos) => repos,
+            None => return,
+        };
+        let user_id = new_user(&repos).await;
+
+        let mock = MockLlmProvider::new("test");
+        mock.push_response(CompletionResponse {
+            content: Some(
+                r#"{"actions_taken":[],"ui_signals":[],"confirmation":"Got it."}"#.to_string(),
+            ),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos.clone());
+        let ctx = AgentContext {
+            user_id,
+            use_case: UseCase::TaskEntry,
+            input: "Call my friend who lives in Denver".to_string(),
+            prior_context: None,
+            extra: None,
+            constrained_to_existing: false,
+        };
+
+        service.run(&ctx).await.expect("agent run should succeed");
+
+        let inferred: Vec<_> = repos
+            .timezone_anchor
+            .list_through(user_id, NaiveDate::from_ymd_opt(2026, 12, 31).unwrap())
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|a| a.source == TimezoneSource::Inferred)
+            .collect();
+
+        assert!(
+            inferred.is_empty(),
+            "no inferred anchors should exist when the tool was never called"
+        );
+    }
+
+    /// Dismissing an inference group deletes exactly that anchor pair.
+    #[tokio::test]
+    async fn test_dismiss_inference_group_removes_pair() {
+        let repos = match test_db().await {
+            Some(repos) => repos,
+            None => return,
+        };
+        let user_id = new_user(&repos).await;
+
+        // Recreate Test 1's flow to seed the pair.
+        let mock = MockLlmProvider::new("test");
+        mock.push_response(CompletionResponse {
+            content: None,
+            tool_calls: vec![ToolCall {
+                id: "tc_tz".to_string(),
+                name: "infer_timezone_change".to_string(),
+                arguments: serde_json::json!({
+                    "destination_zone": "America/Denver",
+                    "effective_date": "2026-07-10",
+                    "return_zone": "America/New_York",
+                    "return_date": "2026-07-17",
+                }),
+            }],
+            stop_reason: StopReason::ToolUse,
+            usage: None,
+        });
+        mock.push_response(CompletionResponse {
+            content: Some(
+                r#"{"actions_taken":[],"ui_signals":[],"confirmation":"Recorded your trip."}"#
+                    .to_string(),
+            ),
+            tool_calls: vec![],
+            stop_reason: StopReason::EndTurn,
+            usage: None,
+        });
+
+        let service = AgentService::new_with_registry_and_repos(make_registry(mock), repos.clone());
+        let ctx = AgentContext {
+            user_id,
+            use_case: UseCase::TaskEntry,
+            input: "Flight to Denver July 10, back to NYC July 17".to_string(),
+            prior_context: None,
+            extra: None,
+            constrained_to_existing: false,
+        };
+        service.run(&ctx).await.expect("agent run should succeed");
+
+        let through = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
+        let inferred: Vec<_> = repos
+            .timezone_anchor
+            .list_through(user_id, through)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|a| a.source == TimezoneSource::Inferred)
+            .collect();
+        let group = inferred[0]
+            .inference_group
+            .expect("seeded anchors must carry an inference_group");
+
+        let deleted = repos
+            .timezone_anchor
+            .delete_group(user_id, group)
+            .await
+            .unwrap();
+        assert_eq!(deleted, 2, "dismissing the group must remove both anchors");
+
+        let remaining: Vec<_> = repos
+            .timezone_anchor
+            .list_through(user_id, through)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|a| a.source == TimezoneSource::Inferred)
+            .collect();
+        assert!(
+            remaining.is_empty(),
+            "no inferred anchors should remain after dismissing the group"
+        );
+    }
 }
 
 // ── Schema validation unit tests ─────────────────────────────────────────────
