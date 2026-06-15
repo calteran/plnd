@@ -10,6 +10,7 @@ mod schedule;
 mod search;
 mod suggestion;
 mod task;
+mod timezone_anchor;
 mod user;
 
 pub use catalog::*;
@@ -24,4 +25,5 @@ pub use schedule::*;
 pub use search::*;
 pub use suggestion::*;
 pub use task::*;
+pub use timezone_anchor::*;
 pub use user::*;

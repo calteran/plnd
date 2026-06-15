@@ -18,6 +18,7 @@ pub mod system;
 pub mod tasks;
 #[cfg(debug_assertions)]
 pub mod test_seed;
+pub mod timezone;
 pub mod user_dish_prefs;
 pub mod user_ingredient_prefs;
 pub mod user_meal_prefs;

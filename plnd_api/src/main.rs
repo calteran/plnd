@@ -33,7 +33,7 @@ use plnd_api::routes::test_seed;
 use plnd_api::routes::{
     agent, auth, briefing, catalog_details, catalog_ingest, day_types, dietary_restrictions,
     meal_pattern, meal_suggestions, preferences, routine, schedule, schedule_anchors, search,
-    system, tasks, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
+    system, tasks, timezone, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
 use plnd_data::cache::SearchCache;
@@ -393,6 +393,17 @@ async fn main() {
             "/schedule/anchors/{id}/status",
             patch(schedule_anchors::set_status),
         )
+        // Timezone anchors
+        .route(
+            "/timezone/anchors",
+            get(timezone::list_anchors).post(timezone::create_anchor),
+        )
+        .route("/timezone/anchors/{id}", delete(timezone::delete_anchor))
+        .route(
+            "/timezone/anchors/group/{inference_group}",
+            delete(timezone::delete_anchor_group),
+        )
+        .route("/timezone/resolve", get(timezone::resolve_zone))
         .route(
             "/routines",
             get(routine::list_routines).post(routine::create_routine),

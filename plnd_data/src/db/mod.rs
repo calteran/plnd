@@ -17,6 +17,7 @@ pub(crate) mod schedule;
 pub(crate) mod search;
 pub(crate) mod sessions;
 pub(crate) mod tasks;
+pub(crate) mod timezone_anchor;
 pub(crate) mod user_dish_prefs;
 pub(crate) mod user_ingredient_prefs;
 pub(crate) mod user_meal_prefs;

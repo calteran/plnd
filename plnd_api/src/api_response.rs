@@ -2,7 +2,8 @@ use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::models::{
     CatalogDish, CatalogDishIngredient, CatalogIngredient, CatalogMeal, CatalogMealDish, DayType,
     DietaryRestriction, MealPatternEntry, MealSuggestion, PlannedMealEntry, Routine, ScheduleEntry,
-    Task, User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail, UserPreferences,
+    Task, TimezoneAnchor, User, UserDishPrefDetail, UserIngredientPref, UserMealPrefDetail,
+    UserPreferences,
 };
 use plnd_data::query_types::{
     PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
@@ -798,6 +799,49 @@ impl From<UserMealPrefDetail> for UserMealPrefDetailResponse {
             has_personal_recipe: m.has_personal_recipe,
             origin_external_source: m.origin_external_source,
             nutrition_estimated: m.nutrition_estimated,
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Timezone anchor response types
+// ---------------------------------------------------------------------------
+
+/// API response wrapper for `plnd_data::models::TimezoneAnchor`.
+///
+/// `zone` is the IANA timezone name string (e.g. `"America/New_York"`);
+/// `chrono_tz::Tz` is not directly schema-representable so it is serialized
+/// as its canonical name. `source` is likewise serialized as a string
+/// (`"device"` | `"user"` | `"inferred"`).
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct TimezoneAnchorResponse {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub effective_date: NaiveDate,
+    pub effective_time: Option<NaiveTime>,
+    /// IANA timezone name (e.g. `"America/New_York"`).
+    pub zone: String,
+    /// `"device"` | `"user"` | `"inferred"`.
+    pub source: String,
+    pub source_ref: Option<Uuid>,
+    pub inference_group: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<TimezoneAnchor> for TimezoneAnchorResponse {
+    fn from(a: TimezoneAnchor) -> Self {
+        Self {
+            id: a.id,
+            user_id: a.user_id,
+            effective_date: a.effective_date,
+            effective_time: a.effective_time,
+            zone: a.zone.name().to_string(),
+            source: a.source.as_str().to_string(),
+            source_ref: a.source_ref,
+            inference_group: a.inference_group,
+            created_at: a.created_at,
+            updated_at: a.updated_at,
         }
     }
 }
