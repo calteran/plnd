@@ -1,4 +1,4 @@
--- Migration 0048: brand provenance for branded-ingredient normalization (#913).
+-- Migration 0049: brand provenance for branded-ingredient normalization (#913).
 -- Branded products (Open Food Facts / USDA Branded) are promoted under a clean
 -- generic `name`; the extracted brand lives here. NULL for canonical (USDA
 -- Foundation/SR Legacy) and user-contributed rows. Forward-only: the dev DB is
