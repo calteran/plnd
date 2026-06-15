@@ -1,10 +1,12 @@
-import { Component, OnInit, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { UserService } from '../../../core/services/user.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
 import { OnboardingStateService } from '../onboarding-state.service';
+import { TimezoneService } from '../../../core/services/timezone.service';
 
 @Component({
   selector: 'app-onboarding-account',
@@ -258,6 +260,10 @@ export class OnboardingAccountComponent implements OnInit {
   private readonly preferencesService = inject(PreferencesService);
   private readonly state = inject(OnboardingStateService);
   private readonly router = inject(Router);
+  private readonly tz = inject(TimezoneService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  private deviceZoneSeeded = false;
 
   readonly displayName = signal('');
   readonly email = signal('');
@@ -321,6 +327,12 @@ export class OnboardingAccountComponent implements OnInit {
       next: () => {
         this.state.markComplete('account');
         this.router.navigate(['/onboarding']);
+        if (!this.deviceZoneSeeded) {
+          this.deviceZoneSeeded = true;
+          this.tz.reportDeviceZone(this.tz.deviceZone())
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({ next: () => {}, error: () => {} }); // fire-and-forget; never block onboarding
+        }
       },
       error: () => this.saveError.set(true),
     });
