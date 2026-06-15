@@ -15,6 +15,7 @@ pub mod schedule;
 pub mod session;
 pub mod task;
 pub mod timezone_anchor;
+pub mod timezone_pending_observation;
 pub mod user;
 pub mod user_dish_pref;
 pub mod user_ingredient_pref;

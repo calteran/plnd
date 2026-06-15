@@ -11,6 +11,7 @@ mod search;
 mod suggestion;
 mod task;
 mod timezone_anchor;
+mod timezone_pending_observation;
 mod user;
 
 pub use catalog::*;
@@ -26,4 +27,5 @@ pub use search::*;
 pub use suggestion::*;
 pub use task::*;
 pub use timezone_anchor::*;
+pub use timezone_pending_observation::*;
 pub use user::*;
