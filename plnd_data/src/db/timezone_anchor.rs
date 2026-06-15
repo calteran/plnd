@@ -26,7 +26,7 @@ fn map_row(row: sqlx::postgres::PgRow) -> Result<TimezoneAnchor, DatabaseError> 
         .try_get("source")
         .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
     let source = TimezoneSource::try_from(source_str.as_str())
-        .map_err(|e| DatabaseError::QueryError(e))?;
+        .map_err(DatabaseError::QueryError)?;
 
     Ok(TimezoneAnchor {
         id: row
