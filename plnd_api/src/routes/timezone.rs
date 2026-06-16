@@ -175,7 +175,7 @@ pub async fn list_anchors(
     state
         .repos
         .timezone_anchor
-        .list_through(user_id, query.through)
+        .list_through_with_source(user_id, query.through)
         .await
         .map(|v| Json(v.into_iter().map(TimezoneAnchorResponse::from).collect()))
         .map_err(|e| {

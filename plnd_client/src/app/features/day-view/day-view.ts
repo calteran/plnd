@@ -43,6 +43,7 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
         <app-timezone-why
           [anchor]="a"
           [currentZone]="zoneView()?.currentZone ?? tz.deviceZone()"
+          [sourceLabel]="a.source_title"
           (useCurrent)="onUseCurrent(a)"
           (pickZone)="onPickZone(a, $event)"
           (closed)="whyOpen.set(null)"

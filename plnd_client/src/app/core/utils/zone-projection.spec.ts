@@ -3,7 +3,7 @@ import { TimezoneAnchorDto } from '../models/timezone';
 
 function anchor(date: string, zone: string, time: string | null = null, extra: Partial<TimezoneAnchorDto> = {}): TimezoneAnchorDto {
   return { id: `${date}-${zone}`, user_id: 'u', effective_date: date, effective_time: time, zone,
-           source: 'user', source_ref: null, inference_group: null, created_at: '', updated_at: '', ...extra };
+           source: 'user', source_ref: null, source_title: null, inference_group: null, created_at: '', updated_at: '', ...extra };
 }
 
 describe('classifyDay', () => {

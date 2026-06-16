@@ -6,7 +6,7 @@ use plnd_data::models::{
     UserPreferences,
 };
 use plnd_data::query_types::{
-    PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
+    PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse, TimezoneAnchorWithSource,
 };
 use rust_decimal::Decimal;
 use serde::Serialize;
@@ -826,6 +826,10 @@ pub struct TimezoneAnchorResponse {
     /// `"device"` | `"user"` | `"inferred"`.
     pub source: String,
     pub source_ref: Option<Uuid>,
+    /// Human title of the originating task (resolved from `source_ref`), or
+    /// `null` when there is no source or the referenced task no longer exists.
+    /// Drives the inferred-anchor provenance line in the `(why?)` popover.
+    pub source_title: Option<String>,
     pub inference_group: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -833,6 +837,8 @@ pub struct TimezoneAnchorResponse {
 
 impl From<TimezoneAnchor> for TimezoneAnchorResponse {
     fn from(a: TimezoneAnchor) -> Self {
+        // No JOIN context here, so the source title is unresolved. Callers that
+        // need it (the anchors-list endpoint) use `From<TimezoneAnchorWithSource>`.
         Self {
             id: a.id,
             user_id: a.user_id,
@@ -841,6 +847,7 @@ impl From<TimezoneAnchor> for TimezoneAnchorResponse {
             zone: a.zone.name().to_string(),
             source: a.source.as_str().to_string(),
             source_ref: a.source_ref,
+            source_title: None,
             inference_group: a.inference_group,
             created_at: a.created_at,
             updated_at: a.updated_at,
@@ -848,9 +855,53 @@ impl From<TimezoneAnchor> for TimezoneAnchorResponse {
     }
 }
 
+impl From<TimezoneAnchorWithSource> for TimezoneAnchorResponse {
+    fn from(a: TimezoneAnchorWithSource) -> Self {
+        let TimezoneAnchorWithSource {
+            anchor,
+            source_title,
+        } = a;
+        Self {
+            source_title,
+            ..Self::from(anchor)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn sample_anchor() -> TimezoneAnchor {
+        TimezoneAnchor {
+            id: Uuid::nil(),
+            user_id: Uuid::nil(),
+            effective_date: NaiveDate::from_ymd_opt(2026, 1, 15).unwrap(),
+            effective_time: None,
+            zone: chrono_tz::America::Denver,
+            source: plnd_data::models::TimezoneSource::Inferred,
+            source_ref: Some(Uuid::nil()),
+            inference_group: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn timezone_anchor_response_carries_source_title() {
+        let with = TimezoneAnchorWithSource {
+            anchor: sample_anchor(),
+            source_title: Some("Flight to DEN".to_string()),
+        };
+        let resp = TimezoneAnchorResponse::from(with);
+        assert_eq!(resp.source_title, Some("Flight to DEN".to_string()));
+    }
+
+    #[test]
+    fn timezone_anchor_response_from_bare_anchor_has_null_source_title() {
+        let resp = TimezoneAnchorResponse::from(sample_anchor());
+        assert_eq!(resp.source_title, None);
+    }
 
     #[test]
     fn schedule_entry_response_includes_one_shot() {

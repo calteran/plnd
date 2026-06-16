@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::db::timezone_anchor as db;
 use crate::models::{TimezoneAnchor, TimezoneSource};
+use crate::query_types::TimezoneAnchorWithSource;
 use crate::repository::timezone_anchor::TimezoneAnchorRepository;
 
 pub struct PgTimezoneAnchorRepository {
@@ -26,6 +27,16 @@ impl TimezoneAnchorRepository for PgTimezoneAnchorRepository {
         through: NaiveDate,
     ) -> Result<Vec<TimezoneAnchor>, crate::Error> {
         db::list_through(&self.pool, user_id, through)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn list_through_with_source(
+        &self,
+        user_id: Uuid,
+        through: NaiveDate,
+    ) -> Result<Vec<TimezoneAnchorWithSource>, crate::Error> {
+        db::list_through_with_source(&self.pool, user_id, through)
             .await
             .map_err(Into::into)
     }

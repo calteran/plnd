@@ -9,6 +9,10 @@ export interface TimezoneAnchorDto {
   zone: string;                    // IANA, e.g. "America/Denver"
   source: TimezoneSource;
   source_ref: string | null;
+  /** Human title of the originating task (resolved from `source_ref`), or null
+   *  when there is no source or the referenced task no longer exists. Drives the
+   *  inferred-anchor provenance line in the `(why?)` popover. */
+  source_title: string | null;
   inference_group: string | null;
   created_at: string;
   updated_at: string;
