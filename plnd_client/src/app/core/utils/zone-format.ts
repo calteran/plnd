@@ -16,9 +16,17 @@ export function zoneShort(zone: string, date: Date): string {
   return tzNamePart(zone, date, 'shortGeneric');
 }
 
-/** Long generic zone label, e.g. "Mountain Time". */
+/**
+ * Long generic zone label, e.g. "Mountain Time".
+ *
+ * Some zones have no distinct generic long name in CLDR, so ICU falls back to the
+ * *standard* name which still carries "Standard"/"Daylight" (e.g. Pacific/Honolulu →
+ * "Hawaii-Aleutian Standard Time"). Strip those tokens so the label reads as a clean
+ * generic name ("Hawaii-Aleutian Time"). Pure string transform — no per-zone table —
+ * so it degrades uniformly across all zones and locales.
+ */
 export function zoneLong(zone: string, date: Date): string {
-  return tzNamePart(zone, date, 'longGeneric');
+  return tzNamePart(zone, date, 'longGeneric').replace(/\s+(Standard|Daylight)\b/g, '');
 }
 
 /** UTC offset of `zone` at `date`, in whole minutes (e.g. America/Denver summer → -360). */
