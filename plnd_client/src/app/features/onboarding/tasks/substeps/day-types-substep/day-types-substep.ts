@@ -14,6 +14,7 @@ import { DayTypesService } from '../../../../../core/services/day-types.service'
 import { DayTypeResponse } from '../../../../../core/models/day-type';
 import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 import { OnboardingStateService } from '../../../onboarding-state.service';
+import { todayIso } from '../../../../../core/utils/date-only';
 
 // Visual order of day pills: M T W T F S S (Mon–Sun, with Sun last).
 // Bit 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat.
@@ -109,10 +110,6 @@ function defaultDOWCards(): ScheduleCard[] {
     blankCard({ name: 'Weekdays', days_bitmask: 62, wake_time: '07:00', sleep_time: '22:00' }), // Mon–Fri: bits 1–5
     blankCard({ name: 'Weekends', days_bitmask: 65, wake_time: '08:00', sleep_time: '23:00' }), // Sat+Sun: bits 0+6
   ];
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function responseToCard(r: DayTypeResponse): ScheduleCard {

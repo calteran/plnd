@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 
 import { detectReducedMotion } from '../../../../core/utils/browser-utils';
+import { parseDateOnly } from '../../../../core/utils/date-only';
 
 export type StageMode = 'spiral' | 'drop';
 
@@ -64,8 +65,7 @@ export const STAGE_WIDTH_PX       = 360;
 const PERIMETER_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
 
 function dayLabel(iso: string): string {
-  const d = new Date(`${iso}T12:00:00`);
-  return d.toLocaleDateString('en-US', { weekday: 'long' });
+  return parseDateOnly(iso).toLocaleDateString('en-US', { weekday: 'long' });
 }
 
 @Component({

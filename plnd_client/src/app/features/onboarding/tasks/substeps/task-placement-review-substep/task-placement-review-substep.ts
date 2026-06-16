@@ -12,6 +12,7 @@ import { Router } from '@angular/router';
 import { AgentService } from '../../../../../core/services/agent.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { mealsForDate } from '../../../../../core/utils/day-type-utils';
+import { parseDateOnly, addDaysDateOnly } from '../../../../../core/utils/date-only';
 import {
   PlaceTasksRequest,
   PlaceTasksEntry,
@@ -61,33 +62,23 @@ interface EditState {
 const DAY_NAMES = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const MONTH_ABBREVS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function addDays(isoDate: string, n: number): string {
-  const d = new Date(`${isoDate}T12:00:00`);
-  d.setDate(d.getDate() + n);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 function datesBetween(start: string, end: string): string[] {
   const dates: string[] = [];
   let current = start;
   while (current <= end) {
     dates.push(current);
-    current = addDays(current, 1);
+    current = addDaysDateOnly(current, 1);
   }
   return dates;
 }
 
 function formatDisplayDate(isoDate: string): string {
-  const d = new Date(`${isoDate}T12:00:00`);
+  const d = parseDateOnly(isoDate);
   return `${MONTH_ABBREVS[d.getMonth()]} ${d.getDate()}`;
 }
 
 function getDayName(isoDate: string): string {
-  const d = new Date(`${isoDate}T12:00:00`);
-  return DAY_NAMES[d.getDay()];
+  return DAY_NAMES[parseDateOnly(isoDate).getDay()];
 }
 
 type Bucket = 'start-of-day' | 'morning' | 'afternoon' | 'evening';
