@@ -6,9 +6,10 @@ use crate::api_response::{
     CatalogMealDishResponse, CommittedEntryRef, DayTypeResponse, DietaryRestrictionResponse,
     DishDetailApiResponse, MealAnchorInstanceResponse, MealDetailApiResponse,
     MealPatternEntryResponse, MealSuggestionResponse, PlanStatusApiResponse,
-    PlannedMealEntryResponse, PostSchedulePlanApiResponse, RoutineResponse, ScheduleEntryResponse,
-    SchedulePeriodApiResponse, TaskResponse, TimezoneAnchorResponse, UserDishPrefDetailResponse,
-    UserIngredientPrefResponse, UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
+    PlannedMealEntryResponse, PostSchedulePlanApiResponse, RoutineResponse, ScheduleAnchorKind,
+    ScheduleAnchorResponse, ScheduleEntryResponse, SchedulePeriodApiResponse, TaskResponse,
+    TimezoneAnchorResponse, UserDishPrefDetailResponse, UserIngredientPrefResponse,
+    UserMealPrefDetailResponse, UserPreferencesResponse, UserResponse,
 };
 use crate::models::{
     CarryoverDecision, ConversationTurn, CreateMealPatternEntryRequest,
@@ -206,6 +207,8 @@ impl Modify for BearerSecurityAddon {
         MealEntryRequest,
         PlannedMealEntryResponse,
         MealAnchorInstanceResponse,
+        ScheduleAnchorResponse,
+        ScheduleAnchorKind,
         CreateScheduleAnchorRequest,
         UpdateScheduleAnchorRequest,
         SetAnchorStatusRequest,

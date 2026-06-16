@@ -115,6 +115,51 @@ impl From<plnd_data::models::MealAnchorInstance> for MealAnchorInstanceResponse 
     }
 }
 
+/// Discriminator for [`ScheduleAnchorResponse`] (#958). Snake-case on the wire,
+/// matching `TimezoneSource`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ScheduleAnchorKind {
+    Meal,
+    ScheduledTask,
+    StartOfDay,
+    EndOfDay,
+    TimezoneChange,
+}
+
+/// One anchor in the unified, ordered `/schedule/anchors` sequence (§4.7).
+///
+/// `sequence` (not `time`) is the structural primitive (§4.8): consumers derive
+/// slot adjacency from index `i`↔`i+1`. `time` is the resolved wall-clock value,
+/// informational. Kind-specific fields are present-but-null on anchors they do
+/// not apply to, matching this codebase's `Option` serialization convention.
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct ScheduleAnchorResponse {
+    pub kind: ScheduleAnchorKind,
+    /// 0-based position in the day's ordered sequence.
+    pub sequence: i32,
+    /// Resolved wall-clock time-of-day (informational; ordering uses `sequence`).
+    pub time: NaiveTime,
+    /// Stable label; matches the `after_anchor` convention
+    /// ("start of day", "end of day", meal/task name, IANA zone name).
+    pub label: String,
+    /// `meal_anchor_instances.id` or `schedule_entries.entry_id`; null for
+    /// start-of-day / end-of-day.
+    pub id: Option<Uuid>,
+    /// Meal only: "planned" | "consumed" | "skipped".
+    pub status: Option<String>,
+    /// Meal only.
+    pub consumed_at: Option<DateTime<Utc>>,
+    /// Meal only.
+    pub tolerance_minutes: Option<i32>,
+    /// Meal only.
+    pub sort_order: Option<i32>,
+    /// Meal only.
+    pub template_entry_id: Option<Uuid>,
+    /// Timezone-change only: IANA zone name (e.g. "America/Denver").
+    pub zone: Option<String>,
+}
+
 /// API response wrapper for `plnd_data::models::MealPatternEntry`.
 #[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct MealPatternEntryResponse {
