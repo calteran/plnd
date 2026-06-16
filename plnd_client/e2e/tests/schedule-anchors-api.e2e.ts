@@ -8,6 +8,8 @@ import { API_BASE, mintTestToken, generateTestSub } from '../helpers/auth';
 // the UI will use once it's built. They run through the real auth flow and
 // the real backend (per docs/architecture.md §9.7).
 
+// POST / PATCH / status return a single MealAnchorInstanceResponse (the meal
+// instance that was mutated): id/name/preferred_time/status/... .
 interface AnchorResponse {
   id: string;
   user_id: string;
@@ -21,6 +23,19 @@ interface AnchorResponse {
   consumed_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// GET /schedule/anchors returns the unified, ordered anchor sequence (#958):
+// all four sources flattened, keyed on `kind`, with `label`/`time`/`sequence`
+// instead of the meal instance's `name`/`preferred_time`.
+interface ScheduleAnchor {
+  kind: 'meal' | 'scheduled_task' | 'start_of_day' | 'end_of_day' | 'timezone_change';
+  sequence: number;
+  time: string;
+  label: string;
+  id: string | null;
+  status: string | null;
+  zone: string | null;
 }
 
 async function authHeaders(sub: string): Promise<Record<string, string>> {
@@ -53,9 +68,11 @@ test.describe('Schedule anchors — per-date meal anchor instances (API)', () =>
 
     const listRes = await fetch(`${API_BASE}/schedule/anchors?date=${date}`, { headers });
     expect(listRes.status).toBe(200);
-    const list = (await listRes.json()) as AnchorResponse[];
-    const names = list.map((i) => i.name);
-    expect(names).toContain('Brunch');
+    // GET returns the unified sequence (#958): the meal anchor surfaces as a
+    // kind=meal entry whose `label` is the meal name.
+    const list = (await listRes.json()) as ScheduleAnchor[];
+    const mealLabels = list.filter((a) => a.kind === 'meal').map((a) => a.label);
+    expect(mealLabels).toContain('Brunch');
   });
 
   test('rename via PATCH updates name only', async () => {
@@ -124,8 +141,8 @@ test.describe('Schedule anchors — per-date meal anchor instances (API)', () =>
     expect(delRes.status).toBe(204);
 
     const listRes = await fetch(`${API_BASE}/schedule/anchors?date=${date}`, { headers });
-    const list = (await listRes.json()) as AnchorResponse[];
-    expect(list.map((i) => i.id)).not.toContain(inst.id);
+    const list = (await listRes.json()) as ScheduleAnchor[];
+    expect(list.map((a) => a.id)).not.toContain(inst.id);
   });
 
   test('past-date add accepted', async () => {
@@ -152,10 +169,11 @@ test.describe('Schedule anchors — per-date meal anchor instances (API)', () =>
 
     const listRes = await fetch(`${API_BASE}/schedule/anchors?date=${date}`, { headers });
     expect(listRes.status).toBe(200);
-    // New user has no day-type templates seeded, so list returns empty —
-    // but the materialization marker has been written. Subsequent reads
-    // should also be empty and not re-import a template.
-    const list = (await listRes.json()) as AnchorResponse[];
+    // New user has no day-type templates seeded, so the unified sequence is
+    // empty: no active day type means no start/end-of-day, and no meals/tasks/
+    // tz changes. The materialization marker has still been written; subsequent
+    // reads stay empty and do not re-import a template.
+    const list = (await listRes.json()) as ScheduleAnchor[];
     expect(list).toEqual([]);
   });
 
