@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ConfigService } from './config.service';
 import { EnvironmentConfig } from '../models/config';
+import { environment } from '../../../environments/environment';
 
 describe('ConfigService', () => {
   let service: ConfigService;
@@ -47,10 +48,36 @@ describe('ConfigService', () => {
         timeout: 60000
       }
     };
-    
+
     service.updateConfig(newConfig);
     const updatedConfig = service.getConfig();
     expect(updatedConfig.api.baseUrl).toEqual('https://api.example.com');
     expect(updatedConfig.api.timeout).toEqual(60000);
+  });
+});
+
+describe('ConfigService api base override', () => {
+  const KEY = '__PLND_API_BASE__';
+
+  afterEach(() => {
+    delete (globalThis as Record<string, unknown>)[KEY];
+  });
+
+  it('uses globalThis.__PLND_API_BASE__ when set', () => {
+    (globalThis as Record<string, unknown>)[KEY] = 'http://localhost:54321';
+    const svc = new ConfigService();
+    expect(svc.getConfig().api.baseUrl).toBe('http://localhost:54321');
+  });
+
+  it('derives the OIDC redirectUri from the app origin when override is set', () => {
+    (globalThis as Record<string, unknown>)[KEY] = 'http://localhost:54321';
+    const svc = new ConfigService();
+    expect(svc.getConfig().oidc.redirectUri).toBe(`${globalThis.location.origin}/auth/callback`);
+  });
+
+  it('falls back to environment when override is unset', () => {
+    const svc = new ConfigService();
+    expect(svc.getConfig().api.baseUrl).toBe(environment.api.baseUrl);
+    expect(svc.getConfig().oidc.redirectUri).toBe(environment.oidc.redirectUri);
   });
 });

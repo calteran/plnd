@@ -14,7 +14,23 @@ otelcol.processor.batch "default" {
   output {
     traces  = [otelcol.exporter.otlp.tempo.input]
     metrics = [otelcol.exporter.prometheus.default.input]
-    logs    = [otelcol.exporter.loki.default.input]
+    logs    = [otelcol.processor.transform.loki_labels.input]
+  }
+}
+
+// Promote selected resource attributes to Loki labels (otherwise they land as
+// structured metadata). `verify.run_id` lets us filter a single verify run in
+// Grafana: {service_name="plnd_api", verify_run_id="<id>"}.
+otelcol.processor.transform "loki_labels" {
+  error_mode = "ignore"
+  log_statements {
+    context = "resource"
+    statements = [
+      `set(attributes["loki.resource.labels"], "service.name, verify.run_id")`,
+    ]
+  }
+  output {
+    logs = [otelcol.exporter.loki.default.input]
   }
 }
 

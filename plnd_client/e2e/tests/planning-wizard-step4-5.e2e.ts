@@ -1,4 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '../fixtures';
+import type { Page } from '@playwright/test';
 import { seedAuth, API_BASE } from '../helpers/auth';
 
 // Fixed seed: 7-day horizon Mon 2026-03-30 → Sun 2026-04-05

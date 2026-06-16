@@ -10,7 +10,7 @@ init:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ Installing Homebrew packages..."
-    brew install flock coreutils libpq dopplerhq/cli/doppler mprocs
+    brew install coreutils libpq dopplerhq/cli/doppler mprocs
 
     echo "→ Installing Rust tools..."
     cargo install cargo-nextest --locked
@@ -78,12 +78,21 @@ api-watch:
 client:
     cd plnd_client && npx ng serve
 
-# Run database only in detached mode
-db:
-    docker compose up -d db
+# Bring up the shared, persistent infra (db + mock-oauth + observability) for a
+# work session. Idempotent. Run once before `just dev` / before agents verify.
+# `just verify` auto-ensures db+oauth on its own, but observability only comes up
+# here — so run this to capture per-run telemetry in Grafana.
+persist:
+    doppler run -- docker compose up -d --wait
 
-# Stop all containers and remove volumes (next `just dev` starts with a clean DB)
+# Stop ALL shared infra and remove volumes. HUMAN-ONLY: this wipes the database
+# used by every running verify. The confirmation prompt aborts on EOF, so agents
+# (non-interactive) can never trigger it.
 stop:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    read -rp "⚠️  Wipes shared infra + volumes used by ALL running verifies. Continue? [y/N] " ans || ans=""
+    [[ "$ans" == [yY] ]] || { echo "Aborted."; exit 1; }
     docker compose down -v
 
 alias down := stop
@@ -149,10 +158,14 @@ check:
     just ts-lint
     just ts-deps
 
-# Full verification — parallel pipeline (see scripts/verify.sh)
-# Runs quality checks + build + unit tests + e2e. Use before every commit.
-verify:
-    @bash scripts/verify.sh
+# Full verification — parallel, ISOLATED pipeline (see scripts/verify.sh).
+# No semaphore: runs are isolated by per-run DB + ephemeral ports.
+# SUBSET ∈ {all,quick,rust,ts,e2e}. Default `all`. Examples:
+#   just verify           # everything
+#   just verify quick     # read-only checks, no infra (fastest)
+#   just verify e2e       # build + isolated API/ng + Playwright
+verify SUBSET="all":
+    @bash scripts/verify.sh {{ SUBSET }}
 
 # ── Compilation & Server Validation ──────────────────────────────────────────
 
@@ -162,14 +175,14 @@ verify-build:
     cargo build --workspace && \
     echo "✅ Build successful"
 
-# Test server startup (15 second timeout - will auto-kill)
-# timeout exits 124 when it kills the process (success); any other code means the server crashed.
+# Test server startup (15 second timeout - will auto-kill, ephemeral port)
 test-run-server:
     #!/usr/bin/env bash
     set -euo pipefail
-    echo "🚀 Testing server startup (15s timeout - will auto-kill)..."
+    PORT=$(bash scripts/free-port.sh)
+    echo "🚀 Testing server startup on :$PORT (15s timeout - will auto-kill)..."
     cd plnd_api
-    timeout 15s doppler run -- cargo run || exit_code=$?
+    timeout 15s doppler run -- env APP_API__BASE_URL="0.0.0.0:$PORT" cargo run || exit_code=$?
     exit_code=${exit_code:-0}
     if [ "$exit_code" -eq 124 ]; then
         echo "✅ Server started successfully (auto-killed after 15s)"
@@ -188,29 +201,6 @@ test-run-server:
 test-ng-headless:
     @echo "🧪 Running Angular tests with headless Chrome..."
     cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
-
-# Ensure infrastructure containers are running and healthy (convenience helper — not used by verify).
-# verify.sh manages its own ephemeral containers independently.
-services-up:
-    @echo "🐳 Ensuring infrastructure is up and healthy..."
-    doppler run -- docker compose up -d --wait
-    @echo "✅ Infrastructure ready"
-
-# Run Playwright e2e tests (CI-safe, requires Docker stack + Angular)
-test-e2e:
-    @echo "Running Playwright e2e tests..."
-    cd plnd_client && npm run e2e:ci
-
-# Run Playwright e2e tests against a natively-running API (no Docker build)
-# Requires: postgres on 5432, mock-oauth on 8080, and API binary running on 3000
-test-e2e-native:
-    @echo "Running Playwright e2e tests (native API)..."
-    cd plnd_client && CI=true npm run e2e:ci
-
-# Run Playwright e2e tests in dev mode (reuses existing ng serve if running)
-test-e2e-dev:
-    @echo "Running Playwright e2e tests (dev mode)..."
-    cd plnd_client && npm run e2e
 
 # Open Playwright HTML report from last run
 test-e2e-report:
@@ -253,8 +243,12 @@ refresh-usda-corpus:
 refresh-usda-test-corpus:
     scripts/build-usda-test-corpus.sh
 
-# Clean build artifacts
+# Clean build artifacts + shared infra. HUMAN-ONLY (same EOF-abort guard as stop).
 clean:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    read -rp "⚠️  Removes node_modules/dist/target AND wipes shared infra. Continue? [y/N] " ans || ans=""
+    [[ "$ans" == [yY] ]] || { echo "Aborted."; exit 1; }
     cargo clean
     cd plnd_client && rm -rf node_modules dist
-    docker compose down -v
+    cd "$(git rev-parse --show-toplevel)" && docker compose down -v

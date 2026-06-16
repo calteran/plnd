@@ -1,4 +1,5 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '../fixtures';
+import type { Page } from '@playwright/test';
 import { API_BASE, seedAuth } from '../helpers/auth';
 import { seedCatalogIngredient, seedDish } from '../helpers/seed-data';
 

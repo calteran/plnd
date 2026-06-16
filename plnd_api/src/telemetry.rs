@@ -8,6 +8,18 @@ use opentelemetry_sdk::{
 };
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
 
+/// Build the OTEL resource. Attaches `verify.run_id` when a run id is provided
+/// (scripts/verify.sh sets `VERIFY_RUN_ID` per run) so concurrent runs are
+/// distinguishable in Loki/Tempo. `run_id` is read from the environment by the
+/// caller so this stays unit-testable.
+fn build_resource(run_id: Option<String>) -> Resource {
+    let mut builder = Resource::builder().with_attribute(KeyValue::new(SERVICE_NAME, "plnd_api"));
+    if let Some(id) = run_id {
+        builder = builder.with_attribute(KeyValue::new("verify.run_id", id));
+    }
+    builder.build()
+}
+
 pub struct TelemetryProviders {
     pub tracer_provider: SdkTracerProvider,
     pub logger_provider: SdkLoggerProvider,
@@ -27,9 +39,7 @@ pub fn init_providers(
         Some(e) => e.to_owned(),
     };
 
-    let resource = Resource::builder()
-        .with_attribute(KeyValue::new(SERVICE_NAME, "plnd_api"))
-        .build();
+    let resource = build_resource(std::env::var("VERIFY_RUN_ID").ok());
 
     // ── Traces ──────────────────────────────────────────────────────────────
     let trace_exporter = opentelemetry_otlp::SpanExporter::builder()
@@ -86,10 +96,24 @@ pub fn shutdown_providers(providers: TelemetryProviders) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use opentelemetry::Key;
 
     #[test]
     fn init_providers_with_none_returns_none() {
         let result = init_providers(None);
         assert!(result.unwrap().is_none());
+    }
+
+    #[test]
+    fn resource_includes_run_id_when_env_set() {
+        let res = build_resource(Some("branch-a1b2".to_string()));
+        let got = res.get(&Key::from_static_str("verify.run_id"));
+        assert_eq!(got.map(|v| v.to_string()), Some("branch-a1b2".to_string()));
+    }
+
+    #[test]
+    fn resource_omits_run_id_when_env_absent() {
+        let res = build_resource(None);
+        assert!(res.get(&Key::from_static_str("verify.run_id")).is_none());
     }
 }
