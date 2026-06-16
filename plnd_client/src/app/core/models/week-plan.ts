@@ -128,19 +128,27 @@ export interface ScheduleEntryDto {
   one_shot?: boolean;
 }
 
-export interface MealAnchorInstanceDto {
-  id: string;
-  user_id: string;
-  date: string;
-  name: string;
-  preferred_time: string;
-  tolerance_minutes: number;
-  sort_order: number;
+export type ScheduleAnchorKind =
+  | 'meal'
+  | 'scheduled_task'
+  | 'start_of_day'
+  | 'end_of_day'
+  | 'timezone_change';
+
+/** Unified anchor from GET /schedule/anchors (#958). Kind-specific fields are
+ *  null unless they apply. `sequence` is the ordering primitive. */
+export interface ScheduleAnchorDto {
+  kind: ScheduleAnchorKind;
+  sequence: number;
+  time: string;                 // "HH:MM:SS"
+  label: string;
+  id: string | null;            // null only for start_of_day / end_of_day
+  status: string | null;        // meal only
+  consumed_at: string | null;   // meal only
+  tolerance_minutes: number | null;
+  sort_order: number | null;
   template_entry_id: string | null;
-  status: string;            // "planned" | "consumed" | "skipped"
-  consumed_at: string | null;
-  created_at: string;
-  updated_at: string;
+  zone: string | null;          // timezone_change only
 }
 
 export interface SchedulePeriodResponse {

@@ -4,7 +4,7 @@ import { HttpClient } from '@angular/common/http';
 import { Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
 import { ConfigService } from './config.service';
 import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor, parseItemType } from '../models/schedule';
-import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
+import { ScheduleAnchorDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
 import { todayIso } from '../utils/date-only';
 
@@ -42,12 +42,15 @@ export class ScheduleService {
             })),
           ),
         anchors: this.http
-          .get<MealAnchorInstanceDto[]>(`${this.apiBase}/schedule/anchors`, { params: { date } })
-          .pipe(catchError(() => of([] as MealAnchorInstanceDto[]))),
+          .get<ScheduleAnchorDto[]>(`${this.apiBase}/schedule/anchors`, { params: { date } })
+          .pipe(catchError(() => of([] as ScheduleAnchorDto[]))),
       })),
       takeUntilDestroyed(),
     ).subscribe(({ schedule, anchors }) => {
       if (schedule.error) this._error.set('Failed to load schedule');
+      // #958: the endpoint now returns all anchor kinds. The day-view still
+      // renders only meals (full slot rendering is #959), so filter to meals.
+      const meals = anchors.filter(a => a.kind === 'meal');
       // Index persisted meals by the anchor instance they were committed against,
       // so each anchor row can render the dish a user planned (onboarding / wizard).
       const mealByAnchor = new Map<string, PlannedMealEntryDto>(
@@ -57,7 +60,7 @@ export class ScheduleService {
       // render *inside* that meal row as during-meal tasks; the rest are top-level
       // rows. Keying off the FK (not the free-form after_anchor label) ties a task
       // to the concrete meal instance on this day.
-      const anchorIds = new Set(anchors.map(a => a.id));
+      const anchorIds = new Set(meals.map(a => a.id as string));
       const tasksByAnchor = new Map<string, ScheduleTask[]>();
       const topLevel: ScheduleTask[] = [];
       for (const e of schedule.data.entries) {
@@ -72,7 +75,7 @@ export class ScheduleService {
         }
       }
       this._items.set([
-        ...anchors.map(a => mapAnchorInstance(a, mealByAnchor.get(a.id), tasksByAnchor.get(a.id) ?? [])),
+        ...meals.map(a => mapAnchorInstance(a, mealByAnchor.get(a.id as string), tasksByAnchor.get(a.id as string) ?? [])),
         ...topLevel,
       ]);
       this._loading.set(false);
@@ -215,16 +218,16 @@ function toMealUiStatus(
 }
 
 function mapAnchorInstance(
-  dto: MealAnchorInstanceDto,
+  dto: ScheduleAnchorDto,
   planned?: PlannedMealEntryDto,
   duringMealTasks: ScheduleTask[] = [],
 ): MealAnchor {
-  const slot = MEAL_SLOTS[dto.name.toLowerCase()];
+  const slot = MEAL_SLOTS[dto.label.toLowerCase()];
   return {
-    id:    dto.id,
-    name:  slot?.name ?? dto.name,
+    id:    dto.id as string,
+    name:  slot?.name ?? dto.label,
     emoji: slot?.emoji ?? '🍴',
-    status:      toMealUiStatus(dto.status, planned?.title ?? undefined),
+    status:      toMealUiStatus(dto.status ?? 'planned', planned?.title ?? undefined),
     description: planned?.title ?? undefined,
     duringMealTasks,
   };
