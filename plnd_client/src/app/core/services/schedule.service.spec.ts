@@ -24,12 +24,15 @@ function flushDay(
     .flush(anchors);
 }
 
-/** A meal anchor instance DTO with sensible defaults for the given id/name. */
+/** A unified meal-kind ScheduleAnchorDto with sensible defaults (#958). */
 function anchorDto(id: string, name: string, date = '2026-04-02'): Record<string, unknown> {
   return {
-    id, user_id: 'u1', date, name, preferred_time: '08:00:00',
-    tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+    kind: 'meal', sequence: 0, time: '08:00:00', label: name, id,
     status: 'planned', consumed_at: null,
+    tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
+    zone: null,
+    // legacy fields harmlessly ignored by the unified mapper:
+    user_id: 'u1', date, name, preferred_time: '08:00:00',
     created_at: `${date}T08:00:00Z`, updated_at: `${date}T08:00:00Z`,
   };
 }
@@ -83,6 +86,25 @@ describe('ScheduleService', () => {
     const req = httpMock.expectOne(r => r.url.includes('/schedule/anchors'));
     expect(req.request.params.get('date')).toBe('2026-04-02');
     req.flush(EMPTY_ANCHORS);
+  });
+
+  it('ignores non-meal anchors when mapping the day (kind filter)', () => {
+    svc.loadDay('2026-04-02');
+    httpMock.expectOne(r => r.url.includes('/schedule/period')).flush({
+      entries: [], carryover: [], planned_meals: [],
+    });
+    httpMock.expectOne(r => r.url.includes('/schedule/anchors')).flush([
+      { kind: 'start_of_day', sequence: 0, time: '07:00:00', label: 'start of day',
+        id: null, status: null, consumed_at: null, tolerance_minutes: null,
+        sort_order: null, template_entry_id: null, zone: null },
+      anchorDto('meal-1', 'breakfast'),
+      { kind: 'end_of_day', sequence: 2, time: '22:00:00', label: 'end of day',
+        id: null, status: null, consumed_at: null, tolerance_minutes: null,
+        sort_order: null, template_entry_id: null, zone: null },
+    ]);
+    // Only the single meal anchor renders as an item row.
+    expect(svc.scheduleItems().length).toBe(1);
+    expect(svc.scheduleItems()[0].id).toBe('meal-1');
   });
 
   it('loadDay records the requested date', () => {
@@ -181,13 +203,7 @@ describe('ScheduleService', () => {
 
   it('maps a meal anchor instance to MealAnchor with MEAL_SLOTS name and emoji', () => {
     svc.loadDay('2026-04-02');
-    flushDay(httpMock, [], [{
-      id: 'm1', user_id: 'u1', date: '2026-04-02',
-      name: 'breakfast', preferred_time: '08:00:00',
-      tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
-      status: 'planned', consumed_at: null,
-      created_at: '2026-04-02T08:00:00Z', updated_at: '2026-04-02T08:00:00Z',
-    }]);
+    flushDay(httpMock, [], [anchorDto('m1', 'breakfast')]);
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(1);
@@ -199,14 +215,9 @@ describe('ScheduleService', () => {
     expect(meal.status).toBe('unplanned');
   });
 
-  it('maps a custom meal anchor by its name field', () => {
+  it('maps a custom meal anchor by its label field', () => {
     svc.loadDay('2026-04-02');
-    flushDay(httpMock, [], [{
-      id: 'm9', user_id: 'u1', date: '2026-04-02',
-      name: 'Brunch', preferred_time: '10:30:00',
-      tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
-      created_at: '2026-04-02T10:30:00Z', updated_at: '2026-04-02T10:30:00Z',
-    }]);
+    flushDay(httpMock, [], [anchorDto('m9', 'Brunch')]);
 
     const items = svc.scheduleItems();
     const meal = items[0] as MealAnchor;
@@ -258,12 +269,7 @@ describe('ScheduleService', () => {
         entry_id: 't1', task_type: 'exercise', title: 'Run',
         status: 'planned', date: '2026-04-02', scheduled_start: '07:00',
       }],
-      [{
-        id: 'm1', user_id: 'u1', date: '2026-04-02',
-        name: 'breakfast', preferred_time: '08:00:00',
-        tolerance_minutes: 60, sort_order: 0, template_entry_id: null,
-        created_at: '2026-04-02T08:00:00Z', updated_at: '2026-04-02T08:00:00Z',
-      }],
+      [anchorDto('m1', 'breakfast')],
     );
 
     const items = svc.scheduleItems();

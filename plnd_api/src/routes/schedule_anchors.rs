@@ -5,12 +5,14 @@
 //! template; subsequent reads return whatever the user has shaped the date
 //! into. Past-date edits are accepted and never trigger agent runs.
 
-use crate::api_response::MealAnchorInstanceResponse;
+use crate::anchors::assemble_day_anchors;
+use crate::api_response::{MealAnchorInstanceResponse, ScheduleAnchorResponse};
 use crate::auth::jwt::Claims;
 use crate::models::{
     CreateScheduleAnchorRequest, ListScheduleAnchorsQuery, SetAnchorStatusRequest,
     UpdateScheduleAnchorRequest,
 };
+use crate::scheduling::day_type_applies_to;
 use crate::state::AppState;
 use axum::{
     Json,
@@ -33,7 +35,7 @@ const DEFAULT_TOLERANCE_MINUTES: i32 = 60;
         ("date" = chrono::NaiveDate, Query, description = "Date (YYYY-MM-DD) to list anchors for; lazy-materialized on first call"),
     ),
     responses(
-        (status = 200, description = "Instances for the date (may be empty)", body = Vec<MealAnchorInstanceResponse>),
+        (status = 200, description = "Ordered anchor sequence for the date (all four sources, §4.7); meals lazy-materialized on first call", body = Vec<ScheduleAnchorResponse>),
         (status = 400, description = "Missing or invalid date"),
         (status = 401, description = "Unauthorized"),
     )
@@ -43,28 +45,68 @@ pub async fn list_for_date(
     State(state): State<Arc<AppState>>,
     Extension(claims): Extension<Claims>,
     Query(query): Query<ListScheduleAnchorsQuery>,
-) -> Result<Json<Vec<MealAnchorInstanceResponse>>, StatusCode> {
+) -> Result<Json<Vec<ScheduleAnchorResponse>>, StatusCode> {
     let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+    let date = query.date;
 
-    state
+    // (1) Meal anchors — keeps lazy materialization.
+    let meals = state
         .repos
         .meal_anchor_instance
-        .materialize(user_id, query.date)
+        .materialize(user_id, date)
         .await
-        .map(|v| {
-            Json(
-                v.into_iter()
-                    .map(MealAnchorInstanceResponse::from)
-                    .collect(),
-            )
-        })
-        .map_err(|e| match e {
-            Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
-            e => {
-                tracing::error!(error = %e, "list_schedule_anchors error");
-                StatusCode::INTERNAL_SERVER_ERROR
-            }
-        })
+        .map_err(map_list_error)?;
+
+    // (2) Scheduled tasks — schedule entries with a fixed start time.
+    let scheduled_tasks: Vec<_> = state
+        .repos
+        .schedule
+        .get_day_entries(user_id, date)
+        .await
+        .map_err(map_list_error)?
+        .into_iter()
+        .filter(|e| e.scheduled_start.is_some())
+        .collect();
+
+    // (3) Active day type → start/end-of-day. Same precedence as materialize:
+    // newest day type wins among those that apply to the date.
+    let mut day_types = state
+        .repos
+        .day_type
+        .list_for_user(user_id)
+        .await
+        .map_err(map_list_error)?;
+    day_types.sort_by_key(|dt| std::cmp::Reverse(dt.created_at));
+    let active_day_type = day_types
+        .into_iter()
+        .find(|dt| day_type_applies_to(dt, date));
+
+    // (4) Timezone-change anchors (folded in for in-day boundaries by the assembler).
+    let tz_anchors = state
+        .repos
+        .timezone_anchor
+        .list_through(user_id, date)
+        .await
+        .map_err(map_list_error)?;
+
+    Ok(Json(assemble_day_anchors(
+        meals,
+        scheduled_tasks,
+        active_day_type,
+        tz_anchors,
+        date,
+    )))
+}
+
+/// Error mapping for the multi-source list (mirrors the prior inline mapping).
+fn map_list_error(e: Error) -> StatusCode {
+    match e {
+        Error::ConnectionLost => StatusCode::SERVICE_UNAVAILABLE,
+        e => {
+            tracing::error!(error = %e, "list_schedule_anchors error");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
 }
 
 #[utoipa::path(
