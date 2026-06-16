@@ -9,6 +9,8 @@
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::routes::catalog_ingest::resolve_name_brand;
+
 use plnd_data::providers::dtos::NutritionFacts;
 use plnd_data::repository::CatalogIngestRepository;
 use plnd_data::repository::catalog_ingest::{
@@ -120,6 +122,7 @@ fn llm_composed_external_id(name: &str) -> String {
 pub async fn promote_new_meal(
     search: &ProviderSearchService,
     ingest: &dyn CatalogIngestRepository,
+    normalizer: &dyn plnd_agent::BrandNormalizer,
     user_id: Uuid,
     proposal: &NewMealProposal,
 ) -> PromotionOutcome {
@@ -127,29 +130,32 @@ pub async fn promote_new_meal(
     if let Some((source, dish)) = search.resolve_dish(&proposal.name).await {
         let mut links: Vec<DishIngredientLinkInput> = Vec::new();
         for (idx, di) in dish.ingredients.iter().enumerate() {
-            if let Some((ing_source, ing)) = search.resolve_ingredient(&di.name).await
-                && let Ok(ingredient_id) = ingest
-                    .ingest_ingredient(ingredient_input_from(&ing_source, &ing))
+            if let Some((ing_source, ing)) = search.resolve_ingredient(&di.name).await {
+                let is_canonical = search.is_canonical_source(&ing_source);
+                let (name, brand) = resolve_name_brand(is_canonical, &ing.name, normalizer).await;
+                if let Ok(ingredient_id) = ingest
+                    .ingest_ingredient(ingredient_input_from(&ing_source, &ing, name, brand))
                     .await
-            {
-                let quantity = if di.quantity.is_sign_positive() && !di.quantity.is_zero() {
-                    di.quantity
-                } else {
-                    Decimal::from(1)
-                };
-                let unit = if di.unit.trim().is_empty() {
-                    "serving".to_string()
-                } else {
-                    di.unit.clone()
-                };
-                links.push(DishIngredientLinkInput {
-                    ingredient_id,
-                    quantity,
-                    unit,
-                    preparation_note: None,
-                    is_optional: false,
-                    sort_order: idx as i16,
-                });
+                {
+                    let quantity = if di.quantity.is_sign_positive() && !di.quantity.is_zero() {
+                        di.quantity
+                    } else {
+                        Decimal::from(1)
+                    };
+                    let unit = if di.unit.trim().is_empty() {
+                        "serving".to_string()
+                    } else {
+                        di.unit.clone()
+                    };
+                    links.push(DishIngredientLinkInput {
+                        ingredient_id,
+                        quantity,
+                        unit,
+                        preparation_note: None,
+                        is_optional: false,
+                        sort_order: idx as i16,
+                    });
+                }
             }
         }
         // Carry the provider's real recipe data onto the catalog row rather than
@@ -201,30 +207,33 @@ pub async fn promote_new_meal(
     let mut links: Vec<DishIngredientLinkInput> = Vec::new();
     let mut aggregated: Option<NutritionFacts> = None;
     for (idx, inferred) in proposal.inferred_ingredients.iter().enumerate() {
-        if let Some((ing_source, ing)) = search.resolve_ingredient(&inferred.name).await
-            && let Ok(ingredient_id) = ingest
-                .ingest_ingredient(ingredient_input_from(&ing_source, &ing))
+        if let Some((ing_source, ing)) = search.resolve_ingredient(&inferred.name).await {
+            let is_canonical = search.is_canonical_source(&ing_source);
+            let (name, brand) = resolve_name_brand(is_canonical, &ing.name, normalizer).await;
+            if let Ok(ingredient_id) = ingest
+                .ingest_ingredient(ingredient_input_from(&ing_source, &ing, name, brand))
                 .await
-        {
-            if let Some(facts) = &ing.nutrition {
-                let scaled = facts.scaled(inferred.grams / 100.0);
-                aggregated = Some(match aggregated {
-                    Some(acc) => acc.plus(&scaled),
-                    None => scaled,
+            {
+                if let Some(facts) = &ing.nutrition {
+                    let scaled = facts.scaled(inferred.grams / 100.0);
+                    aggregated = Some(match aggregated {
+                        Some(acc) => acc.plus(&scaled),
+                        None => scaled,
+                    });
+                }
+                let quantity = Decimal::try_from(inferred.grams)
+                    .ok()
+                    .filter(|d| d.is_sign_positive() && !d.is_zero())
+                    .unwrap_or_else(|| Decimal::from(1));
+                links.push(DishIngredientLinkInput {
+                    ingredient_id,
+                    quantity,
+                    unit: "g".into(),
+                    preparation_note: None,
+                    is_optional: false,
+                    sort_order: idx as i16,
                 });
             }
-            let quantity = Decimal::try_from(inferred.grams)
-                .ok()
-                .filter(|d| d.is_sign_positive() && !d.is_zero())
-                .unwrap_or_else(|| Decimal::from(1));
-            links.push(DishIngredientLinkInput {
-                ingredient_id,
-                quantity,
-                unit: "g".into(),
-                preparation_note: None,
-                is_optional: false,
-                sort_order: idx as i16,
-            });
         }
     }
 
@@ -272,11 +281,13 @@ pub async fn promote_new_meal(
 fn ingredient_input_from(
     source: &str,
     ing: &plnd_data::providers::dtos::ExternalIngredient,
+    name: String,
+    brand: Option<String>,
 ) -> IngestIngredientInput {
     IngestIngredientInput {
         external_source: source.to_string(),
         external_id: ing.external_id.clone(),
-        name: ing.name.clone(),
+        name,
         description: None,
         serving_size_g: None,
         nutrition: ing
@@ -285,7 +296,7 @@ fn ingredient_input_from(
             .and_then(|n| serde_json::to_value(n).ok()),
         allergens: vec![],
         occasion_tags: vec![],
-        brand: None,
+        brand,
     }
 }
 
@@ -413,6 +424,13 @@ mod tests {
         }
     }
 
+    /// A normalizer that returns `None` for every name, so the confidence gate
+    /// keeps the original name and `brand: None` — used to hold existing
+    /// promotion tests at their pre-#940 expectations.
+    fn no_op_normalizer() -> plnd_agent::FixtureBrandNormalizer {
+        plnd_agent::FixtureBrandNormalizer::from_entries(std::collections::HashMap::new())
+    }
+
     fn empty_search_service() -> ProviderSearchService {
         // No providers → every resolve_* returns None → guaranteed miss.
         ProviderSearchService::new(
@@ -435,7 +453,14 @@ mod tests {
                 grams: 100.0,
             }],
         };
-        let out = promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
+        let out = promote_new_meal(
+            &svc,
+            repo.as_ref(),
+            &no_op_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
         assert_eq!(out, PromotionOutcome::Missed);
     }
 
@@ -501,7 +526,14 @@ mod tests {
                 grams: 150.0,
             }],
         };
-        let out = promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
+        let out = promote_new_meal(
+            &svc,
+            repo.as_ref(),
+            &no_op_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { ref meal_type, .. } if meal_type == "catalog"),
             "expected Resolved, got {:?}",
@@ -582,7 +614,14 @@ mod tests {
                 grams: 150.0,
             }],
         };
-        let out = promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
+        let out = promote_new_meal(
+            &svc,
+            repo.as_ref(),
+            &no_op_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { ref meal_type, .. } if meal_type == "catalog"),
             "expected Resolved, got {:?}",
@@ -697,7 +736,8 @@ mod tests {
             inferred_ingredients: vec![],
         };
 
-        let outcome = promote_new_meal(&svc, &repo, Uuid::new_v4(), &proposal).await;
+        let outcome =
+            promote_new_meal(&svc, &repo, &no_op_normalizer(), Uuid::new_v4(), &proposal).await;
 
         // The TheMealDB fixture resolves "chicken" → "Chicken Handi" (id 52795),
         // so promotion takes the recipe branch and ingests a catalog dish + meal
@@ -813,7 +853,8 @@ mod tests {
             }],
         };
 
-        let out = promote_new_meal(&svc, &repo, Uuid::new_v4(), &proposal).await;
+        let out =
+            promote_new_meal(&svc, &repo, &no_op_normalizer(), Uuid::new_v4(), &proposal).await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { .. }),
             "got {out:?}"
@@ -897,7 +938,8 @@ mod tests {
             inferred_ingredients: vec![],
         };
 
-        let out = promote_new_meal(&svc, &repo, Uuid::new_v4(), &proposal).await;
+        let out =
+            promote_new_meal(&svc, &repo, &no_op_normalizer(), Uuid::new_v4(), &proposal).await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { .. }),
             "got {out:?}"
