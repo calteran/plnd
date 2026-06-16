@@ -52,7 +52,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ── Prerequisite checks ─────────────────────────────────────────────────────────
-for tool in timeout doppler node openssl; do
+for tool in timeout doppler node openssl git curl cargo npm npx; do
     command -v "$tool" &>/dev/null || { echo "✗ '$tool' not found" >&2; exit 1; }
 done
 # Docker is only needed by subsets that touch infra (rust/e2e/all); quick/ts are
