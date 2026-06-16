@@ -52,7 +52,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ── Prerequisite checks ─────────────────────────────────────────────────────────
-for tool in timeout doppler node; do
+for tool in timeout doppler node openssl; do
     command -v "$tool" &>/dev/null || { echo "✗ '$tool' not found" >&2; exit 1; }
 done
 docker info &>/dev/null || { echo "✗ Docker is not running — start Docker Desktop" >&2; exit 1; }
@@ -99,18 +99,18 @@ wait_all() {
 
 alloy_reachable() { (exec 3<>/dev/tcp/127.0.0.1/4317) 2>/dev/null && { exec 3>&-; return 0; } || return 1; }
 
-echo "◆ Starting verification (subset: $SUBSET, run: ${RUN_ID:-pending})..."
+# ── Run id — branch slug + short random; names the per-run DB and OTEL tag ───────
+BRANCH_SLUG="$(git -C "$PROJECT_ROOT" branch --show-current 2>/dev/null \
+    | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')"
+RUN_ID="${BRANCH_SLUG:-detached}-$(openssl rand -hex 2)"
+RUN_DB="plnd_verify_$(printf '%s' "$RUN_ID" | tr -c 'a-z0-9' '_')"
+
+echo "◆ Starting verification (subset: $SUBSET, run: $RUN_ID)..."
 
 # ── Auto-ensure shared infra (NEVER tear down) ──────────────────────────────────
 if [[ "$NEED_INFRA" == true ]]; then
     (cd "$PROJECT_ROOT" && doppler run -- docker compose up -d --wait db mock-oauth-server)
 fi
-
-# ── Run id (now that we may need it) ────────────────────────────────────────────
-BRANCH_SLUG="$(git -C "$PROJECT_ROOT" branch --show-current 2>/dev/null \
-    | tr 'A-Z' 'a-z' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')"
-RUN_ID="${BRANCH_SLUG:-detached}-$(openssl rand -hex 2)"
-RUN_DB="plnd_verify_$(printf '%s' "$RUN_ID" | tr -c 'a-z0-9' '_')"
 
 # ── Rust read-only (no infra) ───────────────────────────────────────────────────
 if need "quick,rust"; then
