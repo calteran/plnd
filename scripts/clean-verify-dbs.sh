@@ -66,9 +66,13 @@ fi
 echo "→ Dropping ${#ORPHANS[@]} orphaned plnd_verify_* database(s)..."
 for db in "${ORPHANS[@]}"; do
     # WITH (FORCE) guards the slim chance a connection appears between SELECT and DROP.
-    if psql_db -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE);" >/dev/null 2>&1; then
+    # Capture stderr and surface it only on failure — a real error (permissions,
+    # unexpected state) is then visible for diagnosis, without printing the benign
+    # compose "DB_PASSWORD not set" warning on every successful drop.
+    if drop_err="$(psql_db -c "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE);" 2>&1 >/dev/null)"; then
         echo "  ✓ dropped $db"
     else
         echo "  ✗ could not drop $db (left in place)" >&2
+        [[ -n "$drop_err" ]] && printf '%s\n' "$drop_err" | sed 's/^/      /' >&2
     fi
 done
