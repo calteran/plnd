@@ -226,9 +226,9 @@ async fn seed_day(
     date: NaiveDate,
     status: &str,
 ) -> Result<(), SeedError> {
-    // One task entry: morning exercise
-    let exercise_time = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
-    let scheduled_start = date.and_time(exercise_time).and_utc();
+    // One task entry: morning exercise. scheduled_start is a wall-clock TIME
+    // (#936); the row's `date` column supplies the calendar day.
+    let scheduled_start = NaiveTime::from_hms_opt(7, 0, 0).unwrap();
     sqlx::query(
         "INSERT INTO schedule_entries
              (entry_id, user_id, task_type, date, scheduled_start, status)

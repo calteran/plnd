@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Duration, NaiveDate, NaiveTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -125,8 +125,13 @@ pub async fn create_user_task(
     .await
     .map_err(DatabaseError::from)?;
 
-    let scheduled_end: Option<DateTime<Utc>> =
-        scheduled_at.map(|t| t + Duration::minutes(duration_minutes as i64));
+    // schedule_entries.scheduled_start/end are wall-clock TIME columns (#936):
+    // bind the time-of-day component explicitly rather than relying on an
+    // implicit timestamptz→time cast (which would depend on the session zone).
+    // The row's `date` column carries the calendar day.
+    let se_start: Option<NaiveTime> = scheduled_at.map(|t| t.time());
+    let se_end: Option<NaiveTime> =
+        scheduled_at.map(|t| (t + Duration::minutes(duration_minutes as i64)).time());
     sqlx::query(
         "INSERT INTO schedule_entries
            (user_id, task_type, title, date, scheduled_start, scheduled_end,
@@ -136,8 +141,8 @@ pub async fn create_user_task(
     .bind(user_id)
     .bind(title)
     .bind(date)
-    .bind(scheduled_at)
-    .bind(scheduled_end)
+    .bind(se_start)
+    .bind(se_end)
     .bind(after_anchor)
     .bind(one_shot)
     .execute(&mut *tx)
@@ -282,6 +287,21 @@ mod tests {
                 .expect("generic_tasks row not found");
 
         assert_eq!(category, "user_created");
+
+        // #936: the schedule_entries row stores the wall-clock time-of-day as a
+        // TIME column. 09:00 must land as 09:00 (and 09:30 end), independent of
+        // any session timezone — proving the explicit time-of-day bind.
+        let (se_start, se_end): (Option<NaiveTime>, Option<NaiveTime>) = sqlx::query_as(
+            "SELECT scheduled_start, scheduled_end FROM schedule_entries
+             WHERE user_id = $1 AND title = $2",
+        )
+        .bind(uid)
+        .bind("Buy groceries")
+        .fetch_one(&pool)
+        .await
+        .expect("schedule_entries row not found");
+        assert_eq!(se_start, NaiveTime::from_hms_opt(9, 0, 0));
+        assert_eq!(se_end, NaiveTime::from_hms_opt(9, 30, 0));
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -347,16 +367,15 @@ mod tests {
 
         // task_ref_id was dropped from schedule_entries in migration 0043;
         // identify the row by (user_id, title) — unique within this test.
-        let (scheduled_start, after_anchor): (Option<DateTime<Utc>>, Option<String>) =
-            sqlx::query_as(
-                "SELECT scheduled_start, after_anchor FROM schedule_entries
+        let (scheduled_start, after_anchor): (Option<NaiveTime>, Option<String>) = sqlx::query_as(
+            "SELECT scheduled_start, after_anchor FROM schedule_entries
                  WHERE user_id = $1 AND title = $2",
-            )
-            .bind(uid)
-            .bind(task.title.as_str())
-            .fetch_one(&pool)
-            .await
-            .expect("schedule_entries row not found");
+        )
+        .bind(uid)
+        .bind(task.title.as_str())
+        .fetch_one(&pool)
+        .await
+        .expect("schedule_entries row not found");
 
         assert!(
             scheduled_start.is_none(),

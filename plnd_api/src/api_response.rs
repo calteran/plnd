@@ -405,7 +405,9 @@ pub struct TaskResponse {
     pub user_id: Uuid,
     pub title: String,
     pub task_type: String,
-    /// Wall-clock `HH:MM` (planned time-of-day); storage migration tracked in #936.
+    /// `HH:MM` derived from the task's trigger instant (`tasks.scheduled_start`
+    /// is a genuine `TIMESTAMPTZ` moment — e.g. midnight UTC on the trigger
+    /// date — not a planned wall-clock time, so it is out of #936's scope).
     pub scheduled_start: Option<String>,
     pub duration_minutes: Option<i32>,
     pub energy_required: String,
@@ -446,7 +448,7 @@ pub struct ScheduleEntryResponse {
     pub task_type: String,
     pub title: Option<String>,
     pub date: NaiveDate,
-    /// Wall-clock `HH:MM` (planned time-of-day); storage migration tracked in #936.
+    /// Wall-clock `HH:MM` planned time-of-day, formatted from the `TIME` column (#936).
     pub scheduled_start: Option<String>,
     pub scheduled_end: Option<String>,
     pub status: String,
@@ -933,7 +935,6 @@ mod tests {
 
     #[test]
     fn schedule_entry_response_emits_wall_clock_hhmm() {
-        use chrono::{TimeZone, Utc};
         let entry = ScheduleEntry {
             entry_id: Uuid::nil(),
             user_id: Uuid::nil(),
@@ -941,7 +942,7 @@ mod tests {
             task_type: "general".into(),
             title: None,
             date: NaiveDate::from_ymd_opt(2026, 6, 15).unwrap(),
-            scheduled_start: Some(Utc.with_ymd_and_hms(2026, 6, 15, 9, 0, 0).unwrap()),
+            scheduled_start: Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
             scheduled_end: None,
             status: "planned".into(),
             actual_start: None,
