@@ -20,9 +20,11 @@ export class TimezoneService {
     return this.http.post<DeviceAffirmResponse>(`${this.apiBase}/timezone/device`, { zone });
   }
 
-  resolve(at: string, time?: string): Observable<ResolveResponse> {
-    const q = time ? `?at=${at}&time=${time}` : `?at=${at}`;
-    return this.http.get<ResolveResponse>(`${this.apiBase}/timezone/resolve${q}`);
+  resolve(at: string, time?: string, device?: string): Observable<ResolveResponse> {
+    const params = new URLSearchParams({ at });
+    if (time) params.set('time', time);
+    if (device) params.set('device', device);
+    return this.http.get<ResolveResponse>(`${this.apiBase}/timezone/resolve?${params.toString()}`);
   }
 
   listAnchors(through: string): Observable<TimezoneAnchorDto[]> {
