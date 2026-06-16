@@ -162,10 +162,15 @@ pub fn day_zone_view(
 ) -> DayZoneProjection {
     let incoming = zone_at(anchors, date, None);
 
+    // The earliest intra-day switch by time; among anchors at the same time the
+    // newest (greatest `created_at`) wins, consistent with `governing_anchor` /
+    // `zone_at`'s "a later signal supersedes" rule (§4.8). Maximizing on
+    // `Reverse(effective_time)` selects the smallest time; `created_at` (not
+    // reversed) then selects the most recently recorded among ties.
     let first_switch = anchors
         .iter()
         .filter(|x| x.effective_date == date && x.effective_time.is_some())
-        .min_by_key(|x| (x.effective_time, x.created_at));
+        .max_by_key(|x| (std::cmp::Reverse(x.effective_time), x.created_at));
 
     if let Some(first) = first_switch {
         let from_zone = incoming.unwrap_or(device_zone);
@@ -273,6 +278,25 @@ mod day_view_tests {
         assert_eq!(s.from_zone, chrono_tz::America::Chicago);
         assert_eq!(s.to_zone, chrono_tz::America::Denver);
         assert_eq!(v.incoming_zone, Some(chrono_tz::America::Chicago));
+    }
+
+    #[test]
+    fn travel_tie_break_prefers_newest_anchor_at_same_time() {
+        // Two intra-day switches at the SAME effective_time; the newer (greater
+        // created_at) wins as the switch, matching governing_anchor / zone_at's
+        // "a later signal supersedes" rule (§4.8).
+        let mut older = a("2026-07-10", Some("14:00:00"), chrono_tz::America::Denver);
+        older.created_at = Utc.timestamp_opt(1_000, 0).unwrap();
+        let mut newer = a("2026-07-10", Some("14:00:00"), chrono_tz::America::Chicago);
+        newer.created_at = Utc.timestamp_opt(2_000, 0).unwrap();
+        // Pass oldest-first to prove ordering is by created_at, not input order.
+        let v = day_zone_view(
+            &[older, newer],
+            day("2026-07-10"),
+            chrono_tz::America::New_York,
+        );
+        assert_eq!(v.kind, DayZoneKind::Travel);
+        assert_eq!(v.switch.unwrap().to_zone, chrono_tz::America::Chicago);
     }
 }
 

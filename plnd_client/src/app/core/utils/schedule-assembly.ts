@@ -9,7 +9,7 @@ const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
 };
 
 /** Folds backend consumption status into the UI MealAnchor.status. */
-function toMealUiStatus(status: string | undefined, description?: string): MealAnchor['status'] {
+export function toMealUiStatus(status: string | undefined, description?: string): MealAnchor['status'] {
   if (status === 'consumed') return 'done';
   if (status === 'skipped') return 'skipped';
   return description ? 'planned' : 'unplanned';

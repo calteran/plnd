@@ -6,7 +6,7 @@ import { ConfigService } from './config.service';
 import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor } from '../models/schedule';
 import { ScheduleAnchorDto, SchedulePeriodResponse } from '../models/week-plan';
 import { todayIso } from '../utils/date-only';
-import { assembleScheduleItems } from '../utils/schedule-assembly';
+import { assembleScheduleItems, toMealUiStatus } from '../utils/schedule-assembly';
 
 export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
 
@@ -167,22 +167,6 @@ function findItemStatus(items: ScheduleItem[], id: string): 'pending' | 'done' |
 }
 
 // ── API → model mapping ───────────────────────────────────────────────────────
-
-/**
- * Folds the backend consumption status into the UI `MealAnchor.status`.
- * `consumed` → done, `skipped` → skipped, `planned` falls back to the
- * dish-planning state (a dish title means 'planned', otherwise 'unplanned').
- * Kept here (not imported from schedule-assembly) because it is also used by
- * `setMealConsumption` for optimistic UI updates.
- */
-function toMealUiStatus(
-  status: string | undefined,
-  description?: string,
-): MealAnchor['status'] {
-  if (status === 'consumed') return 'done';
-  if (status === 'skipped') return 'skipped';
-  return description ? 'planned' : 'unplanned';
-}
 
 function toPatchBody(p: TaskEditPatch): Record<string, unknown> {
   const body: Record<string, unknown> = {};
