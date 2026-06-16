@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{NaiveDate, NaiveTime};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -127,15 +127,14 @@ pub async fn update_entry(
     patch: &crate::models::EntryPatch,
 ) -> Result<(), DatabaseError> {
     // COALESCE keeps the existing value when a bind is NULL (field omitted).
-    // scheduled_start is combined with the row's existing date in UTC.
+    // scheduled_start is a wall-clock TIME stored directly (#936) — no date
+    // combination or UTC conversion. An omitted field leaves the column
+    // unchanged; clearing the time is not expressible through this patch.
     let result = sqlx::query(
         "UPDATE schedule_entries SET
              title            = COALESCE($1, title),
              task_type        = COALESCE($2, task_type),
-             scheduled_start  = COALESCE(
-                 CASE WHEN $3::time IS NULL THEN NULL
-                      ELSE (date + $3::time) AT TIME ZONE 'UTC' END,
-                 scheduled_start),
+             scheduled_start  = COALESCE($3::time, scheduled_start),
              duration_minutes = COALESCE($4, duration_minutes),
              energy_required  = COALESCE($5, energy_required),
              one_shot         = COALESCE($6, one_shot),
@@ -238,7 +237,7 @@ pub async fn commit_plan(
     let mut task_types: Vec<String> = Vec::new();
     let mut titles: Vec<Option<String>> = Vec::new();
     let mut dates: Vec<NaiveDate> = Vec::new();
-    let mut scheduled_starts: Vec<Option<DateTime<Utc>>> = Vec::new();
+    let mut scheduled_starts: Vec<Option<NaiveTime>> = Vec::new();
     let mut after_anchors: Vec<Option<String>> = Vec::new();
     let mut duration_minutes_vals: Vec<Option<i32>> = Vec::new();
     let mut energy_required_vals: Vec<Option<String>> = Vec::new();
@@ -248,13 +247,10 @@ pub async fn commit_plan(
         let Some(task_type) = entry.task_type.clone() else {
             continue;
         };
-        let scheduled_start = entry
-            .scheduled_start
-            .map(|t| entry.date.and_time(t).and_utc());
         task_types.push(task_type);
         titles.push(entry.title.clone());
         dates.push(entry.date);
-        scheduled_starts.push(scheduled_start);
+        scheduled_starts.push(entry.scheduled_start);
         after_anchors.push(entry.after_anchor.clone());
         duration_minutes_vals.push(entry.duration_minutes);
         energy_required_vals.push(entry.energy_required.clone());
@@ -268,7 +264,7 @@ pub async fn commit_plan(
                 date, scheduled_start, status, after_anchor,
                 duration_minutes, energy_required, one_shot)
              SELECT $1, unnest($2::text[]),
-                    unnest($3::text[]), unnest($4::date[]), unnest($5::timestamptz[]),
+                    unnest($3::text[]), unnest($4::date[]), unnest($5::time[]),
                     'planned', unnest($6::text[]),
                     unnest($7::int4[]), unnest($8::text[]), unnest($9::bool[])
              RETURNING entry_id, title, date, after_anchor",
@@ -322,12 +318,11 @@ pub async fn commit_plan(
         match decision {
             CarryoverDecision::Carry => {
                 // Reschedule to the new horizon start, keeping status 'planned'.
-                // Update both `date` and `scheduled_start` so the absolute TIMESTAMPTZ
-                // moves to the new date while preserving the wall-clock time (UTC).
+                // `scheduled_start` is a wall-clock TIME (#936), independent of the
+                // date, so moving `date` preserves the time-of-day with no recompute.
                 sqlx::query(
                     "UPDATE schedule_entries
                      SET date = $1,
-                         scheduled_start = ($1 + (scheduled_start AT TIME ZONE 'UTC')::time) AT TIME ZONE 'UTC',
                          updated_at = NOW()
                      WHERE entry_id = $2 AND user_id = $3",
                 )
@@ -495,7 +490,7 @@ pub async fn resolve_open_slots(
 mod tests {
     use std::collections::HashMap;
 
-    use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Utc};
+    use chrono::{Datelike, Duration, NaiveDate, NaiveTime, Utc};
     use sqlx::PgPool;
     use uuid::Uuid;
 
@@ -537,6 +532,51 @@ mod tests {
             energy_required: None,
             one_shot: None,
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // #936 — planned wall-clock storage type
+    // -----------------------------------------------------------------------
+
+    /// `scheduled_start`/`scheduled_end` carry a wall-clock time-of-day (the
+    /// row's `date` supplies the calendar day, per design D1). They must be
+    /// stored as `TIME`, not the legacy `TIMESTAMPTZ`-as-UTC encoding that
+    /// caused the #920 round-trip. `actual_start`/`actual_end` are genuine
+    /// recorded instants and must remain `TIMESTAMPTZ`.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn scheduled_columns_are_time_typed(pool: PgPool) {
+        let types: Vec<(String, String)> = sqlx::query_as(
+            "SELECT column_name, data_type FROM information_schema.columns
+             WHERE table_name = 'schedule_entries'
+               AND column_name IN
+                   ('scheduled_start', 'scheduled_end', 'actual_start', 'actual_end')
+             ORDER BY column_name",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+
+        assert_eq!(
+            types,
+            vec![
+                (
+                    "actual_end".to_string(),
+                    "timestamp with time zone".to_string()
+                ),
+                (
+                    "actual_start".to_string(),
+                    "timestamp with time zone".to_string()
+                ),
+                (
+                    "scheduled_end".to_string(),
+                    "time without time zone".to_string()
+                ),
+                (
+                    "scheduled_start".to_string(),
+                    "time without time zone".to_string()
+                ),
+            ]
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -653,7 +693,7 @@ mod tests {
 
         // Raw-insert 3 carryover entries dated before plan_start — no horizon applies
         let carryover_date = today - Duration::days(1);
-        let sched = (carryover_date.and_hms_opt(9, 0, 0).unwrap()).and_utc();
+        let sched = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
 
         let id_carry: Uuid = sqlx::query_scalar(
             "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
@@ -706,20 +746,19 @@ mod tests {
         };
         commit_plan(&pool, uid, &req).await.unwrap();
 
-        let (date_a, status_a, sched_a): (NaiveDate, String, Option<DateTime<Utc>>) =
-            sqlx::query_as(
-                "SELECT date, status, scheduled_start FROM schedule_entries WHERE entry_id = $1",
-            )
-            .bind(id_carry)
-            .fetch_one(&pool)
-            .await
-            .unwrap();
+        let (date_a, status_a, sched_a): (NaiveDate, String, Option<NaiveTime>) = sqlx::query_as(
+            "SELECT date, status, scheduled_start FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(id_carry)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
         assert_eq!(date_a, plan_start, "Carry should reschedule to plan_start");
         assert_eq!(status_a, "planned");
         assert_eq!(
-            sched_a.unwrap().time(),
-            NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
-            "Time must be preserved"
+            sched_a,
+            Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+            "wall-clock time must be preserved across the date change"
         );
 
         let status_d: String =
@@ -892,6 +931,37 @@ mod tests {
             period.entries[0].energy_required.as_deref(),
             Some("medium"),
             "energy_required must roundtrip through commit_plan"
+        );
+    }
+
+    // #936: a committed wall-clock time round-trips through commit_plan →
+    // get_period as the exact NaiveTime, with no UTC shift. Guards against a
+    // regression to instant-based storage (the #920 round-trip).
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_round_trips_wall_clock_scheduled_start(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![work_entry(start)], // scheduled_start = 09:00
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let period = get_period(&pool, uid, start, end).await.unwrap();
+        assert_eq!(period.entries.len(), 1);
+        assert_eq!(
+            period.entries[0].scheduled_start,
+            Some(NaiveTime::from_hms_opt(9, 0, 0).unwrap()),
+            "wall-clock 09:00 must round-trip unchanged through TIME storage"
         );
     }
 
@@ -1173,7 +1243,7 @@ mod tests {
         // Raw-insert an entry dated 200 days before plan_start — well beyond any
         // former 90-day lookback cap.
         let old_date = plan_start - Duration::days(200);
-        let old_sched = old_date.and_hms_opt(9, 0, 0).unwrap().and_utc();
+        let old_sched = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
 
         sqlx::query(
             "INSERT INTO schedule_entries (user_id, task_type, title, date, scheduled_start, status)
@@ -1209,7 +1279,7 @@ mod tests {
         let plan_start = tomorrow();
 
         let old_date = plan_start - Duration::days(1);
-        let sched = old_date.and_hms_opt(9, 0, 0).unwrap().and_utc();
+        let sched = NaiveTime::from_hms_opt(9, 0, 0).unwrap();
 
         // Regular entry — should appear in carryover
         sqlx::query(
@@ -1258,7 +1328,7 @@ mod tests {
         let plan_end = plan_start + Duration::days(6);
 
         let old_date = plan_start - Duration::days(1);
-        let sched = old_date.and_hms_opt(10, 0, 0).unwrap().and_utc();
+        let sched = NaiveTime::from_hms_opt(10, 0, 0).unwrap();
 
         // One-shot entry in prior window, not completed
         let one_shot_id: Uuid = sqlx::query_scalar(

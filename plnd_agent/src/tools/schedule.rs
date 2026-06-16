@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, NaiveDate, Utc};
+use chrono::{DateTime, NaiveDate, NaiveTime, Utc};
 use plnd_data::repository::{MealAnchorInstanceRepository, ScheduleRepository, TaskRepository};
 
 use crate::tools::{Tool, ToolContext, ToolError, ToolRegistry};
@@ -39,6 +39,15 @@ fn validate_duration_minutes(value: i64, tool: &str) -> Result<i32, ToolError> {
         });
     }
     Ok(value as i32)
+}
+
+// ── Helper: wall-clock duration between two times-of-day ─────────────────────────
+
+/// Minutes from `start` to `end`, both wall-clock `TIME` values (#936). A span
+/// that crosses midnight has `end < start`; wrapping into `[0, 24h)` recovers
+/// the positive duration for any sub-24h span.
+fn wall_clock_duration_minutes(start: NaiveTime, end: NaiveTime) -> i64 {
+    (end - start).num_minutes().rem_euclid(24 * 60)
 }
 
 // ── Helper: map plnd_data::Error → ToolError ─────────────────────────────────────
@@ -136,7 +145,7 @@ impl Tool for GetDayScheduleTool {
                     obj.insert("slot".to_string(), serde_json::Value::String(slot_label));
                 }
                 if let (Some(start), Some(end)) = (e.scheduled_start, e.scheduled_end) {
-                    let mins = (end - start).num_minutes();
+                    let mins = wall_clock_duration_minutes(start, end);
                     obj.insert(
                         "duration".to_string(),
                         serde_json::Value::Number(mins.into()),
@@ -593,6 +602,23 @@ pub(crate) fn register_place_tasks_tools(registry: &mut ToolRegistry) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn t(h: u32, m: u32) -> NaiveTime {
+        NaiveTime::from_hms_opt(h, m, 0).unwrap()
+    }
+
+    #[test]
+    fn wall_clock_duration_same_day() {
+        assert_eq!(wall_clock_duration_minutes(t(9, 0), t(10, 0)), 60);
+        assert_eq!(wall_clock_duration_minutes(t(9, 0), t(9, 0)), 0);
+    }
+
+    #[test]
+    fn wall_clock_duration_crosses_midnight_is_positive() {
+        // 23:30 → 00:30 is a 60-minute span, not -1380 (#936: wall-clock TIME
+        // values wrap at midnight, unlike the prior next-day timestamptz instants).
+        assert_eq!(wall_clock_duration_minutes(t(23, 30), t(0, 30)), 60);
+    }
 
     fn has_user_id_property(schema: &serde_json::Value) -> bool {
         schema

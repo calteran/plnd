@@ -38,8 +38,13 @@ pub struct ScheduleEntry {
     pub task_type: String,        // task vocabulary post-#828 (no NULL meal anchors)
     pub title: Option<String>,
     pub date: NaiveDate,
-    pub scheduled_start: Option<DateTime<Utc>>,
-    pub scheduled_end: Option<DateTime<Utc>>,
+    /// Planned wall-clock start time-of-day. The `date` field supplies the
+    /// calendar day; this column is `TIME` (design D1, #936). Absolute instants
+    /// are derived only at the edge via `timezone::resolve_instant` (D8).
+    pub scheduled_start: Option<NaiveTime>,
+    /// Planned wall-clock end time-of-day (`TIME`), same semantics as
+    /// `scheduled_start`.
+    pub scheduled_end: Option<NaiveTime>,
     pub status: String,
     pub actual_start: Option<DateTime<Utc>>,
     pub actual_end: Option<DateTime<Utc>>,
@@ -101,8 +106,8 @@ pub struct PlanEntryInput {
 }
 
 /// Partial update for a single schedule entry. `None` fields are left unchanged.
-/// `scheduled_start` carries a UTC wall-clock time-of-day (combined with the entry's
-/// existing date by the SQL layer).
+/// `scheduled_start` carries a wall-clock time-of-day, stored directly into the
+/// `TIME` column (#936) — no date combination or UTC conversion.
 #[derive(Debug, Clone, Default)]
 pub struct EntryPatch {
     pub title: Option<String>,

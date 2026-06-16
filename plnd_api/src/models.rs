@@ -106,7 +106,7 @@ pub struct PlanEntryRequest {
     #[serde(default)]
     pub task_type: Option<String>,
     pub title: Option<String>,
-    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS"; omit for slot tasks (after_anchor)
+    /// Wall-clock time-of-day as "HH:MM" or "HH:MM:SS"; omit for slot tasks (after_anchor)
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub scheduled_start: Option<NaiveTime>,
     pub after_anchor: Option<String>,
@@ -145,7 +145,7 @@ pub struct PatchEntryStatusRequest {
 pub struct PatchEntryRequest {
     pub title: Option<String>,
     pub task_type: Option<String>,
-    /// UTC wall-clock time as "HH:MM" or "HH:MM:SS".
+    /// Wall-clock time-of-day as "HH:MM" or "HH:MM:SS".
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub scheduled_start: Option<NaiveTime>,
     pub duration_minutes: Option<i32>,
