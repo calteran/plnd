@@ -64,7 +64,7 @@ function makeTimezoneServiceMock(overrides: {
     deleteAnchor:  jasmine.createSpy('deleteAnchor').and.returnValue(of(undefined)),
     deleteGroup:   jasmine.createSpy('deleteGroup').and.returnValue(of({ deleted: 1 })),
     reportDeviceZone: jasmine.createSpy('reportDeviceZone').and.returnValue(of({})),
-    resolve:          jasmine.createSpy('resolve').and.returnValue(of({ zone: null })),
+    resolve:          jasmine.createSpy('resolve').and.returnValue(of({ zone: null, day_view: { kind: 'same', incoming_zone: null, current_zone: zone, switch: null } })),
     dismissStandoff:  jasmine.createSpy('dismissStandoff').and.returnValue(of(undefined)),
   };
 }
@@ -412,6 +412,11 @@ describe('DayViewComponent (timezone: divergent day)', () => {
       makeAnchor({ effective_date: '2026-01-01', zone: 'America/Denver', effective_time: null }),
     ];
     const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
+    // Server resolves to divergent: incoming zone (from anchor) differs from current device zone.
+    (tzSvc.resolve as jasmine.Spy).and.returnValue(of({
+      zone: 'America/Denver',
+      day_view: { kind: 'divergent', incoming_zone: 'America/Denver', current_zone: 'America/New_York', switch: null },
+    }));
     const svc   = makeScheduleServiceMock({ date: TRAVEL_DATE });
 
     await TestBed.configureTestingModule({
@@ -454,13 +459,33 @@ describe('DayViewComponent (timezone: divergent day)', () => {
     expect(() => f.detectChanges()).not.toThrow();
     expect(f.componentInstance.zoneView()).toBeNull();
   });
+
+  it('does not break when tz.resolve errors (listAnchors succeeds)', async () => {
+    const tzSvc = makeTimezoneServiceMock();
+    (tzSvc.resolve as jasmine.Spy).and.returnValue(throwError(() => new Error('resolve failed')));
+    const svc = makeScheduleServiceMock();
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: tzSvc },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: mockActivatedRoute },
+      ],
+    }).compileComponents();
+    const f = TestBed.createComponent(DayViewComponent);
+    // forkJoin propagates the resolve error; zoneView stays null, no throw.
+    expect(() => f.detectChanges()).not.toThrow();
+    expect(f.componentInstance.zoneView()).toBeNull();
+  });
 });
 
 describe('DayViewComponent (timezone: travel day)', () => {
   const TRAVEL_DATE = '2026-06-20';
 
   it('renders app-timezone-switch-row when zoneView kind is "travel"', async () => {
-    // Intra-day anchor on the travel date → classifyDay returns travel.
+    // Intra-day anchor on the travel date → server returns travel kind.
     const items: ScheduleItem[] = [
       { id: 't1', type: 'general', label: 'Flight', status: 'pending', oneShot: false, floating: false },
     ];
@@ -474,6 +499,11 @@ describe('DayViewComponent (timezone: travel day)', () => {
     ];
     // Device zone differs from anchor zone; incoming zone = null (no prior anchor).
     const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
+    // Server resolves to travel: intra-day switch from New_York to Honolulu.
+    (tzSvc.resolve as jasmine.Spy).and.returnValue(of({
+      zone: 'America/New_York',
+      day_view: { kind: 'travel', incoming_zone: null, current_zone: 'America/New_York', switch: { from_zone: 'America/New_York', to_zone: 'Pacific/Honolulu', anchor_id: 'anchor-travel' } },
+    }));
     const svc   = makeScheduleServiceMock({ scheduleItems: items, date: TRAVEL_DATE });
 
     await TestBed.configureTestingModule({
@@ -491,11 +521,13 @@ describe('DayViewComponent (timezone: travel day)', () => {
     f.detectChanges();
 
     expect(f.componentInstance.zoneView()?.kind).toBe('travel');
+    // anchor_id → full-DTO resolution from the listAnchors result.
+    expect(f.componentInstance.zoneView()!.switch!.anchor.id).toBe('anchor-travel');
     expect(f.debugElement.query(By.css('app-timezone-switch-row'))).toBeTruthy();
   });
 
   it('passes the anchor source_title to the (why?) popover for an inferred travel anchor', async () => {
-    // TRAVEL_DATE (2026-01-15) is a Saturday; an inferred intra-day anchor with a
+    // TRAVEL_DATE (2026-06-20) is a Saturday; an inferred intra-day anchor with a
     // resolved source title should drive the design D5 provenance string.
     const items: ScheduleItem[] = [
       { id: 't1', type: 'general', label: 'Flight', status: 'pending', oneShot: false, floating: false },
@@ -511,6 +543,11 @@ describe('DayViewComponent (timezone: travel day)', () => {
       }),
     ];
     const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
+    // Server resolves to travel; component resolves switch anchor from listAnchors result.
+    (tzSvc.resolve as jasmine.Spy).and.returnValue(of({
+      zone: 'America/New_York',
+      day_view: { kind: 'travel', incoming_zone: null, current_zone: 'America/New_York', switch: { from_zone: 'America/New_York', to_zone: 'Pacific/Honolulu', anchor_id: 'anchor-travel' } },
+    }));
     const svc   = makeScheduleServiceMock({ scheduleItems: items, date: TRAVEL_DATE });
 
     await TestBed.configureTestingModule({

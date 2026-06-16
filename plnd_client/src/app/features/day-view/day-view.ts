@@ -1,13 +1,14 @@
 import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { forkJoin } from 'rxjs';
 import { ScheduleService } from '../../core/services/schedule.service';
 import { todayIso } from '../../core/utils/date-only';
 import { BriefingService } from '../../core/services/briefing.service';
 import { TimezoneService } from '../../core/services/timezone.service';
 import { isMealAnchor, ScheduleItem, TaskEditPatch } from '../../core/models/schedule';
-import { TimezoneAnchorDto } from '../../core/models/timezone';
-import { classifyDay, DayZoneView } from '../../core/utils/zone-projection';
+import { DayZoneViewDto, TimezoneAnchorDto } from '../../core/models/timezone';
+import { DaySwitch, DayZoneView } from '../../core/utils/zone-projection';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
 import { MealRowComponent } from '../schedule/components/meal-row/meal-row';
 import { TaskRowComponent } from '../schedule/components/task-row/task-row';
@@ -207,19 +208,35 @@ export class DayViewComponent implements OnInit, OnDestroy {
   }
 
   private loadZoneView(date: string): void {
-    this.tz.listAnchors(date)
+    forkJoin({
+      anchors: this.tz.listAnchors(date),
+      resolved: this.tz.resolve(date, undefined, this.tz.deviceZone()),
+    })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (list) => {
-          this.anchors.set(list);
-          const currentZone = this.tz.deviceZone();
-          this.zoneView.set(classifyDay(list, date, currentZone));
+        next: ({ anchors, resolved }) => {
+          this.anchors.set(anchors);
+          this.zoneView.set(this.toZoneView(resolved.day_view ?? null, anchors));
         },
         error: () => {
-          // Never break the day on a timezone error.
+          // Never break the day on a timezone error (listAnchors or resolve).
+          // anchors stays empty; zoneView stays null — why-panel will not open.
           this.zoneView.set(null);
         },
       });
+  }
+
+  /** Map the server day_view onto the view model, resolving the switch anchor's
+   *  full DTO from the already-fetched anchor list (needed by the why-panel). */
+  private toZoneView(dv: DayZoneViewDto | null, anchors: TimezoneAnchorDto[]): DayZoneView | null {
+    if (!dv) return null;
+    let sw: DaySwitch | undefined;
+    if (dv.kind === 'travel' && dv.switch) {
+      const swDto = dv.switch;
+      const anchor = anchors.find(a => a.id === swDto.anchor_id);
+      if (anchor) sw = { fromZone: swDto.from_zone, toZone: swDto.to_zone, anchor };
+    }
+    return { kind: dv.kind, incomingZone: dv.incoming_zone, currentZone: dv.current_zone, switch: sw };
   }
 
   onDateChange(date: string): void { this.router.navigate(['/day', date]); }
