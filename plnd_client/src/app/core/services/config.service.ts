@@ -16,13 +16,23 @@ export class ConfigService {
 
   // Allow an e2e harness (or runtime host) to override the API base URL before
   // the app boots via `globalThis.__PLND_API_BASE__`. Unset in production, so the
-  // built-in environment config is used unchanged.
+  // built-in environment config is used unchanged. When the override is active
+  // (i.e. the app is served on a per-run ephemeral port), also derive the OIDC
+  // redirectUri from the app's own origin so the browser login round-trip returns
+  // to this run's frontend instead of the hardcoded dev port (:4200).
   private static resolveInitialConfig(): EnvironmentConfig {
     const override = (globalThis as { __PLND_API_BASE__?: string }).__PLND_API_BASE__;
-    if (override) {
-      return { ...environment, api: { ...environment.api, baseUrl: override } };
+    if (!override) {
+      return environment;
     }
-    return environment;
+    const origin = (globalThis as { location?: { origin?: string } }).location?.origin;
+    return {
+      ...environment,
+      api: { ...environment.api, baseUrl: override },
+      oidc: origin
+        ? { ...environment.oidc, redirectUri: `${origin}/auth/callback` }
+        : environment.oidc,
+    };
   }
 
   getConfig(): EnvironmentConfig {

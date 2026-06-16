@@ -69,8 +69,15 @@ describe('ConfigService api base override', () => {
     expect(svc.getConfig().api.baseUrl).toBe('http://localhost:54321');
   });
 
+  it('derives the OIDC redirectUri from the app origin when override is set', () => {
+    (globalThis as Record<string, unknown>)[KEY] = 'http://localhost:54321';
+    const svc = new ConfigService();
+    expect(svc.getConfig().oidc.redirectUri).toBe(`${globalThis.location.origin}/auth/callback`);
+  });
+
   it('falls back to environment when override is unset', () => {
     const svc = new ConfigService();
     expect(svc.getConfig().api.baseUrl).toBe(environment.api.baseUrl);
+    expect(svc.getConfig().oidc.redirectUri).toBe(environment.oidc.redirectUri);
   });
 });
