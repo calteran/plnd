@@ -2,7 +2,7 @@ import { Component, OnInit, computed, effect, inject, signal, viewChild } from '
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
-import { localIsoDate } from '../../../core/services/schedule.service';
+import { todayIso } from '../../../core/utils/date-only';
 import { OnboardingStateService } from '../onboarding-state.service';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
@@ -156,7 +156,7 @@ export class OnboardingFoodComponent implements OnInit {
     effect(() => {
       const prefs = this.preferencesService.preferences();
       if (!prefs || this.state.planPeriod()) return;
-      this.state.computeAndSetPlanPeriod(localIsoDate(new Date()));
+      this.state.computeAndSetPlanPeriod(todayIso());
     });
   }
 

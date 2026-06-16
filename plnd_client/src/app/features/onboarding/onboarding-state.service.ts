@@ -4,6 +4,7 @@ import { PreferencesService } from '../../core/services/preferences.service';
 import { MealPlanResponse, PlanEntryRequest } from '../../core/models/week-plan';
 import { Routine } from '../../core/models/routine';
 import { DayTypeResponse } from '../../core/models/day-type';
+import { parseDateOnly, toDateOnly, daysBetweenDateOnly } from '../../core/utils/date-only';
 
 export type SectionId = 'account' | 'tasks' | 'food';
 export type SectionStatus = 'not-started' | 'complete';
@@ -60,10 +61,9 @@ export class OnboardingStateService {
   readonly planDays = computed(() => {
     const p = this.planPeriodSignal();
     if (!p) return 0;
-    // Use local-noon parsing to avoid UTC-offset day rollback (same pattern as computeFirstPlanPeriod).
-    const start = new Date(`${p.start}T12:00:00`);
-    const end = new Date(`${p.end}T12:00:00`);
-    return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+    // Inclusive whole-day span via the shared date-only helper (local-noon parsing
+    // avoids UTC-offset day rollback).
+    return daysBetweenDateOnly(p.end, p.start) + 1;
   });
 
   // ── Mutation methods ────────────────────────────────────────────────────
@@ -142,7 +142,7 @@ export function computeFirstPlanPeriod(
   const weekStartDay = prefs.week_start_day;
 
   // plan_start is tomorrow.
-  const planStart = addDays(new Date(`${today}T12:00:00`), 1);
+  const planStart = addDays(parseDateOnly(today), 1);
 
   // Anchor the window on the most recent week-start on or before plan_start.
   const daysSinceWeekStart = (planStart.getDay() - weekStartDay + 7) % 7;
@@ -163,18 +163,11 @@ export function computeFirstPlanPeriod(
       ? addDays(nextPeriodStart, planLength - 1)
       : currentPeriodEnd;
 
-  return { start: toISODate(planStart), end: toISODate(planEnd) };
+  return { start: toDateOnly(planStart), end: toDateOnly(planEnd) };
 }
 
 function addDays(date: Date, days: number): Date {
   const result = new Date(date.getTime());
   result.setDate(result.getDate() + days);
   return result;
-}
-
-function toISODate(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
 }

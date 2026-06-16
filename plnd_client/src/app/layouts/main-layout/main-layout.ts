@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, effect, inject, signal } from '@angular/
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { NavbarAvatarComponent } from '../../shared/components/navbar-avatar/navbar-avatar';
-import { todayIso, localIsoDate } from '../../core/services/schedule.service';
+import { todayIso, toDateOnly } from '../../core/utils/date-only';
 import { WeekPlanService } from '../../core/services/week-plan.service';
 import { PreferencesService } from '../../core/services/preferences.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -43,7 +43,7 @@ export class MainLayoutComponent implements OnInit {
       planStart.setDate(today.getDate() + daysUntilStart);
       const planEnd = new Date(planStart);
       planEnd.setDate(planStart.getDate() + prefs.default_plan_length_days - 1);
-      this.weekPlanService.checkPlanStatus(localIsoDate(planStart), localIsoDate(planEnd));
+      this.weekPlanService.checkPlanStatus(toDateOnly(planStart), toDateOnly(planEnd));
     });
   }
 

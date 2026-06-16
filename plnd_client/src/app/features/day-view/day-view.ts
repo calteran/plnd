@@ -1,7 +1,8 @@
 import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ScheduleService, todayIso } from '../../core/services/schedule.service';
+import { ScheduleService } from '../../core/services/schedule.service';
+import { todayIso } from '../../core/utils/date-only';
 import { BriefingService } from '../../core/services/briefing.service';
 import { TimezoneService } from '../../core/services/timezone.service';
 import { isMealAnchor, ScheduleItem, TaskEditPatch } from '../../core/models/schedule';

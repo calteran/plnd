@@ -1,7 +1,6 @@
 import { inject } from '@angular/core';
 import { ActivatedRouteSnapshot, CanActivateFn, Router } from '@angular/router';
-import { todayIso, offsetIso } from '../services/schedule.service';
-import { parseDateOnly } from '../utils/date-only';
+import { parseDateOnly, todayIso, offsetIso } from '../utils/date-only';
 
 export const todayRedirectGuard: CanActivateFn = () =>
   inject(Router).createUrlTree(['/day', todayIso()]);

@@ -38,3 +38,13 @@ export function daysBetweenDateOnly(later: string, earlier: string): number {
 export function dayOfWeekBit(iso: string): number {
   return 1 << parseDateOnly(iso).getDay();
 }
+
+/** Today's date as a local `YYYY-MM-DD` string (local calendar day, never UTC). */
+export function todayIso(): string {
+  return toDateOnly(new Date());
+}
+
+/** Date-only string `days` away from today (may be negative). */
+export function offsetIso(days: number): string {
+  return addDaysDateOnly(todayIso(), days);
+}

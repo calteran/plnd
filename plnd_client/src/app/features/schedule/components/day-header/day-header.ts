@@ -1,6 +1,5 @@
 import { Component, computed, input, output } from '@angular/core';
-import { todayIso } from '../../../../core/services/schedule.service';
-import { parseDateOnly, addDaysDateOnly } from '../../../../core/utils/date-only';
+import { parseDateOnly, addDaysDateOnly, todayIso } from '../../../../core/utils/date-only';
 import { DayZoneView } from '../../../../core/utils/zone-projection';
 import { zoneCity, zoneShort, zoneLong, offsetPhrase } from '../../../../core/utils/zone-format';
 

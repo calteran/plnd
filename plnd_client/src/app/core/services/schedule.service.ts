@@ -6,7 +6,7 @@ import { ConfigService } from './config.service';
 import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor, parseItemType } from '../models/schedule';
 import { MealAnchorInstanceDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
-import { toDateOnly } from '../utils/date-only';
+import { todayIso } from '../utils/date-only';
 
 export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
 
@@ -171,21 +171,6 @@ export class ScheduleService {
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────
-
-/** Local `YYYY-MM-DD` for a Date. Delegates to the canonical date-only helper. */
-export function localIsoDate(d: Date): string {
-  return toDateOnly(d);
-}
-
-export function todayIso(): string {
-  return localIsoDate(new Date());
-}
-
-export function offsetIso(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return localIsoDate(d);
-}
 
 function flip(status: 'pending' | 'done'): 'pending' | 'done' {
   return status === 'done' ? 'pending' : 'done';
