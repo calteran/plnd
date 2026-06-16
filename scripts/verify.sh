@@ -55,7 +55,11 @@ trap cleanup EXIT INT TERM
 for tool in timeout doppler node openssl; do
     command -v "$tool" &>/dev/null || { echo "✗ '$tool' not found" >&2; exit 1; }
 done
-docker info &>/dev/null || { echo "✗ Docker is not running — start Docker Desktop" >&2; exit 1; }
+# Docker is only needed by subsets that touch infra (rust/e2e/all); quick/ts are
+# pure static/unit checks and run without it.
+if [[ "$NEED_INFRA" == true ]]; then
+    docker info &>/dev/null || { echo "✗ Docker is not running — start Docker Desktop" >&2; exit 1; }
+fi
 
 # ── FIFO completion bus (real-time ✓/✗) ─────────────────────────────────────────
 FIFO=$(mktemp -u /tmp/plnd-verify-bus-XXXXXX); mkfifo "$FIFO"
@@ -156,6 +160,9 @@ if [[ "$NEED_E2E" == true ]]; then
         psql -U plnd -d postgres -c "CREATE DATABASE \"$RUN_DB\";") >/dev/null
     RUN_DB_CREATED=true
 
+    # Derive the per-run DB URL by swapping the db-name segment. Assumes the
+    # password (if any) has no unencoded '/'; Doppler-managed connection strings
+    # percent-encode such characters, so this holds.
     APP_DB_BASE="$(doppler run -- bash -c 'printf %s "$APP_DATABASE__URL"')"; APP_DB_BASE="${APP_DB_BASE%/*}"
     RUN_DB_URL="$APP_DB_BASE/$RUN_DB"
     API_PORT="$("$SCRIPT_DIR/free-port.sh")"

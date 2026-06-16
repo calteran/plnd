@@ -10,7 +10,7 @@ init:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "→ Installing Homebrew packages..."
-    brew install flock coreutils libpq dopplerhq/cli/doppler mprocs
+    brew install coreutils libpq dopplerhq/cli/doppler mprocs
 
     echo "→ Installing Rust tools..."
     cargo install cargo-nextest --locked
