@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process';
 import { setTimeout as delay } from 'node:timers/promises';
 import * as path from 'node:path';
 
-const API_HEALTH_URL = 'http://localhost:3000/health';
+const API_HEALTH_URL = `${process.env['API_BASE'] ?? 'http://localhost:3000'}/health`;
 const API_READY_TIMEOUT_MS = 5_000;
 const API_PROBE_INTERVAL_MS = 500;
 

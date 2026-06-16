@@ -1,7 +1,9 @@
 import { Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
-export const API_BASE = 'http://localhost:3000';
+// Defaults to :3000 so manual runs and `just dev` are unchanged. scripts/verify.sh
+// sets API_BASE to the run's ephemeral API port. Mock-oauth stays :8080 (shared).
+export const API_BASE = process.env['API_BASE'] ?? 'http://localhost:3000';
 
 const MOCK_OAUTH_TOKEN_URL = 'http://localhost:8080/plnd-dev/token';
 const BACKEND_TOKEN_EXCHANGE_URL = `${API_BASE}/auth/token`;

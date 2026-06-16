@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// `just verify` assigns an ephemeral ng-serve port per run; default :4200 for
+// `just dev` / standalone runs.
+const NG_PORT = process.env['NG_PORT'] ?? '4200';
+const BASE_URL = `http://localhost:${NG_PORT}`;
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.e2e.ts',
@@ -23,7 +28,7 @@ export default defineConfig({
   reporter: process.env['CI'] ? 'github' : 'list',
   globalSetup: require.resolve('./e2e/global-setup.ts'),
   use: {
-    baseURL: 'http://localhost:4200',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     headless: true,
@@ -32,8 +37,8 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: {
-    command: 'npx ng serve --configuration development',
-    url: 'http://localhost:4200',
+    command: `npx ng serve --configuration development --port ${NG_PORT}`,
+    url: BASE_URL,
     // In CI/`just verify` always start a fresh server from THIS worktree — never
     // adopt whatever `ng serve` happens to occupy :4200 (a stale or another
     // worktree's build), which silently runs e2e against the wrong frontend.
