@@ -261,21 +261,22 @@ describe('ScheduleService', () => {
     expect(lunch.description).toBeUndefined();
   });
 
-  it('places anchor items before task items in scheduleItems', () => {
+  it('places anchor items before task items in scheduleItems (via after_anchor)', () => {
+    // A floating task (after_anchor: 'breakfast') slots immediately after its meal anchor.
     svc.loadDay('2026-04-02');
     flushDay(
       httpMock,
       [{
         entry_id: 't1', task_type: 'exercise', title: 'Run',
-        status: 'planned', date: '2026-04-02', scheduled_start: '07:00',
+        status: 'planned', date: '2026-04-02', scheduled_start: null, after_anchor: 'breakfast',
       }],
       [anchorDto('m1', 'breakfast')],
     );
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(2);
-    expect(isMealAnchor(items[0])).toBeTrue();
-    expect(isMealAnchor(items[1])).toBeFalse();
+    expect(isMealAnchor(items[0])).toBeTrue();   // meal anchor first
+    expect(isMealAnchor(items[1])).toBeFalse(); // floating task immediately after
   });
 
   it('nests an entry linked by slot_meal_anchor_id into its anchor as a during-meal task', () => {
@@ -300,6 +301,8 @@ describe('ScheduleService', () => {
   });
 
   it('keeps an entry top-level when its slot_meal_anchor_id matches no anchor in the period', () => {
+    // Orphan tasks (slot_meal_anchor_id references a missing anchor) surface at the
+    // front of the list (before the slot-walk output) rather than being silently dropped.
     svc.loadDay('2026-04-02');
     flushDay(
       httpMock,
@@ -313,12 +316,15 @@ describe('ScheduleService', () => {
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(2);
-    const meal = items[0] as MealAnchor;
+    // orphan is leftover → surfaces before slot-walk output
+    expect((items[0] as ScheduleTask).id).toBe('orphan');
+    const meal = items[1] as MealAnchor;
     expect(meal.duringMealTasks.length).toBe(0);
-    expect((items[1] as ScheduleTask).id).toBe('orphan');
   });
 
   it('separates paired and standalone entries by slot_meal_anchor_id', () => {
+    // dt1 is paired to the meal via slot_meal_anchor_id → inside duringMealTasks.
+    // std has no after_anchor and no matching scheduled_task anchor → leftover (front).
     svc.loadDay('2026-04-02');
     flushDay(
       httpMock,
@@ -333,8 +339,10 @@ describe('ScheduleService', () => {
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(2);
-    expect((items[0] as MealAnchor).duringMealTasks.map(t => t.id)).toEqual(['dt1']);
-    expect((items[1] as ScheduleTask).id).toBe('std');
+    // leftover (no matching anchor) surfaces before the slot walk
+    expect((items[0] as ScheduleTask).id).toBe('std');
+    // meal anchor with dt1 nested inside
+    expect((items[1] as MealAnchor).duringMealTasks.map(t => t.id)).toEqual(['dt1']);
   });
 
   it('sets items to [] and clears loading on HTTP error in period', () => {
@@ -646,6 +654,22 @@ describe('ScheduleService', () => {
         .flush('error', { status: 500, statusText: 'Internal Server Error' });
       flushDay(httpMock);
     });
+  });
+
+  it('interleaves a floating task into the slot after its meal anchor', () => {
+    svc.loadDay('2026-04-02');
+    const floating = {
+      entry_id: 'f1', task_type: 'general', title: 'Walk dog', date: '2026-04-02',
+      status: 'pending', after_anchor: 'Breakfast',
+    };
+    const bfast = anchorDto('meal-1', 'Breakfast');
+    const lunch = anchorDto('meal-2', 'Lunch');
+    lunch['sequence'] = 1;
+    flushDay(httpMock, [floating], [bfast, lunch], []);
+
+    const labels = svc.scheduleItems().map(i =>
+      isMealAnchor(i) ? `meal:${i.name}` : `task:${(i as ScheduleTask).label}`);
+    expect(labels).toEqual(['meal:Breakfast', 'task:Walk dog', 'meal:Lunch']);
   });
 
   describe('toggleMealConsumed', () => {

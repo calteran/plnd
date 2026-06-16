@@ -3,10 +3,10 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
 import { Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
 import { ConfigService } from './config.service';
-import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor, parseItemType } from '../models/schedule';
-import { ScheduleAnchorDto, ScheduleEntryDto, SchedulePeriodResponse } from '../models/week-plan';
-import { PlannedMealEntryDto } from '../models/planned-meal-entry';
+import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor } from '../models/schedule';
+import { ScheduleAnchorDto, SchedulePeriodResponse } from '../models/week-plan';
 import { todayIso } from '../utils/date-only';
+import { assembleScheduleItems, toMealUiStatus } from '../utils/schedule-assembly';
 
 export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
 
@@ -48,36 +48,7 @@ export class ScheduleService {
       takeUntilDestroyed(),
     ).subscribe(({ schedule, anchors }) => {
       if (schedule.error) this._error.set('Failed to load schedule');
-      // #958: the endpoint now returns all anchor kinds. The day-view still
-      // renders only meals (full slot rendering is #959), so filter to meals.
-      const meals = anchors.filter(a => a.kind === 'meal');
-      // Index persisted meals by the anchor instance they were committed against,
-      // so each anchor row can render the dish a user planned (onboarding / wizard).
-      const mealByAnchor = new Map<string, PlannedMealEntryDto>(
-        (schedule.data.planned_meals ?? []).map(pm => [pm.meal_anchor_instance_id, pm]),
-      );
-      // Partition entries: those linked to an anchor instance (slot_meal_anchor_id)
-      // render *inside* that meal row as during-meal tasks; the rest are top-level
-      // rows. Keying off the FK (not the free-form after_anchor label) ties a task
-      // to the concrete meal instance on this day.
-      const anchorIds = new Set(meals.map(a => a.id as string));
-      const tasksByAnchor = new Map<string, ScheduleTask[]>();
-      const topLevel: ScheduleTask[] = [];
-      for (const e of schedule.data.entries) {
-        const task = mapEntry(e);
-        const anchorId = e.slot_meal_anchor_id;
-        if (anchorId && anchorIds.has(anchorId)) {
-          const tasks = tasksByAnchor.get(anchorId) ?? [];
-          tasks.push(task);
-          tasksByAnchor.set(anchorId, tasks);
-        } else {
-          topLevel.push(task);
-        }
-      }
-      this._items.set([
-        ...meals.map(a => mapAnchorInstance(a, mealByAnchor.get(a.id as string), tasksByAnchor.get(a.id as string) ?? [])),
-        ...topLevel,
-      ]);
+      this._items.set(assembleScheduleItems(anchors, schedule.data.entries, schedule.data.planned_meals ?? []));
       this._loading.set(false);
     });
   }
@@ -196,60 +167,6 @@ function findItemStatus(items: ScheduleItem[], id: string): 'pending' | 'done' |
 }
 
 // ── API → model mapping ───────────────────────────────────────────────────────
-
-const MEAL_SLOTS: Record<string, { name: string; emoji: string }> = {
-  breakfast: { name: 'Breakfast', emoji: '🥣' },
-  lunch:     { name: 'Lunch',     emoji: '🥗' },
-  dinner:    { name: 'Dinner',    emoji: '🍽' },
-};
-
-/**
- * Folds the backend consumption status into the UI `MealAnchor.status`.
- * `consumed` → done, `skipped` → skipped, `planned` falls back to the
- * dish-planning state (a dish title means 'planned', otherwise 'unplanned').
- */
-function toMealUiStatus(
-  status: string | undefined,
-  description?: string,
-): MealAnchor['status'] {
-  if (status === 'consumed') return 'done';
-  if (status === 'skipped') return 'skipped';
-  return description ? 'planned' : 'unplanned';
-}
-
-function mapAnchorInstance(
-  dto: ScheduleAnchorDto,
-  planned?: PlannedMealEntryDto,
-  duringMealTasks: ScheduleTask[] = [],
-): MealAnchor {
-  const slot = MEAL_SLOTS[dto.label.toLowerCase()];
-  return {
-    id:    dto.id as string,
-    name:  slot?.name ?? dto.label,
-    emoji: slot?.emoji ?? '🍴',
-    status:      toMealUiStatus(dto.status ?? 'planned', planned?.title ?? undefined),
-    description: planned?.title ?? undefined,
-    duringMealTasks,
-  };
-}
-
-function mapEntry(e: ScheduleEntryDto): ScheduleTask {
-  // Floating = lives in a meal slot (anchored) with no fixed clock time.
-  // A task with neither a time nor an anchor is NOT floating, so its time stays editable.
-  const floating = !e.scheduled_start && !!e.after_anchor;
-  return {
-    id:      e.entry_id,
-    type:    parseItemType(e.task_type),
-    label:   e.title ?? e.task_type,
-    status:  e.status === 'completed' ? 'done' : 'pending',
-    scheduledStart: e.scheduled_start ?? undefined,
-    durationMinutes: e.duration_minutes ?? undefined,
-    energy:  (e.energy_required as ScheduleTask['energy']) ?? undefined,
-    oneShot: e.one_shot ?? false,
-    floating,
-  };
-}
-
 
 function toPatchBody(p: TaskEditPatch): Record<string, unknown> {
   const body: Record<string, unknown> = {};

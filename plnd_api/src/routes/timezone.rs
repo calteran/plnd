@@ -6,7 +6,7 @@
 //!
 //! Endpoints:
 //! - `GET  /timezone/anchors?through=<YYYY-MM-DD>` — list anchors in window.
-//! - `GET  /timezone/resolve?at=<YYYY-MM-DD>[&time=<HH:MM>]` — server-side resolution.
+//! - `GET  /timezone/resolve?at=<YYYY-MM-DD>[&time=<HH:MM>][&device=<IANA>]` — server-side resolution.
 //! - `POST /timezone/anchors` — create a `user`-source anchor.
 //! - `DELETE /timezone/anchors/{id}` — delete a single anchor.
 //! - `DELETE /timezone/anchors/group/{inference_group}` — delete a whole group.
@@ -24,6 +24,7 @@ use axum::{
 use chrono::{NaiveDate, NaiveTime};
 use plnd_data::Error;
 use plnd_data::models::TimezoneSource;
+use plnd_data::timezone::{DayZoneKind, DayZoneProjection};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -48,6 +49,8 @@ pub struct ResolveQuery {
     /// is used (consistent with how `zone_at` handles `time = None`).
     #[serde(default, deserialize_with = "deserialize_opt_hhmm")]
     pub time: Option<NaiveTime>,
+    /// Optional device IANA zone. When supplied, the response includes `day_view`.
+    pub device: Option<String>,
 }
 
 fn deserialize_opt_hhmm<'de, D>(deserializer: D) -> Result<Option<NaiveTime>, D::Error>
@@ -75,6 +78,54 @@ where
 pub struct ResolveResponse {
     /// IANA timezone name, or `null` if no anchor covers the requested point.
     pub zone: Option<String>,
+    /// Server-computed day-zone view. Present only when the request supplies a
+    /// `device` zone; `null` otherwise (backward compatible).
+    pub day_view: Option<DayZoneViewResponse>,
+}
+
+/// Wire form of [`plnd_data::timezone::DayZoneKind`].
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DayZoneKindResponse {
+    Same,
+    Divergent,
+    Travel,
+}
+
+/// Wire form of the first intra-day zone switch (present only on `Travel` days).
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct DayZoneSwitchResponse {
+    pub from_zone: String,
+    pub to_zone: String,
+    pub anchor_id: Uuid,
+}
+
+/// Server-computed day-zone view (replaces the former client `classifyDay`).
+#[derive(Debug, Serialize, utoipa::ToSchema)]
+pub struct DayZoneViewResponse {
+    pub kind: DayZoneKindResponse,
+    pub incoming_zone: Option<String>,
+    pub current_zone: String,
+    pub switch: Option<DayZoneSwitchResponse>,
+}
+
+impl From<DayZoneProjection> for DayZoneViewResponse {
+    fn from(p: DayZoneProjection) -> Self {
+        Self {
+            kind: match p.kind {
+                DayZoneKind::Same => DayZoneKindResponse::Same,
+                DayZoneKind::Divergent => DayZoneKindResponse::Divergent,
+                DayZoneKind::Travel => DayZoneKindResponse::Travel,
+            },
+            incoming_zone: p.incoming_zone.map(|z| z.name().to_string()),
+            current_zone: p.current_zone.name().to_string(),
+            switch: p.switch.map(|s| DayZoneSwitchResponse {
+                from_zone: s.from_zone.name().to_string(),
+                to_zone: s.to_zone.name().to_string(),
+                anchor_id: s.anchor_id,
+            }),
+        }
+    }
 }
 
 /// Request body for `POST /timezone/anchors`.
@@ -190,6 +241,9 @@ pub async fn list_anchors(
 /// `plnd_data::timezone::zone_at` to find the applicable zone. Returns
 /// `{ "zone": "<IANA name>" }` or `{ "zone": null }` when no anchor covers
 /// the requested point.
+///
+/// When `device` is supplied, the response also includes `day_view` with a
+/// server-computed classification of the day's zone layout.
 #[utoipa::path(
     get,
     path = "/timezone/resolve",
@@ -197,7 +251,7 @@ pub async fn list_anchors(
     security(("bearer_auth" = [])),
     params(ResolveQuery),
     responses(
-        (status = 200, description = "Timezone at the requested point (zone may be null)", body = ResolveResponse),
+        (status = 200, description = "Timezone at the requested point; includes day_view when device is supplied", body = ResolveResponse),
         (status = 401, description = "Unauthorized"),
     )
 )]
@@ -222,7 +276,19 @@ pub async fn resolve_zone(
     let zone = plnd_data::timezone::zone_at(&anchors, query.at, query.time)
         .map(|tz| tz.name().to_string());
 
-    Ok(Json(ResolveResponse { zone }))
+    let day_view = query
+        .device
+        .as_deref()
+        .and_then(|d| d.parse::<chrono_tz::Tz>().ok())
+        .map(|device_zone| {
+            DayZoneViewResponse::from(plnd_data::timezone::day_zone_view(
+                &anchors,
+                query.at,
+                device_zone,
+            ))
+        });
+
+    Ok(Json(ResolveResponse { zone, day_view }))
 }
 
 /// Create a user-source timezone anchor.
@@ -625,6 +691,7 @@ mod tests {
     fn resolve_response_serializes_zone_as_string() {
         let resp = ResolveResponse {
             zone: Some("America/Denver".to_string()),
+            day_view: None,
         };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"zone\":\"America/Denver\""));
@@ -632,7 +699,10 @@ mod tests {
 
     #[test]
     fn resolve_response_serializes_null_zone() {
-        let resp = ResolveResponse { zone: None };
+        let resp = ResolveResponse {
+            zone: None,
+            day_view: None,
+        };
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"zone\":null"));
     }
@@ -766,5 +836,36 @@ mod tests {
         let json = serde_json::to_string(&resp).unwrap();
         assert!(json.contains("\"outcome\":\"no_change\""));
         assert!(json.contains("\"confirm\":null"));
+    }
+
+    #[test]
+    fn resolve_response_with_day_view_serializes() {
+        let resp = ResolveResponse {
+            zone: Some("America/Denver".to_string()),
+            day_view: Some(DayZoneViewResponse {
+                kind: DayZoneKindResponse::Travel,
+                incoming_zone: Some("America/New_York".to_string()),
+                current_zone: "America/Denver".to_string(),
+                switch: Some(DayZoneSwitchResponse {
+                    from_zone: "America/New_York".to_string(),
+                    to_zone: "America/Denver".to_string(),
+                    anchor_id: Uuid::nil(),
+                }),
+            }),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"kind\":\"travel\""));
+        assert!(json.contains("\"incoming_zone\":\"America/New_York\""));
+        assert!(json.contains("\"from_zone\":\"America/New_York\""));
+    }
+
+    #[test]
+    fn resolve_response_without_day_view_omits_or_nulls_it() {
+        let resp = ResolveResponse {
+            zone: None,
+            day_view: None,
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"day_view\":null"));
     }
 }

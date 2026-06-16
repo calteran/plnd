@@ -18,7 +18,25 @@ export interface TimezoneAnchorDto {
   updated_at: string;
 }
 
-export interface ResolveResponse { zone: string | null; }
+export type DayZoneKind = 'same' | 'divergent' | 'travel';
+
+export interface DayZoneSwitchDto {
+  from_zone: string;
+  to_zone: string;
+  anchor_id: string;
+}
+
+export interface DayZoneViewDto {
+  kind: DayZoneKind;
+  incoming_zone: string | null;
+  current_zone: string;
+  switch: DayZoneSwitchDto | null;
+}
+
+export interface ResolveResponse {
+  zone: string | null;
+  day_view?: DayZoneViewDto | null;
+}
 
 export type DeviceAffirmOutcome = 'no_change' | 'appended' | 'recording' | 'standoff';
 

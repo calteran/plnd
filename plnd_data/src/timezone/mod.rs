@@ -14,6 +14,7 @@
 
 use chrono::{DateTime, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
+use uuid::Uuid;
 
 use crate::models::TimezoneAnchor;
 
@@ -116,6 +117,186 @@ pub fn resolve_instant(wall: NaiveDateTime, tz: Tz) -> DateTime<Utc> {
             // fall back to UTC interpretation rather than panicking.
             Utc.from_utc_datetime(&wall)
         }
+    }
+}
+
+/// Whether the day's effective zone matches the device, differs from it, or
+/// changes within the day. Mirrors the client `classifyDay` contract.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DayZoneKind {
+    Same,
+    Divergent,
+    Travel,
+}
+
+/// The first intra-day zone change on the queried date.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DayZoneSwitch {
+    pub from_zone: Tz,
+    pub to_zone: Tz,
+    pub anchor_id: Uuid,
+}
+
+/// Server-side projection of a day's timezone view (§4.8).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DayZoneProjection {
+    pub kind: DayZoneKind,
+    pub incoming_zone: Option<Tz>,
+    /// The device's zone (the `device_zone` argument), never the effective or
+    /// destination zone — mirrors `classifyDay`'s `currentZone`.
+    pub current_zone: Tz,
+    pub switch: Option<DayZoneSwitch>,
+}
+
+/// Classify a day's zone view given the user's anchors and the device zone.
+///
+/// Faithful port of the former client `classifyDay`: the incoming (start-of-day)
+/// zone is `zone_at(date, None)`; a same-date timed anchor makes the day a
+/// `Travel` day with a switch from `incoming ?? device` to that anchor's zone;
+/// otherwise the day is `Same`/`Divergent` by comparing `incoming ?? device`
+/// against the device zone.
+pub fn day_zone_view(
+    anchors: &[TimezoneAnchor],
+    date: NaiveDate,
+    device_zone: Tz,
+) -> DayZoneProjection {
+    let incoming = zone_at(anchors, date, None);
+
+    // The earliest intra-day switch by time; among anchors at the same time the
+    // newest (greatest `created_at`) wins, consistent with `governing_anchor` /
+    // `zone_at`'s "a later signal supersedes" rule (§4.8). Maximizing on
+    // `Reverse(effective_time)` selects the smallest time; `created_at` (not
+    // reversed) then selects the most recently recorded among ties.
+    let first_switch = anchors
+        .iter()
+        .filter(|x| x.effective_date == date && x.effective_time.is_some())
+        .max_by_key(|x| (std::cmp::Reverse(x.effective_time), x.created_at));
+
+    if let Some(first) = first_switch {
+        let from_zone = incoming.unwrap_or(device_zone);
+        return DayZoneProjection {
+            kind: DayZoneKind::Travel,
+            incoming_zone: incoming,
+            current_zone: device_zone,
+            switch: Some(DayZoneSwitch {
+                from_zone,
+                to_zone: first.zone,
+                anchor_id: first.id,
+            }),
+        };
+    }
+
+    let effective = incoming.unwrap_or(device_zone);
+    let kind = if effective == device_zone {
+        DayZoneKind::Same
+    } else {
+        DayZoneKind::Divergent
+    };
+    DayZoneProjection {
+        kind,
+        incoming_zone: incoming,
+        current_zone: device_zone,
+        switch: None,
+    }
+}
+
+#[cfg(test)]
+mod day_view_tests {
+    use super::*;
+    use crate::models::TimezoneSource;
+    use chrono::{TimeZone, Utc};
+    use uuid::Uuid;
+
+    fn a(date: &str, time: Option<&str>, zone: chrono_tz::Tz) -> TimezoneAnchor {
+        TimezoneAnchor {
+            id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            effective_date: NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap(),
+            effective_time: time.map(|t| NaiveTime::parse_from_str(t, "%H:%M:%S").unwrap()),
+            zone,
+            source: TimezoneSource::User,
+            source_ref: None,
+            inference_group: None,
+            created_at: Utc.timestamp_opt(0, 0).unwrap(),
+            updated_at: Utc.timestamp_opt(0, 0).unwrap(),
+        }
+    }
+
+    fn day(s: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    #[test]
+    fn same_when_incoming_matches_device() {
+        let anchors = vec![a("2026-01-01", None, chrono_tz::America::New_York)];
+        let v = day_zone_view(&anchors, day("2026-07-10"), chrono_tz::America::New_York);
+        assert_eq!(v.kind, DayZoneKind::Same);
+        assert_eq!(v.incoming_zone, Some(chrono_tz::America::New_York));
+        assert!(v.switch.is_none());
+    }
+
+    #[test]
+    fn divergent_when_incoming_differs_from_device() {
+        let anchors = vec![a("2026-01-01", None, chrono_tz::America::New_York)];
+        let v = day_zone_view(&anchors, day("2026-07-10"), chrono_tz::America::Denver);
+        assert_eq!(v.kind, DayZoneKind::Divergent);
+    }
+
+    #[test]
+    fn travel_when_intraday_switch_on_date() {
+        let switch = a("2026-07-10", Some("14:00:00"), chrono_tz::America::Denver);
+        let switch_id = switch.id;
+        let v = day_zone_view(&[switch], day("2026-07-10"), chrono_tz::America::New_York);
+        assert_eq!(v.kind, DayZoneKind::Travel);
+        let s = v.switch.unwrap();
+        assert_eq!(s.to_zone, chrono_tz::America::Denver);
+        // incoming is None → from_zone falls back to device zone (mirrors classifyDay).
+        assert_eq!(s.from_zone, chrono_tz::America::New_York);
+        assert_eq!(s.anchor_id, switch_id);
+    }
+
+    #[test]
+    fn empty_anchors_are_same_as_device() {
+        let v = day_zone_view(&[], day("2026-07-10"), chrono_tz::America::Denver);
+        assert_eq!(v.kind, DayZoneKind::Same);
+        assert!(v.incoming_zone.is_none());
+    }
+
+    #[test]
+    fn travel_from_zone_uses_incoming_when_present() {
+        // A prior whole-day anchor sets the incoming zone to Chicago; an
+        // intra-day timed anchor on the queried date switches to Denver. The
+        // travel `from_zone` must take the `Some(incoming)` path (Chicago),
+        // not the device fallback (New_York).
+        let anchors = vec![
+            a("2026-07-01", None, chrono_tz::America::Chicago),
+            a("2026-07-10", Some("14:00:00"), chrono_tz::America::Denver),
+        ];
+        let v = day_zone_view(&anchors, day("2026-07-10"), chrono_tz::America::New_York);
+        assert_eq!(v.kind, DayZoneKind::Travel);
+        let s = v.switch.unwrap();
+        assert_eq!(s.from_zone, chrono_tz::America::Chicago);
+        assert_eq!(s.to_zone, chrono_tz::America::Denver);
+        assert_eq!(v.incoming_zone, Some(chrono_tz::America::Chicago));
+    }
+
+    #[test]
+    fn travel_tie_break_prefers_newest_anchor_at_same_time() {
+        // Two intra-day switches at the SAME effective_time; the newer (greater
+        // created_at) wins as the switch, matching governing_anchor / zone_at's
+        // "a later signal supersedes" rule (§4.8).
+        let mut older = a("2026-07-10", Some("14:00:00"), chrono_tz::America::Denver);
+        older.created_at = Utc.timestamp_opt(1_000, 0).unwrap();
+        let mut newer = a("2026-07-10", Some("14:00:00"), chrono_tz::America::Chicago);
+        newer.created_at = Utc.timestamp_opt(2_000, 0).unwrap();
+        // Pass oldest-first to prove ordering is by created_at, not input order.
+        let v = day_zone_view(
+            &[older, newer],
+            day("2026-07-10"),
+            chrono_tz::America::New_York,
+        );
+        assert_eq!(v.kind, DayZoneKind::Travel);
+        assert_eq!(v.switch.unwrap().to_zone, chrono_tz::America::Chicago);
     }
 }
 
