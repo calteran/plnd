@@ -97,7 +97,10 @@ wait_all() {
     JOB_PIDS=(); return $overall
 }
 
-alloy_reachable() { (exec 3<>/dev/tcp/127.0.0.1/4317) 2>/dev/null && { exec 3>&-; return 0; } || return 1; }
+# Probe Alloy's OTLP port on a PRIVATE fd inside a subshell — never fd 3, which is
+# the FIFO completion-bus write-end held by the main shell. The subshell auto-closes
+# the probe fd on exit; its exit status IS the reachability result.
+alloy_reachable() { (exec 9<>/dev/tcp/127.0.0.1/4317) 2>/dev/null; }
 
 # ── Run id — branch slug + short random; names the per-run DB and OTEL tag ───────
 BRANCH_SLUG="$(git -C "$PROJECT_ROOT" branch --show-current 2>/dev/null \
