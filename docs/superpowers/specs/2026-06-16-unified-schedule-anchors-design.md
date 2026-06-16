@@ -187,9 +187,17 @@ Algorithm:
 - no active day type → only data anchors, no SOD/EOD;
 - tie-break determinism (two anchors at the same minute).
 
-**Rust integration (`plnd_api/tests/schedule_anchors_test.rs`):**
-- authenticated `GET /schedule/anchors` against a seeded user returns all four kinds in one ordered sequence;
-- first call still lazily materializes meal instances.
+**Rust serde (`plnd_api/tests/schedule_anchors_test.rs`):** `ScheduleAnchorResponse` /
+`ScheduleAnchorKind` serialize as the documented contract (snake_case `kind`,
+present-but-null kind-specific fields, populated `zone` for timezone changes).
+
+**Integration coverage:** this repo has no live-HTTP/DB harness under `plnd_api/tests`
+(those are serde/logic tests; DB tests live in `plnd_data/src/db` under `#[sqlx::test]`).
+The wired endpoint is exercised end-to-end against the real backend by the existing
+Playwright e2e `plnd_client/e2e/tests/schedule-anchors-api.e2e.ts` (asserts the GET list
+returns the unified sequence; first-call lazy materialization; empty sequence for a
+day-type-less user), and the ordering/source logic is fully covered by the
+`assemble_day_anchors` unit tests above. No separate Rust HTTP integration test is added.
 
 **Angular unit:** `schedule.service` spec for the unified DTO + `kind === 'meal'` filter.
 
@@ -215,4 +223,4 @@ Algorithm:
 
 - Endpoint returns all four anchor sources as one ordered sequence; meal-only behavior is gone. ✔ (contract above)
 - Unified anchor response type defined; OpenAPI/utoipa annotation updated. ✔ (`ScheduleAnchorResponse`, D1)
-- Unit + integration tests cover each source and ordering, including a midnight-crossing day type. ✔ (Testing)
+- Unit tests cover each source and ordering, including a midnight-crossing day type; the wired endpoint is covered end-to-end by the existing Playwright e2e. ✔ (Testing)
