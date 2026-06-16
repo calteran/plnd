@@ -965,4 +965,232 @@ mod tests {
         .unwrap();
         assert_eq!(meal.calories_kcal, Some(400.0));
     }
+
+    // ── #940: branded normalization on agent promotion ───────────────────────
+
+    /// Records the `(name, brand)` of each ingredient ingested, so a test can
+    /// assert how the promotion path named a branded vs. canonical ingredient.
+    #[derive(Default)]
+    struct IngredientRecordingRepo {
+        ingredients: Mutex<Vec<(String, Option<String>)>>,
+    }
+
+    #[async_trait::async_trait]
+    impl CatalogIngestRepository for IngredientRecordingRepo {
+        async fn ingest_ingredient(
+            &self,
+            i: IngestIngredientInput,
+        ) -> Result<Uuid, plnd_data::Error> {
+            self.ingredients
+                .lock()
+                .unwrap()
+                .push((i.name.clone(), i.brand.clone()));
+            Ok(Uuid::new_v4())
+        }
+        async fn contribute_ingredient(
+            &self,
+            _i: ContributeIngredientInput,
+        ) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+        async fn ingest_dish(&self, _i: IngestDishInput) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+        async fn ingest_meal(&self, _i: IngestMealInput) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+    }
+
+    /// Branded nutrition provider (non-canonical): returns a composite product name.
+    struct BrandedCheddarProvider;
+
+    #[async_trait::async_trait]
+    impl NutritionProvider for BrandedCheddarProvider {
+        fn source_name(&self) -> &str {
+            "test_branded"
+        }
+        async fn search_ingredients(
+            &self,
+            q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            if q.query.to_lowercase().contains("cheddar") {
+                Ok(vec![SearchResult {
+                    external_id: "branded-cheddar-1".into(),
+                    name: "Great Value Shredded Cheddar Cheese".into(),
+                    ..Default::default()
+                }])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn get_ingredient_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
+            Ok(Some(ExternalIngredient {
+                external_id: "branded-cheddar-1".into(),
+                name: "Great Value Shredded Cheddar Cheese".into(),
+                serving_size_g: None,
+                nutrition: None,
+                allergens: vec![],
+            }))
+        }
+    }
+
+    /// Canonical nutrition provider: returns a clean generic name and reports
+    /// `is_canonical_source() == true`, so the seam must skip normalization.
+    struct CanonicalCheddarProvider;
+
+    #[async_trait::async_trait]
+    impl NutritionProvider for CanonicalCheddarProvider {
+        fn source_name(&self) -> &str {
+            "test_canonical"
+        }
+        fn is_canonical_source(&self) -> bool {
+            true
+        }
+        async fn search_ingredients(
+            &self,
+            q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            if q.query.to_lowercase().contains("cheddar") {
+                Ok(vec![SearchResult {
+                    external_id: "canonical-cheddar-1".into(),
+                    name: "Cheddar cheese low moisture".into(),
+                    ..Default::default()
+                }])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn get_ingredient_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
+            Ok(Some(ExternalIngredient {
+                external_id: "canonical-cheddar-1".into(),
+                name: "Cheddar cheese low moisture".into(),
+                serving_size_g: None,
+                nutrition: None,
+                allergens: vec![],
+            }))
+        }
+    }
+
+    /// Fixture normalizer mapping the branded composite to its generic + brand,
+    /// and also mapping the canonical name (to prove it is *not* consulted).
+    fn cheddar_normalizer() -> plnd_agent::FixtureBrandNormalizer {
+        use plnd_agent::Normalization;
+        use std::collections::HashMap;
+        let mut map = HashMap::new();
+        map.insert(
+            "Great Value Shredded Cheddar Cheese".to_string(),
+            Normalization {
+                generic_name: "Cheddar cheese".into(),
+                brand: Some("Great Value".into()),
+                confidence: 0.95,
+            },
+        );
+        map.insert(
+            "Cheddar cheese low moisture".to_string(),
+            Normalization {
+                generic_name: "WRONG should be skipped".into(),
+                brand: Some("WRONG".into()),
+                confidence: 0.99,
+            },
+        );
+        plnd_agent::FixtureBrandNormalizer::from_entries(map)
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    async fn promote_normalizes_branded_ingredient() {
+        let repo = IngredientRecordingRepo::default();
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(BrandedCheddarProvider)],
+            vec![], // no recipe provider → inferred-compose branch
+            vec![],
+            plnd_data::cache::SearchCache::new(36),
+        );
+        let proposal = NewMealProposal {
+            name: "Cheese Plate".into(),
+            occasion_tags: vec!["snack".into()],
+            inferred_ingredients: vec![InferredIngredient {
+                // matches the branded provider's returned name (confidence 1.0)
+                name: "Great Value Shredded Cheddar Cheese".into(),
+                grams: 50.0,
+            }],
+        };
+
+        let out = promote_new_meal(
+            &svc,
+            &repo,
+            &cheddar_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
+        assert!(
+            matches!(out, PromotionOutcome::Resolved { .. }),
+            "got {out:?}"
+        );
+
+        let recorded = repo.ingredients.lock().unwrap();
+        assert_eq!(recorded.len(), 1, "exactly one ingredient ingested");
+        assert_eq!(
+            recorded[0].0, "Cheddar cheese",
+            "branded name cleaned to generic"
+        );
+        assert_eq!(
+            recorded[0].1.as_deref(),
+            Some("Great Value"),
+            "brand captured"
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    async fn promote_skips_normalization_for_canonical_ingredient() {
+        let repo = IngredientRecordingRepo::default();
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(CanonicalCheddarProvider)],
+            vec![],
+            vec![],
+            plnd_data::cache::SearchCache::new(36),
+        );
+        let proposal = NewMealProposal {
+            name: "Cheese Plate".into(),
+            occasion_tags: vec!["snack".into()],
+            inferred_ingredients: vec![InferredIngredient {
+                name: "Cheddar cheese low moisture".into(),
+                grams: 50.0,
+            }],
+        };
+
+        let out = promote_new_meal(
+            &svc,
+            &repo,
+            &cheddar_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
+        assert!(
+            matches!(out, PromotionOutcome::Resolved { .. }),
+            "got {out:?}"
+        );
+
+        let recorded = repo.ingredients.lock().unwrap();
+        assert_eq!(recorded.len(), 1, "exactly one ingredient ingested");
+        // Canonical source bypasses the normalizer even though a fixture entry
+        // exists for this name — original name kept, no brand.
+        assert_eq!(
+            recorded[0].0, "Cheddar cheese low moisture",
+            "canonical name kept verbatim"
+        );
+        assert_eq!(
+            recorded[0].1, None,
+            "no brand applied to canonical ingredient"
+        );
+    }
 }
