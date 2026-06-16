@@ -1193,4 +1193,90 @@ mod tests {
             "no brand applied to canonical ingredient"
         );
     }
+
+    /// Recipe provider whose dish links a single branded ingredient, so the
+    /// recipe-match branch (Branch 1) of `promote_new_meal` can be exercised
+    /// with the brand normalizer — guarding it against diverging from the
+    /// inferred-compose branch.
+    struct BrandedCheddarDishProvider;
+
+    #[async_trait::async_trait]
+    impl RecipeProvider for BrandedCheddarDishProvider {
+        fn source_name(&self) -> &str {
+            "test_recipe"
+        }
+        async fn search_dishes(
+            &self,
+            q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            if q.query.to_lowercase().contains("cheese") {
+                Ok(vec![SearchResult {
+                    external_id: "cheese-plate-1".into(),
+                    name: "Cheese Plate".into(),
+                    ..Default::default()
+                }])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn get_dish_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalDish>, ExternalProviderError> {
+            Ok(Some(ExternalDish {
+                external_id: "cheese-plate-1".into(),
+                name: "Cheese Plate".into(),
+                ingredients: vec![ExternalDishIngredient {
+                    // matches BrandedCheddarProvider's returned name (confidence 1.0)
+                    name: "Great Value Shredded Cheddar Cheese".into(),
+                    quantity: Decimal::from(1),
+                    unit: "serving".into(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }))
+        }
+    }
+
+    #[cfg(debug_assertions)]
+    #[tokio::test]
+    async fn promote_normalizes_branded_ingredient_in_recipe_branch() {
+        let repo = IngredientRecordingRepo::default();
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(BrandedCheddarProvider)],
+            vec![Arc::new(BrandedCheddarDishProvider)], // recipe provider → Branch 1
+            vec![],
+            plnd_data::cache::SearchCache::new(36),
+        );
+        let proposal = NewMealProposal {
+            name: "Cheese Plate".into(),
+            occasion_tags: vec!["snack".into()],
+            inferred_ingredients: vec![],
+        };
+
+        let out = promote_new_meal(
+            &svc,
+            &repo,
+            &cheddar_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
+        assert!(
+            matches!(out, PromotionOutcome::Resolved { .. }),
+            "got {out:?}"
+        );
+
+        let recorded = repo.ingredients.lock().unwrap();
+        assert_eq!(recorded.len(), 1, "exactly one ingredient ingested");
+        assert_eq!(
+            recorded[0].0, "Cheddar cheese",
+            "branded recipe ingredient cleaned to generic"
+        );
+        assert_eq!(
+            recorded[0].1.as_deref(),
+            Some("Great Value"),
+            "brand captured on recipe-branch ingredient"
+        );
+    }
 }
