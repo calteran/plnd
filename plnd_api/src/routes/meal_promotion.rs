@@ -9,11 +9,12 @@
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::routes::catalog_ingest::{ingest_input_from_detail, resolve_name_brand};
+
 use plnd_data::providers::dtos::NutritionFacts;
 use plnd_data::repository::CatalogIngestRepository;
 use plnd_data::repository::catalog_ingest::{
-    DishIngredientLinkInput, IngestDishInput, IngestIngredientInput, IngestMealInput,
-    MealDishLinkInput,
+    DishIngredientLinkInput, IngestDishInput, IngestMealInput, MealDishLinkInput,
 };
 use plnd_data::search::ProviderSearchService;
 use rust_decimal::Decimal;
@@ -120,6 +121,7 @@ fn llm_composed_external_id(name: &str) -> String {
 pub async fn promote_new_meal(
     search: &ProviderSearchService,
     ingest: &dyn CatalogIngestRepository,
+    normalizer: &dyn plnd_agent::BrandNormalizer,
     user_id: Uuid,
     proposal: &NewMealProposal,
 ) -> PromotionOutcome {
@@ -127,29 +129,32 @@ pub async fn promote_new_meal(
     if let Some((source, dish)) = search.resolve_dish(&proposal.name).await {
         let mut links: Vec<DishIngredientLinkInput> = Vec::new();
         for (idx, di) in dish.ingredients.iter().enumerate() {
-            if let Some((ing_source, ing)) = search.resolve_ingredient(&di.name).await
-                && let Ok(ingredient_id) = ingest
-                    .ingest_ingredient(ingredient_input_from(&ing_source, &ing))
+            if let Some((ing_source, ing)) = search.resolve_ingredient(&di.name).await {
+                let is_canonical = search.is_canonical_source(&ing_source);
+                let (name, brand) = resolve_name_brand(is_canonical, &ing.name, normalizer).await;
+                if let Ok(ingredient_id) = ingest
+                    .ingest_ingredient(ingest_input_from_detail(&ing_source, ing, name, brand))
                     .await
-            {
-                let quantity = if di.quantity.is_sign_positive() && !di.quantity.is_zero() {
-                    di.quantity
-                } else {
-                    Decimal::from(1)
-                };
-                let unit = if di.unit.trim().is_empty() {
-                    "serving".to_string()
-                } else {
-                    di.unit.clone()
-                };
-                links.push(DishIngredientLinkInput {
-                    ingredient_id,
-                    quantity,
-                    unit,
-                    preparation_note: None,
-                    is_optional: false,
-                    sort_order: idx as i16,
-                });
+                {
+                    let quantity = if di.quantity.is_sign_positive() && !di.quantity.is_zero() {
+                        di.quantity
+                    } else {
+                        Decimal::from(1)
+                    };
+                    let unit = if di.unit.trim().is_empty() {
+                        "serving".to_string()
+                    } else {
+                        di.unit.clone()
+                    };
+                    links.push(DishIngredientLinkInput {
+                        ingredient_id,
+                        quantity,
+                        unit,
+                        preparation_note: None,
+                        is_optional: false,
+                        sort_order: idx as i16,
+                    });
+                }
             }
         }
         // Carry the provider's real recipe data onto the catalog row rather than
@@ -201,30 +206,40 @@ pub async fn promote_new_meal(
     let mut links: Vec<DishIngredientLinkInput> = Vec::new();
     let mut aggregated: Option<NutritionFacts> = None;
     for (idx, inferred) in proposal.inferred_ingredients.iter().enumerate() {
-        if let Some((ing_source, ing)) = search.resolve_ingredient(&inferred.name).await
-            && let Ok(ingredient_id) = ingest
-                .ingest_ingredient(ingredient_input_from(&ing_source, &ing))
+        if let Some((ing_source, ing)) = search.resolve_ingredient(&inferred.name).await {
+            let is_canonical = search.is_canonical_source(&ing_source);
+            let (name, brand) = resolve_name_brand(is_canonical, &ing.name, normalizer).await;
+            // Scale this ingredient's per-100g nutrition by its inferred grams
+            // before `ing` is moved into the ingest input; applied only on a
+            // successful ingest so a failed ingredient contributes neither a link
+            // nor nutrition (#903).
+            let scaled = ing
+                .nutrition
+                .as_ref()
+                .map(|facts| facts.scaled(inferred.grams / 100.0));
+            if let Ok(ingredient_id) = ingest
+                .ingest_ingredient(ingest_input_from_detail(&ing_source, ing, name, brand))
                 .await
-        {
-            if let Some(facts) = &ing.nutrition {
-                let scaled = facts.scaled(inferred.grams / 100.0);
-                aggregated = Some(match aggregated {
-                    Some(acc) => acc.plus(&scaled),
-                    None => scaled,
+            {
+                if let Some(scaled) = scaled {
+                    aggregated = Some(match aggregated {
+                        Some(acc) => acc.plus(&scaled),
+                        None => scaled,
+                    });
+                }
+                let quantity = Decimal::try_from(inferred.grams)
+                    .ok()
+                    .filter(|d| d.is_sign_positive() && !d.is_zero())
+                    .unwrap_or_else(|| Decimal::from(1));
+                links.push(DishIngredientLinkInput {
+                    ingredient_id,
+                    quantity,
+                    unit: "g".into(),
+                    preparation_note: None,
+                    is_optional: false,
+                    sort_order: idx as i16,
                 });
             }
-            let quantity = Decimal::try_from(inferred.grams)
-                .ok()
-                .filter(|d| d.is_sign_positive() && !d.is_zero())
-                .unwrap_or_else(|| Decimal::from(1));
-            links.push(DishIngredientLinkInput {
-                ingredient_id,
-                quantity,
-                unit: "g".into(),
-                preparation_note: None,
-                is_optional: false,
-                sort_order: idx as i16,
-            });
         }
     }
 
@@ -267,26 +282,6 @@ pub async fn promote_new_meal(
         Some(user_id),
     )
     .await
-}
-
-fn ingredient_input_from(
-    source: &str,
-    ing: &plnd_data::providers::dtos::ExternalIngredient,
-) -> IngestIngredientInput {
-    IngestIngredientInput {
-        external_source: source.to_string(),
-        external_id: ing.external_id.clone(),
-        name: ing.name.clone(),
-        description: None,
-        serving_size_g: None,
-        nutrition: ing
-            .nutrition
-            .as_ref()
-            .and_then(|n| serde_json::to_value(n).ok()),
-        allergens: vec![],
-        occasion_tags: vec![],
-        brand: None,
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -413,6 +408,30 @@ mod tests {
         }
     }
 
+    /// In-test `BrandNormalizer` backed by a name→`Normalization` map. Implements
+    /// the (non-gated) `BrandNormalizer` trait directly rather than reusing the
+    /// debug-only `FixtureBrandNormalizer`, so these promotion tests compile and
+    /// run under `--release` as well as debug.
+    struct MockBrandNormalizer {
+        entries: std::collections::HashMap<String, plnd_agent::Normalization>,
+    }
+
+    #[async_trait::async_trait]
+    impl plnd_agent::BrandNormalizer for MockBrandNormalizer {
+        async fn normalize(&self, branded_name: &str) -> Option<plnd_agent::Normalization> {
+            self.entries.get(branded_name).cloned()
+        }
+    }
+
+    /// A normalizer that returns `None` for every name (empty map), so the
+    /// confidence gate keeps the original name and `brand: None` — used to hold
+    /// existing promotion tests at their pre-#940 expectations.
+    fn no_op_normalizer() -> MockBrandNormalizer {
+        MockBrandNormalizer {
+            entries: std::collections::HashMap::new(),
+        }
+    }
+
     fn empty_search_service() -> ProviderSearchService {
         // No providers → every resolve_* returns None → guaranteed miss.
         ProviderSearchService::new(
@@ -435,7 +454,14 @@ mod tests {
                 grams: 100.0,
             }],
         };
-        let out = promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
+        let out = promote_new_meal(
+            &svc,
+            repo.as_ref(),
+            &no_op_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
         assert_eq!(out, PromotionOutcome::Missed);
     }
 
@@ -501,7 +527,14 @@ mod tests {
                 grams: 150.0,
             }],
         };
-        let out = promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
+        let out = promote_new_meal(
+            &svc,
+            repo.as_ref(),
+            &no_op_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { ref meal_type, .. } if meal_type == "catalog"),
             "expected Resolved, got {:?}",
@@ -582,7 +615,14 @@ mod tests {
                 grams: 150.0,
             }],
         };
-        let out = promote_new_meal(&svc, repo.as_ref(), Uuid::new_v4(), &proposal).await;
+        let out = promote_new_meal(
+            &svc,
+            repo.as_ref(),
+            &no_op_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { ref meal_type, .. } if meal_type == "catalog"),
             "expected Resolved, got {:?}",
@@ -697,7 +737,8 @@ mod tests {
             inferred_ingredients: vec![],
         };
 
-        let outcome = promote_new_meal(&svc, &repo, Uuid::new_v4(), &proposal).await;
+        let outcome =
+            promote_new_meal(&svc, &repo, &no_op_normalizer(), Uuid::new_v4(), &proposal).await;
 
         // The TheMealDB fixture resolves "chicken" → "Chicken Handi" (id 52795),
         // so promotion takes the recipe branch and ingests a catalog dish + meal
@@ -813,7 +854,8 @@ mod tests {
             }],
         };
 
-        let out = promote_new_meal(&svc, &repo, Uuid::new_v4(), &proposal).await;
+        let out =
+            promote_new_meal(&svc, &repo, &no_op_normalizer(), Uuid::new_v4(), &proposal).await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { .. }),
             "got {out:?}"
@@ -897,7 +939,8 @@ mod tests {
             inferred_ingredients: vec![],
         };
 
-        let out = promote_new_meal(&svc, &repo, Uuid::new_v4(), &proposal).await;
+        let out =
+            promote_new_meal(&svc, &repo, &no_op_normalizer(), Uuid::new_v4(), &proposal).await;
         assert!(
             matches!(out, PromotionOutcome::Resolved { .. }),
             "got {out:?}"
@@ -922,5 +965,316 @@ mod tests {
         )
         .unwrap();
         assert_eq!(meal.calories_kcal, Some(400.0));
+    }
+
+    // ── #940: branded normalization on agent promotion ───────────────────────
+
+    /// Records the `(name, brand)` of each ingredient ingested, so a test can
+    /// assert how the promotion path named a branded vs. canonical ingredient.
+    #[derive(Default)]
+    struct IngredientRecordingRepo {
+        ingredients: Mutex<Vec<(String, Option<String>)>>,
+    }
+
+    #[async_trait::async_trait]
+    impl CatalogIngestRepository for IngredientRecordingRepo {
+        async fn ingest_ingredient(
+            &self,
+            i: IngestIngredientInput,
+        ) -> Result<Uuid, plnd_data::Error> {
+            self.ingredients
+                .lock()
+                .unwrap()
+                .push((i.name.clone(), i.brand.clone()));
+            Ok(Uuid::new_v4())
+        }
+        async fn contribute_ingredient(
+            &self,
+            _i: ContributeIngredientInput,
+        ) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+        async fn ingest_dish(&self, _i: IngestDishInput) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+        async fn ingest_meal(&self, _i: IngestMealInput) -> Result<Uuid, plnd_data::Error> {
+            Ok(Uuid::new_v4())
+        }
+    }
+
+    /// Branded nutrition provider (non-canonical): returns a composite product name.
+    struct BrandedCheddarProvider;
+
+    #[async_trait::async_trait]
+    impl NutritionProvider for BrandedCheddarProvider {
+        fn source_name(&self) -> &str {
+            "test_branded"
+        }
+        async fn search_ingredients(
+            &self,
+            q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            if q.query.to_lowercase().contains("cheddar") {
+                Ok(vec![SearchResult {
+                    external_id: "branded-cheddar-1".into(),
+                    name: "Great Value Shredded Cheddar Cheese".into(),
+                    ..Default::default()
+                }])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn get_ingredient_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
+            Ok(Some(ExternalIngredient {
+                external_id: "branded-cheddar-1".into(),
+                name: "Great Value Shredded Cheddar Cheese".into(),
+                serving_size_g: None,
+                nutrition: None,
+                allergens: vec![],
+            }))
+        }
+    }
+
+    /// Canonical nutrition provider: returns a clean generic name and reports
+    /// `is_canonical_source() == true`, so the seam must skip normalization.
+    struct CanonicalCheddarProvider;
+
+    #[async_trait::async_trait]
+    impl NutritionProvider for CanonicalCheddarProvider {
+        fn source_name(&self) -> &str {
+            "test_canonical"
+        }
+        fn is_canonical_source(&self) -> bool {
+            true
+        }
+        async fn search_ingredients(
+            &self,
+            q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            if q.query.to_lowercase().contains("cheddar") {
+                Ok(vec![SearchResult {
+                    external_id: "canonical-cheddar-1".into(),
+                    name: "Cheddar cheese low moisture".into(),
+                    ..Default::default()
+                }])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn get_ingredient_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalIngredient>, ExternalProviderError> {
+            Ok(Some(ExternalIngredient {
+                external_id: "canonical-cheddar-1".into(),
+                name: "Cheddar cheese low moisture".into(),
+                serving_size_g: None,
+                nutrition: None,
+                allergens: vec![],
+            }))
+        }
+    }
+
+    /// Mock normalizer mapping the branded composite to its generic + brand,
+    /// and also mapping the canonical name (to prove it is *not* consulted).
+    fn cheddar_normalizer() -> MockBrandNormalizer {
+        use plnd_agent::Normalization;
+        use std::collections::HashMap;
+        let mut entries = HashMap::new();
+        entries.insert(
+            "Great Value Shredded Cheddar Cheese".to_string(),
+            Normalization {
+                generic_name: "Cheddar cheese".into(),
+                brand: Some("Great Value".into()),
+                confidence: 0.95,
+            },
+        );
+        entries.insert(
+            "Cheddar cheese low moisture".to_string(),
+            Normalization {
+                generic_name: "WRONG should be skipped".into(),
+                brand: Some("WRONG".into()),
+                confidence: 0.99,
+            },
+        );
+        MockBrandNormalizer { entries }
+    }
+
+    #[tokio::test]
+    async fn promote_normalizes_branded_ingredient() {
+        let repo = IngredientRecordingRepo::default();
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(BrandedCheddarProvider)],
+            vec![], // no recipe provider → inferred-compose branch
+            vec![],
+            plnd_data::cache::SearchCache::new(36),
+        );
+        let proposal = NewMealProposal {
+            name: "Cheese Plate".into(),
+            occasion_tags: vec!["snack".into()],
+            inferred_ingredients: vec![InferredIngredient {
+                // matches the branded provider's returned name (confidence 1.0)
+                name: "Great Value Shredded Cheddar Cheese".into(),
+                grams: 50.0,
+            }],
+        };
+
+        let out = promote_new_meal(
+            &svc,
+            &repo,
+            &cheddar_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
+        assert!(
+            matches!(out, PromotionOutcome::Resolved { .. }),
+            "got {out:?}"
+        );
+
+        let recorded = repo.ingredients.lock().unwrap();
+        assert_eq!(recorded.len(), 1, "exactly one ingredient ingested");
+        assert_eq!(
+            recorded[0].0, "Cheddar cheese",
+            "branded name cleaned to generic"
+        );
+        assert_eq!(
+            recorded[0].1.as_deref(),
+            Some("Great Value"),
+            "brand captured"
+        );
+    }
+
+    #[tokio::test]
+    async fn promote_skips_normalization_for_canonical_ingredient() {
+        let repo = IngredientRecordingRepo::default();
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(CanonicalCheddarProvider)],
+            vec![],
+            vec![],
+            plnd_data::cache::SearchCache::new(36),
+        );
+        let proposal = NewMealProposal {
+            name: "Cheese Plate".into(),
+            occasion_tags: vec!["snack".into()],
+            inferred_ingredients: vec![InferredIngredient {
+                name: "Cheddar cheese low moisture".into(),
+                grams: 50.0,
+            }],
+        };
+
+        let out = promote_new_meal(
+            &svc,
+            &repo,
+            &cheddar_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
+        assert!(
+            matches!(out, PromotionOutcome::Resolved { .. }),
+            "got {out:?}"
+        );
+
+        let recorded = repo.ingredients.lock().unwrap();
+        assert_eq!(recorded.len(), 1, "exactly one ingredient ingested");
+        // Canonical source bypasses the normalizer even though a fixture entry
+        // exists for this name — original name kept, no brand.
+        assert_eq!(
+            recorded[0].0, "Cheddar cheese low moisture",
+            "canonical name kept verbatim"
+        );
+        assert_eq!(
+            recorded[0].1, None,
+            "no brand applied to canonical ingredient"
+        );
+    }
+
+    /// Recipe provider whose dish links a single branded ingredient, so the
+    /// recipe-match branch (Branch 1) of `promote_new_meal` can be exercised
+    /// with the brand normalizer — guarding it against diverging from the
+    /// inferred-compose branch.
+    struct BrandedCheddarDishProvider;
+
+    #[async_trait::async_trait]
+    impl RecipeProvider for BrandedCheddarDishProvider {
+        fn source_name(&self) -> &str {
+            "test_recipe"
+        }
+        async fn search_dishes(
+            &self,
+            q: &SearchQuery,
+        ) -> Result<Vec<SearchResult>, ExternalProviderError> {
+            if q.query.to_lowercase().contains("cheese") {
+                Ok(vec![SearchResult {
+                    external_id: "cheese-plate-1".into(),
+                    name: "Cheese Plate".into(),
+                    ..Default::default()
+                }])
+            } else {
+                Ok(vec![])
+            }
+        }
+        async fn get_dish_by_id(
+            &self,
+            _id: &str,
+        ) -> Result<Option<ExternalDish>, ExternalProviderError> {
+            Ok(Some(ExternalDish {
+                external_id: "cheese-plate-1".into(),
+                name: "Cheese Plate".into(),
+                ingredients: vec![ExternalDishIngredient {
+                    // matches BrandedCheddarProvider's returned name (confidence 1.0)
+                    name: "Great Value Shredded Cheddar Cheese".into(),
+                    quantity: Decimal::from(1),
+                    unit: "serving".into(),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }))
+        }
+    }
+
+    #[tokio::test]
+    async fn promote_normalizes_branded_ingredient_in_recipe_branch() {
+        let repo = IngredientRecordingRepo::default();
+        let svc = ProviderSearchService::new(
+            vec![Arc::new(BrandedCheddarProvider)],
+            vec![Arc::new(BrandedCheddarDishProvider)], // recipe provider → Branch 1
+            vec![],
+            plnd_data::cache::SearchCache::new(36),
+        );
+        let proposal = NewMealProposal {
+            name: "Cheese Plate".into(),
+            occasion_tags: vec!["snack".into()],
+            inferred_ingredients: vec![],
+        };
+
+        let out = promote_new_meal(
+            &svc,
+            &repo,
+            &cheddar_normalizer(),
+            Uuid::new_v4(),
+            &proposal,
+        )
+        .await;
+        assert!(
+            matches!(out, PromotionOutcome::Resolved { .. }),
+            "got {out:?}"
+        );
+
+        let recorded = repo.ingredients.lock().unwrap();
+        assert_eq!(recorded.len(), 1, "exactly one ingredient ingested");
+        assert_eq!(
+            recorded[0].0, "Cheddar cheese",
+            "branded recipe ingredient cleaned to generic"
+        );
+        assert_eq!(
+            recorded[0].1.as_deref(),
+            Some("Great Value"),
+            "brand captured on recipe-branch ingredient"
+        );
     }
 }

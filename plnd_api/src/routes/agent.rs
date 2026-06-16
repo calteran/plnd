@@ -249,6 +249,7 @@ async fn resolve_slot_meal(
             match promote_new_meal(
                 &state.provider_search,
                 state.repos.catalog_ingest.as_ref(),
+                state.brand_normalizer.as_ref(),
                 user_id,
                 &proposal,
             )

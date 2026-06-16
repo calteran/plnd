@@ -74,7 +74,7 @@ pub async fn ingest_ingredient(
 /// Canonical sources (USDA Foundation/SR Legacy) already carry clean names, so
 /// they bypass normalization. Branded sources are split via the normalizer and
 /// passed through the confidence gate; any failure keeps the original name.
-async fn resolve_name_brand(
+pub(crate) async fn resolve_name_brand(
     is_canonical: bool,
     original_name: &str,
     normalizer: &dyn plnd_agent::BrandNormalizer,
