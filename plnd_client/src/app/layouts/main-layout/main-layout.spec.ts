@@ -168,7 +168,7 @@ describe('MainLayoutComponent — device-zone / standoff', () => {
     f.componentInstance.onMoved(confirm);
     const anchorReq = httpMock.expectOne(`${API_BASE}/timezone/anchors`);
     anchorReq.flush({ id: '1', user_id: 'u1', effective_date: '2026-06-15', effective_time: null,
-      zone: 'America/Denver', source: 'user', source_ref: null,
+      zone: 'America/Denver', source: 'user', source_ref: null, source_title: null,
       inference_group: null, created_at: '', updated_at: '' });
     f.detectChanges();
 

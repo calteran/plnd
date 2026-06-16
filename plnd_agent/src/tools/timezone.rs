@@ -304,6 +304,15 @@ mod tests {
             unimplemented!("stub")
         }
 
+        async fn list_through_with_source(
+            &self,
+            _user_id: Uuid,
+            _through: NaiveDate,
+        ) -> Result<Vec<plnd_data::query_types::TimezoneAnchorWithSource>, plnd_data::Error>
+        {
+            unimplemented!("stub")
+        }
+
         async fn add(
             &self,
             user_id: Uuid,

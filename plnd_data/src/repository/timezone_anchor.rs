@@ -4,6 +4,7 @@ use chrono_tz::Tz;
 use uuid::Uuid;
 
 use crate::models::{TimezoneAnchor, TimezoneSource};
+use crate::query_types::TimezoneAnchorWithSource;
 
 #[async_trait]
 pub trait TimezoneAnchorRepository: Send + Sync {
@@ -15,6 +16,15 @@ pub trait TimezoneAnchorRepository: Send + Sync {
         user_id: Uuid,
         through: NaiveDate,
     ) -> Result<Vec<TimezoneAnchor>, crate::Error>;
+
+    /// Like [`list_through`](Self::list_through), but each anchor is paired with
+    /// the title of the task its `source_ref` points to (via a LEFT JOIN). The
+    /// title is `None` when there is no `source_ref` or the task is gone.
+    async fn list_through_with_source(
+        &self,
+        user_id: Uuid,
+        through: NaiveDate,
+    ) -> Result<Vec<TimezoneAnchorWithSource>, crate::Error>;
 
     /// Insert a new anchor and return it.
     #[allow(clippy::too_many_arguments)]

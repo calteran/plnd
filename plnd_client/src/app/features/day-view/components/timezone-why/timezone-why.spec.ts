@@ -12,6 +12,7 @@ function baseAnchor(overrides: Partial<TimezoneAnchorDto> = {}): TimezoneAnchorD
     zone: 'America/Denver',
     source: 'device',
     source_ref: null,
+    source_title: null,
     inference_group: null,
     created_at: '2026-06-14T00:00:00Z',
     updated_at: '2026-06-14T00:00:00Z',

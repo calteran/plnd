@@ -78,6 +78,7 @@ function makeAnchor(overrides: Partial<TimezoneAnchorDto> = {}): TimezoneAnchorD
     zone: 'America/Denver',
     source: 'user',
     source_ref: null,
+    source_title: null,
     inference_group: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
@@ -491,6 +492,46 @@ describe('DayViewComponent (timezone: travel day)', () => {
 
     expect(f.componentInstance.zoneView()?.kind).toBe('travel');
     expect(f.debugElement.query(By.css('app-timezone-switch-row'))).toBeTruthy();
+  });
+
+  it('passes the anchor source_title to the (why?) popover for an inferred travel anchor', async () => {
+    // TRAVEL_DATE (2026-01-15) is a Saturday; an inferred intra-day anchor with a
+    // resolved source title should drive the design D5 provenance string.
+    const items: ScheduleItem[] = [
+      { id: 't1', type: 'general', label: 'Flight', status: 'pending', oneShot: false, floating: false },
+    ];
+    const anchors: TimezoneAnchorDto[] = [
+      makeAnchor({
+        id: 'anchor-travel',
+        source: 'inferred',
+        effective_date: TRAVEL_DATE,
+        effective_time: '14:00:00',
+        zone: 'Pacific/Honolulu',
+        source_title: 'Flight to HNL',
+      }),
+    ];
+    const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
+    const svc   = makeScheduleServiceMock({ scheduleItems: items, date: TRAVEL_DATE });
+
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: tzSvc },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: TRAVEL_DATE }) } },
+      ],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+
+    f.componentInstance.openWhy(f.componentInstance.zoneView()!.switch!.anchor);
+    f.detectChanges();
+
+    const p = f.debugElement.query(By.css('.tz-why-pop__provenance'));
+    expect(p.nativeElement.textContent.trim()).toBe('Inferred from "Flight to HNL" on Saturday');
   });
 
   it('does not render app-timezone-switch-row when no anchors (same kind)', async () => {

@@ -5,9 +5,16 @@ use uuid::Uuid;
 
 use crate::db::error::DatabaseError;
 use crate::models::{TimezoneAnchor, TimezoneSource};
+use crate::query_types::TimezoneAnchorWithSource;
 
 const COLUMNS: &str = "id, user_id, effective_date, effective_time, zone, source, \
      source_ref, inference_group, created_at, updated_at";
+
+/// Same columns as [`COLUMNS`], qualified with the `a` alias for the
+/// `timezone_change_anchors` table in joined queries. The output column names
+/// are unchanged (`id`, `user_id`, …), so [`map_row`] reads them by name.
+const QUALIFIED_COLUMNS: &str = "a.id, a.user_id, a.effective_date, a.effective_time, a.zone, \
+     a.source, a.source_ref, a.inference_group, a.created_at, a.updated_at";
 
 /// Map a raw Postgres row into a [`TimezoneAnchor`].
 ///
@@ -58,6 +65,21 @@ fn map_row(row: sqlx::postgres::PgRow) -> Result<TimezoneAnchor, DatabaseError> 
     })
 }
 
+/// Map a joined row into a [`TimezoneAnchorWithSource`], reading the
+/// `source_title` column before delegating the anchor columns to [`map_row`].
+fn map_row_with_source(
+    row: sqlx::postgres::PgRow,
+) -> Result<TimezoneAnchorWithSource, DatabaseError> {
+    let source_title: Option<String> = row
+        .try_get("source_title")
+        .map_err(|e| DatabaseError::QueryError(e.to_string()))?;
+    let anchor = map_row(row)?;
+    Ok(TimezoneAnchorWithSource {
+        anchor,
+        source_title,
+    })
+}
+
 /// All anchors for `user_id` with `effective_date <= through`, ordered
 /// ascending by `(effective_date, effective_time)` with NULL `effective_time`
 /// sorting first within a date (a whole-day switch precedes timed switches).
@@ -82,6 +104,37 @@ pub async fn list_through(
     .map_err(DatabaseError::from)?;
 
     rows.into_iter().map(map_row).collect()
+}
+
+/// Like [`list_through`], but also resolves each anchor's `source_ref` to the
+/// originating task's title via a LEFT JOIN on `tasks.task_id`.
+///
+/// `source_title` is `None` when the anchor has no `source_ref` or the
+/// referenced task no longer exists. Ordering matches `list_through`.
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "timezone_change_anchors", op = "list_through_with_source")
+)]
+pub async fn list_through_with_source(
+    pool: &PgPool,
+    user_id: Uuid,
+    through: NaiveDate,
+) -> Result<Vec<TimezoneAnchorWithSource>, DatabaseError> {
+    let rows = sqlx::query(sqlx::AssertSqlSafe(format!(
+        "SELECT {COLUMNS}, t.title AS source_title \
+         FROM timezone_change_anchors a \
+         LEFT JOIN tasks t ON t.task_id = a.source_ref \
+         WHERE a.user_id = $1 AND a.effective_date <= $2 \
+         ORDER BY a.effective_date ASC, a.effective_time ASC NULLS FIRST",
+        COLUMNS = QUALIFIED_COLUMNS
+    )))
+    .bind(user_id)
+    .bind(through)
+    .fetch_all(pool)
+    .await
+    .map_err(DatabaseError::from)?;
+
+    rows.into_iter().map(map_row_with_source).collect()
 }
 
 /// Insert a new anchor and return it.
@@ -154,4 +207,114 @@ pub async fn delete_group(
     .await
     .map(|r| r.rows_affected())
     .map_err(DatabaseError::from)
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::{tasks, users};
+    use chrono::NaiveTime;
+
+    async fn new_user(pool: &PgPool) -> Uuid {
+        users::create(
+            pool,
+            &format!("{}@test.invalid", Uuid::new_v4()),
+            None,
+            None,
+        )
+        .await
+        .expect("failed to create test user")
+        .user_id
+    }
+
+    #[sqlx::test]
+    async fn list_through_with_source_resolves_task_title(pool: PgPool) {
+        let user_id = new_user(&pool).await;
+        let travel_date = NaiveDate::from_ymd_opt(2026, 7, 1).unwrap();
+
+        // A task to act as the inferred anchor's source.
+        let task = tasks::create_user_task(
+            &pool,
+            user_id,
+            "Flight to DEN",
+            "medium",
+            travel_date,
+            None,
+            120,
+            Some("breakfast"),
+            false,
+        )
+        .await
+        .expect("create task");
+
+        // Inferred anchor referencing the task (intra-day).
+        add(
+            &pool,
+            user_id,
+            travel_date,
+            Some(NaiveTime::from_hms_opt(14, 0, 0).unwrap()),
+            chrono_tz::America::Denver,
+            TimezoneSource::Inferred,
+            Some(task.task_id),
+            Some(Uuid::new_v4()),
+        )
+        .await
+        .expect("add inferred anchor");
+
+        // A device anchor on an earlier date with no source_ref.
+        add(
+            &pool,
+            user_id,
+            NaiveDate::from_ymd_opt(2026, 6, 1).unwrap(),
+            None,
+            chrono_tz::America::New_York,
+            TimezoneSource::Device,
+            None,
+            None,
+        )
+        .await
+        .expect("add device anchor");
+
+        let rows = list_through_with_source(&pool, user_id, travel_date)
+            .await
+            .expect("list_through_with_source");
+
+        // Ordered ascending by (date, time): device (6-1) first, inferred (7-1) second.
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].anchor.source, TimezoneSource::Device);
+        assert_eq!(rows[0].source_title, None);
+        assert_eq!(rows[1].anchor.source, TimezoneSource::Inferred);
+        assert_eq!(rows[1].source_title, Some("Flight to DEN".to_string()));
+    }
+
+    #[sqlx::test]
+    async fn list_through_with_source_null_for_dangling_ref(pool: PgPool) {
+        let user_id = new_user(&pool).await;
+        let date = NaiveDate::from_ymd_opt(2026, 7, 1).unwrap();
+
+        // source_ref points at a task that does not exist.
+        add(
+            &pool,
+            user_id,
+            date,
+            None,
+            chrono_tz::America::Denver,
+            TimezoneSource::Inferred,
+            Some(Uuid::new_v4()),
+            Some(Uuid::new_v4()),
+        )
+        .await
+        .expect("add anchor with dangling source_ref");
+
+        let rows = list_through_with_source(&pool, user_id, date)
+            .await
+            .expect("list_through_with_source");
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].source_title, None);
+    }
 }

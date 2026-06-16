@@ -101,6 +101,7 @@ describe('DayHeaderComponent', () => {
           effective_time: '12:00:00',
           source: 'device',
           source_ref: null,
+          source_title: null,
           inference_group: null,
           created_at: '2026-07-10T00:00:00Z',
           updated_at: '2026-07-10T00:00:00Z',

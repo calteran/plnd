@@ -14,6 +14,7 @@ const minimalAnchor: TimezoneAnchorDto = {
   zone: 'Pacific/Honolulu',
   source: 'user',
   source_ref: null,
+  source_title: null,
   inference_group: null,
   created_at: '2026-07-01T00:00:00Z',
   updated_at: '2026-07-01T00:00:00Z',
