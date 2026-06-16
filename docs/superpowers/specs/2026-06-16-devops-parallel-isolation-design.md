@@ -59,6 +59,14 @@ serialize through one machine-global lock.
 prometheus 9090, loki 3100, tempo 3200, grafana 3001) are brought up **once per work session**
 and stay up.
 
+**Prerequisite — pin the Compose project name.** Today each worktree gets a distinct default
+project name (derived from its directory), so a bare `docker compose up db` from worktree A and
+worktree B would spin up *two separate* Postgres containers that re-collide on host port 5432.
+For infra to be genuinely *shared* across all worktrees, `docker-compose.yml` gets a top-level
+`name: plnd`, so every worktree's `docker compose` invocation targets the one shared project.
+This also enables per-run DB management via `docker compose exec -T db psql` (container-local
+trust auth — no host `psql` or password needed).
+
 - **Postgres is one shared *server*.** Each run uses its own *database* on it (Tier 2), so
   the server is shared but the data is not.
 - **mock-oauth is stateless and shared.** This is the key simplification: because the OIDC
@@ -258,7 +266,8 @@ as the default, so manual runs and CI are unchanged:
   Loki label so runs are filterable in Grafana.
 - `plnd_api/src/telemetry.rs` — only if `Resource::builder()` does not merge
   `OTEL_RESOURCE_ATTRIBUTES`; add a `verify.run_id` attribute from env.
-- `docker-compose.yml` — possibly raise Postgres `max_connections` (tuning, if needed).
+- `docker-compose.yml` — add top-level `name: plnd` (shared project across worktrees);
+  possibly raise Postgres `max_connections` (tuning, if needed).
 - `plnd_client/e2e/helpers/auth.ts`, `playwright.config.ts`, `e2e/global-setup.ts` — env-driven endpoints.
 - `plnd_client/karma.conf.js` — NEW, `port: process.env.KARMA_PORT || 9876`; wired into the
   `@angular/build:karma` builder via `angular.json` `karmaConfig`.
