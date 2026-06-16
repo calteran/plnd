@@ -9,13 +9,12 @@
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::routes::catalog_ingest::resolve_name_brand;
+use crate::routes::catalog_ingest::{ingest_input_from_detail, resolve_name_brand};
 
 use plnd_data::providers::dtos::NutritionFacts;
 use plnd_data::repository::CatalogIngestRepository;
 use plnd_data::repository::catalog_ingest::{
-    DishIngredientLinkInput, IngestDishInput, IngestIngredientInput, IngestMealInput,
-    MealDishLinkInput,
+    DishIngredientLinkInput, IngestDishInput, IngestMealInput, MealDishLinkInput,
 };
 use plnd_data::search::ProviderSearchService;
 use rust_decimal::Decimal;
@@ -134,7 +133,7 @@ pub async fn promote_new_meal(
                 let is_canonical = search.is_canonical_source(&ing_source);
                 let (name, brand) = resolve_name_brand(is_canonical, &ing.name, normalizer).await;
                 if let Ok(ingredient_id) = ingest
-                    .ingest_ingredient(ingredient_input_from(&ing_source, &ing, name, brand))
+                    .ingest_ingredient(ingest_input_from_detail(&ing_source, ing, name, brand))
                     .await
                 {
                     let quantity = if di.quantity.is_sign_positive() && !di.quantity.is_zero() {
@@ -210,12 +209,19 @@ pub async fn promote_new_meal(
         if let Some((ing_source, ing)) = search.resolve_ingredient(&inferred.name).await {
             let is_canonical = search.is_canonical_source(&ing_source);
             let (name, brand) = resolve_name_brand(is_canonical, &ing.name, normalizer).await;
+            // Scale this ingredient's per-100g nutrition by its inferred grams
+            // before `ing` is moved into the ingest input; applied only on a
+            // successful ingest so a failed ingredient contributes neither a link
+            // nor nutrition (#903).
+            let scaled = ing
+                .nutrition
+                .as_ref()
+                .map(|facts| facts.scaled(inferred.grams / 100.0));
             if let Ok(ingredient_id) = ingest
-                .ingest_ingredient(ingredient_input_from(&ing_source, &ing, name, brand))
+                .ingest_ingredient(ingest_input_from_detail(&ing_source, ing, name, brand))
                 .await
             {
-                if let Some(facts) = &ing.nutrition {
-                    let scaled = facts.scaled(inferred.grams / 100.0);
+                if let Some(scaled) = scaled {
                     aggregated = Some(match aggregated {
                         Some(acc) => acc.plus(&scaled),
                         None => scaled,
@@ -276,28 +282,6 @@ pub async fn promote_new_meal(
         Some(user_id),
     )
     .await
-}
-
-fn ingredient_input_from(
-    source: &str,
-    ing: &plnd_data::providers::dtos::ExternalIngredient,
-    name: String,
-    brand: Option<String>,
-) -> IngestIngredientInput {
-    IngestIngredientInput {
-        external_source: source.to_string(),
-        external_id: ing.external_id.clone(),
-        name,
-        description: None,
-        serving_size_g: None,
-        nutrition: ing
-            .nutrition
-            .as_ref()
-            .and_then(|n| serde_json::to_value(n).ok()),
-        allergens: vec![],
-        occasion_tags: vec![],
-        brand,
-    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -424,11 +408,28 @@ mod tests {
         }
     }
 
-    /// A normalizer that returns `None` for every name, so the confidence gate
-    /// keeps the original name and `brand: None` — used to hold existing
-    /// promotion tests at their pre-#940 expectations.
-    fn no_op_normalizer() -> plnd_agent::FixtureBrandNormalizer {
-        plnd_agent::FixtureBrandNormalizer::from_entries(std::collections::HashMap::new())
+    /// In-test `BrandNormalizer` backed by a name→`Normalization` map. Implements
+    /// the (non-gated) `BrandNormalizer` trait directly rather than reusing the
+    /// debug-only `FixtureBrandNormalizer`, so these promotion tests compile and
+    /// run under `--release` as well as debug.
+    struct MockBrandNormalizer {
+        entries: std::collections::HashMap<String, plnd_agent::Normalization>,
+    }
+
+    #[async_trait::async_trait]
+    impl plnd_agent::BrandNormalizer for MockBrandNormalizer {
+        async fn normalize(&self, branded_name: &str) -> Option<plnd_agent::Normalization> {
+            self.entries.get(branded_name).cloned()
+        }
+    }
+
+    /// A normalizer that returns `None` for every name (empty map), so the
+    /// confidence gate keeps the original name and `brand: None` — used to hold
+    /// existing promotion tests at their pre-#940 expectations.
+    fn no_op_normalizer() -> MockBrandNormalizer {
+        MockBrandNormalizer {
+            entries: std::collections::HashMap::new(),
+        }
     }
 
     fn empty_search_service() -> ProviderSearchService {
@@ -1077,13 +1078,13 @@ mod tests {
         }
     }
 
-    /// Fixture normalizer mapping the branded composite to its generic + brand,
+    /// Mock normalizer mapping the branded composite to its generic + brand,
     /// and also mapping the canonical name (to prove it is *not* consulted).
-    fn cheddar_normalizer() -> plnd_agent::FixtureBrandNormalizer {
+    fn cheddar_normalizer() -> MockBrandNormalizer {
         use plnd_agent::Normalization;
         use std::collections::HashMap;
-        let mut map = HashMap::new();
-        map.insert(
+        let mut entries = HashMap::new();
+        entries.insert(
             "Great Value Shredded Cheddar Cheese".to_string(),
             Normalization {
                 generic_name: "Cheddar cheese".into(),
@@ -1091,7 +1092,7 @@ mod tests {
                 confidence: 0.95,
             },
         );
-        map.insert(
+        entries.insert(
             "Cheddar cheese low moisture".to_string(),
             Normalization {
                 generic_name: "WRONG should be skipped".into(),
@@ -1099,10 +1100,9 @@ mod tests {
                 confidence: 0.99,
             },
         );
-        plnd_agent::FixtureBrandNormalizer::from_entries(map)
+        MockBrandNormalizer { entries }
     }
 
-    #[cfg(debug_assertions)]
     #[tokio::test]
     async fn promote_normalizes_branded_ingredient() {
         let repo = IngredientRecordingRepo::default();
@@ -1148,7 +1148,6 @@ mod tests {
         );
     }
 
-    #[cfg(debug_assertions)]
     #[tokio::test]
     async fn promote_skips_normalization_for_canonical_ingredient() {
         let repo = IngredientRecordingRepo::default();
@@ -1238,7 +1237,6 @@ mod tests {
         }
     }
 
-    #[cfg(debug_assertions)]
     #[tokio::test]
     async fn promote_normalizes_branded_ingredient_in_recipe_branch() {
         let repo = IngredientRecordingRepo::default();
