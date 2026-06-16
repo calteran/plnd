@@ -143,8 +143,9 @@ pub struct ScheduleAnchorResponse {
     /// Stable label; matches the `after_anchor` convention
     /// ("start of day", "end of day", meal/task name, IANA zone name).
     pub label: String,
-    /// `meal_anchor_instances.id` or `schedule_entries.entry_id`; null for
-    /// start-of-day / end-of-day.
+    /// Underlying row id: `meal_anchor_instances.id` (meal),
+    /// `schedule_entries.entry_id` (scheduled task), or the timezone-change
+    /// anchor id; null only for start-of-day / end-of-day.
     pub id: Option<Uuid>,
     /// Meal only: "planned" | "consumed" | "skipped".
     pub status: Option<String>,
