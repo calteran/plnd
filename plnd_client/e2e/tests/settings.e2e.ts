@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { seedAuth } from '../helpers/auth';
 import { SettingsPage } from '../pages/settings.page';
 

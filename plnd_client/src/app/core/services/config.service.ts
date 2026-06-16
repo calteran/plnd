@@ -7,10 +7,22 @@ import { EnvironmentConfig } from '../models/config';
   providedIn: 'root'
 })
 export class ConfigService {
-  private configSubject = new BehaviorSubject<EnvironmentConfig>(environment);
+  private configSubject: BehaviorSubject<EnvironmentConfig>;
 
   constructor() {
+    this.configSubject = new BehaviorSubject<EnvironmentConfig>(ConfigService.resolveInitialConfig());
     this.validateConfigObject(this.getConfig());
+  }
+
+  // Allow an e2e harness (or runtime host) to override the API base URL before
+  // the app boots via `globalThis.__PLND_API_BASE__`. Unset in production, so the
+  // built-in environment config is used unchanged.
+  private static resolveInitialConfig(): EnvironmentConfig {
+    const override = (globalThis as { __PLND_API_BASE__?: string }).__PLND_API_BASE__;
+    if (override) {
+      return { ...environment, api: { ...environment.api, baseUrl: override } };
+    }
+    return environment;
   }
 
   getConfig(): EnvironmentConfig {

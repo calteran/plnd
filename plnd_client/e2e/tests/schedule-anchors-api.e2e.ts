@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { API_BASE, mintTestToken, generateTestSub } from '../helpers/auth';
 
 // Per-date meal anchor instance CRUD — API-only e2e (issue #828).

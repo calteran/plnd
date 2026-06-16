@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { API_BASE, mintTestToken, seedAuth } from '../helpers/auth';
 import { seedMealAnchor } from '../helpers/seed-data';
 import { DayViewPage } from '../pages/day-view.page';

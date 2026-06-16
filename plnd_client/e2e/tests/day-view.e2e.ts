@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import { DayViewPage } from '../pages/day-view.page';
 import { API_BASE, seedAuth, generateTestSub, injectAuthToken, seedTestState } from '../helpers/auth';
 import { seedMealAnchor, seedScheduleEntries } from '../helpers/seed-data';
