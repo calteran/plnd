@@ -38,12 +38,13 @@ serialize through one machine-global lock.
 - Provide fast, isolated `just verify <subset>` for agents (`quick`, `rust`, `ts`, `e2e`).
 - Remove or guard every command that tempts an agent into a conflict.
 - Keep a frictionless human dev loop: `just dev`/`api`/`client` always own ports 3000/4200.
+- Tag each run's telemetry with a per-run id so concurrent runs are distinguishable in Grafana.
 
 ## Non-goals
 
-- Changing the observability stack (alloy/prometheus/loki/tempo/grafana). Those are
-  brought up only by `just dev`/full-stack flows, never by `verify`, so they are out of
-  scope for the parallelism problem.
+- Re-architecting *what* the observability stack collects. We add per-run **labeling** (see
+  "Per-run log tagging") and move its startup into `just persist`, but the OTLP→Tempo/Loki/
+  Prometheus pipeline is otherwise unchanged.
 - Full Dockerization of the API for e2e. The API stays a native binary; we isolate it via
   an ephemeral port, not a container.
 - CI changes. This targets the local parallel-agent workflow. CI runs one job per runner and
@@ -54,8 +55,9 @@ serialize through one machine-global lock.
 
 ### Tier 1 — Shared, persistent, fixed-port infra
 
-`db` (Postgres, 5432) and `mock-oauth` (8080) are brought up **once per work session** and
-stay up. They are the only fixed-port pieces `verify` depends on.
+`db` (Postgres, 5432), `mock-oauth` (8080), and the **observability stack** (alloy 4317/4318,
+prometheus 9090, loki 3100, tempo 3200, grafana 3001) are brought up **once per work session**
+and stay up.
 
 - **Postgres is one shared *server*.** Each run uses its own *database* on it (Tier 2), so
   the server is shared but the data is not.
@@ -64,9 +66,14 @@ stay up. They are the only fixed-port pieces `verify` depends on.
   fetch, and the token exchange are identical for every run — **zero per-run OIDC plumbing**.
   This is what makes dropping the semaphore cheap; per-run OIDC ports would have required
   threading a dynamic issuer URL through config, tokens, and the mock server.
+- **Observability is shared and always-on.** Verify does not *require* it (the API tolerates
+  a missing OTLP collector — that's why verify works today without it), but keeping it up
+  lets every run's logs/traces/metrics flow into Loki/Tempo/Prometheus, tagged per run (see
+  "Per-run log tagging"). The cost is low and capturing all logs is desirable.
 
-**Lifecycle command:** `just persist` brings up `db` + `mock-oauth` (`docker compose up -d
---wait db mock-oauth-server`), idempotent. The human runs it once before a session.
+**Lifecycle command:** `just persist` brings up the full shared stack — `docker compose up -d
+--wait` (all services), idempotent. The human runs it once before a session. (Agents never run
+`persist`; their `verify` runs auto-ensure only the subset they need — see "Infra auto-ensure".)
 
 ### Tier 2 — Per-run ephemeral resources
 
@@ -81,6 +88,7 @@ basename + PID) and provisions, for the duration of the run only:
 | CORS origin | derived from ng port | `APP_AUTH__FRONTEND_ORIGIN=http://localhost:<ngPort>` |
 | Karma port | ephemeral free port | `KARMA_PORT` (new `karma.conf.js`) |
 | e2e API base | derived from API port | `API_BASE` (env, read by e2e helpers) |
+| Telemetry tag | run id as OTel resource attr | `OTEL_RESOURCE_ATTRIBUTES=verify.run_id=<runid>` + `APP_OTEL__ENDPOINT` (see "Per-run log tagging") |
 
 `nextest` needs only `DATABASE_URL` pointing at the shared Postgres server — `sqlx::test`
 already creates its own isolated `_sqlx_test_*` databases per test, so parallel nextest legs
@@ -124,6 +132,39 @@ allocation. (The existing stale-`:3000` detection in `wait_for_api`, issue #780,
 moot once the port is per-run and ephemeral, but the "did the freshly-built binary actually
 come up?" `kill -0 "$API_PID"` check is retained.)
 
+## Per-run log tagging
+
+So concurrent runs are distinguishable in Grafana, each run tags its telemetry with its run id.
+
+**Run id format:** human-meaningful, not just random — `<worktree-or-branch-slug>-<short-rand>`
+(e.g. `chore-devops-parallel-isolation-a1b2`). The same id names the per-run DB
+(`plnd_verify_<runid>`) and the OTel `verify.run_id`, so logs, traces, and the database all
+correlate, and you can find a specific agent's run by its branch in Grafana.
+
+**Pipeline:**
+
+1. **Export only when collecting is possible.** Verify probes Alloy (`localhost:4317`); if
+   reachable (i.e. `just persist` brought observability up), it starts the per-run API with
+   `APP_OTEL__ENDPOINT=http://localhost:4317`. If Alloy is down, the endpoint is left unset and
+   the API runs stdout-only — verify still works on a minimal machine. (`config.otel.endpoint`
+   is `Option<String>`; `None` = stdout-only.)
+2. **Attach the tag.** The per-run API env carries
+   `OTEL_RESOURCE_ATTRIBUTES=verify.run_id=<runid>,service.instance.id=<runid>`.
+   `telemetry.rs` builds its `Resource` via `Resource::builder()`, whose default detectors read
+   `OTEL_RESOURCE_ATTRIBUTES` — so this should attach with no code change. **Plan must verify
+   against the installed `opentelemetry_sdk` version**; if the builder does not merge env
+   attributes, add a 2-line change in `telemetry.rs` reading a `VERIFY_RUN_ID` env var and
+   `.with_attribute(KeyValue::new("verify.run_id", id))`.
+3. **Promote to a Loki label.** Alloy currently maps OTLP resource attributes to Loki
+   *structured metadata*, not indexed labels (`otelcol.exporter.loki` default). Add a
+   label-promotion hint in `config/observability/alloy/config.alloy` (a `loki.resource.labels`
+   hint via an `otelcol.processor.transform`/attributes step) so `verify.run_id` becomes a
+   queryable label. Resulting Grafana query: `{service_name="plnd_api", verify_run_id="<runid>"}`.
+
+**Limitation:** only the native API's telemetry carries the tag. Shared container logs
+(postgres, mock-oauth via `loki.source.docker`) are cross-run and cannot be per-run tagged —
+acceptable, since the API logs are the signal of interest.
+
 ## `verify.sh` decomposition → subsets + parallelism from one refactor
 
 `verify.sh` is restructured so each leg is independently runnable and declares the isolation
@@ -165,14 +206,19 @@ parallel FIFO/job machinery, minus the flock.
 Any subset that needs Tier 1 infra runs an **idempotent** `docker compose up -d --wait db
 mock-oauth-server` if it is not already healthy — and **never tears it down**. The original
 danger was auto-*teardown* racing a queued run; auto-*startup* is safe and lets unattended
-agents self-heal on a cold machine. `just persist` is the explicit human alias for the same
-ensure-up.
+agents self-heal on a cold machine.
+
+Verify auto-ensures only the **DB + OIDC** it strictly needs, not observability — so an agent
+on a cold machine still runs. Observability is brought up by the human's `just persist`; when
+it is up, per-run telemetry flows and is tagged (the Alloy probe in "Per-run log tagging"
+gates export on its reachability). `just persist` is the explicit human command for the full
+shared stack.
 
 ## Command cleanup (justfile)
 
 | Command | Disposition | Rationale |
 |---|---|---|
-| `persist` | **NEW** | Bring up shared Tier 1 infra (`db` + `mock-oauth`), idempotent, `--wait`. Human session setup. |
+| `persist` | **NEW** | Bring up the full shared Tier 1 stack — `docker compose up -d --wait` (db + mock-oauth + observability), idempotent. Human session setup. |
 | `db` | **REMOVE** | Bare `up -d db` outside any isolation; superseded by `persist`. |
 | `services-up` | **REMOVE** | Duplicate of `persist`; folded in. |
 | `stop` / `down` | **KEEP, guard** | Tears down Tier 1 (`down -v`). Human-only control. Add an interactive confirmation; agents run Just non-interactively, so the default-No prompt aborts them automatically. Document as human-only in CLAUDE.md. |
@@ -205,8 +251,13 @@ as the default, so manual runs and CI are unchanged:
 - `justfile` — remove `db`, `services-up`, `test-e2e`/`-native`/`-dev`; add `persist`;
   guard `stop`/`clean`; ephemeral-port `test-run-server`; `verify SUBSET` param.
 - `scripts/verify.sh` — remove flock + `up`/`down -v` bracket; add run-id, per-run DB
-  create/drop, ephemeral port allocation, env threading, subset dispatch, infra auto-ensure.
+  create/drop, ephemeral port allocation, env threading, subset dispatch, infra auto-ensure,
+  Alloy probe + per-run OTel tagging (`APP_OTEL__ENDPOINT` + `OTEL_RESOURCE_ATTRIBUTES`).
 - `scripts/free-port.sh` — NEW (or inline helper).
+- `config/observability/alloy/config.alloy` — promote `verify.run_id` (resource attr) to a
+  Loki label so runs are filterable in Grafana.
+- `plnd_api/src/telemetry.rs` — only if `Resource::builder()` does not merge
+  `OTEL_RESOURCE_ATTRIBUTES`; add a `verify.run_id` attribute from env.
 - `docker-compose.yml` — possibly raise Postgres `max_connections` (tuning, if needed).
 - `plnd_client/e2e/helpers/auth.ts`, `playwright.config.ts`, `e2e/global-setup.ts` — env-driven endpoints.
 - `plnd_client/karma.conf.js` — NEW, `port: process.env.KARMA_PORT || 9876`; wired into the
@@ -223,6 +274,12 @@ as the default, so manual runs and CI are unchanged:
   + retry; concurrency is low.
 - **Orphaned per-run DBs** if a run is `kill -9`'d before its trap → add a periodic/`persist`-time
   sweep dropping `plnd_verify_*` DBs older than N hours (cheap janitor; flagged for plan).
+- **OTel env-attr merging unverified** — if the installed `opentelemetry_sdk` `Resource::builder()`
+  does not read `OTEL_RESOURCE_ATTRIBUTES`, the tag silently won't attach → plan must verify and
+  fall back to the explicit `telemetry.rs` change.
+- **Loki label cardinality** — `verify.run_id` is high-cardinality (unbounded over time). It is a
+  developer-facing local stack, so this is acceptable, but the plan should confirm Loki retention
+  keeps the index bounded (the stack already wipes on `down -v`).
 - **CLAUDE.md drift** — several rules reference the semaphore and `:3000`; must be updated in
   the same PR or they will mislead future agents.
 
