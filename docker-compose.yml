@@ -24,8 +24,17 @@ services:
       - JSON_CONFIG_PATH=/config/config.json
     volumes:
       - ./config/mock-oauth:/config
+    # Gate on the JWKS endpoint of the *configured* `plnd-dev` issuer, NOT the
+    # built-in `/default` issuer. The auth flow only ever uses `plnd-dev`: e2e
+    # mints tokens at /plnd-dev/token and plnd_api validates them against
+    # /plnd-dev/jwks (issuer comes from config/mock-oauth/config.json). `/default`
+    # is a built-in issuer that responds before JSON_CONFIG_PATH is applied, so a
+    # probe against it can go green while `plnd-dev` isn't serving yet — the
+    # cold-start race behind the e2e 401/500 flakiness. Probing /plnd-dev/jwks
+    # forces the config to load, the issuer to materialize, and its signing key
+    # to generate — exactly the dependencies the token exchange relies on.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO/dev/null http://localhost:8080/default/.well-known/openid-configuration"]
+      test: ["CMD-SHELL", "wget -qO/dev/null http://localhost:8080/plnd-dev/jwks"]
       interval: 5s
       timeout: 3s
       retries: 10
