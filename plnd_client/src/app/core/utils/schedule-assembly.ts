@@ -72,6 +72,9 @@ export function assembleScheduleItems(
 
   for (const e of entries) {
     const mealAnchorId = e.slot_meal_anchor_id;
+    // Precedence: `slot_meal_anchor_id` wins over `scheduled_start`. An entry with
+    // both nests in its meal row here; the backend may still emit a scheduled_task
+    // anchor for it, which then matches no entry and acts as an invisible boundary.
     if (mealAnchorId && mealAnchorIds.has(mealAnchorId)) {
       const list = duringByAnchor.get(mealAnchorId) ?? [];
       list.push(mapEntry(e));

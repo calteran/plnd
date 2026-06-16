@@ -96,6 +96,18 @@ describe('assembleScheduleItems', () => {
     expect(meal.description).toBe('Avocado toast');
   });
 
+  it('preserves backend sequence order across a midnight-crossing day (no client re-sort)', () => {
+    // The backend linearizes a night-shift day as Dinner(21:00) → Midnight snack(01:00)
+    // → Breakfast(08:00). Clock times are non-monotonic; the client must follow the
+    // given `sequence`/array order and never re-sort by `time`.
+    const dinner = anchor('meal', 'Dinner', 'm-dinner'); dinner.time = '21:00:00';
+    const snack  = anchor('meal', 'Midnight snack', 'm-snack'); snack.time = '01:00:00';
+    const bfast  = anchor('meal', 'Breakfast', 'm-bfast'); bfast.time = '08:00:00';
+    const labels = assembleScheduleItems([dinner, snack, bfast], [], [])
+      .map(i => (i as MealAnchor).name);
+    expect(labels).toEqual(['Dinner', 'Midnight snack', 'Breakfast']);
+  });
+
   it('renders an unmatched floating task at the top instead of dropping it', () => {
     const anchors = [anchor('meal', 'Breakfast', 'meal-1')];
     const entries = [entry({ entry_id: 't4', title: 'Orphan', after_anchor: 'Dinner' })];
