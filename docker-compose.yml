@@ -7,6 +7,18 @@ name: plnd
 services:
   db:
     image: postgres:15
+    # Raise the server connection ceiling for parallel `just verify` fan-out.
+    # `just verify` is isolated, not serialized (no semaphore), so multiple runs
+    # share this one Postgres. Each run peaks at roughly ~35 backends: the nextest
+    # leg opens ~one connection per parallel test thread (num_cpus, with
+    # sqlx::test creating a throwaway DB + lazy pool per test) and the e2e leg's
+    # API pool tops out at max_connections=10 (config/api/default.toml). The
+    # stock postgres:15 ceiling of 100 (minus 3 superuser-reserved) is exhausted
+    # by ~3 concurrent runs, surfacing as connection errors that masquerade as
+    # flakiness. 300 covers the 6–8 simultaneous runs we target with headroom;
+    # raise further if exhaustion reappears. The postgres entrypoint prepends
+    # `postgres` to any arg starting with `-`, so init logic is preserved.
+    command: -c max_connections=300
     environment:
       POSTGRES_USER: plnd
       POSTGRES_PASSWORD: ${DB_PASSWORD}
