@@ -175,9 +175,15 @@ if [[ "$NEED_E2E" == true ]]; then
     fi
 
     API_LOG=$(mktemp /tmp/plnd-verify-api-XXXXXX)
-    ( cd "$PROJECT_ROOT/plnd_api" && \
-      doppler run -- env "${API_ENV[@]}" ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- ) &
+    # Background the API DIRECTLY — no wrapper subshell. `3>&-` closes the FIFO
+    # completion-bus write-end for doppler and its plnd_api child so the reader
+    # can reach EOF; API_PID is the doppler pid so cleanup's kill reaches the
+    # server. A wrapper subshell would keep fd 3 open for the server's whole life
+    # (→ `wait READER_PID` hangs) and make API_PID the subshell, orphaning plnd_api.
+    cd "$PROJECT_ROOT/plnd_api"
+    doppler run -- env "${API_ENV[@]}" ../target/debug/plnd_api > "$API_LOG" 2>&1 3>&- &
     API_PID=$!
+    cd "$PROJECT_ROOT"
 
     wait_for_api() {
         if ! timeout 30s bash -c \
