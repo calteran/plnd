@@ -83,7 +83,20 @@ client:
 # `just verify` auto-ensures db+oauth on its own, but observability only comes up
 # here — so run this to capture per-run telemetry in Grafana.
 persist:
+    #!/usr/bin/env bash
+    set -euo pipefail
     doppler run -- docker compose up -d --wait
+    # Reclaim any plnd_verify_* DBs orphaned by force-killed / OOM'd verify runs
+    # (their EXIT trap never fired). Non-fatal: a failed sweep must not block infra.
+    bash scripts/clean-verify-dbs.sh || true
+
+# Drop orphaned per-run `plnd_verify_*` databases left behind when a verify run is
+# force-killed (SIGKILL/OOM) before its EXIT trap can drop its DB. Safe anytime:
+# only drops DBs with NO active connection AND older than MIN_AGE (default "1 hour";
+# pass "0" to drop every unconnected orphan). Also runs at `just persist`. Scope is
+# limited to the `plnd_verify_` prefix — never touches plnd_dev or _sqlx_test_* DBs.
+clean-verify-dbs MIN_AGE="1 hour":
+    @bash scripts/clean-verify-dbs.sh "{{ MIN_AGE }}"
 
 # Stop ALL shared infra and remove volumes. HUMAN-ONLY: this wipes the database
 # used by every running verify. The confirmation prompt aborts on EOF, so agents
