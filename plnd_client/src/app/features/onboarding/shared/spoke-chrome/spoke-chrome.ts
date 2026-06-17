@@ -71,13 +71,13 @@ type DotState = 'completed' | 'current' | 'ahead';
       display: flex;
       align-items: center;
       padding: 12px 16px;
-      background: var(--color-surface-white, #ffffff);
-      border-bottom: 1.5px solid var(--color-accent-border, #fde68a);
+      background: var(--color-surface-white);
+      border-bottom: 1.5px solid var(--color-accent-border);
       gap: 12px;
     }
 
     .hub-link {
-      color: var(--color-accent, #d97706);
+      color: var(--color-accent);
       font-size: 13px;
       text-decoration: none;
       flex-shrink: 0;
@@ -91,7 +91,7 @@ type DotState = 'completed' | 'current' | 'ahead';
       text-align: center;
       font-size: 13px;
       font-weight: 700;
-      color: var(--color-accent-dark, #78350f);
+      color: var(--color-accent-dark);
       margin: 0;
     }
 
@@ -113,13 +113,13 @@ type DotState = 'completed' | 'current' | 'ahead';
     }
 
     .dot--completed {
-      background: var(--color-accent, #d97706);
-      border-color: var(--color-accent, #d97706);
+      background: var(--color-accent);
+      border-color: var(--color-accent);
     }
 
     .dot--current {
       background: transparent;
-      border-color: var(--color-accent, #d97706);
+      border-color: var(--color-accent);
     }
 
     .spoke-content {
@@ -133,27 +133,27 @@ type DotState = 'completed' | 'current' | 'ahead';
       justify-content: space-between;
       align-items: center;
       padding: 12px 16px;
-      border-top: 1.5px solid var(--color-accent-border, #fde68a);
-      background: var(--color-surface-white, #ffffff);
+      border-top: 1.5px solid var(--color-accent-border);
+      background: var(--color-surface-white);
     }
 
     .footer-spacer { display: block; }
 
     .btn-back {
       background: transparent;
-      border: 1.5px solid var(--color-accent, #d97706);
-      color: var(--color-accent, #d97706);
+      border: 1.5px solid var(--color-accent);
+      color: var(--color-accent);
       padding: 8px 16px;
       border-radius: 6px;
       font-size: 13px;
       cursor: pointer;
     }
 
-    .btn-back:hover { background: var(--color-accent-light, #fef3c7); }
+    .btn-back:hover { background: var(--color-accent-light); }
 
     .btn-continue {
-      background: var(--color-accent, #d97706);
-      color: #ffffff;
+      background: var(--color-accent);
+      color: var(--color-btn-accent-text);
       border: none;
       padding: 8px 20px;
       border-radius: 6px;
@@ -162,7 +162,7 @@ type DotState = 'completed' | 'current' | 'ahead';
       cursor: pointer;
     }
 
-    .btn-continue:hover { background: var(--color-accent-dark, #78350f); }
+    .btn-continue:hover { background: var(--color-accent-dark); }
 
     @media (min-width: 768px) {
       .spoke-chrome {
@@ -178,7 +178,7 @@ type DotState = 'completed' | 'current' | 'ahead';
       .spoke-title {
         font-size: 18px;
         font-weight: 800;
-        color: var(--color-text-primary, #111827);
+        color: var(--color-text-primary);
         letter-spacing: -0.02em;
       }
 

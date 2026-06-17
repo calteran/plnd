@@ -55,6 +55,29 @@
   --color-badge-exercise-fg:    var(--color-success);
   --color-badge-leisure-bg:     var(--color-purple-light);
   --color-badge-leisure-fg:     var(--color-purple);
+  // Tooltip foreground rides on --color-tooltip-bg, which inverts between modes,
+  // so the text must invert with it (dark text on the light dark-mode chip) — a
+  // hardcoded #fff went invisible against the light dark-mode tooltip.
+  --color-tooltip-text:   #ffffff;
+  // Neutral interaction/overlay layers. Dark mode flips the hover wash to a
+  // light tint and deepens scrims/shadows; these must NOT follow the accent.
+  --color-hover-bg:       rgba(0, 0, 0, 0.06);
+  --color-overlay-scrim:  rgba(0, 0, 0, 0.35);
+  --shadow-modal:         0 8px 32px rgba(0, 0, 0, 0.18);
+  --shadow-card:          0 2px 8px rgba(217, 119, 6, 0.10);
+  --shadow-card-hover:    0 2px 10px rgba(217, 119, 6, 0.14);
+  --shadow-badge:         0 1px 3px rgba(217, 119, 6, 0.18);
+  // Decorative meal-loading bowl illustration. Self-contained artwork whose
+  // palette reads well on both surfaces, so no dark override is needed — the
+  // values intentionally apply in both themes (like the badge aliases above).
+  --color-illus-bowl-rim:    #7c2d12;
+  --color-illus-bowl-body:   #b45309;
+  --color-illus-bowl-broth:  #ecfccb;
+  --color-illus-bowl-shadow: #365314;
+  --color-illus-carrot:      #ea580c;
+  --color-illus-pea:         #65a30d;
+  --color-illus-noodle:      #ffffff;
+  --color-illus-herb:        #15803d;
 }
 
 [data-theme="dark"] {
@@ -107,4 +130,11 @@
   --color-badge-medication-fg:  #fb923c;
   --color-badge-appointment-bg: rgba(3, 105, 161, 0.15);
   --color-badge-appointment-fg: #38bdf8;
+  --color-tooltip-text:   #1e1e2e;
+  --color-hover-bg:       rgba(255, 255, 255, 0.08);
+  --color-overlay-scrim:  rgba(0, 0, 0, 0.55);
+  --shadow-modal:         0 8px 32px rgba(0, 0, 0, 0.55);
+  --shadow-card:          0 2px 8px rgba(0, 0, 0, 0.40);
+  --shadow-card-hover:    0 2px 10px rgba(0, 0, 0, 0.50);
+  --shadow-badge:         0 1px 3px rgba(0, 0, 0, 0.40);
 }

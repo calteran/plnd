@@ -79,7 +79,7 @@ type FoodSubstep =
     </app-spoke-chrome>
   `,
   styles: [`
-    .meal-plan-loading { padding: 24px 16px; font-size: 13px; color: var(--color-text-muted, #6b7280); }
+    .meal-plan-loading { padding: 24px 16px; font-size: 13px; color: var(--color-text-muted); }
   `],
 })
 export class OnboardingFoodComponent implements OnInit {

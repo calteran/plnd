@@ -108,26 +108,26 @@ export const MAX_PERSONALISED_NAMES = 5;
 
     .plan-icon {
       width: 52px; height: 52px;
-      background: var(--color-accent, #d97706);
+      background: var(--color-accent);
       border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
       flex-shrink: 0;
       animation: iconPulse 2.2s ease-in-out infinite;
     }
-    .plan-icon svg { width: 26px; height: 26px; fill: white; }
+    .plan-icon svg { width: 26px; height: 26px; fill: var(--color-btn-accent-text); }
 
     @keyframes iconPulse {
-      0%,100% { box-shadow: 0 0 0 0 rgba(217,119,6,0.4); }
-      50%      { box-shadow: 0 0 0 12px rgba(217,119,6,0); }
+      0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 40%, transparent); }
+      50%      { box-shadow: 0 0 0 12px transparent; }
     }
 
     .heading-block { text-align: center; }
     .heading-block h2 {
       font-size: 18px; font-weight: 800;
-      color: var(--color-text-primary, #78350f);
+      color: var(--color-text-primary);
       margin: 0 0 4px; letter-spacing: -0.01em;
     }
-    .subtitle { font-size: 13px; color: var(--color-text-secondary, #b45309); margin: 0; }
+    .subtitle { font-size: 13px; color: var(--color-text-secondary); margin: 0; }
 
     .chat-window {
       width: 100%; height: 210px;
@@ -146,9 +146,9 @@ export const MAX_PERSONALISED_NAMES = 5;
       padding: 8px 14px;
       border-radius: 18px; border-bottom-left-radius: 4px;
       font-size: 13px; line-height: 1.45;
-      color: var(--color-text-primary, #78350f);
+      color: var(--color-text-primary);
       background: var(--color-surface-meal);
-      border: 1px solid var(--color-accent-border, #fde68a);
+      border: 1px solid var(--color-accent-border);
       max-width: 88%;
     }
 
@@ -163,8 +163,8 @@ export const MAX_PERSONALISED_NAMES = 5;
 
     .tag {
       display: inline-block;
-      background: var(--color-accent-light, #fef3c7);
-      color: var(--color-accent-dark, #92400e);
+      background: var(--color-accent-light);
+      color: var(--color-accent-dark);
       border-radius: 10px; padding: 1px 7px;
       font-size: 11px; font-weight: 700; margin: 0 2px;
     }
@@ -174,7 +174,7 @@ export const MAX_PERSONALISED_NAMES = 5;
       padding: 10px 14px;
       border-radius: 18px; border-bottom-left-radius: 4px;
       background: var(--color-surface-meal);
-      border: 1px solid var(--color-accent-border, #fde68a);
+      border: 1px solid var(--color-accent-border);
       display: inline-flex; gap: 4px; align-items: center;
       align-self: flex-start;
       animation: bubbleIn 0.3s ease forwards;
@@ -182,7 +182,7 @@ export const MAX_PERSONALISED_NAMES = 5;
 
     .dot {
       width: 6px; height: 6px; border-radius: 50%;
-      background: var(--color-accent, #d97706);
+      background: var(--color-accent);
       animation: dotBounce 0.7s ease-in-out infinite;
     }
     .dot:nth-child(2) { animation-delay: 0.14s; }

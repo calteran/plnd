@@ -10,6 +10,7 @@
     "check-dependencies": "ncu --peer",
     "check-licenses": "license-checker-rseidelsohn --summary",
     "check-circular": "depcruise src",
+    "check-color-tokens": "node scripts/check-color-tokens.mjs",
     "e2e": "playwright test",
     "e2e:ci": "CI=true playwright test --project=chromium",
     "e2e:headed": "playwright test --headed",

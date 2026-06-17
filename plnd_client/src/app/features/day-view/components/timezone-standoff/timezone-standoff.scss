@@ -37,8 +37,8 @@
 }
 
 .tz-standoff__btn {
-  background: var(--color-accent, #4f7ef8);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-btn-accent-text);
   border: none;
   border-radius: 6px;
   padding: 4px 12px;

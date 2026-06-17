@@ -842,7 +842,7 @@ Token definitions live in `plnd_client/src/styles/_tokens.scss`; this section ca
 - **Accordion expansion.** `max-height` CSS transition for in-place toggles preserving layout; `@if` for large panels carrying state. Chevron rotates 180° when open.
 - **Displaced-meal flag.** Meals that fall outside their usual time window — typically because a scheduled task displaces them — render with a small warning glyph and a subtle tone shift, visible in both the planning grid and the day view. The intent is to signal "your routine is interrupted here" without alarm; the user decides whether to accept or rearrange.
 
-**Dark mode.** Implemented via CSS custom properties on `[data-theme="dark"]`. Indigo replaces amber (amber on dark surfaces reads as caution and loses warmth). Test new features in both modes; the most common mistake is hardcoding a color in a component's SCSS instead of using a token.
+**Dark mode.** Implemented via CSS custom properties on `[data-theme="dark"]`. Indigo replaces amber (amber on dark surfaces reads as caution and loses warmth). Test new features in both modes; the most common mistake is hardcoding a color in a component's SCSS (or inline `styles:[]` template) instead of using a token — a literal can't follow the dark-mode override, so it silently breaks contrast. This is enforced: `just check-color-tokens` (part of `just verify`) fails the build on any color literal outside `_tokens.scss`. For a translucent tint of a token, use `color-mix(in srgb, var(--token) N%, transparent)` rather than a hardcoded `rgba()`.
 
 **Accessibility.**
 

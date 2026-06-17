@@ -1,7 +1,7 @@
 .tz-why-pop {
   position: relative;
-  background: var(--color-surface, #fff);
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+  background: var(--color-surface-white);
+  border: 1px solid var(--color-border-row);
   border-radius: 10px;
   padding: 12px 36px 12px 14px; // right padding reserves space for × close button
   box-shadow: var(--shadow-dropdown);
@@ -13,7 +13,7 @@
 
 .tz-why-pop__provenance {
   margin: 0 0 10px;
-  color: var(--color-text-muted, rgba(0, 0, 0, 0.55));
+  color: var(--color-text-muted);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -25,8 +25,8 @@
 }
 
 .tz-why-pop__btn {
-  background: var(--color-accent, #4f7ef8);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-btn-accent-text);
   border: none;
   border-radius: 6px;
   padding: 5px 12px;
@@ -40,8 +40,8 @@
 
   &--ghost {
     background: transparent;
-    color: var(--color-text, inherit);
-    border: 1px solid var(--color-border, rgba(0, 0, 0, 0.2));
+    color: var(--color-text-body);
+    border: 1px solid var(--color-border-input);
     opacity: 0.75;
 
     &:hover { opacity: 1; filter: none; }
@@ -50,12 +50,12 @@
 
 .tz-why-pop__select {
   width: 100%;
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.2));
+  border: 1px solid var(--color-border-input);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 12px;
-  background: var(--color-surface, #fff);
-  color: var(--color-text, inherit);
+  background: var(--color-surface-white);
+  color: var(--color-text-body);
   cursor: pointer;
 }
 
@@ -67,13 +67,13 @@
   border: none;
   font-size: 16px;
   line-height: 1;
-  color: var(--color-text-muted, rgba(0, 0, 0, 0.45));
+  color: var(--color-text-muted);
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 4px;
 
   &:hover {
-    color: var(--color-text, inherit);
-    background: var(--color-hover-bg, rgba(0, 0, 0, 0.06));
+    color: var(--color-text-body);
+    background: var(--color-hover-bg);
   }
 }

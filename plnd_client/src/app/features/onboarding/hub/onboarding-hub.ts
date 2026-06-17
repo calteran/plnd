@@ -446,7 +446,7 @@ const HUB_SECTIONS: HubSection[] = [
       display: inline-block;
       width: 14px;
       height: 14px;
-      border: 2px solid rgba(255, 255, 255, 0.4);
+      border: 2px solid color-mix(in srgb, var(--color-btn-accent-text) 40%, transparent);
       border-top-color: var(--color-btn-accent-text);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;

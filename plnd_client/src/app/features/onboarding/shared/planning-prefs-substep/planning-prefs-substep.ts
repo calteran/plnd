@@ -92,12 +92,12 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     }
 
     .callout {
-      background: var(--color-accent-light, #fef3c7);
-      border: 1.5px solid var(--color-accent-border, #fde68a);
+      background: var(--color-accent-light);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 8px;
       padding: 12px 14px;
       font-size: 13px;
-      color: var(--color-accent-dark, #78350f);
+      color: var(--color-accent-dark);
     }
 
     .field-group {
@@ -109,12 +109,12 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     .field-label {
       font-size: 12px;
       font-weight: 700;
-      color: var(--color-accent-dark, #78350f);
+      color: var(--color-accent-dark);
     }
 
     .segmented-control {
       display: flex;
-      border: 1.5px solid var(--color-accent-border, #fde68a);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 8px;
       overflow: hidden;
     }
@@ -123,7 +123,7 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       flex: 1;
       background: var(--color-surface-white);
       border: none;
-      border-right: 1.5px solid var(--color-accent-border, #fde68a);
+      border-right: 1.5px solid var(--color-accent-border);
       padding: 8px;
       font-size: 13px;
       cursor: pointer;
@@ -133,7 +133,7 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     .seg-btn:last-child { border-right: none; }
 
     .seg-btn--active {
-      background: var(--color-accent, #d97706);
+      background: var(--color-accent);
       color: var(--color-btn-accent-text);
       font-weight: 700;
     }
@@ -160,8 +160,8 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     }
 
     .day-pill--active {
-      background: var(--color-accent, #d97706);
-      border-color: var(--color-accent, #d97706);
+      background: var(--color-accent);
+      border-color: var(--color-accent);
       color: var(--color-btn-accent-text);
     }
 
@@ -173,7 +173,7 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
     }
 
     .time-input {
-      border: 1.5px solid var(--color-accent-border, #fde68a);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 6px;
       padding: 6px 10px;
       font-size: 13px;
