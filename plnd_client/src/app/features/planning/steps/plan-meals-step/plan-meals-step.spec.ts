@@ -542,6 +542,17 @@ describe('PlanMealsStepComponent', () => {
       expect(firstCell.querySelector('.gc-swap-pending')).toBeNull();
     });
 
+    it('should ignore a second swap while one is already in flight for the same slot', () => {
+      const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+      (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(agentSpy.suggestSlot).toHaveBeenCalledTimes(1);
+
+      // A re-trigger while the first request is still pending must be a no-op.
+      component.refreshSlot('2026-03-23', 'breakfast');
+      expect(agentSpy.suggestSlot).toHaveBeenCalledTimes(1);
+    });
+
     it('should clear the swapping indicator if suggestSlot errors', () => {
       const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
       (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();

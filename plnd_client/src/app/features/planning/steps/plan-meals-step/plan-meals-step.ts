@@ -320,7 +320,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .gc-spinner {
       width: 11px; height: 11px; flex: none;
       border: 2px solid var(--color-accent-light);
-      border-top-color: var(--color-accent-border);
+      border-top-color: var(--color-accent);
       border-radius: 50%;
       animation: gc-spin 0.6s linear infinite;
     }
@@ -698,6 +698,7 @@ export class PlanMealsStepComponent implements OnInit {
   /** Per-cell agent refresh — suggests a replacement and auto-approves it.
    *  Passes the current mealRef as avoid so the agent doesn't return the same meal. */
   refreshSlot(date: string, slot: MealSlot): void {
+    if (this.isSwapping(date, slot)) return;
     const existing = this.getMeal(date, slot);
     const avoid    = existing?.mealRef ? [existing.mealRef] : [];
     // Show immediate in-flight feedback so the click registers before the agent responds.
