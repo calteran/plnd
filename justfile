@@ -17,6 +17,7 @@ init:
     cargo install cargo-deny --locked
     cargo install cargo-machete
     cargo install cargo-msrv --locked
+    cargo install cargo-watch --locked
 
     echo "→ Installing Angular/Node dependencies..."
     cd plnd_client && npm ci
@@ -60,19 +61,24 @@ install-deps:
 dev:
     #!/usr/bin/env bash
     set -euo pipefail
+    if ! command -v cargo-watch >/dev/null 2>&1; then
+        echo "→ Installing cargo-watch (API auto-reload)..."
+        cargo install cargo-watch --locked
+    fi
     echo "→ Starting infrastructure (db, mock-oauth-server)..."
     doppler run -- docker compose up -d --wait --wait-timeout 120
     echo "→ Infrastructure healthy."
-    echo "→ Starting API and client..."
+    echo "→ Starting API and client (API auto-reloads on Rust changes)..."
     mprocs
 
 # Run API service locally (requires PostgreSQL)
 api:
     cd plnd_api && doppler run -- cargo run
 
-# Run API service with auto-reload (requires cargo-watch)
+# Run API service with auto-reload (installs cargo-watch if missing)
 api-watch:
-    cd plnd_api && cargo install cargo-watch && doppler run -- cargo watch -x run
+    @command -v cargo-watch >/dev/null 2>&1 || (echo "→ Installing cargo-watch..." && cargo install cargo-watch --locked)
+    cd plnd_api && doppler run -- cargo watch --why -x run
 
 # Run client locally
 client:

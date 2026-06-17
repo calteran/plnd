@@ -1,6 +1,10 @@
 procs:
+  # Auto-rebuilds and restarts the API on any Rust source change. cargo-watch is
+  # workspace-aware, so edits to plnd_data / plnd_agent / plnd_seed trigger a rebuild
+  # too (it ignores target/ and respects .gitignore). Install via `just init`; `just dev`
+  # also self-installs it if missing.
   api:
-    shell: "trap 'kill 0' INT TERM EXIT; doppler run -- cargo run & wait"
+    shell: "trap 'kill 0' INT TERM EXIT; doppler run -- cargo watch --why -x run & wait"
     cwd: plnd_api
 
   client:
