@@ -156,8 +156,14 @@ async function completeFoodSpoke(page: Page): Promise<void> {
   await expect(page.locator('.prefs-substep')).toBeVisible();
   await page.locator('.btn-continue').click();
 
-  // Step 3: Meal Plan Review — wait for /agent/meal-plan response then save
-  await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
+  // Step 3: Meal Plan Review — wait for generation to actually finish before
+  // saving. The grid only renders once generation completes, so gating on the
+  // first cell is a deterministic generation-complete signal; asserting only
+  // btn-continue enabled can pass in the brief window BEFORE plan-meals-step
+  // mounts and flips isGenerating=true, clicking through before any meals
+  // generate (#970).
+  await expect(page.locator('.gc').first()).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10_000 });
   await page.locator('.btn-continue').click();
 
   await expect(page).toHaveURL(/\/onboarding$/);
@@ -857,6 +863,11 @@ test.describe('Onboarding', () => {
       await page.goto('/onboarding');
       await landAtMealPlanReview(page);
 
+      // Gate on the loader before asserting disabled: it appears only once
+      // plan-meals-step has mounted and started generating (response held open).
+      // Without this the disabled assertion can race the window before
+      // plan-meals-step mounts, when the button is still enabled (#970).
+      await expect(page.locator('app-meal-plan-loading')).toBeVisible({ timeout: 10_000 });
       // Button is disabled while generation is in flight (response gated open).
       await expect(page.locator('.btn-continue')).toBeDisabled();
       // Releasing the gated response transitions the button to enabled.

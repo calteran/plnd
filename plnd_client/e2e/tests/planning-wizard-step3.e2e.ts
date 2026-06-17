@@ -60,6 +60,10 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     await page.goto('/plan/week');
     await expect(page.locator('.planning-wizard')).toBeVisible();
     await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
+    // Auto-generation runs on entry and the grid only renders once it finishes
+    // (while generating, the loader replaces the grid). Gate on the first cell
+    // so no test races the generation-complete settle under parallel load (#970).
+    await expect(page.locator('.gc').first()).toBeVisible({ timeout: 10_000 });
   });
 
   // ── Grid structure ───────────────────────────────────────────────────────────
@@ -74,7 +78,10 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     });
 
     test('meals-grid renders 9 cells total (3 days × 3 slots)', async ({ page }) => {
-      await expect(page.locator('.gc')).toHaveCount(9);
+      // Generous timeout: the cell count is days × deduped slots, and the slot
+      // set settles after the day-types load resolves. The default 5s ceiling
+      // could expire mid-settle under parallel load and observe 6 (#970).
+      await expect(page.locator('.gc')).toHaveCount(9, { timeout: 10_000 });
     });
   });
 
@@ -275,6 +282,10 @@ test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
     await page.goto('/plan/week');
     await expect(page.locator('.planning-wizard')).toBeVisible();
     await expect(page.locator('.progress-pill.active .pill-num')).toHaveText('3');
+    // Auto-generation runs on entry and the grid only renders once it finishes
+    // (while generating, the loader replaces the grid). Gate on the first cell
+    // so no test races the generation-complete settle under parallel load (#970).
+    await expect(page.locator('.gc').first()).toBeVisible({ timeout: 10_000 });
   });
 
   test('auto-generate populates all cells with proposed meals on first entry', async ({ page }) => {
