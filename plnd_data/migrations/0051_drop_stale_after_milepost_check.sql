@@ -1,0 +1,12 @@
+-- Migration 0051: drop orphaned check constraint from pre-rename era.
+-- schedule_entries_after_milepost_check was the auto-named inline CHECK on the
+-- original schedule_entries.after_milepost column (migration 0011), restricting
+-- values to ('breakfast', 'lunch', 'dinner'). When the column was renamed to
+-- after_anchor (0028), Postgres rewrote the column reference inside the CHECK
+-- expression but kept the constraint's original name. Migration 0033 then tried
+-- to drop it as schedule_entries_after_anchor_check — wrong name, silently
+-- ignored due to IF EXISTS — so the 3-meal constraint survived even though 0033
+-- widened after_anchor to unconstrained TEXT for the anchor/slot model. Saving a
+-- plan with any after_anchor label outside breakfast/lunch/dinner (custom anchors,
+-- 'start_of_day', user meal occasions) is blocked by this stale constraint.
+ALTER TABLE schedule_entries DROP CONSTRAINT IF EXISTS schedule_entries_after_milepost_check;
