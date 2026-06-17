@@ -40,7 +40,11 @@ const PATTERNS = [
   { name: 'hex literal', re: /#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F])/ },
   { name: 'rgb()/rgba()', re: /\brgba?\(/i },
   { name: 'hsl()/hsla()', re: /\bhsla?\(/i },
-  { name: 'named colour', re: new RegExp(`\\b(?:${COLOUR_PROPS})\\s*[:=]\\s*["']?\\b(?:${NAMED})\\b`, 'i') },
+  // Named colour anywhere in a colour property's value (catches shorthands like
+  // `border: 1px solid white`), but only as a standalone value token: the
+  // (?<![\w-])…(?![\w-]) guard excludes colour words embedded in identifiers such
+  // as `var(--color-surface-white)` or `var(--color-purple)`, which are tokens.
+  { name: 'named colour', re: new RegExp(`\\b(?:${COLOUR_PROPS})\\s*[:=][^;{}]*?(?<![\\w-])(?:${NAMED})(?![\\w-])`, 'i') },
 ];
 
 /** Strip comments so prose/issue-refs can't masquerade as colour literals. */
