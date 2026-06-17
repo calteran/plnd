@@ -282,7 +282,7 @@ export class DietaryPreferencesSubstepComponent implements OnInit {
   // promote response can't set a stale pendingIngredientId against new input.
   private readonly cancelPromote$ = new Subject<void>();
 
-  readonly lifestyleExpanded = signal(false);
+  readonly lifestyleExpanded = signal(true);
   readonly selectedLifestyles = signal<string[]>([]);
   readonly customLifestyleInput = signal('');
   readonly customLifestyles = computed(() =>
