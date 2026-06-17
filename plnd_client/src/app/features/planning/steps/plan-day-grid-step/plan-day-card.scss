@@ -11,7 +11,7 @@
 
   &:hover {
     border-color: var(--color-accent-border);
-    box-shadow: 0 2px 8px rgba(217, 119, 6, 0.10);
+    box-shadow: var(--shadow-card);
   }
 
   &:focus-visible {
@@ -21,7 +21,7 @@
 
   &.expanded {
     border-color: var(--color-accent);
-    box-shadow: 0 2px 10px rgba(217, 119, 6, 0.14);
+    box-shadow: var(--shadow-card-hover);
   }
 }
 

@@ -222,19 +222,19 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .btn-refresh-all:hover { background: var(--color-surface-base); }
     .btn-refresh-all:disabled { opacity: 0.4; cursor: default; }
     .badge {
-      background: var(--color-accent-border); color: #fff;
+      background: var(--color-accent-border); color: var(--color-btn-accent-text);
       border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: 700;
     }
 
     /* ── Modal ── */
     .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+      position: fixed; inset: 0; background: var(--color-overlay-scrim);
       display: flex; align-items: center; justify-content: center; z-index: 100;
     }
     .modal-box {
       background: var(--color-surface-white);
       border-radius: 12px; padding: 24px 28px; max-width: 380px; width: 90%;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+      box-shadow: var(--shadow-modal);
     }
     .modal-msg { font-size: 14px; color: var(--color-text-body); margin: 0 0 18px; line-height: 1.5; }
     .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
@@ -246,7 +246,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .btn-confirm {
       background: var(--color-accent-border); border: none;
       border-radius: 7px; padding: 6px 14px; font-size: 13px; cursor: pointer;
-      color: #fff; font-weight: 600;
+      color: var(--color-btn-accent-text); font-weight: 600;
     }
 
     .meals-grid {
@@ -356,7 +356,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     }
     .btn-cancel-primary {
       background: var(--color-accent-border); border: none;
-      color: #fff; font-weight: 600;
+      color: var(--color-btn-accent-text); font-weight: 600;
     }
 
     /* Skip / clear corner button */
@@ -390,7 +390,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .gc-suggest {
       flex: 1;
       background: transparent;
-      border: 1px solid rgba(0, 0, 0, 0.08);
+      border: 1px solid var(--color-border-row);
       border-radius: 5px; padding: 3px 0;
       font-size: 12px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
@@ -398,9 +398,9 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
       transition: background 0.12s, border-color 0.12s;
     }
     .gc-approve:hover {
-      background: #dcfce7;
-      border-color: #86efac;
-      color: #166534;
+      background: var(--color-success-light);
+      border-color: var(--color-success-border);
+      color: var(--color-success);
     }
     .gc-pick:hover {
       background: var(--color-accent-light);
@@ -413,7 +413,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
 
     /* Approved meal edit button */
     .gc-edit-custom {
-      background: transparent; border: 1px solid rgba(217, 119, 6, 0.2);
+      background: transparent; border: 1px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
       border-radius: 5px; padding: 3px 7px;
       font-size: 10px; color: var(--color-accent-dark);
       cursor: pointer; opacity: 0.75; align-self: flex-end;

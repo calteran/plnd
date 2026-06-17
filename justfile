@@ -180,6 +180,11 @@ check-tracing-skip:
         echo "✓ No unsafe skip() patterns in plnd_api/src/routes/" ; \
     fi
 
+# Enforce the colour-token policy: no hard-coded colour literals outside
+# src/styles/_tokens.scss (the usual cause of dark-mode contrast regressions).
+check-color-tokens:
+    cd plnd_client && npm run check-color-tokens
+
 # Combined quality check (all quality gates, no tests)
 check:
     just fmt
@@ -189,6 +194,7 @@ check:
     just check-tracing-skip
     just ts-lint
     just ts-deps
+    just check-color-tokens
 
 # Full verification — parallel, ISOLATED pipeline (see scripts/verify.sh).
 # No semaphore: runs are isolated by per-run DB + ephemeral ports.

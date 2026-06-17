@@ -96,7 +96,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
     .progress-pill.active { background: var(--color-accent-light); border-color: var(--color-accent); color: var(--color-accent-dark); }
     .progress-pill.active .pill-label { font-weight: 700; }
     .progress-pill.done .pill-num,
-    .progress-pill.active .pill-num { background: var(--color-accent); color: #fff; }
+    .progress-pill.active .pill-num { background: var(--color-accent); color: var(--color-btn-accent-text); }
     .progress-pill.disabled { opacity: 0.4; cursor: default; }
     .pill-num { width: 16px; height: 16px; border-radius: 50%; background: var(--color-border-row);
                 display: flex; align-items: center; justify-content: center;
@@ -111,7 +111,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
                font-size: 16px; font-weight: 400; line-height: 1; min-width: 44px; min-height: 44px;
                display: flex; align-items: center; justify-content: center; }
     .nav-btn--back { margin-right: auto; }
-    .error-msg { color: var(--color-error, #c0392b); padding: 1rem 0; }
+    .error-msg { color: var(--color-destructive); padding: 1rem 0; }
   `]
 })
 export class PlanningWizardComponent implements OnInit {

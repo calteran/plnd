@@ -151,6 +151,7 @@ if need "quick,ts"; then
     run_job "eslint"  "$PROJECT_ROOT/plnd_client" npx eslint "src/**/*.ts" "e2e/**/*.ts"
     run_job "ts-deps" "$PROJECT_ROOT/plnd_client" bash -c \
         "npm run check-dependencies && npm run check-licenses && npm run check-circular"
+    run_job "color-tokens" "$PROJECT_ROOT/plnd_client" npm run check-color-tokens
 fi
 if need "ts"; then
     KARMA_PORT="$("$SCRIPT_DIR/free-port.sh")"

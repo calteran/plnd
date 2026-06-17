@@ -37,7 +37,7 @@ import { RouterLink } from '@angular/router';
     .btn {
       padding: 0.5rem 1.5rem;
       background: var(--color-accent);
-      color: #fff;
+      color: var(--color-btn-accent-text);
       border-radius: 6px;
       font-size: 1rem;
       text-decoration: none;

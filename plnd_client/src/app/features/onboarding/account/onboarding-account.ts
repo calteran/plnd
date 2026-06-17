@@ -135,7 +135,7 @@ import { TimezoneService } from '../../../core/services/timezone.service';
     .field-label {
       font-size: 12px;
       font-weight: 700;
-      color: var(--color-accent-dark, #78350f);
+      color: var(--color-accent-dark);
       text-transform: uppercase;
       letter-spacing: 0.04em;
     }
@@ -182,7 +182,7 @@ import { TimezoneService } from '../../../core/services/timezone.service';
     .section-heading {
       font-size: 12px;
       font-weight: 700;
-      color: var(--color-accent-dark, #78350f);
+      color: var(--color-accent-dark);
       text-transform: uppercase;
       letter-spacing: 0.04em;
       margin: 4px 0 0;
@@ -195,9 +195,9 @@ import { TimezoneService } from '../../../core/services/timezone.service';
       align-items: center;
       justify-content: space-between;
       padding: 10px 12px;
-      border: 1.5px solid var(--color-accent-border, #fde68a);
+      border: 1.5px solid var(--color-accent-border);
       border-radius: 10px;
-      background: var(--color-accent-light, #fef3c7);
+      background: var(--color-accent-light);
     }
 
     .toggle-info {
@@ -214,14 +214,14 @@ import { TimezoneService } from '../../../core/services/timezone.service';
 
     .toggle-subtitle {
       font-size: 11px;
-      color: var(--color-accent-dark, #78350f);
+      color: var(--color-accent-dark);
       opacity: 0.8;
     }
 
     .toggle {
       width: 18px;
       height: 18px;
-      accent-color: var(--color-accent, #d97706);
+      accent-color: var(--color-accent);
       cursor: pointer;
     }
 
@@ -232,10 +232,10 @@ import { TimezoneService } from '../../../core/services/timezone.service';
     /* ── Future placeholder ───────────────────────────────────── */
 
     .future-placeholder {
-      border: 1.5px dashed var(--color-accent-border, #fde68a);
+      border: 1.5px dashed var(--color-accent-border);
       border-radius: 10px;
-      background: var(--color-accent-light, #fef3c7);
-      color: var(--color-accent-dark, #78350f);
+      background: var(--color-accent-light);
+      color: var(--color-accent-dark);
       font-size: 12px;
       padding: 12px;
       text-align: center;

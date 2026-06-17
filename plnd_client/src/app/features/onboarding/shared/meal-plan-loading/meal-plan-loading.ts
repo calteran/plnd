@@ -81,10 +81,10 @@ function dayLabel(iso: string): string {
           <div class="bowl-base">
             <svg width="140" height="140" viewBox="0 0 120 120" aria-hidden="true">
               <g transform="translate(60 60) scale(1 0.906) translate(-60 -60)">
-                <circle cx="60" cy="60" r="54" fill="#7c2d12"/>
-                <circle cx="60" cy="60" r="50" fill="#b45309"/>
-                <circle cx="60" cy="60" r="44" fill="#ecfccb"/>
-                <path d="M 16 60 A 44 44 0 0 0 104 60 L 104 66 A 44 44 0 0 1 16 66 Z" fill="#365314" opacity="0.14"/>
+                <circle class="bowl-rim" cx="60" cy="60" r="54"/>
+                <circle class="bowl-body" cx="60" cy="60" r="50"/>
+                <circle class="bowl-broth" cx="60" cy="60" r="44"/>
+                <path class="bowl-shadow" d="M 16 60 A 44 44 0 0 0 104 60 L 104 66 A 44 44 0 0 1 16 66 Z" opacity="0.14"/>
               </g>
             </svg>
           </div>
@@ -110,30 +110,30 @@ function dayLabel(iso: string): string {
             <svg width="140" height="140" viewBox="0 0 120 120" aria-hidden="true">
               <g transform="translate(60 60) scale(1 0.906) translate(-60 -60)">
                 <!-- Structure: exterior → rim band → contents → crescent shadow -->
-                <circle cx="60" cy="60" r="54" fill="#7c2d12"/>
-                <circle cx="60" cy="60" r="50" fill="#b45309"/>
-                <circle cx="60" cy="60" r="44" fill="#ecfccb"/>
-                <path d="M 16 60 A 44 44 0 0 0 104 60 L 104 66 A 44 44 0 0 1 16 66 Z" fill="#365314" opacity="0.14"/>
+                <circle class="bowl-rim" cx="60" cy="60" r="54"/>
+                <circle class="bowl-body" cx="60" cy="60" r="50"/>
+                <circle class="bowl-broth" cx="60" cy="60" r="44"/>
+                <path class="bowl-shadow" d="M 16 60 A 44 44 0 0 0 104 60 L 104 66 A 44 44 0 0 1 16 66 Z" opacity="0.14"/>
 
                 <!-- Carrots (3, 13s cycle) -->
-                <rect class="ing" x="58" y="58" width="10" height="3.5" rx="1.5" fill="#ea580c" style="--start: 10deg; --dur: 13s; --del: 0s;"/>
-                <rect class="ing" x="58" y="58" width="9"  height="3.5" rx="1.5" fill="#ea580c" style="--start: 130deg; --dur: 13s; --del: -4.3s;"/>
-                <rect class="ing" x="58" y="58" width="8"  height="3.5" rx="1.5" fill="#ea580c" style="--start: 250deg; --dur: 13s; --del: -8.6s;"/>
+                <rect class="ing ing-carrot" x="58" y="58" width="10" height="3.5" rx="1.5" style="--start: 10deg; --dur: 13s; --del: 0s;"/>
+                <rect class="ing ing-carrot" x="58" y="58" width="9"  height="3.5" rx="1.5" style="--start: 130deg; --dur: 13s; --del: -4.3s;"/>
+                <rect class="ing ing-carrot" x="58" y="58" width="8"  height="3.5" rx="1.5" style="--start: 250deg; --dur: 13s; --del: -8.6s;"/>
 
                 <!-- Peas (4, 11s cycle) -->
-                <circle class="ing" cx="60" cy="60" r="2.8" fill="#65a30d" style="--start: 45deg; --dur: 11s; --del: 0s;"/>
-                <circle class="ing" cx="60" cy="60" r="2.8" fill="#65a30d" style="--start: 135deg; --dur: 11s; --del: -2.7s;"/>
-                <circle class="ing" cx="60" cy="60" r="2.8" fill="#65a30d" style="--start: 225deg; --dur: 11s; --del: -5.5s;"/>
-                <circle class="ing" cx="60" cy="60" r="2.5" fill="#65a30d" style="--start: 315deg; --dur: 11s; --del: -8.2s;"/>
+                <circle class="ing ing-pea" cx="60" cy="60" r="2.8" style="--start: 45deg; --dur: 11s; --del: 0s;"/>
+                <circle class="ing ing-pea" cx="60" cy="60" r="2.8" style="--start: 135deg; --dur: 11s; --del: -2.7s;"/>
+                <circle class="ing ing-pea" cx="60" cy="60" r="2.8" style="--start: 225deg; --dur: 11s; --del: -5.5s;"/>
+                <circle class="ing ing-pea" cx="60" cy="60" r="2.5" style="--start: 315deg; --dur: 11s; --del: -8.2s;"/>
 
                 <!-- Noodle squiggles (2, 16s cycle) -->
-                <path class="ing" d="M 60 60 q 6 -4 12 0 t 12 0" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.85" style="--start: 75deg; --dur: 16s; --del: 0s;"/>
-                <path class="ing" d="M 60 60 q 6 -4 12 0 t 12 0" stroke="#fff" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.7"  style="--start: 255deg; --dur: 16s; --del: -8s;"/>
+                <path class="ing ing-noodle" d="M 60 60 q 6 -4 12 0 t 12 0" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.85" style="--start: 75deg; --dur: 16s; --del: 0s;"/>
+                <path class="ing ing-noodle" d="M 60 60 q 6 -4 12 0 t 12 0" stroke-width="2.2" fill="none" stroke-linecap="round" opacity="0.7"  style="--start: 255deg; --dur: 16s; --del: -8s;"/>
 
                 <!-- Herb specks (3, 9s cycle) -->
-                <circle class="ing" cx="60" cy="60" r="1.4" fill="#15803d" style="--start: 90deg; --dur: 9s; --del: 0s;"/>
-                <circle class="ing" cx="60" cy="60" r="1.4" fill="#15803d" style="--start: 210deg; --dur: 9s; --del: -3s;"/>
-                <circle class="ing" cx="60" cy="60" r="1.4" fill="#15803d" style="--start: 330deg; --dur: 9s; --del: -6s;"/>
+                <circle class="ing ing-herb" cx="60" cy="60" r="1.4" style="--start: 90deg; --dur: 9s; --del: 0s;"/>
+                <circle class="ing ing-herb" cx="60" cy="60" r="1.4" style="--start: 210deg; --dur: 9s; --del: -3s;"/>
+                <circle class="ing ing-herb" cx="60" cy="60" r="1.4" style="--start: 330deg; --dur: 9s; --del: -6s;"/>
               </g>
             </svg>
           </div>
@@ -171,7 +171,7 @@ function dayLabel(iso: string): string {
     :host { display: block; }
 
     .loader {
-      background: var(--color-surface-warm, #fef3c7);
+      background: var(--color-surface-warm);
       border-radius: 14px;
       padding: 28px 20px 18px;
       min-height: 380px;
@@ -186,7 +186,7 @@ function dayLabel(iso: string): string {
     .heading {
       font-size: 16px;
       font-weight: 800;
-      color: var(--color-text-primary, #78350f);
+      color: var(--color-text-primary);
       letter-spacing: -0.01em;
       margin: 0;
       text-align: center;
@@ -224,6 +224,16 @@ function dayLabel(iso: string): string {
     }
     .bowl-base svg { display: block; }
 
+    /* ── Bowl illustration fills (tokenised; SVG presentation attrs can't use var()) ── */
+    .bowl-rim    { fill: var(--color-illus-bowl-rim); }
+    .bowl-body   { fill: var(--color-illus-bowl-body); }
+    .bowl-broth  { fill: var(--color-illus-bowl-broth); }
+    .bowl-shadow { fill: var(--color-illus-bowl-shadow); }
+    .ing-carrot  { fill: var(--color-illus-carrot); }
+    .ing-pea     { fill: var(--color-illus-pea); }
+    .ing-herb    { fill: var(--color-illus-herb); }
+    .ing-noodle  { stroke: var(--color-illus-noodle); }
+
     /* ── Swirling ingredients inside the bowl SVG ── */
     .ing {
       transform-box: view-box;
@@ -252,7 +262,7 @@ function dayLabel(iso: string): string {
       z-index: 2;
     }
     .steam path {
-      stroke: var(--color-accent-dark, #b45309);
+      stroke: var(--color-accent-dark);
       stroke-width: 2.5;
       fill: none;
       stroke-linecap: round;
@@ -283,15 +293,15 @@ function dayLabel(iso: string): string {
     .particle.text {
       /* Theme-aware surface so the (theme-aware) caption text stays legible in
          dark mode — a hardcoded near-white left light lavender text unreadable. */
-      background: var(--color-surface-white, #ffffff);
-      border: 1px solid var(--color-accent-light, #fde68a);
-      color: var(--color-accent-dark, #92400e);
+      background: var(--color-surface-white);
+      border: 1px solid var(--color-accent-light);
+      color: var(--color-accent-dark);
       font-size: 11px;
       font-style: italic;
       padding: 3px 9px;
       border-radius: 12px;
       white-space: nowrap;
-      box-shadow: 0 1px 3px rgba(217, 119, 6, 0.18);
+      box-shadow: var(--shadow-badge);
     }
     @keyframes spiralIn {
       0%   { transform: rotate(var(--angle)) translate(140px) rotate(calc(-1 * var(--angle))) scale(0.7); opacity: 0; }
@@ -316,9 +326,9 @@ function dayLabel(iso: string): string {
       line-height: 22px;
     }
     .drop-particle.text {
-      background: var(--color-surface-white, #ffffff);
-      border: 1px solid var(--color-accent-light, #fde68a);
-      color: var(--color-accent-dark, #92400e);
+      background: var(--color-surface-white);
+      border: 1px solid var(--color-accent-light);
+      color: var(--color-accent-dark);
       font-size: 10px;
       font-style: italic;
       padding: 2px 8px;
@@ -338,7 +348,7 @@ function dayLabel(iso: string): string {
     .static-caption {
       font-size: 13px;
       font-style: italic;
-      color: var(--color-accent-dark, #92400e);
+      color: var(--color-accent-dark);
       margin: 0;
       text-align: center;
       min-height: 18px;
@@ -361,9 +371,9 @@ function dayLabel(iso: string): string {
     .reassurance {
       font-size: 12px;
       font-style: italic;
-      color: var(--color-text-secondary, #b45309);
-      background: var(--color-surface-white, #ffffff);
-      border: 1px solid var(--color-border-meal, #fde68a);
+      color: var(--color-text-secondary);
+      background: var(--color-surface-white);
+      border: 1px solid var(--color-border-meal);
       border-radius: 10px;
       padding: 6px 14px;
       margin: 4px 0 0;
@@ -378,7 +388,7 @@ function dayLabel(iso: string): string {
     .cancel-link {
       background: transparent;
       border: none;
-      color: var(--color-text-muted, #b45309);
+      color: var(--color-text-muted);
       font-size: 12px;
       font-style: italic;
       cursor: pointer;
@@ -386,7 +396,7 @@ function dayLabel(iso: string): string {
       text-decoration: underline dotted;
       z-index: 10;
     }
-    .cancel-link:hover { color: var(--color-accent-dark, #92400e); }
+    .cancel-link:hover { color: var(--color-accent-dark); }
 
     @media (prefers-reduced-motion: reduce) {
       .ing,
