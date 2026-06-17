@@ -170,7 +170,11 @@ export interface PlanEntryRequest {
   date: string;
   task_type?: string;           // omit for meal anchor entries
   title?: string;
-  scheduled_start: string; // "HH:MM"
+  // Wall-clock start for fixed-time tasks/meals. Omit (or null) for floating,
+  // anchor-relative tasks — the backend stores a NULL scheduled_start and the day
+  // view then keeps them in their `after_anchor` slot rather than reclassifying
+  // them as a fixed scheduled_task. Mutually exclusive with a bare `after_anchor`.
+  scheduled_start?: string | null; // "HH:MM"
   after_anchor?: string;
   duration_minutes?: number;
   energy_required?: EnergyLevel;

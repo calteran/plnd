@@ -795,7 +795,10 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       date: entry.scheduled_date,
       task_type: entry.task_type,
       title: entry.title,
-      scheduled_start: entry.time_window_start ?? '12:00',
+      // Fixed-time tasks carry their clock time; floating (anchor-relative) tasks
+      // must keep a null scheduled_start so the day view renders them in their
+      // `after_anchor` slot instead of collapsing them onto the lunch anchor.
+      scheduled_start: entry.time_window_start ?? null,
       after_anchor: entry.after_anchor,
       duration_minutes: entry.duration_minutes,
       energy_required: entry.energy_required,
