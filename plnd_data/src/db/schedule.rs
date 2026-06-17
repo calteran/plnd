@@ -889,6 +889,55 @@ mod tests {
         );
     }
 
+    // Regression for the stale `schedule_entries_after_milepost_check` constraint
+    // (migration 0051): the original 3-meal CHECK from 0011 survived the
+    // milepost→anchor rename (0028) and 0033's wrong-name DROP, so committing a
+    // plan whose `after_anchor` is a non-meal label — exactly what the open-text
+    // anchor/slot model (0033/0034) allows — was rejected at the DB. Every other
+    // commit_plan test happens to use None/"breakfast"/"lunch", all of which pass
+    // the stale constraint, so the bug escaped. A custom label must round-trip.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_accepts_non_meal_after_anchor(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let entry = PlanEntryInput {
+            date: start,
+            task_type: Some("work".to_string()),
+            title: Some("Morning routine".to_string()),
+            scheduled_start: None,
+            after_anchor: Some("start_of_day".to_string()),
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![entry],
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+
+        commit_plan(&pool, uid, &req)
+            .await
+            .expect("commit_plan must accept a non-meal after_anchor label");
+
+        let period = get_period(&pool, uid, start, end).await.unwrap();
+        assert_eq!(period.entries.len(), 1);
+        assert_eq!(
+            period.entries[0].after_anchor,
+            Some("start_of_day".to_string()),
+            "custom after_anchor label must be preserved"
+        );
+    }
+
     #[sqlx::test(migrations = "./migrations")]
     async fn commit_plan_persists_duration_and_energy(pool: PgPool) {
         let uid = new_user(&pool).await;
