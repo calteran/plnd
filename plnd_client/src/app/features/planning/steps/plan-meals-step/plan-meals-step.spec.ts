@@ -254,13 +254,29 @@ describe('PlanMealsStepComponent', () => {
     expect(agentSpy.suggestSlot).toHaveBeenCalledWith('2026-03-23', 'breakfast', [{ type: 'user', id: 'u1' }]);
   });
 
-  it('should apply the suggestSlot result to the cell', () => {
-    spyOn(service, 'setMealRef');
+  it('should apply the suggestSlot result to the cell as a proposed meal', () => {
+    spyOn(service, 'proposeMealRef');
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
 
     suggestSlot$.next({ date: '2026-03-23', meal_name: 'breakfast', meal_ref: null, title: 'Avocado toast' });
-    expect(service.setMealRef).toHaveBeenCalledWith('2026-03-23', 'breakfast', null, 'Avocado toast', undefined, undefined);
+    expect(service.proposeMealRef).toHaveBeenCalledWith('2026-03-23', 'breakfast', null, 'Avocado toast', undefined, undefined);
+  });
+
+  it('should keep the cell proposed after suggesting, preserving ✓ approve and 🔀 suggest', () => {
+    // Regression: suggesting a meal used to auto-approve it, collapsing the cell to
+    // the edit-only approved view and removing the approve/suggest buttons.
+    const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+    (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
+
+    suggestSlot$.next({ date: '2026-03-23', meal_name: 'breakfast', meal_ref: null, title: 'Avocado toast' });
+    fixture.detectChanges();
+
+    expect(service.scheduledMeals()['2026-03-23']?.['breakfast']?.approvalState).toBe('proposed');
+    expect(firstCell.classList.contains('approved-g')).toBeFalse();
+    expect(firstCell.querySelector('.gc-approve')).toBeTruthy();
+    expect(firstCell.querySelector('.gc-suggest')).toBeTruthy();
+    expect(firstCell.querySelector('.gc-text')!.textContent!.trim()).toBe('Avocado toast');
   });
 
   it('should NOT auto-generate when meals already exist on init', () => {

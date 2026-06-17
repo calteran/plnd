@@ -146,6 +146,15 @@ describe('WeekPlanService', () => {
     expect(meal?.title).toBe('Egg toast');
   });
 
+  it('proposeMealRef stores the ref but leaves approvalState proposed', () => {
+    service.initSession('2026-03-24', '2026-03-30');
+    service.proposeMealRef('2026-03-24', 'breakfast', { type: 'user', id: 'u1' }, 'Egg toast');
+    const meal = service.scheduledMeals()['2026-03-24']?.['breakfast'];
+    expect(meal?.approvalState).toBe('proposed');
+    expect(meal?.mealRef?.id).toBe('u1');
+    expect(meal?.title).toBe('Egg toast');
+  });
+
   it('addTask and removeTask update scheduledTasks signal', () => {
     service.initSession('2026-03-24', '2026-03-30');
     service.addTask({ date: '2026-03-24', title: 'Walk', energy: 'low' });

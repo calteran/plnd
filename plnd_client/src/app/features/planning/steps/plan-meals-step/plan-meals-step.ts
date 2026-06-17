@@ -695,7 +695,9 @@ export class PlanMealsStepComponent implements OnInit {
     this.editingValue.set('');
   }
 
-  /** Per-cell agent refresh — suggests a replacement and auto-approves it.
+  /** Per-cell agent refresh — suggests a replacement the user can review.
+   *  The new meal stays *proposed* (not auto-approved) so the approve/suggest actions
+   *  remain available for re-rolling or accepting it.
    *  Passes the current mealRef as avoid so the agent doesn't return the same meal. */
   refreshSlot(date: string, slot: MealSlot): void {
     if (this.isSwapping(date, slot)) return;
@@ -708,7 +710,7 @@ export class PlanMealsStepComponent implements OnInit {
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: entry => {
-          this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title ?? '', entry.estimated_nutrition, entry.estimated);
+          this.weekPlanService.proposeMealRef(date, slot, entry.meal_ref, entry.title ?? '', entry.estimated_nutrition, entry.estimated);
           this.clearFailedSlot(date, slot);
           this.setSwapping(date, slot, false);
         },

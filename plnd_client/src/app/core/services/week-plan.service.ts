@@ -263,6 +263,8 @@ export class WeekPlanService {
     });
   }
 
+  /** Sets a meal ref and marks the cell approved — used when the user explicitly
+   *  chooses/confirms a meal (e.g. inline edit). */
   setMealRef(
     date: string,
     slot: MealSlot,
@@ -273,6 +275,25 @@ export class WeekPlanService {
   ): void {
     this.setMeal(date, slot, {
       approvalState: 'approved',
+      mealRef: ref,
+      title,
+      nutrition,
+      estimated,
+    });
+  }
+
+  /** Sets a meal ref but leaves the cell *proposed* — used when the agent suggests a
+   *  replacement the user hasn't endorsed yet, so the approve/suggest actions remain. */
+  proposeMealRef(
+    date: string,
+    slot: MealSlot,
+    ref: MealRef | null,
+    title: string,
+    nutrition?: MealNutrition,
+    estimated?: boolean,
+  ): void {
+    this.setMeal(date, slot, {
+      approvalState: 'proposed',
       mealRef: ref,
       title,
       nutrition,
