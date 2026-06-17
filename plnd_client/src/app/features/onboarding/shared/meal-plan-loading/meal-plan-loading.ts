@@ -203,12 +203,17 @@ function dayLabel(iso: string): string {
     }
     .stage {
       display: flex; align-items: center; justify-content: center;
-      /* Keep the animated particles inside their own box. Without this they spill
-         past the stage's edges into the sibling reassurance note below (and the
-         heading above), so the floating captions collide with that text. The
-         ingredients enter from translate(140px) — only ~20px beyond the 240px-tall
-         box — so the clip is visually unnoticeable while isolating the animation. */
-      overflow: hidden;
+      /* Clip vertically only. The vertical clip keeps particles from spilling into
+         the sibling heading above and the reassurance note below, where the floating
+         captions would collide with that text. Horizontal overflow stays visible so
+         wide text pills entering near the left/right perimeter (anchored at the centre,
+         translate(140px) outward) render in full instead of being guillotined by the
+         360px-wide box — a 22px emoji barely clears the edge, but a ~250px caption pill
+         extends far past it. overflow-x:visible paired with overflow-y:clip is the one
+         combination CSS leaves un-coerced (visible only coerces to auto when paired with
+         scroll/auto/hidden), so we get a true vertical-only clip with no scroll container. */
+      overflow-x: visible;
+      overflow-y: clip;
       border-radius: 14px;
     }
     .static-stage {
