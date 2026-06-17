@@ -4,7 +4,7 @@ procs:
   # too (it ignores target/ and respects .gitignore). Install via `just init`; `just dev`
   # also self-installs it if missing.
   api:
-    shell: "trap 'kill 0' INT TERM EXIT; doppler run -- cargo watch -x run & wait"
+    shell: "trap 'kill 0' INT TERM EXIT; doppler run -- cargo watch --why -x run & wait"
     cwd: plnd_api
 
   client:

@@ -77,8 +77,8 @@ api:
 
 # Run API service with auto-reload (installs cargo-watch if missing)
 api-watch:
-    command -v cargo-watch >/dev/null 2>&1 || cargo install cargo-watch --locked
-    cd plnd_api && doppler run -- cargo watch -x run
+    @command -v cargo-watch >/dev/null 2>&1 || (echo "→ Installing cargo-watch..." && cargo install cargo-watch --locked)
+    cd plnd_api && doppler run -- cargo watch --why -x run
 
 # Run client locally
 client:
