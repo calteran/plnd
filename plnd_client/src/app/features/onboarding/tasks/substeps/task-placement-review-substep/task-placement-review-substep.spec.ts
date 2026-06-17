@@ -389,6 +389,39 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
   }));
 
+  // ── 10b. Floating (anchor-relative) tasks are saved with no scheduled_start ──
+
+  it('saves an anchor-relative task with no scheduled_start so the day view keeps it in its slot', fakeAsync(async () => {
+    const { fixture, component, stateMock, httpController, router } = await setup(['Meds'], PLAN_PERIOD, []);
+    fixture.detectChanges();
+
+    // A floating task: placed by anchor, with NO fixed clock time.
+    const floatingEntry: PlaceTasksEntry = {
+      title: 'Meds',
+      scheduled_date: '2026-04-28',
+      after_anchor: 'breakfast',
+      duration_minutes: 5,
+      energy_required: 'low',
+      task_type: 'general',
+    };
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([floatingEntry]);
+    fixture.detectChanges();
+
+    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    component.complete.subscribe(jasmine.createSpy('complete'));
+
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.save-btn')!.click();
+    fixture.detectChanges();
+    tick();
+
+    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
+    expect(placedArg.length).toBe(1);
+    expect(placedArg[0].after_anchor).toBe('breakfast');
+    // Must NOT fabricate a noon clock time — that would reclassify the task as a
+    // fixed scheduled_task at lunch in the day view (the bug being fixed).
+    expect(placedArg[0].scheduled_start).toBeFalsy();
+  }));
+
   // ── 11. Save & Return works with empty task list ─────────────────────────────
 
   it('"Save & Return to Hub" works correctly with an empty task list', fakeAsync(async () => {
