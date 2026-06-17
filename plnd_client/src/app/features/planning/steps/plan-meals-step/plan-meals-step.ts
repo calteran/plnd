@@ -622,6 +622,11 @@ export class PlanMealsStepComponent implements OnInit {
     this.editingCell.set(null);
     this.editingValue.set('');
     if (!trimmed) { this.confirmingEdit = false; return; }
+    // Optimistically show the user's text immediately so the cell never reverts to the
+    // pre-edit meal while the agent round-trips (#962). The agent response then enriches
+    // this entry with the matched meal ref + nutrition.
+    this.weekPlanService.setMealRef(date, slot, null, trimmed);
+    this.clearFailedSlot(date, slot);
     // Resolve via agent; auto-approves the cell with the matched meal ref
     this.mealPlannerAgentService
       .resolveText(trimmed, slot, date)
@@ -629,11 +634,9 @@ export class PlanMealsStepComponent implements OnInit {
       .subscribe({
         next: resp => {
           this.weekPlanService.setMealRef(date, slot, resp.meal_ref, trimmed, resp.estimated_nutrition);
-          this.clearFailedSlot(date, slot);
         },
         error: () => {
-          this.weekPlanService.setMealRef(date, slot, null, trimmed);
-          this.clearFailedSlot(date, slot);
+          // Optimistic entry already reflects the user's text; nothing more to do.
         },
       });
     this.confirmingEdit = false;

@@ -207,6 +207,30 @@ describe('PlanMealsStepComponent', () => {
     );
   });
 
+  it('should optimistically show the edited meal text before resolveText responds (#962)', () => {
+    const resolve$ = new Subject<{ meal_ref: null; confirmation: string }>();
+    agentSpy.resolveText = jasmine.createSpy('resolveText').and.returnValue(resolve$);
+
+    // Start from a known approved meal so a reversion would be visible.
+    service.setMealRef('2026-03-23', 'breakfast', { type: 'user', id: 'u1' }, 'Old meal');
+    fixture.detectChanges();
+
+    component.confirmEdit('2026-03-23', 'breakfast', 'New meal');
+    fixture.detectChanges();
+
+    // Before the agent responds, the cell must already reflect the new text —
+    // it must NOT revert to the pre-edit "Old meal".
+    const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+    expect(firstCell.textContent).toContain('New meal');
+    expect(firstCell.textContent).not.toContain('Old meal');
+    expect(service.scheduledMeals()['2026-03-23']?.['breakfast']?.title).toBe('New meal');
+
+    // When the agent resolves, the entry is enriched with the matched ref.
+    resolve$.next({ meal_ref: null, confirmation: 'Added New meal' });
+    fixture.detectChanges();
+    expect(service.scheduledMeals()['2026-03-23']?.['breakfast']?.title).toBe('New meal');
+  });
+
   it('should apply .approved-g state when ✓ approve is clicked on a proposed cell', () => {
     const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
     (firstCell.querySelector('.gc-approve') as HTMLButtonElement).click();
