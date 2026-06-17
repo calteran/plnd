@@ -932,8 +932,8 @@ mod tests {
         let period = get_period(&pool, uid, start, end).await.unwrap();
         assert_eq!(period.entries.len(), 1);
         assert_eq!(
-            period.entries[0].after_anchor,
-            Some("start_of_day".to_string()),
+            period.entries[0].after_anchor.as_deref(),
+            Some("start_of_day"),
             "custom after_anchor label must be preserved"
         );
     }
