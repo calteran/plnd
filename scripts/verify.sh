@@ -5,8 +5,10 @@
 #
 # Isolation model:
 #   • Shared infra (db, mock-oauth) lives in the pinned Compose project `plnd`,
-#     brought up once per session via `just persist` (this script auto-ensures it
-#     if missing, but NEVER tears it down).
+#     brought up once per session via `just persist`. This script REQUIRES that
+#     infra to already be running and never calls `docker compose up` itself —
+#     `persist` (and `just dev`) are the sole writers of infra state, so a
+#     concurrent verify can never recreate a peer's live containers.
 #   • Each run gets its own application DB `plnd_verify_<runid>` on the shared
 #     Postgres and ephemeral ports for the API and ng serve — so concurrent runs
 #     across worktrees never collide. No flock.
@@ -114,9 +116,23 @@ RUN_DB="plnd_verify_$(printf '%s' "$RUN_ID" | tr -c 'a-z0-9' '_')"
 
 echo "◆ Starting verification (subset: $SUBSET, run: $RUN_ID)..."
 
-# ── Auto-ensure shared infra (NEVER tear down) ──────────────────────────────────
+# ── Require shared infra — never bring it up (persist/dev own that) ──────────────
+# A concurrent `docker compose up` on the pinned `plnd` project can recreate a
+# peer verify's live containers (config-hash convergence + racing invocations),
+# so verify only ever READS infra state. Missing infra is a fast, clear failure.
+infra_running() {  # infra_running <service> — true iff a running container exists for it
+    [[ -n "$(cd "$PROJECT_ROOT" && docker compose ps --status running --quiet "$1" 2>/dev/null)" ]]
+}
 if [[ "$NEED_INFRA" == true ]]; then
-    (cd "$PROJECT_ROOT" && doppler run -- docker compose up -d --wait db mock-oauth-server)
+    declare -a MISSING=()
+    infra_running db               || MISSING+=(db)
+    infra_running mock-oauth-server || MISSING+=(mock-oauth-server)
+    if (( ${#MISSING[@]} )); then
+        echo "✗ Shared infra not running: ${MISSING[*]}" >&2
+        echo "  Shared infra is HUMAN-ONLY: the user starts it with 'just persist'." >&2
+        echo "  Agents: do not run persist. Notify the user that infra needs starting, then wait." >&2
+        exit 1
+    fi
 fi
 
 # ── Rust read-only (no infra) ───────────────────────────────────────────────────

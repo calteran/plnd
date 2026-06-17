@@ -79,12 +79,25 @@ client:
     cd plnd_client && npx ng serve
 
 # Bring up the shared, persistent infra (db + mock-oauth + observability) for a
-# work session. Idempotent. Run once before `just dev` / before agents verify.
-# `just verify` auto-ensures db+oauth on its own, but observability only comes up
-# here — so run this to capture per-run telemetry in Grafana.
+# work session. Idempotent. HUMAN-ONLY: run once in your terminal before `just dev`
+# and before setting agents loose. `just verify` REQUIRES this infra and never
+# brings it up itself, and agents must never run `persist` either — it is a
+# convergence writer (`docker compose up` can recreate a peer verify's live
+# containers). Only the user configures the environment. This is also the only
+# thing that starts the observability stack — so run it to capture per-run
+# telemetry in Grafana.
 persist:
     #!/usr/bin/env bash
     set -euo pipefail
+    # HUMAN-ONLY hard guard: a non-interactive caller (no TTY on stdin — i.e. an
+    # agent invoking via a tool) aborts here; a human terminal proceeds with no
+    # prompt. Agents that find infra missing must notify the user and wait, never
+    # bring infra up themselves.
+    if [[ ! -t 0 ]]; then
+        echo "✗ 'just persist' is HUMAN-ONLY — run it yourself from an interactive terminal." >&2
+        echo "  Agents: do not run persist. Notify the user that shared infra needs starting, then wait." >&2
+        exit 1
+    fi
     doppler run -- docker compose up -d --wait
     # Reclaim any plnd_verify_* DBs orphaned by force-killed / OOM'd verify runs
     # (their EXIT trap never fired). Non-fatal: a failed sweep must not block infra.
