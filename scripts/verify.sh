@@ -120,10 +120,8 @@ echo "◆ Starting verification (subset: $SUBSET, run: $RUN_ID)..."
 # A concurrent `docker compose up` on the pinned `plnd` project can recreate a
 # peer verify's live containers (config-hash convergence + racing invocations),
 # so verify only ever READS infra state. Missing infra is a fast, clear failure.
-infra_running() {  # infra_running <service> — true iff its container exists and is running
-    local cid
-    cid="$(cd "$PROJECT_ROOT" && docker compose ps -q "$1" 2>/dev/null)"
-    [[ -n "$cid" ]] && [[ "$(docker inspect -f '{{.State.Running}}' "$cid" 2>/dev/null)" == "true" ]]
+infra_running() {  # infra_running <service> — true iff a running container exists for it
+    [[ -n "$(cd "$PROJECT_ROOT" && docker compose ps --status running --quiet "$1" 2>/dev/null)" ]]
 }
 if [[ "$NEED_INFRA" == true ]]; then
     declare -a MISSING=()
