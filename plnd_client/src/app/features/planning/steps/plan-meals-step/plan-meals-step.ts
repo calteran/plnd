@@ -103,9 +103,16 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
                  [class.approved-g]="isApproved(day, entry.name)"
                  [class.skipped-g]="isSkipped(day, entry.name)"
                  [class.gc-editing]="isCellEditing(day, entry.name)"
+                 [class.gc-swapping]="isSwapping(day, entry.name)"
                  [class.gc-failed]="isFailedSlot(day, entry.name)">
 
-              @if (isSkipped(day, entry.name)) {
+              @if (isSwapping(day, entry.name)) {
+                <span class="gc-swap-pending" role="status">
+                  <span class="gc-spinner" aria-hidden="true"></span>
+                  Finding a new meal…
+                </span>
+
+              } @else if (isSkipped(day, entry.name)) {
                 <span class="gc-text skip-t">— skipped</span>
                 <div class="gc-actions">
                   <button class="gc-undo" type="button"
@@ -278,7 +285,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     [data-tip]:hover::after {
       content: attr(data-tip);
       position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
-      background: var(--color-tooltip-bg); color: #fff; font-size: 10px; white-space: nowrap;
+      background: var(--color-tooltip-bg); color: var(--color-tooltip-text); font-size: 10px; white-space: nowrap;
       padding: 3px 7px; border-radius: 4px; pointer-events: none; z-index: 10;
     }
     [data-tip]:hover::before {
@@ -302,6 +309,25 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
     .gc.gc-editing  { border-color: var(--color-accent-border); box-shadow: 0 0 0 2px var(--color-accent-light); }
     .gc.gc-na { background: var(--color-surface-base); opacity: 0.2; border-style: dashed; }
     .gc.gc-failed { border-color: var(--color-warning-border); background: var(--color-warning-light); }
+    .gc.gc-swapping { border-color: var(--color-accent-border); }
+
+    /* In-flight swap feedback */
+    .gc-swap-pending {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 11px; font-style: italic; color: var(--color-text-muted);
+      flex: 1;
+    }
+    .gc-spinner {
+      width: 11px; height: 11px; flex: none;
+      border: 2px solid var(--color-accent-light);
+      border-top-color: var(--color-accent-border);
+      border-radius: 50%;
+      animation: gc-spin 0.6s linear infinite;
+    }
+    @keyframes gc-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .gc-spinner { animation: none; }
+    }
 
     /* ── Cancellation card (shown when user cancels in-flight generation) ── */
     .cancel-card {
@@ -470,6 +496,10 @@ export class PlanMealsStepComponent implements OnInit {
   readonly cancelled        = signal(false);
   private  totalPlannedCount = signal(0);
   private  generationSub: Subscription | null = null;
+  // Cells with an in-flight agent swap (refreshSlot). Keyed by `${date}|${slot}` so the
+  // cell can show immediate "finding…" feedback instead of sitting unchanged until the
+  // round-trip lands.
+  readonly swappingSlots    = signal<ReadonlySet<string>>(new Set());
 
   readonly blockedNames = computed(() => [
     ...this.userMealsService.meals().filter(m => m.is_blocked).map(m => m.name),
@@ -590,6 +620,23 @@ export class PlanMealsStepComponent implements OnInit {
     return this.failedSlots().some(f => f.date === date && f.meal_name === slot);
   }
 
+  private swapKey(date: string, slot: MealSlot): string {
+    return `${date}|${slot}`;
+  }
+
+  isSwapping(date: string, slot: MealSlot): boolean {
+    return this.swappingSlots().has(this.swapKey(date, slot));
+  }
+
+  private setSwapping(date: string, slot: MealSlot, on: boolean): void {
+    this.swappingSlots.update(set => {
+      const next = new Set(set);
+      if (on) next.add(this.swapKey(date, slot));
+      else next.delete(this.swapKey(date, slot));
+      return next;
+    });
+  }
+
   private clearFailedSlot(date: string, slot: MealSlot): void {
     this.failedSlots.update(slots => slots.filter(f => !(f.date === date && f.meal_name === slot)));
   }
@@ -653,6 +700,8 @@ export class PlanMealsStepComponent implements OnInit {
   refreshSlot(date: string, slot: MealSlot): void {
     const existing = this.getMeal(date, slot);
     const avoid    = existing?.mealRef ? [existing.mealRef] : [];
+    // Show immediate in-flight feedback so the click registers before the agent responds.
+    this.setSwapping(date, slot, true);
     this.mealPlannerAgentService
       .suggestSlot(date, slot, avoid)
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -660,8 +709,9 @@ export class PlanMealsStepComponent implements OnInit {
         next: entry => {
           this.weekPlanService.setMealRef(date, slot, entry.meal_ref, entry.title ?? '', entry.estimated_nutrition, entry.estimated);
           this.clearFailedSlot(date, slot);
+          this.setSwapping(date, slot, false);
         },
-        error: () => { /* leave cell unchanged; no user-visible feedback for now */ },
+        error: () => { this.setSwapping(date, slot, false); /* leave cell unchanged */ },
       });
   }
 

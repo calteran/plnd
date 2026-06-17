@@ -518,6 +518,43 @@ describe('PlanMealsStepComponent', () => {
     });
   });
 
+  describe('swap pending feedback', () => {
+    it('should mark the cell as swapping immediately when 🔀 Suggest is clicked, before the agent responds', () => {
+      const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+      (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
+      fixture.detectChanges();
+
+      // suggestSlot$ has NOT emitted yet — the cell must already signal work in flight.
+      expect(firstCell.classList.contains('gc-swapping')).toBeTrue();
+      expect(firstCell.querySelector('.gc-swap-pending')).toBeTruthy();
+    });
+
+    it('should clear the swapping indicator once suggestSlot emits', () => {
+      const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+      (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(firstCell.classList.contains('gc-swapping')).toBeTrue();
+
+      suggestSlot$.next({ date: '2026-03-23', meal_name: 'breakfast', meal_ref: null, title: 'Avocado toast' });
+      fixture.detectChanges();
+
+      expect(firstCell.classList.contains('gc-swapping')).toBeFalse();
+      expect(firstCell.querySelector('.gc-swap-pending')).toBeNull();
+    });
+
+    it('should clear the swapping indicator if suggestSlot errors', () => {
+      const firstCell: HTMLElement = fixture.nativeElement.querySelector('.gc');
+      (firstCell.querySelector('.gc-suggest') as HTMLButtonElement).click();
+      fixture.detectChanges();
+      expect(firstCell.classList.contains('gc-swapping')).toBeTrue();
+
+      suggestSlot$.error(new Error('boom'));
+      fixture.detectChanges();
+
+      expect(firstCell.classList.contains('gc-swapping')).toBeFalse();
+    });
+  });
+
   describe('Refresh modal', () => {
     it('should show the Refresh button when there are unapproved meals', () => {
       expect(fixture.nativeElement.querySelector('.btn-refresh-all')).toBeTruthy();
