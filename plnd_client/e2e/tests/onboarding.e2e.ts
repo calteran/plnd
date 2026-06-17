@@ -798,14 +798,13 @@ test.describe('Onboarding', () => {
       await landAtDietaryPreferences(page);
     });
 
-    test('Lifestyle panel is collapsed by default; expands on click', async ({ page }) => {
-      await expect(page.locator('.lifestyle-expanded')).not.toBeVisible();
-      await page.locator('.section-header').first().click();
+    test('Lifestyle panel is expanded by default; collapses on click', async ({ page }) => {
       await expect(page.locator('.lifestyle-expanded')).toBeVisible();
+      await page.locator('.section-header').first().click();
+      await expect(page.locator('.lifestyle-expanded')).not.toBeVisible();
     });
 
     test('selecting Vegan chip marks it amber', async ({ page }) => {
-      await page.locator('.section-header').first().click();
       await expect(page.locator('.lifestyle-expanded')).toBeVisible();
       const veganChip = page.locator('.chip').filter({ hasText: 'Vegan' });
       await veganChip.click();

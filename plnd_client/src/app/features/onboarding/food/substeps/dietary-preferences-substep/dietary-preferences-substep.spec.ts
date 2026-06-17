@@ -51,8 +51,8 @@ describe('DietaryPreferencesSubstepComponent', () => {
     fixture.detectChanges();
   });
 
-  it('lifestyle section starts collapsed', () => {
-    expect(component.lifestyleExpanded()).toBe(false);
+  it('lifestyle section starts expanded', () => {
+    expect(component.lifestyleExpanded()).toBe(true);
   });
 
   it('toggling a lifestyle chip adds it to selectedLifestyles; toggling again removes it', () => {
