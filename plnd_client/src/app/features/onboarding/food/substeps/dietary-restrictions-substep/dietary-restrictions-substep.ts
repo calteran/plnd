@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
 import { RestrictionType } from '../../../../../core/models/dietary-restriction';
 
@@ -79,6 +79,7 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string }> = {
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .restrictions-substep { display: flex; flex-direction: column; gap: 16px; }
     .banner { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--color-accent-dark); }

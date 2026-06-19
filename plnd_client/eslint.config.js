@@ -1,55 +1,35 @@
 // @ts-check
 "use strict";
 
-const js = require("@eslint/js");
-const tsEslint = require("@typescript-eslint/eslint-plugin");
-const angularEslint = require("@angular-eslint/eslint-plugin");
-const angularTemplate = require("@angular-eslint/eslint-plugin-template");
-const angularTemplateParser = require("@angular-eslint/template-parser");
+const eslint = require("@eslint/js");
+const tseslint = require("typescript-eslint");
+const angular = require("angular-eslint");
 
-module.exports = [
+// angular-eslint v22 consolidated its flat configs into the `angular-eslint`
+// umbrella package; the individual `@angular-eslint/*` plugins no longer expose
+// `.configs`. typescript-eslint is likewise consumed via its umbrella package.
+module.exports = tseslint.config(
   // Ignore generated/third-party project directories
   { ignores: ["projects/**/*"] },
 
-  // Base JS recommended rules (eslint:recommended equivalent in flat config)
-  // Scoped to JS/TS files to avoid applying JS rules to HTML templates
-  {
-    files: ["**/*.{js,mjs,cjs,ts}"],
-    ...js.configs.recommended,
-  },
-
-  // @typescript-eslint flat/recommended — sets up parser, plugins, and base rules for *.ts
-  ...tsEslint.configs["flat/recommended"].map((config) => ({
-    ...config,
-    files: ["**/*.ts"],
-  })),
-
-  // @typescript-eslint flat/stylistic — consistency rules (array types, type annotations, etc.)
-  ...tsEslint.configs["flat/stylistic"].map((config) => ({
-    ...config,
-    files: ["**/*.ts"],
-  })),
-
-  // Override: configure no-unused-vars to respect the _ prefix convention for intentionally unused params
+  // TypeScript sources: ESLint recommended + typescript-eslint recommended &
+  // stylistic + angular recommended, with inline-template extraction so Angular
+  // template rules apply to inline component templates.
   {
     files: ["**/*.ts"],
+    extends: [
+      eslint.configs.recommended,
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.stylistic,
+      ...angular.configs.tsRecommended,
+    ],
+    processor: angular.processInlineTemplates,
     rules: {
+      // Respect the _ prefix convention for intentionally unused params
       "@typescript-eslint/no-unused-vars": [
         "error",
         { argsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
       ],
-    },
-  },
-
-  // Angular rules for TypeScript files, with inline template extraction
-  {
-    files: ["**/*.ts"],
-    plugins: {
-      "@angular-eslint": angularEslint,
-    },
-    processor: angularTemplate.processors["extract-inline-html"],
-    rules: {
-      ...angularEslint.configs.recommended.rules,
       "@angular-eslint/directive-selector": [
         "error",
         { type: "attribute", prefix: "app", style: "camelCase" },
@@ -58,20 +38,19 @@ module.exports = [
         "error",
         { type: "element", prefix: "app", style: "kebab-case" },
       ],
+      // Angular 22 made OnPush the default change detection strategy; the v22
+      // migration stamped `ChangeDetectionStrategy.Eager` on existing components
+      // to preserve pre-v22 (CheckAlways) behavior. Adopting OnPush per component
+      // is deferred to #983 — until then, do not flag the Eager opt-outs the
+      // migration introduced.
+      "@angular-eslint/prefer-on-push-component-change-detection": "off",
     },
   },
 
   // Angular template rules for HTML files
   {
     files: ["**/*.html"],
-    plugins: {
-      "@angular-eslint/template": angularTemplate,
-    },
-    languageOptions: {
-      parser: angularTemplateParser,
-    },
-    rules: {
-      ...angularTemplate.configs.recommended.rules,
-    },
+    extends: [...angular.configs.templateRecommended],
+    rules: {},
   },
-];
+);

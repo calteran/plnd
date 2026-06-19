@@ -6,6 +6,7 @@ import {
   Output,
   inject,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
@@ -339,6 +340,7 @@ export function buildDayCards(
 
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .placement-review {
       display: flex;

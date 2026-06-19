@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, computed, inject, input, signal, ViewChild, ElementRef } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, input, signal, ViewChild, ElementRef, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Observable, Subscription } from 'rxjs';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
@@ -169,6 +169,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     :host { display: block; }
 

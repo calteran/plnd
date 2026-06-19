@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { zoneLong } from '../../../../core/utils/zone-format';
 
 @Component({
@@ -15,6 +15,7 @@ import { zoneLong } from '../../../../core/utils/zone-format';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './timezone-standoff.scss',
 })
 export class TimezoneStandoffComponent {

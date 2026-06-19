@@ -1,4 +1,4 @@
-import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, EventEmitter, Injector, OnInit, Output, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed, toObservable } from '@angular/core/rxjs-interop';
 import { Subject, forkJoin, from, mergeMap, of } from 'rxjs';
 import { debounceTime, distinctUntilChanged, filter, map, switchMap, take, takeUntil } from 'rxjs/operators';
@@ -225,6 +225,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .prefs-substep { display: flex; flex-direction: column; gap: 20px; }
     .banner { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--color-accent-dark); }

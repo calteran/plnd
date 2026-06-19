@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, computed, inject, signal, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { SpokeChromeComponent } from '../shared/spoke-chrome/spoke-chrome';
 import { PlanningPrefsSubstepComponent } from '../shared/planning-prefs-substep/planning-prefs-substep';
@@ -19,6 +19,7 @@ type TasksSubstep = 'planning-prefs' | 'schedule-types' | 'routines-tasks' | 'ta
     RoutinesTasksSubstepComponent,
     TaskPlacementReviewSubstepComponent,
   ],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <app-spoke-chrome
       [title]="'Tasks & Routines'"

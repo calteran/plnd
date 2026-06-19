@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 @Component({
@@ -12,6 +12,7 @@ import { RouterLink } from '@angular/router';
       <a routerLink="/today" class="btn">Go to today</a>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .not-found {
       display: flex;

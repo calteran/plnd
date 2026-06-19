@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, computed, input } from '@angular/core';
+import { Component, EventEmitter, Output, computed, input, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 type DotState = 'completed' | 'current' | 'ahead';
@@ -57,6 +57,7 @@ type DotState = 'completed' | 'current' | 'ahead';
       </footer>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .spoke-chrome {
       max-width: 560px;

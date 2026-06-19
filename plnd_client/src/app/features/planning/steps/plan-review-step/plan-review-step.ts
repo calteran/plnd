@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { CarryoverDecision, DROP_REASONS, DropReason } from '../../../../core/models/week-plan';
@@ -50,6 +50,7 @@ const DECISION_CYCLE: CarryoverDecision[] = ['carry', 'defer', 'drop'];
       </ul>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .plan-review { display: flex; flex-direction: column; gap: 1rem; }
 

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { PlannedTask } from '../../../../core/models/week-plan';
 import { AddEntryComponent, AddedEntry } from '../../../schedule/components/add-entry/add-entry';
@@ -74,6 +74,7 @@ import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
 
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .tasks-step { display: flex; flex-direction: column; gap: 8px; }
 

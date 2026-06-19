@@ -1,10 +1,11 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, effect, inject, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ThemeService } from './core/services/theme.service';
 
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `<router-outlet />`
 })
 export class AppComponent {

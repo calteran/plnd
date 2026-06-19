@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
 import { DayTypesMealsService } from '../../../core/services/day-types-meals.service';
@@ -82,6 +82,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
       </footer>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .planning-wizard { display: flex; flex-direction: column; height: 100%;
                        max-width: 860px; margin-inline: auto; width: 100%; }

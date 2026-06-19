@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { TimezoneStandoffComponent } from './timezone-standoff';
 
 @Component({
   standalone: true,
   imports: [TimezoneStandoffComponent],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <app-timezone-standoff
       intendedZone="America/New_York"

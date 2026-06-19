@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../core/services/week-plan.service';
 import { PreferencesService } from '../../../core/services/preferences.service';
@@ -78,6 +78,7 @@ type FoodSubstep =
       }
     </app-spoke-chrome>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .meal-plan-loading { padding: 24px 16px; font-size: 13px; color: var(--color-text-muted); }
   `],

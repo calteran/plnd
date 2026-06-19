@@ -1,4 +1,4 @@
-import { Component, computed, input, output, signal } from '@angular/core';
+import { Component, computed, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import { TimezoneAnchorDto } from '../../../../core/models/timezone';
 import { parseDateOnly } from '../../../../core/utils/date-only';
 
@@ -37,6 +37,7 @@ const PICK_ZONES: { id: string; label: string }[] = [
       <button type="button" class="tz-why-pop__close" aria-label="Close" (click)="closed.emit()">×</button>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './timezone-why.scss',
 })
 export class TimezoneWhyComponent {

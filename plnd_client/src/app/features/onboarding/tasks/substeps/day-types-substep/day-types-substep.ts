@@ -7,6 +7,7 @@ import {
   Output,
   inject,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin, of, switchMap, map } from 'rxjs';
@@ -341,6 +342,7 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
 
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .day-types-substep {
       display: flex;

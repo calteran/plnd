@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject } from '@angular/core';
+import { Component, OnInit, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
@@ -59,6 +59,7 @@ import { formatWeekDate } from '../../utils/date-format.utils';
       </button>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .plan-confirm { display: flex; flex-direction: column; gap: 1rem; }
 

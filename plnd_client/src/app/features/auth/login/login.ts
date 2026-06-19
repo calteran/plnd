@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -15,6 +15,7 @@ import { AuthService } from '../../../core/services/auth.service';
       <button (click)="signIn()">Sign in with Mock OAuth</button>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .login-page {
       text-align: center;

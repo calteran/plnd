@@ -1,4 +1,4 @@
-import { Component, inject, input, output, signal, computed } from '@angular/core';
+import { Component, inject, input, output, signal, computed, ChangeDetectionStrategy } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MealAnchor } from '../../../../core/models/schedule';
 import { MealSlot } from '../../../../core/models/week-plan';
@@ -87,6 +87,7 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './meal-review-pane.scss',
 })
 export class MealReviewPaneComponent {

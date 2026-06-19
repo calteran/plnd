@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, inject, input, output, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import { AgentService } from '../../../../core/services/agent.service';
 import { ConversationTurn, UiSignal } from '../../../../core/models/agent';
 import { ItemType, parseItemType } from '../../../../core/models/schedule';
@@ -98,6 +98,7 @@ export interface AddedEntry {
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './add-entry.scss'
 })
 export class AddEntryComponent {

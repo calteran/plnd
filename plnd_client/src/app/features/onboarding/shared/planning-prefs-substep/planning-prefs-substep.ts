@@ -1,4 +1,4 @@
-import { Component, EventEmitter, OnInit, Output, inject, signal } from '@angular/core';
+import { Component, EventEmitter, OnInit, Output, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { OnboardingStateService } from '../../onboarding-state.service';
 import { PreferencesService } from '../../../../core/services/preferences.service';
 
@@ -84,6 +84,7 @@ const DAY_ABBREVS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
       </div>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .planning-prefs {
       display: flex;

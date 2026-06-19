@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { ItemType, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { TaskEditFormComponent } from '../task-edit-form/task-edit-form';
 
@@ -67,6 +67,7 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
       <app-task-edit-form [task]="item()" (save)="save.emit($event)" (closed)="closed.emit()" />
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './task-row.scss'
 })
 export class TaskRowComponent {

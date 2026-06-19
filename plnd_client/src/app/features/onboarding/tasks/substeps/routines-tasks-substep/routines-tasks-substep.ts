@@ -6,6 +6,7 @@ import {
   inject,
   signal,
   computed,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RoutinesService } from '../../../../../core/services/routines.service';
@@ -338,6 +339,7 @@ function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekD
 
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .routines-tasks-substep {
       display: flex;
