@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { OAuthService } from 'angular-oauth2-oidc';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -12,6 +12,7 @@ import { AuthService } from '../../../core/services/auth.service';
 @Component({
   selector: 'app-auth-callback',
   imports: [],
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `<p>Signing in…</p>`
 })
 export class AuthCallbackComponent implements OnInit {

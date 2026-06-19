@@ -6,6 +6,7 @@ import {
   input,
   output,
   signal,
+  ChangeDetectionStrategy
 } from '@angular/core';
 
 import { detectReducedMotion } from '../../../../core/utils/browser-utils';
@@ -167,6 +168,7 @@ function dayLabel(iso: string): string {
       <button class="cancel-link" type="button" (click)="cancelClick.emit()">Cancel</button>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     :host { display: block; }
 

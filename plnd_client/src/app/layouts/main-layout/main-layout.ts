@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { NavbarAvatarComponent } from '../../shared/components/navbar-avatar/navbar-avatar';
@@ -15,6 +15,7 @@ import { TimezoneStandoffComponent } from '../../features/day-view/components/ti
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, NavbarAvatarComponent, TimezoneStandoffComponent],
   templateUrl: './main-layout.html',
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './main-layout.scss'
 })
 export class MainLayoutComponent implements OnInit {

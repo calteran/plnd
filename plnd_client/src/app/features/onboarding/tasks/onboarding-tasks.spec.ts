@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output } from '@angular/core';
+import { Component, EventEmitter, Output, ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
@@ -13,22 +13,26 @@ import { TaskPlacementReviewSubstepComponent } from './substeps/task-placement-r
 // SpokeChromeComponent uses only RouterLink (no services), so we keep the real one.
 // Substeps all have heavy service dependencies — stub them.
 
-@Component({ selector: 'app-planning-prefs-substep', standalone: true, template: '' })
+@Component({ selector: 'app-planning-prefs-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+ template: '' })
 class PlanningPrefsStub {
   @Output() complete = new EventEmitter<void>();
 }
 
-@Component({ selector: 'app-day-types-substep', standalone: true, template: '' })
+@Component({ selector: 'app-day-types-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+ template: '' })
 class DayTypesStub {
   @Output() complete = new EventEmitter<void>();
 }
 
-@Component({ selector: 'app-routines-tasks-substep', standalone: true, template: '' })
+@Component({ selector: 'app-routines-tasks-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+ template: '' })
 class RoutinesTasksStub {
   @Output() complete = new EventEmitter<void>();
 }
 
-@Component({ selector: 'app-task-placement-review-substep', standalone: true, template: '' })
+@Component({ selector: 'app-task-placement-review-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+ template: '' })
 class TaskPlacementStub {
   @Output() complete = new EventEmitter<void>();
 }

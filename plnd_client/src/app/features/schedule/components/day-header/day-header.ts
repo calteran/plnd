@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { parseDateOnly, addDaysDateOnly, todayIso } from '../../../../core/utils/date-only';
 import { DayZoneView } from '../../../../core/utils/zone-projection';
 import { zoneCity, zoneShort, zoneLong, offsetPhrase } from '../../../../core/utils/zone-format';
@@ -27,6 +27,7 @@ import { zoneCity, zoneShort, zoneLong, offsetPhrase } from '../../../../core/ut
       <span class="tz-pill">TRAVEL DAY</span>
     }
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './day-header.scss'
 })
 export class DayHeaderComponent {

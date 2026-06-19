@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
 import { BriefingService } from '../../../../core/services/briefing.service';
 
 @Component({
@@ -53,6 +53,7 @@ import { BriefingService } from '../../../../core/services/briefing.service';
 
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './briefing-header.scss',
 })
 export class BriefingHeaderComponent {

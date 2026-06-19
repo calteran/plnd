@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input, ChangeDetectionStrategy } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
@@ -9,6 +9,7 @@ import { EnergyLevel } from '../../../../core/models/week-plan';
   standalone: true,
   imports: [DatePipe, TitleCasePipe],
   styleUrl: 'plan-day-card.scss',
+  changeDetection: ChangeDetectionStrategy.Eager,
   template: `
     <div
       class="day-card"

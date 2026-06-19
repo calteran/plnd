@@ -1,4 +1,4 @@
-import { Component, input, output, signal } from '@angular/core';
+import { Component, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MealAnchor, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { TaskRowComponent } from '../task-row/task-row';
 import { MealReviewPaneComponent } from '../../../day-view/components/meal-review-pane/meal-review-pane';
@@ -65,6 +65,7 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
       }
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './meal-row.scss'
 })
 export class MealRowComponent {

@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { DaySwitch } from '../../../../core/utils/zone-projection';
 import { zoneLong, offsetWords } from '../../../../core/utils/zone-format';
 import { parseDateOnly } from '../../../../core/utils/date-only';
@@ -13,6 +13,7 @@ import { parseDateOnly } from '../../../../core/utils/date-only';
       <button type="button" class="tz-switch-row__why" (click)="whyClicked.emit()">(why?)</button>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './timezone-switch-row.scss',
 })
 export class TimezoneSwitchRowComponent {

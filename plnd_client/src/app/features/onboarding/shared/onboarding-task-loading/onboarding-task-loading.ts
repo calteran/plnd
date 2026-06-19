@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, input, signal } from '@angular/core';
+import { Component, OnInit, OnDestroy, input, signal, ChangeDetectionStrategy } from '@angular/core';
 
 import { detectReducedMotion } from '../../../../core/utils/browser-utils';
 
@@ -95,6 +95,7 @@ export const MAX_PERSONALISED_NAMES = 5;
 
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .loading-screen {
       display: flex;

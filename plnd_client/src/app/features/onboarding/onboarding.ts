@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, ChangeDetectionStrategy } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { OnboardingStateService } from './onboarding-state.service';
 
@@ -8,6 +8,7 @@ import { OnboardingStateService } from './onboarding-state.service';
   imports: [RouterOutlet],
   providers: [OnboardingStateService],
   template: `<router-outlet />`,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './onboarding.scss',
 })
 export class OnboardingComponent {}

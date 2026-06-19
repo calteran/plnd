@@ -1,4 +1,4 @@
-import { Component, ElementRef, afterNextRender, computed, effect, input, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, afterNextRender, computed, effect, input, output, signal, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { ItemType, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { EnergyLevel } from '../../../../core/models/week-plan';
@@ -66,6 +66,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
       <button type="button" class="done-edit" (click)="closed.emit()">Done</button>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './task-edit-form.scss',
 })
 export class TaskEditFormComponent {

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, input } from '@angular/core';
+import { Component, OnInit, computed, inject, input, ChangeDetectionStrategy } from '@angular/core';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { PlanDayCardComponent } from './plan-day-card';
@@ -24,6 +24,7 @@ import { daysInRange } from '../../utils/date-format.utils';
       </div>
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     .day-grid { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
     @media (max-width: 600px) {

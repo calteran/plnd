@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, effect, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -112,6 +112,7 @@ import { TimezoneService } from '../../../core/services/timezone.service';
       </div>
     </app-spoke-chrome>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styles: [`
     :host {
       display: block;

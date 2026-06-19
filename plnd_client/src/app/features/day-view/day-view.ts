@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
@@ -135,6 +135,7 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
 
     </div>
   `,
+  changeDetection: ChangeDetectionStrategy.Eager,
   styleUrl: './day-view.scss',
 })
 export class DayViewComponent implements OnInit, OnDestroy {
