@@ -10,7 +10,7 @@ plnd_agent = { path = "../plnd_agent" }
 plnd_data = { path = "../plnd_data" }
 plnd_seed = { path = "../plnd_seed" }
 axum = "0.8"
-tower-http = { version = "0.6", features = ["cors", "trace", "request-id"] }
+tower-http = { version = "0.7", features = ["cors", "trace", "request-id"] }
 tokio = { version = "1", features = ["full"] }
 rust_decimal = { version = "1", features = ["db-postgres"] }
 chrono    = { version = "0.4",  features = ["serde"] }
