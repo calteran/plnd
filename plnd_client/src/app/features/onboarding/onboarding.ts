@@ -8,7 +8,7 @@ import { OnboardingStateService } from './onboarding-state.service';
   imports: [RouterOutlet],
   providers: [OnboardingStateService],
   template: `<router-outlet />`,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './onboarding.scss',
 })
 export class OnboardingComponent {}

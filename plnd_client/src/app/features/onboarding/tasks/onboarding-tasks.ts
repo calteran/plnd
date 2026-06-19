@@ -19,7 +19,7 @@ type TasksSubstep = 'planning-prefs' | 'schedule-types' | 'routines-tasks' | 'ta
     RoutinesTasksSubstepComponent,
     TaskPlacementReviewSubstepComponent,
   ],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-spoke-chrome
       [title]="'Tasks & Routines'"

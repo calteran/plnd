@@ -37,7 +37,7 @@ const PICK_ZONES: { id: string; label: string }[] = [
       <button type="button" class="tz-why-pop__close" aria-label="Close" (click)="closed.emit()">×</button>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './timezone-why.scss',
 })
 export class TimezoneWhyComponent {

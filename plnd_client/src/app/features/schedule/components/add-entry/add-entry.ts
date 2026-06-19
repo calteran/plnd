@@ -98,7 +98,7 @@ export interface AddedEntry {
       </div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './add-entry.scss'
 })
 export class AddEntryComponent {

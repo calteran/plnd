@@ -62,8 +62,8 @@ describe('ProfileComponent', () => {
     component.save();
 
     expect(userService.updateUser).toHaveBeenCalled();
-    expect(component.successMessage).toBe('Profile updated.');
-    expect(component.pending).toBeFalse();
+    expect(component.successMessage()).toBe('Profile updated.');
+    expect(component.pending()).toBeFalse();
   });
 
   it('save shows error message on failure', () => {
@@ -71,8 +71,8 @@ describe('ProfileComponent', () => {
     component.form.setValue({ display_name: 'New Name', avatar_url: '' });
     component.save();
 
-    expect(component.errorMessage).toBe('Failed to save. Please try again.');
-    expect(component.pending).toBeFalse();
+    expect(component.errorMessage()).toBe('Failed to save. Please try again.');
+    expect(component.pending()).toBeFalse();
   });
 
   it('cancel resets the form to current user values', () => {
@@ -102,7 +102,7 @@ describe('ProfileComponent', () => {
   });
 
   it('save() no-ops when pending is true', () => {
-    component.pending = true;
+    component.pending.set(true);
     component.form.setValue({ display_name: 'New Name', avatar_url: '' });
     component.save();
     expect(userService.updateUser).not.toHaveBeenCalled();

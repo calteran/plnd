@@ -9,7 +9,7 @@ import { RouterOutlet } from '@angular/router';
       <router-outlet />
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .auth-layout {
       min-height: 100vh;

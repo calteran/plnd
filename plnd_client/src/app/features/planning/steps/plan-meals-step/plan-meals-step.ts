@@ -169,7 +169,7 @@ import { MealPatternEntry } from '../../../../core/models/meal-pattern';
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display: block; }
 

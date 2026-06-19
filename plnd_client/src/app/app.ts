@@ -5,7 +5,7 @@ import { ThemeService } from './core/services/theme.service';
 @Component({
   selector: 'app-root',
   imports: [RouterOutlet],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `<router-outlet />`
 })
 export class AppComponent {

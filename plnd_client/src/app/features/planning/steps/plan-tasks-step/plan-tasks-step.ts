@@ -24,9 +24,9 @@ import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
             <span class="day-name">{{ formattedDays()[day].dayName }}</span>
             <span class="day-date">{{ formattedDays()[day].shortDate }}</span>
             <span class="task-badge"
-                  [class.zero]="(tasksByDay()[day]?.length ?? 0) === 0">
-              {{ tasksByDay()[day]?.length ?? 0 }}
-              {{ (tasksByDay()[day]?.length ?? 0) === 1 ? 'task' : 'tasks' }}
+                  [class.zero]="(tasksByDay()[day].length) === 0">
+              {{ tasksByDay()[day].length }}
+              {{ (tasksByDay()[day].length) === 1 ? 'task' : 'tasks' }}
             </span>
             <span class="chevron">▾</span>
           </div>
@@ -74,7 +74,7 @@ import { formatDayName, formatDayDate } from '../../utils/date-format.utils';
 
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .tasks-step { display: flex; flex-direction: column; gap: 8px; }
 

@@ -6,7 +6,7 @@ import { TimezoneStandoffComponent } from './timezone-standoff';
 @Component({
   standalone: true,
   imports: [TimezoneStandoffComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-timezone-standoff
       intendedZone="America/New_York"

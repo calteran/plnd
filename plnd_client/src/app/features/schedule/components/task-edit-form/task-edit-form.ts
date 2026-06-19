@@ -66,7 +66,7 @@ const ENERGIES: EnergyLevel[] = ['low', 'medium', 'high'];
       <button type="button" class="done-edit" (click)="closed.emit()">Done</button>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './task-edit-form.scss',
 })
 export class TaskEditFormComponent {

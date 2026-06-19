@@ -82,7 +82,7 @@ interface WizardStep { n: number; label: string; disabled?: boolean; }
       </footer>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .planning-wizard { display: flex; flex-direction: column; height: 100%;
                        max-width: 860px; margin-inline: auto; width: 100%; }

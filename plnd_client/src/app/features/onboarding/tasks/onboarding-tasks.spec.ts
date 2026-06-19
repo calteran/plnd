@@ -13,25 +13,25 @@ import { TaskPlacementReviewSubstepComponent } from './substeps/task-placement-r
 // SpokeChromeComponent uses only RouterLink (no services), so we keep the real one.
 // Substeps all have heavy service dependencies — stub them.
 
-@Component({ selector: 'app-planning-prefs-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+@Component({ selector: 'app-planning-prefs-substep', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush,
  template: '' })
 class PlanningPrefsStub {
   @Output() complete = new EventEmitter<void>();
 }
 
-@Component({ selector: 'app-day-types-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+@Component({ selector: 'app-day-types-substep', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush,
  template: '' })
 class DayTypesStub {
   @Output() complete = new EventEmitter<void>();
 }
 
-@Component({ selector: 'app-routines-tasks-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+@Component({ selector: 'app-routines-tasks-substep', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush,
  template: '' })
 class RoutinesTasksStub {
   @Output() complete = new EventEmitter<void>();
 }
 
-@Component({ selector: 'app-task-placement-review-substep', standalone: true, changeDetection: ChangeDetectionStrategy.Eager,
+@Component({ selector: 'app-task-placement-review-substep', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush,
  template: '' })
 class TaskPlacementStub {
   @Output() complete = new EventEmitter<void>();

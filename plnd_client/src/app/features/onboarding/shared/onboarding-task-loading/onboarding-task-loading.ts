@@ -95,7 +95,7 @@ export const MAX_PERSONALISED_NAMES = 5;
 
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .loading-screen {
       display: flex;

@@ -67,7 +67,7 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
       <app-task-edit-form [task]="item()" (save)="save.emit($event)" (closed)="closed.emit()" />
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './task-row.scss'
 })
 export class TaskRowComponent {

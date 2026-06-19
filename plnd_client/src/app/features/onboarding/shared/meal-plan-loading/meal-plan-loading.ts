@@ -168,7 +168,7 @@ function dayLabel(iso: string): string {
       <button class="cancel-link" type="button" (click)="cancelClick.emit()">Cancel</button>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host { display: block; }
 

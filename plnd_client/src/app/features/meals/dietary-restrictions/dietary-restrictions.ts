@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { DietaryRestrictionsService } from '../../../core/services/dietary-restrictions.service';
@@ -31,7 +31,7 @@ import {
                 <h2 class="type-heading">{{ restrictionLabels[type] }}</h2>
                 @for (item of groupedRestrictions()[type]; track item.restriction_id) {
                   <div class="restriction-item">
-                    @if (editingId === item.restriction_id) {
+                    @if (editingId() === item.restriction_id) {
                       <!-- Inline edit form -->
                       <div class="edit-form">
                         <span class="item-name">{{ item.name }}</span>
@@ -53,9 +53,9 @@ import {
                           <button
                             type="button"
                             class="btn btn--primary"
-                            [disabled]="pending"
+                            [disabled]="pending()"
                             (click)="saveEdit(item.restriction_id)"
-                          >{{ pending ? 'Saving…' : 'Save' }}</button>
+                          >{{ pending() ? 'Saving…' : 'Save' }}</button>
                         </div>
                       </div>
                     } @else {
@@ -75,7 +75,7 @@ import {
                         <button
                           type="button"
                           class="btn btn--danger"
-                          [disabled]="pending"
+                          [disabled]="pending()"
                           (click)="deleteRestriction(item.restriction_id)"
                         >Delete</button>
                       </div>
@@ -92,11 +92,11 @@ import {
         </div>
 
         <!-- Status messages -->
-        @if (successMessage) {
-          <p class="status-success">{{ successMessage }}</p>
+        @if (successMessage()) {
+          <p class="status-success">{{ successMessage() }}</p>
         }
-        @if (errorMessage) {
-          <p class="status-error">{{ errorMessage }}</p>
+        @if (errorMessage()) {
+          <p class="status-error">{{ errorMessage() }}</p>
         }
 
         <!-- Add form -->
@@ -139,16 +139,16 @@ import {
               <button
                 type="button"
                 class="btn btn--primary"
-                [disabled]="pending || addForm.invalid"
+                [disabled]="pending() || addForm.invalid"
                 (click)="save()"
-              >{{ pending ? 'Adding…' : 'Add Restriction' }}</button>
+              >{{ pending() ? 'Adding…' : 'Add Restriction' }}</button>
             </div>
           </form>
         </section>
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .dr-page {
       max-width: 700px;
@@ -354,11 +354,11 @@ export class DietaryRestrictionsComponent implements OnInit {
 
   readonly hasAny = computed(() => (this.dietaryRestrictionsService.restrictions()?.length ?? 0) > 0);
 
-  pending = false;
-  successMessage = '';
-  errorMessage = '';
+  readonly pending = signal(false);
+  readonly successMessage = signal('');
+  readonly errorMessage = signal('');
 
-  editingId: string | null = null;
+  readonly editingId = signal<string | null>(null);
   readonly editNotesControl = new FormControl<string | null>(null);
 
   readonly addForm = new FormGroup({
@@ -372,64 +372,64 @@ export class DietaryRestrictionsComponent implements OnInit {
   }
 
   startEdit(item: DietaryRestriction): void {
-    this.editingId = item.restriction_id;
+    this.editingId.set(item.restriction_id);
     this.editNotesControl.setValue(item.notes);
-    this.successMessage = '';
-    this.errorMessage = '';
+    this.successMessage.set('');
+    this.errorMessage.set('');
   }
 
   cancelEdit(): void {
-    this.editingId = null;
+    this.editingId.set(null);
     this.editNotesControl.setValue(null);
   }
 
   saveEdit(id: string): void {
-    if (this.pending) return;
-    this.pending = true;
-    this.successMessage = '';
-    this.errorMessage = '';
+    if (this.pending()) return;
+    this.pending.set(true);
+    this.successMessage.set('');
+    this.errorMessage.set('');
 
     // Coerce blank string → null so the backend PATCH receives an explicit null
     // (clears the notes field) rather than an empty string.
     const notes = this.editNotesControl.value?.trim() || null;
     this.dietaryRestrictionsService.update(id, { notes }).subscribe({
       next: () => {
-        this.pending = false;
-        this.editingId = null;
+        this.pending.set(false);
+        this.editingId.set(null);
         this.editNotesControl.setValue(null);
-        this.successMessage = 'Updated successfully.';
+        this.successMessage.set('Updated successfully.');
       },
       error: () => {
-        this.pending = false;
-        this.errorMessage = 'Failed to update. Please try again.';
+        this.pending.set(false);
+        this.errorMessage.set('Failed to update. Please try again.');
       }
     });
   }
 
   deleteRestriction(id: string): void {
-    if (this.pending) return;
-    this.pending = true;
-    this.successMessage = '';
-    this.errorMessage = '';
+    if (this.pending()) return;
+    this.pending.set(true);
+    this.successMessage.set('');
+    this.errorMessage.set('');
 
     this.dietaryRestrictionsService.delete(id).subscribe({
       next: () => {
-        this.pending = false;
-        this.successMessage = 'Restriction removed.';
+        this.pending.set(false);
+        this.successMessage.set('Restriction removed.');
       },
       error: () => {
-        this.pending = false;
-        this.errorMessage = 'Failed to delete. Please try again.';
+        this.pending.set(false);
+        this.errorMessage.set('Failed to delete. Please try again.');
       }
     });
   }
 
   save(): void {
-    if (this.pending || this.addForm.invalid) return;
+    if (this.pending() || this.addForm.invalid) return;
 
-    this.pending = true;
-    this.successMessage = '';
-    this.errorMessage = '';
+    this.pending.set(true);
+    this.successMessage.set('');
+    this.errorMessage.set('');
 
     const { restriction_type, name, notes } = this.addForm.getRawValue();
     // Omit notes entirely when blank (field is optional on create).
@@ -443,16 +443,16 @@ export class DietaryRestrictionsComponent implements OnInit {
 
     this.dietaryRestrictionsService.create(req).subscribe({
       next: () => {
-        this.pending = false;
-        this.successMessage = 'Restriction added.';
+        this.pending.set(false);
+        this.successMessage.set('Restriction added.');
         this.addForm.reset({ restriction_type: 'allergy', name: '', notes: null });
       },
       error: (err) => {
-        this.pending = false;
+        this.pending.set(false);
         if (err.status === 409) {
-          this.errorMessage = 'A restriction with this type and name already exists.';
+          this.errorMessage.set('A restriction with this type and name already exists.');
         } else {
-          this.errorMessage = 'Failed to add. Please try again.';
+          this.errorMessage.set('Failed to add. Please try again.');
         }
       }
     });

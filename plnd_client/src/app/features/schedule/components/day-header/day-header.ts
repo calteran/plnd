@@ -27,7 +27,7 @@ import { zoneCity, zoneShort, zoneLong, offsetPhrase } from '../../../../core/ut
       <span class="tz-pill">TRAVEL DAY</span>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './day-header.scss'
 })
 export class DayHeaderComponent {

@@ -15,7 +15,7 @@ import { AuthService } from '../../../core/services/auth.service';
       <button (click)="signIn()">Sign in with Mock OAuth</button>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .login-page {
       text-align: center;

@@ -225,7 +225,7 @@ const EMPTY_SEARCH: IngredientSearchResponse = { local: [], external: [], provid
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .prefs-substep { display: flex; flex-direction: column; gap: 20px; }
     .banner { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--color-accent-dark); }

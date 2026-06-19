@@ -38,12 +38,7 @@ module.exports = tseslint.config(
         "error",
         { type: "element", prefix: "app", style: "kebab-case" },
       ],
-      // Angular 22 made OnPush the default change detection strategy; the v22
-      // migration stamped `ChangeDetectionStrategy.Eager` on existing components
-      // to preserve pre-v22 (CheckAlways) behavior. Adopting OnPush per component
-      // is deferred to #983 — until then, do not flag the Eager opt-outs the
-      // migration introduced.
-      "@angular-eslint/prefer-on-push-component-change-detection": "off",
+      "@angular-eslint/prefer-on-push-component-change-detection": "error",
     },
   },
 

@@ -135,7 +135,7 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
 
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './day-view.scss',
 })
 export class DayViewComponent implements OnInit, OnDestroy {

@@ -16,7 +16,7 @@ import { BriefingService } from '../../../../core/services/briefing.service';
       </div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './yesterday-snapshot.scss',
 })
 export class YesterdaySnapshotComponent {

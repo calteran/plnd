@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { UserService } from '../../../core/services/user.service';
@@ -66,11 +66,11 @@ import { UserService } from '../../../core/services/user.service';
               }
             </div>
 
-            @if (successMessage) {
-              <p class="status-success">{{ successMessage }}</p>
+            @if (successMessage()) {
+              <p class="status-success">{{ successMessage() }}</p>
             }
-            @if (errorMessage) {
-              <p class="status-error">{{ errorMessage }}</p>
+            @if (errorMessage()) {
+              <p class="status-error">{{ errorMessage() }}</p>
             }
 
             <div class="form-actions">
@@ -80,9 +80,9 @@ import { UserService } from '../../../core/services/user.service';
               <button
                 type="submit"
                 class="btn btn--primary"
-                [disabled]="pending || form.invalid"
+                [disabled]="pending() || form.invalid"
               >
-                {{ pending ? 'Saving…' : 'Save' }}
+                {{ pending() ? 'Saving…' : 'Save' }}
               </button>
             </div>
           </form>
@@ -90,7 +90,7 @@ import { UserService } from '../../../core/services/user.service';
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .profile-page {
       max-width: 600px;
@@ -187,9 +187,9 @@ export class ProfileComponent implements OnInit {
   readonly userService = inject(UserService);
   private readonly router = inject(Router);
 
-  pending = false;
-  successMessage = '';
-  errorMessage = '';
+  readonly pending = signal(false);
+  readonly successMessage = signal('');
+  readonly errorMessage = signal('');
 
   readonly form = new FormGroup({
     display_name: new FormControl('', [Validators.maxLength(100)]),
@@ -216,11 +216,11 @@ export class ProfileComponent implements OnInit {
   }
 
   save(): void {
-    if (this.form.invalid || this.pending) return;
+    if (this.form.invalid || this.pending()) return;
 
-    this.pending = true;
-    this.successMessage = '';
-    this.errorMessage = '';
+    this.pending.set(true);
+    this.successMessage.set('');
+    this.errorMessage.set('');
 
     const { display_name, avatar_url } = this.form.value;
     const req: Record<string, string> = {};
@@ -229,21 +229,21 @@ export class ProfileComponent implements OnInit {
 
     this.userService.updateUser(req).subscribe({
       next: () => {
-        this.pending = false;
-        this.successMessage = 'Profile updated.';
+        this.pending.set(false);
+        this.successMessage.set('Profile updated.');
         this.form.markAsPristine();
       },
       error: () => {
-        this.pending = false;
-        this.errorMessage = 'Failed to save. Please try again.';
+        this.pending.set(false);
+        this.errorMessage.set('Failed to save. Please try again.');
       }
     });
   }
 
   cancel(): void {
     this.resetFormToUser();
-    this.successMessage = '';
-    this.errorMessage = '';
+    this.successMessage.set('');
+    this.errorMessage.set('');
   }
 
   goBack(): void {
