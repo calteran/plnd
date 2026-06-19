@@ -24,7 +24,7 @@ import { daysInRange } from '../../utils/date-format.utils';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .day-grid { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
     @media (max-width: 600px) {

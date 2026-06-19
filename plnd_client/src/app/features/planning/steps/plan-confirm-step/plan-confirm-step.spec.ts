@@ -113,7 +113,7 @@ describe('PlanConfirmStepComponent', () => {
   });
 
   it('should show styled error banner when errorMessage is set', () => {
-    fixture.componentInstance.errorMessage = 'Failed to save plan — please try again.';
+    fixture.componentInstance.errorMessage.set('Failed to save plan — please try again.');
     fixture.detectChanges();
     const el = fixture.nativeElement.querySelector('.error-banner');
     expect(el).toBeTruthy();

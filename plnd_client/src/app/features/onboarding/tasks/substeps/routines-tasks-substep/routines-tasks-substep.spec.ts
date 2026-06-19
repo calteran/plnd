@@ -115,11 +115,14 @@ describe('RoutinesTasksSubstepComponent', () => {
   // ── 3. Adding a routine via form calls create() and shows a chip ────────────
 
   it('adding a routine via form calls RoutinesService.create() and shows a chip', async () => {
-    const { fixture, component, templatesSvcMock } = await setup();
+    const { fixture, templatesSvcMock } = await setup();
     fixture.detectChanges();
 
-    component.routineName = 'Yoga';
-    component.selectedRrule = 'FREQ=DAILY';
+    // OnPush: drive the ngModel field through a real DOM event so change
+    // detection runs the way it would for an actual keystroke.
+    const nameInput: HTMLInputElement = fixture.nativeElement.querySelectorAll('.name-input')[0];
+    nameInput.value = 'Yoga';
+    nameInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
     const addBtns: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll('.add-btn');
@@ -182,7 +185,11 @@ describe('RoutinesTasksSubstepComponent', () => {
     const { fixture, component } = await setup();
     fixture.detectChanges();
 
-    component.taskName = 'Call dentist';
+    // OnPush: drive the ngModel field through a real DOM event so the Add
+    // button's [disabled] binding re-evaluates as it would for a keystroke.
+    const taskInput: HTMLInputElement = fixture.nativeElement.querySelectorAll('.name-input')[1];
+    taskInput.value = 'Call dentist';
+    taskInput.dispatchEvent(new Event('input'));
     fixture.detectChanges();
 
     const addBtns: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll('.add-btn');
@@ -259,15 +266,17 @@ describe('RoutinesTasksSubstepComponent', () => {
   // ── 10. Day picker shows when "Weekly" recurrence is selected ───────────────
 
   it('shows day picker when "Weekly" recurrence is selected', async () => {
-    const { fixture, component } = await setup();
+    const { fixture } = await setup();
     fixture.detectChanges();
 
     // Day picker should not be visible with the default 'FREQ=DAILY' selection
     let dayRow: HTMLElement | null = fixture.nativeElement.querySelector('.day-row');
     expect(dayRow).toBeNull();
 
-    // Select "Weekly"
-    component.selectedRrule = 'FREQ=WEEKLY';
+    // Select "Weekly" via a real <select> change so OnPush change detection runs.
+    const select: HTMLSelectElement = fixture.nativeElement.querySelector('.recurrence-select');
+    select.value = 'FREQ=WEEKLY';
+    select.dispatchEvent(new Event('change'));
     fixture.detectChanges();
 
     dayRow = fixture.nativeElement.querySelector('.day-row');

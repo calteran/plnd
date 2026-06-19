@@ -65,7 +65,7 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './meal-row.scss'
 })
 export class MealRowComponent {

@@ -342,7 +342,7 @@ function responseToCard(r: DayTypeResponse): ScheduleCard {
 
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .day-types-substep {
       display: flex;

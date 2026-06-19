@@ -55,7 +55,7 @@ const THEME_ICONS: Record<EffectiveTheme, string> = {
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .avatar-container {
       position: relative;

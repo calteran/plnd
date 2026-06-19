@@ -57,7 +57,7 @@ type DotState = 'completed' | 'current' | 'ahead';
       </footer>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .spoke-chrome {
       max-width: 560px;

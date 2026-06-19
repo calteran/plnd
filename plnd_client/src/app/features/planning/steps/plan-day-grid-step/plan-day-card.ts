@@ -9,7 +9,7 @@ import { EnergyLevel } from '../../../../core/models/week-plan';
   standalone: true,
   imports: [DatePipe, TitleCasePipe],
   styleUrl: 'plan-day-card.scss',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
       class="day-card"

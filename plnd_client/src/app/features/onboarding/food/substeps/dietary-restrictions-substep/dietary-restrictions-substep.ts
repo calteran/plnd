@@ -79,7 +79,7 @@ const TYPE_CONFIG: Record<DisplayRestrictionType, { label: string }> = {
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .restrictions-substep { display: flex; flex-direction: column; gap: 16px; }
     .banner { background: var(--color-accent-light); border: 1.5px solid var(--color-accent-border); border-radius: 8px; padding: 10px 14px; font-size: 13px; color: var(--color-accent-dark); }

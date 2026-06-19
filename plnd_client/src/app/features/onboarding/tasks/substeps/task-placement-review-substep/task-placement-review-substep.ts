@@ -340,7 +340,7 @@ export function buildDayCards(
 
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .placement-review {
       display: flex;

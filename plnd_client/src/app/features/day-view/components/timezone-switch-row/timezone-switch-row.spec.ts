@@ -29,7 +29,7 @@ const testSwitch: DaySwitch = {
 @Component({
   standalone: true,
   imports: [TimezoneSwitchRowComponent],
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <app-timezone-switch-row
       [switch]="sw"

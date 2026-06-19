@@ -50,7 +50,7 @@ const DECISION_CYCLE: CarryoverDecision[] = ['carry', 'defer', 'drop'];
       </ul>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .plan-review { display: flex; flex-direction: column; gap: 1rem; }
 

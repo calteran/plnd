@@ -13,7 +13,7 @@ import { parseDateOnly } from '../../../../core/utils/date-only';
       <button type="button" class="tz-switch-row__why" (click)="whyClicked.emit()">(why?)</button>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './timezone-switch-row.scss',
 })
 export class TimezoneSwitchRowComponent {

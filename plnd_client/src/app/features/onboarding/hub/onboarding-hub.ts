@@ -189,7 +189,7 @@ const HUB_SECTIONS: HubSection[] = [
       </div>
     }
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     /* ── Page shell ─────────────────────────────── */
     .hub {

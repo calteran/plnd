@@ -12,7 +12,7 @@ import { RouterLink } from '@angular/router';
       <a routerLink="/today" class="btn">Go to today</a>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .not-found {
       display: flex;

@@ -15,7 +15,7 @@ import { TimezoneStandoffComponent } from '../../features/day-view/components/ti
   standalone: true,
   imports: [RouterOutlet, RouterLink, RouterLinkActive, NavbarAvatarComponent, TimezoneStandoffComponent],
   templateUrl: './main-layout.html',
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './main-layout.scss'
 })
 export class MainLayoutComponent implements OnInit {

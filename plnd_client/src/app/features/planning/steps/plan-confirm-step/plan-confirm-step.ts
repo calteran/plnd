@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
@@ -41,8 +41,8 @@ import { formatWeekDate } from '../../utils/date-format.utils';
         </div>
       </div>
 
-      @if (errorMessage) {
-        <div class="error-banner" role="alert">{{ errorMessage }}</div>
+      @if (errorMessage()) {
+        <div class="error-banner" role="alert">{{ errorMessage() }}</div>
       }
 
       <button class="btn-finish"
@@ -59,7 +59,7 @@ import { formatWeekDate } from '../../utils/date-format.utils';
       </button>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .plan-confirm { display: flex; flex-direction: column; gap: 1rem; }
 
@@ -107,7 +107,7 @@ export class PlanConfirmStepComponent implements OnInit {
   private readonly dayTypesMealsService = inject(DayTypesMealsService);
   private readonly router = inject(Router);
 
-  errorMessage = '';
+  readonly errorMessage = signal('');
 
   ngOnInit(): void {
     this.dayTypesMealsService.load();
@@ -138,13 +138,13 @@ export class PlanConfirmStepComponent implements OnInit {
   readonly formatWeekDate = formatWeekDate;
 
   finish(): void {
-    this.errorMessage = '';
+    this.errorMessage.set('');
     this.weekPlanService.commitPlan(this.weekPlanService.planningTaskId()).subscribe({
       next: () => {
         this.router.navigate(['/day', this.weekPlanService.planStart()]);
       },
       error: () => {
-        this.errorMessage = 'Failed to save plan — please try again.';
+        this.errorMessage.set('Failed to save plan — please try again.');
       },
     });
   }

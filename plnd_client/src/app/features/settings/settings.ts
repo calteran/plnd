@@ -1,4 +1,4 @@
-import { Component, OnInit, effect, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormGroup, FormControl, Validators } from '@angular/forms';
 import { PreferencesService } from '../../core/services/preferences.service';
@@ -44,18 +44,18 @@ import { PreferencesService } from '../../core/services/preferences.service';
                    formControlName="planningTriggerOffset" class="settings-input" />
           </div>
 
-          <button type="submit" [disabled]="pending">Save</button>
-          @if (successMessage) {
-            <p class="status-success">{{ successMessage }}</p>
+          <button type="submit" [disabled]="pending()">Save</button>
+          @if (successMessage()) {
+            <p class="status-success">{{ successMessage() }}</p>
           }
-          @if (errorMessage) {
-            <p class="status-error">{{ errorMessage }}</p>
+          @if (errorMessage()) {
+            <p class="status-error">{{ errorMessage() }}</p>
           }
         </form>
       }
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .settings-page {
       max-width: 600px;
@@ -126,9 +126,9 @@ export class SettingsComponent implements OnInit {
     planningTriggerOffset: new FormControl<number>(0, { nonNullable: true, validators: [Validators.min(-14), Validators.max(14)] }),
   });
 
-  pending = false;
-  successMessage = '';
-  errorMessage = '';
+  readonly pending = signal(false);
+  readonly successMessage = signal('');
+  readonly errorMessage = signal('');
   private prefsInitialized = false;
 
   constructor() {
@@ -160,21 +160,21 @@ export class SettingsComponent implements OnInit {
   }
 
   save(): void {
-    this.successMessage = '';
-    this.errorMessage = '';
+    this.successMessage.set('');
+    this.errorMessage.set('');
     if (!this.form.valid) {
-      this.errorMessage = 'Please correct the invalid values before saving.';
+      this.errorMessage.set('Please correct the invalid values before saving.');
       return;
     }
     const v = this.form.getRawValue();
-    this.pending = true;
+    this.pending.set(true);
     this.preferencesService.patchPreferences({
       week_start_day: v.weekStartDay,
       default_plan_length_days: v.planLengthDays,
       planning_trigger_offset: v.planningTriggerOffset,
     }).subscribe({
-      next: () => { this.pending = false; this.successMessage = 'Settings saved.'; this.form.markAsPristine(); },
-      error: () => { this.pending = false; this.errorMessage = 'Failed to save settings.'; }
+      next: () => { this.pending.set(false); this.successMessage.set('Settings saved.'); this.form.markAsPristine(); },
+      error: () => { this.pending.set(false); this.errorMessage.set('Failed to save settings.'); }
     });
   }
 }

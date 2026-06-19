@@ -112,7 +112,7 @@ import { TimezoneService } from '../../../core/services/timezone.service';
       </div>
     </app-spoke-chrome>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     :host {
       display: block;

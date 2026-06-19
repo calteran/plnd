@@ -132,7 +132,7 @@ describe('DietaryRestrictionsComponent', () => {
     fixture.detectChanges();
 
     expect(fixture.nativeElement.textContent).toContain('Updated successfully.');
-    expect(component.editingId).toBeNull();
+    expect(component.editingId()).toBeNull();
   });
 
   it('should call delete() when Delete button is clicked', () => {
@@ -158,10 +158,10 @@ describe('DietaryRestrictionsComponent', () => {
 
     const component = fixture.componentInstance;
     component.startEdit(MOCK_INTOLERANCE);
-    expect(component.editingId).toBe('id-2');
+    expect(component.editingId()).toBe('id-2');
 
     component.cancelEdit();
-    expect(component.editingId).toBeNull();
+    expect(component.editingId()).toBeNull();
     expect(component.editNotesControl.value).toBeNull();
   });
 
@@ -178,8 +178,8 @@ describe('DietaryRestrictionsComponent', () => {
       .flush('Error', { status: 500, statusText: 'Internal Server Error' });
     fixture.detectChanges();
 
-    expect(component.errorMessage).toBeTruthy();
-    expect(component.pending).toBeFalse();
+    expect(component.errorMessage()).toBeTruthy();
+    expect(component.pending()).toBeFalse();
   });
 
   it('saveEdit() no-ops when pending is true', () => {
@@ -190,10 +190,10 @@ describe('DietaryRestrictionsComponent', () => {
 
     const component = fixture.componentInstance;
     component.startEdit(MOCK_INTOLERANCE);
-    component.pending = true;
+    component.pending.set(true);
     component.saveEdit('id-2');
     httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions/id-2') && r.method === 'PATCH');
-    expect(component.pending).toBeTrue();
+    expect(component.pending()).toBeTrue();
   });
 
   it('deleteRestriction() shows error on HTTP 500', () => {
@@ -208,8 +208,8 @@ describe('DietaryRestrictionsComponent', () => {
       .flush('Error', { status: 500, statusText: 'Internal Server Error' });
     fixture.detectChanges();
 
-    expect(component.errorMessage).toBeTruthy();
-    expect(component.pending).toBeFalse();
+    expect(component.errorMessage()).toBeTruthy();
+    expect(component.pending()).toBeFalse();
   });
 
   it('deleteRestriction() no-ops when pending is true', () => {
@@ -219,10 +219,10 @@ describe('DietaryRestrictionsComponent', () => {
     fixture.detectChanges();
 
     const component = fixture.componentInstance;
-    component.pending = true;
+    component.pending.set(true);
     component.deleteRestriction('id-1');
     httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions/id-1') && r.method === 'DELETE');
-    expect(component.pending).toBeTrue();
+    expect(component.pending()).toBeTrue();
   });
 
   it('save() no-ops when form invalid (empty name)', () => {
@@ -235,7 +235,7 @@ describe('DietaryRestrictionsComponent', () => {
     component.addForm.setValue({ restriction_type: 'allergy', name: '', notes: null });
     component.save();
     httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions') && r.method === 'POST');
-    expect(component.pending).toBeFalse();
+    expect(component.pending()).toBeFalse();
   });
 
   it('save() shows generic error for non-409 failure', () => {
@@ -251,7 +251,7 @@ describe('DietaryRestrictionsComponent', () => {
       .flush('Error', { status: 500, statusText: 'Internal Server Error' });
     fixture.detectChanges();
 
-    expect(component.errorMessage).toBe('Failed to add. Please try again.');
+    expect(component.errorMessage()).toBe('Failed to add. Please try again.');
   });
 
   it('renders notes span for items with notes', () => {
@@ -290,7 +290,7 @@ describe('DietaryRestrictionsComponent', () => {
       .flush('Conflict', { status: 409, statusText: 'Conflict' });
     fixture.detectChanges();
 
-    expect(component.errorMessage).toBe('A restriction with this type and name already exists.');
+    expect(component.errorMessage()).toBe('A restriction with this type and name already exists.');
   });
 
   it('saveEdit() coerces blank notes to null when saving', () => {
@@ -309,7 +309,7 @@ describe('DietaryRestrictionsComponent', () => {
     req.flush({ ...MOCK_INTOLERANCE, notes: null });
     fixture.detectChanges();
 
-    expect(component.successMessage).toBe('Updated successfully.');
+    expect(component.successMessage()).toBe('Updated successfully.');
   });
 
   it('goBack() navigates to /today', () => {

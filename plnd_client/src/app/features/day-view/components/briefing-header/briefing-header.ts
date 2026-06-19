@@ -53,7 +53,7 @@ import { BriefingService } from '../../../../core/services/briefing.service';
 
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './briefing-header.scss',
 })
 export class BriefingHeaderComponent {

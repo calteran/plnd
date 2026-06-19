@@ -87,7 +87,7 @@ type ActiveAction = 'swap' | 'edit' | 'add' | null;
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './meal-review-pane.scss',
 })
 export class MealReviewPaneComponent {

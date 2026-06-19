@@ -78,7 +78,7 @@ type FoodSubstep =
       }
     </app-spoke-chrome>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .meal-plan-loading { padding: 24px 16px; font-size: 13px; color: var(--color-text-muted); }
   `],

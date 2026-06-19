@@ -15,7 +15,7 @@ import { zoneLong } from '../../../../core/utils/zone-format';
       </div>
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styleUrl: './timezone-standoff.scss',
 })
 export class TimezoneStandoffComponent {

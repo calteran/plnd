@@ -339,7 +339,7 @@ function rruleToFormState(rrule: string): { selectedRrule: string; selectedWeekD
 
     </div>
   `,
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   styles: [`
     .routines-tasks-substep {
       display: flex;
