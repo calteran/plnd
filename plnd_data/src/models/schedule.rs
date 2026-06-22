@@ -106,6 +106,11 @@ pub struct PlanEntryInput {
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
     pub one_shot: Option<bool>,
+    /// 0-based order within (date, slot). Defaults to 0 when omitted.
+    pub slot_position: Option<i32>,
+    /// Pre-materialization meal pairing: resolved to slot_meal_anchor_id at
+    /// commit by matching (date, name) against meal_anchor_instances.
+    pub paired_meal_name: Option<String>,
 }
 
 /// Partial update for a single schedule entry. `None` fields are left unchanged.

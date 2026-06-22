@@ -64,6 +64,9 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             .transpose()?,
         energy_required: e.energy_required,
         one_shot: e.one_shot,
+        // Task 5 will wire these through PlanEntryRequest; for now default to None.
+        slot_position: None,
+        paired_meal_name: None,
     })
 }
 

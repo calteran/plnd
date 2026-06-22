@@ -234,11 +234,44 @@ pub async fn commit_plan(
     // After #828, schedule_entries is task-only — any meal anchor entries (the
     // legacy task_type=None shape) are silently skipped; meal anchors are
     // owned by meal_anchor_instances and created via /schedule/anchors.
+
+    // Resolve paired_meal_name -> meal_anchor_instances.id for this commit.
+    // Instances are materialized earlier in planning, so they exist by now.
+    let mut paired_lookup: HashMap<(NaiveDate, String), Uuid> = HashMap::new();
+    {
+        let pairs: Vec<(NaiveDate, String)> = req
+            .entries
+            .iter()
+            .filter_map(|e| e.paired_meal_name.clone().map(|n| (e.date, n)))
+            .collect();
+        if !pairs.is_empty() {
+            let dates: Vec<NaiveDate> = pairs.iter().map(|(d, _)| *d).collect();
+            let names: Vec<String> = pairs.iter().map(|(_, n)| n.clone()).collect();
+            let rows: Vec<(NaiveDate, String, Uuid)> = sqlx::query_as(
+                "SELECT mai.date, mai.name, mai.id FROM meal_anchor_instances mai
+                 JOIN UNNEST($2::date[], $3::text[]) AS req(date, name)
+                      ON req.date = mai.date AND req.name = mai.name
+                 WHERE mai.user_id = $1",
+            )
+            .bind(user_id)
+            .bind(&dates)
+            .bind(&names)
+            .fetch_all(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+            for (d, n, id) in rows {
+                paired_lookup.insert((d, n), id);
+            }
+        }
+    }
+
     let mut task_types: Vec<String> = Vec::new();
     let mut titles: Vec<Option<String>> = Vec::new();
     let mut dates: Vec<NaiveDate> = Vec::new();
     let mut scheduled_starts: Vec<Option<NaiveTime>> = Vec::new();
     let mut after_anchors: Vec<Option<String>> = Vec::new();
+    let mut slot_meal_anchor_ids: Vec<Option<Uuid>> = Vec::new();
+    let mut slot_positions: Vec<i32> = Vec::new();
     let mut duration_minutes_vals: Vec<Option<i32>> = Vec::new();
     let mut energy_required_vals: Vec<Option<String>> = Vec::new();
     let mut one_shot_vals: Vec<bool> = Vec::new();
@@ -247,11 +280,26 @@ pub async fn commit_plan(
         let Some(task_type) = entry.task_type.clone() else {
             continue;
         };
+        // Paired task: resolve the meal name to an instance id. On miss, fall
+        // back to floating in the same-named slot (logged, never dropped).
+        let (after_anchor, slot_meal_anchor_id) = match &entry.paired_meal_name {
+            Some(name) => match paired_lookup.get(&(entry.date, name.clone())) {
+                Some(id) => (None, Some(*id)),
+                None => {
+                    tracing::warn!(date = %entry.date, meal = %name,
+                        "paired_meal_name resolved to no instance; floating in slot");
+                    (Some(name.clone()), None)
+                }
+            },
+            None => (entry.after_anchor.clone(), None),
+        };
         task_types.push(task_type);
         titles.push(entry.title.clone());
         dates.push(entry.date);
         scheduled_starts.push(entry.scheduled_start);
-        after_anchors.push(entry.after_anchor.clone());
+        after_anchors.push(after_anchor);
+        slot_meal_anchor_ids.push(slot_meal_anchor_id);
+        slot_positions.push(entry.slot_position.unwrap_or(0));
         duration_minutes_vals.push(entry.duration_minutes);
         energy_required_vals.push(entry.energy_required.clone());
         one_shot_vals.push(entry.one_shot.unwrap_or(false));
@@ -262,11 +310,13 @@ pub async fn commit_plan(
             "INSERT INTO schedule_entries
                (user_id, task_type, title,
                 date, scheduled_start, status, after_anchor,
+                slot_meal_anchor_id, slot_position,
                 duration_minutes, energy_required, one_shot)
              SELECT $1, unnest($2::text[]),
                     unnest($3::text[]), unnest($4::date[]), unnest($5::time[]),
                     'planned', unnest($6::text[]),
-                    unnest($7::int4[]), unnest($8::text[]), unnest($9::bool[])
+                    unnest($7::uuid[]), unnest($8::int4[]),
+                    unnest($9::int4[]), unnest($10::text[]), unnest($11::bool[])
              RETURNING entry_id, title, date, after_anchor",
         )
         .bind(user_id)
@@ -275,6 +325,8 @@ pub async fn commit_plan(
         .bind(&dates)
         .bind(&scheduled_starts)
         .bind(&after_anchors)
+        .bind(&slot_meal_anchor_ids)
+        .bind(&slot_positions)
         .bind(&duration_minutes_vals)
         .bind(&energy_required_vals)
         .bind(&one_shot_vals)
@@ -531,6 +583,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         }
     }
 
@@ -810,6 +864,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
         let bad_req = CommitPlanInput {
             plan_start: start,
@@ -861,6 +917,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
 
         let req = CommitPlanInput {
@@ -912,6 +970,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
 
         let req = CommitPlanInput {
@@ -954,6 +1014,8 @@ mod tests {
             duration_minutes: Some(45),
             energy_required: Some("medium".to_string()),
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
 
         let req = CommitPlanInput {
@@ -1037,6 +1099,8 @@ mod tests {
                 duration_minutes: None,
                 energy_required: None,
                 one_shot: None,
+                slot_position: None,
+                paired_meal_name: None,
             }],
             meal_entries: Vec::new(),
             replace: false,
@@ -1109,6 +1173,110 @@ mod tests {
         assert_eq!(row.1, meal_ref_id);
         assert_eq!(row.2, "user_meal");
         assert_eq!(row.3.as_deref(), Some("Oatmeal Bowl"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_persists_distinct_slot_positions_in_one_slot(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let mk = |title: &str, pos: i32| PlanEntryInput {
+            date: start,
+            task_type: Some("work".to_string()),
+            title: Some(title.to_string()),
+            scheduled_start: None,
+            after_anchor: Some("lunch".to_string()),
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: Some(pos),
+            paired_meal_name: None,
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![mk("a", 0), mk("b", 1), mk("c", 2)],
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        // Without slot_position population this fails the deferred unique constraint
+        // (three rows at (date,'lunch',0)).
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let period = get_period(&pool, uid, start, start).await.unwrap();
+        let mut by_pos: Vec<(i32, String)> = period
+            .entries
+            .iter()
+            .map(|e| (e.slot_position, e.title.clone().unwrap()))
+            .collect();
+        by_pos.sort();
+        assert_eq!(
+            by_pos,
+            vec![(0, "a".into()), (1, "b".into()), (2, "c".into())]
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_resolves_paired_meal_name_to_instance(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let instance = crate::db::meal_anchor_instance::add(
+            &pool,
+            uid,
+            start,
+            "breakfast",
+            NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+            60,
+        )
+        .await
+        .unwrap();
+
+        let entry = PlanEntryInput {
+            date: start,
+            task_type: Some("medication".to_string()),
+            title: Some("Take pills with food".to_string()),
+            scheduled_start: None,
+            after_anchor: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: Some(0),
+            paired_meal_name: Some("breakfast".to_string()),
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![entry],
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let anchor_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT slot_meal_anchor_id FROM schedule_entries WHERE user_id = $1",
+        )
+        .bind(uid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            anchor_id,
+            Some(instance.id),
+            "paired_meal_name must resolve to the instance id"
+        );
     }
 
     // The floating-task vs meal-anchor pairing collision test that used to
