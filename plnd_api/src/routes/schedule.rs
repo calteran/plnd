@@ -684,5 +684,31 @@ mod tests {
             position: 1,
         };
         assert!(super::reposition_target(&ok_anchor).is_ok());
+
+        // whitespace-only after_anchor is treated as empty — must reject
+        let whitespace_anchor = RepositionEntryRequest {
+            date: date(2026, 1, 1),
+            after_anchor: Some("   ".into()),
+            slot_meal_anchor_id: None,
+            position: 0,
+        };
+        assert_eq!(
+            super::reposition_target(&whitespace_anchor).unwrap_err(),
+            StatusCode::BAD_REQUEST,
+        );
+
+        // slot_meal_anchor_id-only happy path
+        let meal_anchor_id = Uuid::new_v4();
+        let ok_meal_anchor = RepositionEntryRequest {
+            date: date(2026, 1, 1),
+            after_anchor: None,
+            slot_meal_anchor_id: Some(meal_anchor_id),
+            position: 2,
+        };
+        let target = super::reposition_target(&ok_meal_anchor).expect("should be Ok");
+        assert!(
+            matches!(target, SlotTarget::MealAnchor(id) if id == meal_anchor_id),
+            "expected SlotTarget::MealAnchor({meal_anchor_id:?}), got {target:?}",
+        );
     }
 }
