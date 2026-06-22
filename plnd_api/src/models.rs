@@ -114,6 +114,12 @@ pub struct PlanEntryRequest {
     pub energy_required: Option<String>,
     #[serde(default)]
     pub one_shot: Option<bool>,
+    /// 0-based order within (date, slot). Sent by the planning wizards.
+    #[serde(default)]
+    pub slot_position: Option<i32>,
+    /// Pre-materialization meal pairing; resolved to slot_meal_anchor_id at commit.
+    #[serde(default)]
+    pub paired_meal_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
@@ -151,6 +157,18 @@ pub struct PatchEntryRequest {
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
     pub one_shot: Option<bool>,
+}
+
+/// Body for `PATCH /schedule/entries/{id}/position`. Exactly one of
+/// `after_anchor` / `slot_meal_anchor_id` must be present.
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct RepositionEntryRequest {
+    pub date: NaiveDate,
+    #[serde(default)]
+    pub after_anchor: Option<String>,
+    #[serde(default)]
+    pub slot_meal_anchor_id: Option<Uuid>,
+    pub position: i32,
 }
 
 /// Body for `PATCH /schedule/anchors/{id}/status`. Deserializes directly into
