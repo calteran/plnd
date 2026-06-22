@@ -5,6 +5,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { Router } from '@angular/router';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import {
   TaskPlacementReviewSubstepComponent,
   bucketOf,
@@ -625,6 +626,102 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     // Opening edit 0 should target Read Book
     component.openEdit(0);
     expect(component.editState()?.entryIndex).toBe(0);
+  });
+
+  // ── toPlanEntries() mapping ───────────────────────────────────────────────────
+
+  it('maps reordered placements to contiguous slot_position and paired_meal_name', async () => {
+    const { component } = await setup();
+    // Don't call detectChanges — we bypass the HTTP load and set entries directly.
+    component.entries.set([
+      { title: 'a', scheduled_date: '2026-06-22', task_type: 'work', duration_minutes: 30,
+        energy_required: 'low', after_anchor: 'lunch' },
+      { title: 'b', scheduled_date: '2026-06-22', task_type: 'work', duration_minutes: 30,
+        energy_required: 'low', after_anchor: 'lunch' },
+      { title: 'c', scheduled_date: '2026-06-22', task_type: 'medication', duration_minutes: 5,
+        energy_required: 'low', paired_meal_name: 'breakfast' },
+    ] as PlaceTasksEntry[]);
+
+    const planEntries = component.toPlanEntries();
+    const lunch = planEntries.filter(e => e.after_anchor === 'lunch');
+    expect(lunch.map(e => e.slot_position)).toEqual([0, 1]);
+    expect(planEntries.find(e => e.paired_meal_name === 'breakfast')?.slot_position).toBe(0);
+  });
+
+  it('paired task carries paired_meal_name and null scheduled_start', async () => {
+    const { component } = await setup();
+    component.entries.set([
+      { title: 'take meds', scheduled_date: '2026-06-22', task_type: 'medication',
+        duration_minutes: 5, energy_required: 'low', paired_meal_name: 'breakfast' },
+    ] as PlaceTasksEntry[]);
+
+    const planEntries = component.toPlanEntries();
+    expect(planEntries[0].paired_meal_name).toBe('breakfast');
+    expect(planEntries[0].scheduled_start).toBeNull();
+    expect(planEntries[0].after_anchor).toBeUndefined();
+  });
+
+  // ── onDrop() same-day cross-slot (into-meal pairing) ─────────────────────────
+
+  it('same-day drop into meal slot sets paired_meal_name and leaves exactly ONE instance', async () => {
+    const { component, httpController, fixture } = await setup();
+    fixture.detectChanges();
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([
+      { title: 'Walk', scheduled_date: '2026-04-28', task_type: 'exercise',
+        duration_minutes: 30, energy_required: 'medium', after_anchor: 'lunch' },
+    ] as PlaceTasksEntry[]);
+    fixture.detectChanges();
+
+    const entry = component.entries()[0];
+    const dropEvent = {
+      item: { data: entry },
+      previousIndex: 0,
+      currentIndex: 0,
+      container: { data: [entry] },
+      previousContainer: { data: [entry] },
+      isPointerOverContainer: true,
+      distance: { x: 0, y: 0 },
+      dropPoint: { x: 0, y: 0 },
+    } as unknown as CdkDragDrop<PlaceTasksEntry[]>;
+
+    // Drop into 'breakfast' slot on the same date
+    (component as unknown as { onDrop(e: CdkDragDrop<PlaceTasksEntry[]>, date: string, slotKey: string): void })
+      .onDrop(dropEvent, '2026-04-28', 'breakfast');
+
+    const allWalks = component.entries().filter(e => e.title === 'Walk');
+    expect(allWalks.length).toBe(1);
+    expect(allWalks[0].scheduled_date).toBe('2026-04-28');
+    expect(allWalks[0].paired_meal_name).toBe('breakfast');
+  });
+
+  it('cross-day drop changes scheduled_date and leaves exactly ONE instance', async () => {
+    const { component, httpController, fixture } = await setup();
+    fixture.detectChanges();
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([
+      { title: 'Walk', scheduled_date: '2026-04-28', task_type: 'exercise',
+        duration_minutes: 30, energy_required: 'medium', after_anchor: 'lunch' },
+    ] as PlaceTasksEntry[]);
+    fixture.detectChanges();
+
+    const entry = component.entries()[0];
+    const dropEvent = {
+      item: { data: entry },
+      previousIndex: 0,
+      currentIndex: 0,
+      container: { data: [] },
+      previousContainer: { data: [entry] },
+      isPointerOverContainer: true,
+      distance: { x: 0, y: 0 },
+      dropPoint: { x: 0, y: 0 },
+    } as unknown as CdkDragDrop<PlaceTasksEntry[]>;
+
+    // Drop into 'lunch' slot on a different date
+    (component as unknown as { onDrop(e: CdkDragDrop<PlaceTasksEntry[]>, date: string, slotKey: string): void })
+      .onDrop(dropEvent, '2026-04-29', 'lunch');
+
+    const allWalks = component.entries().filter(e => e.title === 'Walk');
+    expect(allWalks.length).toBe(1);
+    expect(allWalks[0].scheduled_date).toBe('2026-04-29');
   });
 
 });

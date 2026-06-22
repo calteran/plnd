@@ -6,10 +6,12 @@ import {
   Output,
   inject,
   signal,
+  computed,
   ChangeDetectionStrategy
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { AgentService } from '../../../../../core/services/agent.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { mealsForDate } from '../../../../../core/utils/day-type-utils';
@@ -45,6 +47,31 @@ interface DayCard {
   displayDate: string; // e.g. "Apr 28"
   dayName: string;     // e.g. "MONDAY"
   rows: DayRow[];
+}
+
+// ── CDK drag-drop section structure ──────────────────────────────────────────
+
+/**
+ * A section within a day card corresponding to one drop list.
+ * slotKey is either a meal name (for meal-associated tasks) or '<sched>'
+ * (for unanchored tasks).
+ */
+interface DaySection {
+  /** CDK drop list ID */
+  dropListId: string;
+  /** Meal label (e.g. "BREAKFAST") if this is a meal section; null for unanchored */
+  mealLabel: string | null;
+  /** The slot key: meal name or '<sched>' */
+  slotKey: string;
+  /** Tasks belonging to this section */
+  taskRows: TaskRow[];
+}
+
+interface DayCardSections {
+  date: string;
+  displayDate: string;
+  dayName: string;
+  sections: DaySection[];
 }
 
 // ── Edit state ───────────────────────────────────────────────────────────────
@@ -168,12 +195,86 @@ export function buildDayCards(
   });
 }
 
+/** CDK drop list ID for an onboarding placement slot (date + slotKey). */
+export function onboardingDropListId(date: string, slotKey: string): string {
+  return `onboarding-slot-${date}-${slotKey}`;
+}
+
+/** Derive the slot key for an entry. Mirrors toPlanEntries slotKey derivation. */
+function entrySlotKey(entry: PlaceTasksEntry): string {
+  return entry.paired_meal_name ?? entry.after_anchor ?? '<sched>';
+}
+
+/**
+ * Build CDK-friendly section groups for a day card.
+ * Each section maps to one cdkDropList. Meals from the pattern each get their own
+ * section; tasks are placed into the section whose slotKey matches the task's
+ * entrySlotKey. Unmatched tasks fall into the '<sched>' section.
+ */
+function buildDaySections(
+  date: string,
+  entries: PlaceTasksEntry[],
+  pattern: MealPatternEntry[],
+): DaySection[] {
+  const dayEntries = entries
+    .map((entry, idx) => ({ entry, idx }))
+    .filter(({ entry }) => entry.scheduled_date === date);
+
+  const mealNames = pattern.map(p => p.name.toLowerCase());
+
+  const sections: DaySection[] = [];
+
+  // Unanchored / fixed-time section (always present)
+  const schedSection: DaySection = {
+    dropListId: onboardingDropListId(date, '<sched>'),
+    mealLabel: null,
+    slotKey: '<sched>',
+    taskRows: [],
+  };
+
+  const mealSections = new Map<string, DaySection>();
+  for (const p of pattern) {
+    const slotKey = p.name.toLowerCase();
+    const section: DaySection = {
+      dropListId: onboardingDropListId(date, slotKey),
+      mealLabel: p.name.toUpperCase(),
+      slotKey,
+      taskRows: [],
+    };
+    mealSections.set(slotKey, section);
+    sections.push(section);
+  }
+
+  // Bucket tasks into sections
+  for (const { entry, idx } of dayEntries) {
+    const sk = entrySlotKey(entry);
+    const taskRow: TaskRow = { kind: 'task', entry, entryIndex: idx };
+    if (mealSections.has(sk)) {
+      mealSections.get(sk)!.taskRows.push(taskRow);
+    } else if (mealNames.includes(sk)) {
+      // after_anchor matches a meal name — pair it with that meal's section
+      const section = mealSections.get(sk);
+      if (section) {
+        section.taskRows.push(taskRow);
+      } else {
+        schedSection.taskRows.push(taskRow);
+      }
+    } else {
+      schedSection.taskRows.push(taskRow);
+    }
+  }
+
+  // Prepend the unanchored section (always first)
+  sections.unshift(schedSection);
+  return sections;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 @Component({
   selector: 'app-task-placement-review-substep',
   standalone: true,
-  imports: [OnboardingTaskLoadingComponent],
+  imports: [OnboardingTaskLoadingComponent, DragDropModule],
   template: `
     <div class="placement-review">
 
@@ -210,7 +311,7 @@ export function buildDayCards(
       } @else {
         <!-- Day-card grid -->
         <div class="day-grid">
-          @for (card of dayCards(); track card.date) {
+          @for (card of daySections(); track card.date) {
             <div class="day-card">
               <!-- Card header -->
               <div class="day-header">
@@ -218,110 +319,122 @@ export function buildDayCards(
                 <span class="day-date">{{ card.displayDate }}</span>
               </div>
 
-              <!-- Interleaved timeline rows -->
-              @for (row of card.rows; track rowTrack(row)) {
-                @if (row.kind === 'meal') {
+              <!-- Sections: each section is a cdkDropList -->
+              @for (section of card.sections; track section.slotKey) {
+                @if (section.mealLabel) {
                   <div class="meal-divider">
-                    <span class="meal-label">{{ row.label }}</span>
+                    <span class="meal-label">{{ section.mealLabel }}</span>
                     <em class="meal-placeholder">&mdash;</em>
                   </div>
-                } @else {
-                  @if (editState() && editState()!.entryIndex === row.entryIndex) {
-                    <!-- Edit form -->
-                    <div class="task-row task-row--editing">
-                      <div class="edit-form">
-                        <label class="edit-field">
-                          <span class="edit-label">Name</span>
-                          <input
-                            type="text"
-                            class="edit-input"
-                            [value]="editState()!.title"
-                            (input)="onEditTitle($any($event.target).value)"
-                            aria-label="Task name"
-                          />
-                        </label>
-                        <label class="edit-field">
-                          <span class="edit-label">Date</span>
-                          <select
-                            class="edit-input"
-                            [value]="editState()!.scheduledDate"
-                            (change)="onEditDate($any($event.target).value)"
-                            aria-label="Task date"
-                          >
-                            @for (d of planDates(); track d.value) {
-                              <option [value]="d.value">{{ d.label }}</option>
-                            }
-                          </select>
-                        </label>
-                        <label class="edit-field">
-                          <span class="edit-label">Time</span>
-                          <input
-                            type="time"
-                            class="edit-input"
-                            [value]="editState()!.timeWindowStart"
-                            (change)="onEditTime($any($event.target).value)"
-                            aria-label="Task time"
-                          />
-                        </label>
-                        <label class="edit-field">
-                          <span class="edit-label">Duration (min)</span>
-                          <input
-                            type="number"
-                            class="edit-input edit-input--short"
-                            min="1"
-                            [value]="editState()!.durationMinutes"
-                            (change)="onEditDuration(+$any($event.target).value)"
-                            aria-label="Duration in minutes"
-                          />
-                        </label>
-                        <label class="edit-field">
-                          <span class="edit-label">Energy</span>
-                          <select
-                            class="edit-input"
-                            [value]="editState()!.energyRequired"
-                            (change)="onEditEnergy($any($event.target).value)"
-                            aria-label="Energy level"
-                          >
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                          </select>
-                        </label>
-                        <div class="edit-actions">
-                          <button
-                            type="button"
-                            class="save-edit-btn"
-                            (click)="saveEdit()"
-                          >Save</button>
-                          <button
-                            type="button"
-                            class="remove-edit-btn"
-                            (click)="removeEntry(row.entryIndex)"
-                          >Remove</button>
+                }
+                <div
+                  cdkDropList
+                  [id]="section.dropListId"
+                  [cdkDropListData]="section.taskRows"
+                  [cdkDropListConnectedTo]="allDropListIds()"
+                  (cdkDropListDropped)="onDrop($event, card.date, section.slotKey)"
+                  class="section-drop-list"
+                >
+                  @for (row of section.taskRows; track rowTrack(row)) {
+                    <div cdkDrag [cdkDragData]="row.entry" class="task-drag-item">
+                      @if (editState() && editState()!.entryIndex === row.entryIndex) {
+                        <!-- Edit form -->
+                        <div class="task-row task-row--editing">
+                          <div class="edit-form">
+                            <label class="edit-field">
+                              <span class="edit-label">Name</span>
+                              <input
+                                type="text"
+                                class="edit-input"
+                                [value]="editState()!.title"
+                                (input)="onEditTitle($any($event.target).value)"
+                                aria-label="Task name"
+                              />
+                            </label>
+                            <label class="edit-field">
+                              <span class="edit-label">Date</span>
+                              <select
+                                class="edit-input"
+                                [value]="editState()!.scheduledDate"
+                                (change)="onEditDate($any($event.target).value)"
+                                aria-label="Task date"
+                              >
+                                @for (d of planDates(); track d.value) {
+                                  <option [value]="d.value">{{ d.label }}</option>
+                                }
+                              </select>
+                            </label>
+                            <label class="edit-field">
+                              <span class="edit-label">Time</span>
+                              <input
+                                type="time"
+                                class="edit-input"
+                                [value]="editState()!.timeWindowStart"
+                                (change)="onEditTime($any($event.target).value)"
+                                aria-label="Task time"
+                              />
+                            </label>
+                            <label class="edit-field">
+                              <span class="edit-label">Duration (min)</span>
+                              <input
+                                type="number"
+                                class="edit-input edit-input--short"
+                                min="1"
+                                [value]="editState()!.durationMinutes"
+                                (change)="onEditDuration(+$any($event.target).value)"
+                                aria-label="Duration in minutes"
+                              />
+                            </label>
+                            <label class="edit-field">
+                              <span class="edit-label">Energy</span>
+                              <select
+                                class="edit-input"
+                                [value]="editState()!.energyRequired"
+                                (change)="onEditEnergy($any($event.target).value)"
+                                aria-label="Energy level"
+                              >
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                              </select>
+                            </label>
+                            <div class="edit-actions">
+                              <button
+                                type="button"
+                                class="save-edit-btn"
+                                (click)="saveEdit()"
+                              >Save</button>
+                              <button
+                                type="button"
+                                class="remove-edit-btn"
+                                (click)="removeEntry(row.entryIndex)"
+                              >Remove</button>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  } @else {
-                    <!-- Default task row -->
-                    <div class="task-row">
-                      @if (row.entry.time_window_start) {
-                        <span class="task-time">{{ row.entry.time_window_start }}</span>
+                      } @else {
+                        <!-- Default task row -->
+                        <div class="task-row">
+                          @if (row.entry.time_window_start) {
+                            <span class="task-time">{{ row.entry.time_window_start }}</span>
+                          }
+                          <span class="task-title">{{ row.entry.title }}</span>
+                          <div class="task-meta">
+                            <span class="energy-badge energy-badge--{{ row.entry.energy_required }}">
+                              {{ row.entry.energy_required }}
+                            </span>
+                            <button
+                              type="button"
+                              class="edit-btn"
+                              (click)="openEdit(row.entryIndex)"
+                              [attr.aria-label]="'Edit ' + row.entry.title"
+                            >Edit</button>
+                          </div>
+                        </div>
                       }
-                      <span class="task-title">{{ row.entry.title }}</span>
-                      <div class="task-meta">
-                        <span class="energy-badge energy-badge--{{ row.entry.energy_required }}">
-                          {{ row.entry.energy_required }}
-                        </span>
-                        <button
-                          type="button"
-                          class="edit-btn"
-                          (click)="openEdit(row.entryIndex)"
-                          [attr.aria-label]="'Edit ' + row.entry.title"
-                        >Edit</button>
-                      </div>
                     </div>
                   }
-                }
+                </div>
               }
             </div>
           }
@@ -444,7 +557,21 @@ export function buildDayCards(
       color: var(--color-text-muted);
     }
 
+    /* ── Drop list sections ── */
+
+    .section-drop-list {
+      min-height: 4px;
+    }
+
     /* ── Task rows ── */
+
+    .task-drag-item {
+      cursor: grab;
+    }
+
+    .task-drag-item:active {
+      cursor: grabbing;
+    }
 
     .task-row {
       display: flex;
@@ -647,6 +774,36 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   // ── Date picker options ───────────────────────────────────────────────────
   readonly planDates = signal<{ value: string; label: string }[]>([]);
 
+  /** Section-grouped view of entries per day card (used by the CDK drag template). */
+  readonly daySections = computed((): DayCardSections[] => {
+    const period = this.stateService.planPeriod();
+    if (!period) return [];
+    const dates = datesBetween(period.start, period.end);
+    const entriesSnap = this.entries();
+    return dates.map(date => {
+      const pattern = mealsForDate(date, this.stateService.dayTypes());
+      const sections = buildDaySections(date, entriesSnap, pattern);
+      return {
+        date,
+        displayDate: formatDisplayDate(date),
+        dayName: getDayName(date),
+        sections,
+      };
+    });
+  });
+
+  /**
+   * All CDK drop list IDs across the full horizon (for cross-day and same-day
+   * connections). A list's own ID appearing in its own connectedTo is a harmless
+   * CDK no-op, so we include all IDs unconditionally — excluding same-day siblings
+   * would break same-day cross-slot drops.
+   */
+  readonly allDropListIds = computed((): string[] => {
+    return this.daySections().flatMap(card =>
+      card.sections.map(s => s.dropListId)
+    );
+  });
+
   ngOnInit(): void {
     const taskNames = this.stateService.upcomingTaskNames();
     const period = this.stateService.planPeriod();
@@ -713,8 +870,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
 
   // ── Row tracking ──────────────────────────────────────────────────────────
 
-  rowTrack(row: DayRow): string {
-    if (row.kind === 'meal') return `meal-${row.id}`;
+  rowTrack(row: TaskRow): string {
     return `task-${row.entryIndex}`;
   }
 
@@ -790,22 +946,98 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, (date) => mealsForDate(date, this.stateService.dayTypes())));
   }
 
+  // ── Drag & drop ───────────────────────────────────────────────────────────
+
+  /**
+   * Handle a CDK drop into a slot section.
+   * - If same date AND same slot: pure reorder within the section.
+   * - Otherwise: cross-slot or cross-day move — update date + slot atomically
+   *   in a single signal mutation to prevent duplicate entries.
+   */
+  onDrop(event: CdkDragDrop<TaskRow[]>, targetDate: string, targetSlotKey: string): void {
+    const droppedEntry: PlaceTasksEntry = event.item.data;
+
+    this.entries.update(list => {
+      // Find the dropped entry's current index by reference identity
+      const fromIdx = list.indexOf(droppedEntry);
+      if (fromIdx === -1) return list;
+
+      const prevSlotKey = entrySlotKey(droppedEntry);
+      const prevDate = droppedEntry.scheduled_date;
+
+      // Build the fully updated entry in one step (atomic: date + slot)
+      const updatedEntry: PlaceTasksEntry = {
+        ...droppedEntry,
+        scheduled_date: targetDate,
+        // Clear both slot fields first, then set the appropriate one
+        after_anchor: undefined,
+        paired_meal_name: undefined,
+        ...(targetSlotKey !== '<sched>'
+          ? { paired_meal_name: targetSlotKey }
+          : {}),
+      };
+
+      // Remove from old position, insert at new position
+      const updated = [...list];
+      updated.splice(fromIdx, 1);
+
+      if (prevDate === targetDate && prevSlotKey === targetSlotKey) {
+        // Pure same-slot reorder: insert at the CDK-computed index within the slot
+        // Find the insertion offset among entries in this slot
+        const slotEntries = updated
+          .map((e, i) => ({ e, i }))
+          .filter(({ e }) => e.scheduled_date === targetDate && entrySlotKey(e) === targetSlotKey);
+
+        const insertAtSlotIdx = Math.min(event.currentIndex, slotEntries.length);
+        const insertAtListIdx = insertAtSlotIdx < slotEntries.length
+          ? slotEntries[insertAtSlotIdx].i
+          : (slotEntries.length > 0 ? slotEntries[slotEntries.length - 1].i + 1 : updated.length);
+        updated.splice(insertAtListIdx, 0, droppedEntry);
+      } else {
+        // Cross-slot or cross-day: append to the end of the target slot's entries
+        const slotEntries = updated
+          .map((e, i) => ({ e, i }))
+          .filter(({ e }) => e.scheduled_date === targetDate && entrySlotKey(e) === targetSlotKey);
+
+        const insertAtListIdx = slotEntries.length > 0
+          ? slotEntries[slotEntries.length - 1].i + 1
+          : updated.length;
+        updated.splice(insertAtListIdx, 0, updatedEntry);
+      }
+
+      return updated;
+    });
+  }
+
   // ── Save & Return ─────────────────────────────────────────────────────────
 
-  onSaveAndReturn(): void {
-    const planEntries: PlanEntryRequest[] = this.entries().map(entry => ({
-      date: entry.scheduled_date,
-      task_type: entry.task_type,
-      title: entry.title,
-      // Fixed-time tasks carry their clock time; floating (anchor-relative) tasks
-      // must keep a null scheduled_start so the day view renders them in their
-      // `after_anchor` slot instead of collapsing them onto the lunch anchor.
-      scheduled_start: entry.time_window_start ?? null,
-      after_anchor: entry.after_anchor,
-      duration_minutes: entry.duration_minutes,
-      energy_required: entry.energy_required,
-    }));
+  /**
+   * Map entries to PlanEntryRequest[], deriving contiguous slot_position per
+   * (scheduled_date, slotKey) group from the entries array order.
+   * slotKey = paired_meal_name ?? after_anchor ?? '<sched>'
+   */
+  toPlanEntries(): PlanEntryRequest[] {
+    const posByGroup = new Map<string, number>();
+    return this.entries().map(entry => {
+      const slotKey = `${entry.scheduled_date}::${entry.paired_meal_name ?? entry.after_anchor ?? '<sched>'}`;
+      const pos = posByGroup.get(slotKey) ?? 0;
+      posByGroup.set(slotKey, pos + 1);
+      return {
+        date: entry.scheduled_date,
+        task_type: entry.task_type,
+        title: entry.title,
+        scheduled_start: entry.after_anchor || entry.paired_meal_name ? null : (entry.time_window_start ?? null),
+        after_anchor: entry.paired_meal_name ? undefined : entry.after_anchor,
+        paired_meal_name: entry.paired_meal_name,
+        duration_minutes: entry.duration_minutes,
+        energy_required: entry.energy_required,
+        slot_position: pos,
+      };
+    });
+  }
 
+  onSaveAndReturn(): void {
+    const planEntries = this.toPlanEntries();
     this.stateService.setPlacedTasks(planEntries);
     this.stateService.markComplete('tasks');
     this.complete.emit();
