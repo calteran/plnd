@@ -13,6 +13,7 @@ use crate::models::{
 use crate::query_types::{
     CommittedEntry, PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
+use crate::repository::schedule::SlotTarget;
 
 const ENTRY_COLS: &str = "entry_id, user_id, routine_id, task_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
@@ -156,6 +157,135 @@ pub async fn update_entry(
     if result.rows_affected() == 0 {
         return Err(DatabaseError::NotFound);
     }
+    Ok(())
+}
+
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "schedule_entries", op = "reposition_entry")
+)]
+pub async fn reposition_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    date: NaiveDate,
+    target: &SlotTarget,
+    position: i32,
+) -> Result<(), DatabaseError> {
+    let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
+
+    // Load and lock the entry's current slot.
+    let current: Option<(NaiveDate, Option<String>, Option<Uuid>, i32)> = sqlx::query_as(
+        "SELECT date, after_anchor, slot_meal_anchor_id, slot_position
+         FROM schedule_entries WHERE entry_id = $1 AND user_id = $2 FOR UPDATE",
+    )
+    .bind(entry_id)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+    let Some((src_date, src_after, src_meal, src_pos)) = current else {
+        return Err(DatabaseError::NotFound);
+    };
+
+    let position = position.max(0);
+
+    // Step 1: compact the SOURCE slot (close the hole the entry leaves), excl. entry.
+    match (&src_after, &src_meal) {
+        (Some(a), None) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position - 1
+                 WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+                   AND slot_meal_anchor_id IS NULL
+                   AND slot_position > $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(src_date)
+            .bind(a)
+            .bind(src_pos)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+        }
+        (None, Some(m)) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position - 1
+                 WHERE user_id = $1 AND date = $2 AND slot_meal_anchor_id = $3
+                   AND after_anchor IS NULL
+                   AND slot_position > $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(src_date)
+            .bind(m)
+            .bind(src_pos)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+        }
+        _ => {} // entry had no slot (e.g. was a scheduled task) — nothing to compact.
+    }
+
+    // Step 2: open a gap in the TARGET slot at `position`, excl. entry.
+    let (tgt_after, tgt_meal): (Option<String>, Option<Uuid>) = match target {
+        SlotTarget::AfterAnchor(a) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position + 1
+                 WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+                   AND slot_meal_anchor_id IS NULL
+                   AND slot_position >= $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(date)
+            .bind(a)
+            .bind(position)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+            (Some(a.clone()), None)
+        }
+        SlotTarget::MealAnchor(m) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position + 1
+                 WHERE user_id = $1 AND date = $2 AND slot_meal_anchor_id = $3
+                   AND after_anchor IS NULL
+                   AND slot_position >= $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(date)
+            .bind(m)
+            .bind(position)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+            (None, Some(*m))
+        }
+    };
+
+    // Step 3: place the entry. Floating contract: scheduled_start = NULL.
+    let updated = sqlx::query(
+        "UPDATE schedule_entries SET
+             date = $1, after_anchor = $2, slot_meal_anchor_id = $3,
+             scheduled_start = NULL, slot_position = $4, updated_at = NOW()
+         WHERE entry_id = $5 AND user_id = $6",
+    )
+    .bind(date)
+    .bind(&tgt_after)
+    .bind(tgt_meal)
+    .bind(position)
+    .bind(entry_id)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+    if updated.rows_affected() == 0 {
+        return Err(DatabaseError::NotFound);
+    }
+
+    tx.commit().await.map_err(DatabaseError::from)?;
     Ok(())
 }
 
@@ -2028,5 +2158,197 @@ mod tests {
             vec!["a", "b", "c"],
             "must come back in slot_position order"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // reposition_entry
+    // -----------------------------------------------------------------------
+
+    use crate::repository::schedule::SlotTarget;
+
+    async fn insert_floating(
+        pool: &PgPool,
+        uid: Uuid,
+        date: NaiveDate,
+        title: &str,
+        anchor: &str,
+        pos: i32,
+    ) -> Uuid {
+        sqlx::query_scalar(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, status, after_anchor, slot_position)
+             VALUES ($1, 'work', $2, $3, 'planned', $4, $5) RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(title)
+        .bind(date)
+        .bind(anchor)
+        .bind(pos)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn slot_order(pool: &PgPool, uid: Uuid, date: NaiveDate, anchor: &str) -> Vec<String> {
+        sqlx::query_scalar(
+            "SELECT title FROM schedule_entries
+             WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+             ORDER BY slot_position",
+        )
+        .bind(uid)
+        .bind(date)
+        .bind(anchor)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_within_slot_reorders(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+        let _b = insert_floating(&pool, uid, d, "b", "lunch", 1).await;
+        let _c = insert_floating(&pool, uid, d, "c", "lunch", 2).await;
+
+        // Move "a" to the end (position 2).
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            2,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            slot_order(&pool, uid, d, "lunch").await,
+            vec!["b", "c", "a"]
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_between_slots_moves_and_compacts(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+        let _b = insert_floating(&pool, uid, d, "b", "lunch", 1).await;
+        let _x = insert_floating(&pool, uid, d, "x", "dinner", 0).await;
+
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d,
+            &SlotTarget::AfterAnchor("dinner".into()),
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(slot_order(&pool, uid, d, "lunch").await, vec!["b"]);
+        assert_eq!(slot_order(&pool, uid, d, "dinner").await, vec!["a", "x"]);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_into_and_out_of_meal_pairing(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let instance = crate::db::meal_anchor_instance::add(
+            &pool,
+            uid,
+            d,
+            "lunch",
+            NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            60,
+        )
+        .await
+        .unwrap();
+        let a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+
+        // Into the meal pairing.
+        reposition_entry(&pool, uid, a, d, &SlotTarget::MealAnchor(instance.id), 0)
+            .await
+            .unwrap();
+        let (after, meal, sched): (Option<String>, Option<Uuid>, Option<NaiveTime>) =
+            sqlx::query_as(
+                "SELECT after_anchor, slot_meal_anchor_id, scheduled_start
+                            FROM schedule_entries WHERE entry_id = $1",
+            )
+            .bind(a)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(after, None);
+        assert_eq!(meal, Some(instance.id));
+        assert_eq!(sched, None, "reposition forces scheduled_start NULL");
+
+        // Back out to a slot.
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d,
+            &SlotTarget::AfterAnchor("dinner".into()),
+            0,
+        )
+        .await
+        .unwrap();
+        let (after2, meal2): (Option<String>, Option<Uuid>) = sqlx::query_as(
+            "SELECT after_anchor, slot_meal_anchor_id
+                            FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(after2, Some("dinner".to_string()));
+        assert_eq!(meal2, None);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_across_days(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d1 = tomorrow();
+        let d2 = d1 + Duration::days(1);
+        let a = insert_floating(&pool, uid, d1, "a", "lunch", 0).await;
+        let _y = insert_floating(&pool, uid, d2, "y", "lunch", 0).await;
+
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d2,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            0,
+        )
+        .await
+        .unwrap();
+        let new_date: NaiveDate =
+            sqlx::query_scalar("SELECT date FROM schedule_entries WHERE entry_id = $1")
+                .bind(a)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(new_date, d2);
+        assert_eq!(slot_order(&pool, uid, d2, "lunch").await, vec!["a", "y"]);
+        assert!(slot_order(&pool, uid, d1, "lunch").await.is_empty());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_unknown_entry_is_not_found(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let err = reposition_entry(
+            &pool,
+            uid,
+            Uuid::new_v4(),
+            d,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            0,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, DatabaseError::NotFound));
     }
 }
