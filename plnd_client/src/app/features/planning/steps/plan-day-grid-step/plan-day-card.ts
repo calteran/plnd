@@ -148,16 +148,15 @@ export class PlanDayCardComponent {
   }
 
   /**
-   * All CDK drop list IDs across the full horizon (for cross-day connections).
-   * Each date uses that date's own meal slots so IDs match the actual drop lists
-   * rendered on each card. The current card's own IDs are excluded — CDK handles
-   * intra-list drops without needing them in `connectedTo`.
+   * All CDK drop list IDs across the full horizon (for cross-day and same-day connections).
+   * Each date uses that date's own meal slots so IDs match the actual drop lists rendered
+   * on each card. The current card's own IDs ARE included — a list's own ID in its own
+   * `connectedTo` is a harmless no-op in CDK, and excluding them would break same-day
+   * cross-slot drops (e.g. dragging a task from <sched> into a meal slot on the same card).
    */
   protected readonly allDropListIds = computed((): string[] => {
     const ids: string[] = [];
-    const thisDate = this.date();
     for (const date of this.horizonDays()) {
-      if (date === thisDate) continue; // exclude own lists; CDK handles intra-list natively
       // Meal-paired slots for this specific date
       for (const s of this.dayTypesMealsService.mealsForDate(date)) {
         ids.push(wizardDropListId(date, s.name));

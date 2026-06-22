@@ -199,6 +199,55 @@ describe('PlanDayCardComponent', () => {
     });
   });
 
+  describe('allDropListIds() same-day connections', () => {
+    it('includes same-day sibling slot IDs so cross-slot drag on the same card is permitted', () => {
+      createComponent('2026-03-31');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-31', '2026-04-01']);
+      fixture.detectChanges();
+
+      const ids: string[] = (fixture.componentInstance as unknown as { allDropListIds(): string[] }).allDropListIds();
+
+      // PATTERN_FIXTURE has breakfast/lunch/dinner; same-day lunch and sched IDs must be present
+      expect(ids).toContain('wizard-slot-2026-03-31-lunch');
+      expect(ids).toContain('wizard-slot-2026-03-31-<sched>');
+      // Cross-day IDs should still be present
+      expect(ids).toContain('wizard-slot-2026-04-01-lunch');
+    });
+  });
+
+  describe('onDrop() same-day cross-slot (into-meal pairing)', () => {
+    it('same-day drop from <sched> into meal slot sets paired_meal_name and leaves exactly ONE instance', () => {
+      service.initSession('2026-03-31', '2026-04-06');
+      service.addTask({ date: '2026-03-31', title: 'Morning Walk', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-31');
+
+      const task = service.scheduledTasks().find(t => t.title === 'Morning Walk')!;
+      const dropEvent = {
+        item: { data: task },
+        previousIndex: 0,
+        currentIndex: 0,
+        container: { data: [] },
+        previousContainer: { data: [task] },
+        isPointerOverContainer: true,
+        distance: { x: 0, y: 0 },
+        dropPoint: { x: 0, y: 0 },
+      } as unknown as CdkDragDrop<PlannedTask[]>;
+
+      // Drop into 'lunch' slot on the SAME date (same-day cross-slot)
+      (fixture.componentInstance as unknown as { onDrop(e: CdkDragDrop<PlannedTask[]>, s: string): void })
+        .onDrop(dropEvent, 'lunch');
+
+      const allWalks = service.scheduledTasks().filter(t => t.title === 'Morning Walk');
+      // (a) exactly ONE instance
+      expect(allWalks.length).toBe(1);
+      // (b) date unchanged
+      expect(allWalks[0].date).toBe('2026-03-31');
+      // (c) now paired with lunch
+      expect(allWalks[0].paired_meal_name).toBe('lunch');
+    });
+  });
+
   describe('onDrop() cross-day duplicate regression', () => {
     it('cross-day drop leaves EXACTLY ONE instance of the task on the new date', () => {
       // Regression: the old onDrop called moveTaskToDay then updateTaskSlot with the
