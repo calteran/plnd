@@ -1,12 +1,14 @@
 import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
-import { Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
+import { Observable, Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
 import { ConfigService } from './config.service';
-import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor } from '../models/schedule';
+import { ScheduleItem, MealAnchor, ScheduleTask, SlotGroup, TaskEditPatch, isMealAnchor } from '../models/schedule';
 import { ScheduleAnchorDto, SchedulePeriodResponse } from '../models/week-plan';
 import { todayIso } from '../utils/date-only';
-import { assembleScheduleItems, toMealUiStatus } from '../utils/schedule-assembly';
+import { assembleScheduleItems, assembleSlotGroups, toMealUiStatus } from '../utils/schedule-assembly';
+
+export type RepositionTarget = { afterAnchor: string } | { mealAnchorId: string };
 
 export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
 
@@ -17,12 +19,14 @@ export class ScheduleService {
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly _items        = signal<ScheduleItem[]>([]);
+  private readonly _slotGroups   = signal<SlotGroup[]>([]);
   private readonly _loading      = signal(false);
   private readonly _error        = signal<string | null>(null);
   private readonly _date         = signal(todayIso());
   private readonly _loadTrigger$ = new Subject<string>();
 
   readonly scheduleItems = this._items.asReadonly();
+  readonly slotGroups    = this._slotGroups.asReadonly();
   readonly isLoading     = this._loading.asReadonly();
   readonly loadError     = this._error.asReadonly();
   readonly date          = this._date.asReadonly();
@@ -48,7 +52,10 @@ export class ScheduleService {
       takeUntilDestroyed(),
     ).subscribe(({ schedule, anchors }) => {
       if (schedule.error) this._error.set('Failed to load schedule');
-      this._items.set(assembleScheduleItems(anchors, schedule.data.entries, schedule.data.planned_meals ?? []));
+      const entries      = schedule.data.entries;
+      const plannedMeals = schedule.data.planned_meals ?? [];
+      this._items.set(assembleScheduleItems(anchors, entries, plannedMeals));
+      this._slotGroups.set(assembleSlotGroups(anchors, entries, plannedMeals));
       this._loading.set(false);
     });
   }
@@ -141,6 +148,18 @@ export class ScheduleService {
 
   addItem(task: ScheduleTask): void {
     this._items.update(items => [...items, task]);
+  }
+
+  repositionTask(
+    entryId: string,
+    date: string,
+    target: RepositionTarget,
+    position: number,
+  ): Observable<void> {
+    const body: Record<string, unknown> = { date, position };
+    if ('afterAnchor' in target) body['after_anchor'] = target.afterAnchor;
+    else body['slot_meal_anchor_id'] = target.mealAnchorId;
+    return this.http.patch<void>(`${this.apiBase}/schedule/entries/${entryId}/position`, body);
   }
 }
 

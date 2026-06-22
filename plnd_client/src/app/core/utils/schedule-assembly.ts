@@ -146,13 +146,31 @@ export function assembleSlotGroups(
   entries: ScheduleEntryDto[],
   plannedMeals: PlannedMealEntryDto[],
 ): SlotGroup[] {
+  const mealAnchorIds = new Set(
+    anchors.filter(a => a.kind === 'meal' && a.id !== null).map(a => a.id as string),
+  );
+
   // Partition floating tasks by their after_anchor label (lowercased).
   // Entries appear in backend sort order (by slot_position), so insertion
   // order gives us the correct arrival order within each slot.
   const floatingByLabel = new Map<string, ScheduleTask[]>();
+  // Index scheduled tasks by their entry_id so we can resolve scheduled_task
+  // anchors below.
+  const scheduledById = new Map<string, ScheduleTask>();
+  // Index during-meal tasks by their meal anchor id.
+  const duringByMealId = new Map<string, ScheduleTask[]>();
   for (const e of entries) {
-    if (e.slot_meal_anchor_id) continue; // paired — handled by meal rows
-    if (e.scheduled_start) continue;     // scheduled — is an anchor itself
+    const mealAnchorId = e.slot_meal_anchor_id;
+    if (mealAnchorId && mealAnchorIds.has(mealAnchorId)) {
+      const list = duringByMealId.get(mealAnchorId) ?? [];
+      list.push(mapEntry(e));
+      duringByMealId.set(mealAnchorId, list);
+      continue;
+    }
+    if (e.scheduled_start) {
+      scheduledById.set(e.entry_id, mapEntry(e));
+      continue;                          // scheduled — is an anchor itself
+    }
     if (!e.after_anchor) continue;       // orphan — no slot to place it in
     const key = e.after_anchor.toLowerCase();
     const list = floatingByLabel.get(key) ?? [];
@@ -173,7 +191,9 @@ export function assembleSlotGroups(
 
     let anchor: SlotGroup['anchor'] = null;
     if (a.kind === 'meal' && a.id) {
-      anchor = mapAnchorInstance(a, mealByAnchor.get(a.id), []);
+      anchor = mapAnchorInstance(a, mealByAnchor.get(a.id), duringByMealId.get(a.id) ?? []);
+    } else if (a.kind === 'scheduled_task' && a.id) {
+      anchor = scheduledById.get(a.id) ?? null;
     }
     groups.push({ anchorLabel: label, anchor, tasks: floatingByLabel.get(label) ?? [] });
   }

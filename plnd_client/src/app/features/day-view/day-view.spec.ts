@@ -1,27 +1,33 @@
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { By } from '@angular/platform-browser';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { DayViewComponent } from './day-view';
 import { ScheduleService } from '../../core/services/schedule.service';
 import { BriefingService } from '../../core/services/briefing.service';
 import { TimezoneService } from '../../core/services/timezone.service';
-import { ScheduleItem } from '../../core/models/schedule';
+import { MealAnchor, ScheduleItem, ScheduleTask, SlotGroup } from '../../core/models/schedule';
 import { TimezoneAnchorDto } from '../../core/models/timezone';
 import { signal } from '@angular/core';
 
 function makeScheduleServiceMock(overrides: Partial<{
   scheduleItems: ScheduleItem[];
+  slotGroups: SlotGroup[];
   isLoading: boolean;
   loadError: string | null;
   date: string;
 }> = {}) {
-  const items   = signal(overrides.scheduleItems ?? []);
-  const loading = signal(overrides.isLoading     ?? false);
-  const error   = signal(overrides.loadError     ?? null);
-  const date    = signal(overrides.date          ?? '2026-03-19');
+  const items      = signal(overrides.scheduleItems ?? []);
+  const slotGroups = signal(overrides.slotGroups    ?? []);
+  const loading    = signal(overrides.isLoading     ?? false);
+  const error      = signal(overrides.loadError     ?? null);
+  const date       = signal(overrides.date          ?? '2026-03-19');
   return {
     scheduleItems: items.asReadonly(),
+    slotGroups:    slotGroups.asReadonly(),
     isLoading:     loading.asReadonly(),
     loadError:     error.asReadonly(),
     date:          date.asReadonly(),
@@ -30,6 +36,7 @@ function makeScheduleServiceMock(overrides: Partial<{
     toggleMealConsumed:  jasmine.createSpy('toggleMealConsumed'),
     setMealConsumption:  jasmine.createSpy('setMealConsumption'),
     addItem:             jasmine.createSpy('addItem'),
+    repositionTask:      jasmine.createSpy('repositionTask').and.returnValue(of(undefined)),
     // Plain method (not a pre-installed spy) so individual tests can spyOn it.
     updateEntry(_id: string, _patch: unknown): void {
       // no-op stub; overridden per-test via spyOn
@@ -142,11 +149,16 @@ describe('DayViewComponent (schedule view)', () => {
   });
 
   it('renders meal and task rows when items are present', async () => {
-    const items: ScheduleItem[] = [
-      { id: 'm1', name: 'Breakfast', emoji: '🥑', status: 'done', duringMealTasks: [] },
-      { id: 't1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false, floating: false }
+    const mealAnchor: ScheduleItem = { id: 'm1', name: 'Breakfast', emoji: '🥑', status: 'done', duringMealTasks: [] };
+    const task: ScheduleTask = { id: 't1', type: 'general', label: '💊 Vitamins', status: 'pending', oneShot: false, floating: true };
+    const slotGroups: SlotGroup[] = [
+      { anchorLabel: 'breakfast', anchor: mealAnchor as MealAnchor, tasks: [] },
+      { anchorLabel: 'after-breakfast', anchor: null, tasks: [task] },
     ];
-    const svc = makeScheduleServiceMock({ scheduleItems: items });
+    const svc = makeScheduleServiceMock({
+      scheduleItems: [mealAnchor, task],
+      slotGroups,
+    });
     await TestBed.configureTestingModule({
       imports: [DayViewComponent],
       providers: [
@@ -594,5 +606,93 @@ describe('DayViewComponent (timezone: travel day)', () => {
 
     expect(f.componentInstance.zoneView()?.kind).toBe('same');
     expect(f.debugElement.query(By.css('app-timezone-switch-row'))).toBeNull();
+  });
+});
+
+// ── Drag-and-drop drop handler tests ─────────────────────────────────────────
+
+describe('DayViewComponent (drag-and-drop)', () => {
+  const DROP_DATE = '2026-03-20';
+
+  let t1: ScheduleTask;
+  let t2: ScheduleTask;
+
+  beforeEach(() => {
+    t1 = { id: 't1', type: 'general', label: 'Task 1', status: 'pending', oneShot: false, floating: true };
+    t2 = { id: 't2', type: 'general', label: 'Task 2', status: 'pending', oneShot: false, floating: true };
+  });
+
+  async function setupDrop(tasks: ScheduleTask[]) {
+    const slotGroups: SlotGroup[] = [
+      { anchorLabel: 'lunch', anchor: null, tasks: [...tasks] },
+    ];
+    const svc = makeScheduleServiceMock({
+      scheduleItems: [...tasks],
+      slotGroups,
+      date: DROP_DATE,
+    });
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: DROP_DATE }) } },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    }).compileComponents();
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+    // Prime the slotGroupMap with a mutable copy of the tasks array
+    const map = new Map<string, ScheduleTask[]>();
+    map.set('lunch', [...tasks]);
+    f.componentInstance.slotGroupMap.set(map);
+    return { f, component: f.componentInstance, svc };
+  }
+
+  it('reorders within a slot and calls repositionTask with the right args', async () => {
+    const { component, svc } = await setupDrop([t1, t2]);
+
+    const taskList = component.slotTasks('lunch');
+    const drop = {
+      previousIndex: 0,
+      currentIndex: 1,
+      container: { id: 'slot-lunch', data: taskList },
+      previousContainer: { id: 'slot-lunch', data: taskList },
+      item: { data: t1 },
+    } as unknown as CdkDragDrop<ScheduleTask[]>;
+
+    component.onSlotDrop(drop, 'lunch');
+
+    // (a) local slot reordered
+    expect(component.slotTasks('lunch').map(t => t.id)).toEqual(['t2', 't1']);
+
+    // (b) repositionTask called with correct args
+    expect(svc.repositionTask).toHaveBeenCalledOnceWith(
+      't1',
+      DROP_DATE,
+      { afterAnchor: 'lunch' },
+      1,
+    );
+  });
+
+  it('does not reorder when previousIndex === currentIndex', async () => {
+    const { component, svc } = await setupDrop([t1, t2]);
+
+    const taskList = component.slotTasks('lunch');
+    const drop = {
+      previousIndex: 0,
+      currentIndex: 0,
+      container: { id: 'slot-lunch', data: taskList },
+      previousContainer: { id: 'slot-lunch', data: taskList },
+      item: { data: t1 },
+    } as unknown as CdkDragDrop<ScheduleTask[]>;
+
+    component.onSlotDrop(drop, 'lunch');
+
+    expect(component.slotTasks('lunch').map(t => t.id)).toEqual(['t1', 't2']);
+    expect(svc.repositionTask).toHaveBeenCalledOnceWith('t1', DROP_DATE, { afterAnchor: 'lunch' }, 0);
   });
 });
