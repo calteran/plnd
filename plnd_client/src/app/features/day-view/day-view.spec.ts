@@ -695,4 +695,85 @@ describe('DayViewComponent (drag-and-drop)', () => {
     expect(component.slotTasks('lunch').map(t => t.id)).toEqual(['t1', 't2']);
     expect(svc.repositionTask).toHaveBeenCalledOnceWith('t1', DROP_DATE, { afterAnchor: 'lunch' }, 0);
   });
+
+  it('transfers a task from a slot into a meal during-meal list and never mutates the service snapshot', async () => {
+    // Build a meal anchor with an empty during-meal list (service-owned snapshot).
+    const mealId = 'meal-breakfast';
+    const serviceOwnedDuringMeal: ScheduleTask[] = [];
+    const mealAnchor: MealAnchor = {
+      id: mealId, name: 'Breakfast', emoji: '🥑', status: 'planned',
+      duringMealTasks: serviceOwnedDuringMeal,
+    };
+
+    const slotGroups: SlotGroup[] = [
+      { anchorLabel: 'breakfast', anchor: mealAnchor, tasks: [] },
+      { anchorLabel: 'after-breakfast', anchor: null, tasks: [t1, t2] },
+    ];
+    const svc = makeScheduleServiceMock({
+      scheduleItems: [mealAnchor as unknown as ScheduleItem, t1, t2],
+      slotGroups,
+      date: DROP_DATE,
+    });
+
+    await TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: DROP_DATE }) } },
+        provideHttpClient(),
+        provideHttpClientTesting(),
+      ],
+    }).compileComponents();
+
+    const f = TestBed.createComponent(DayViewComponent);
+    f.detectChanges();
+
+    // Manually prime slotGroupMap with mutable copies (as the effect would do in real use).
+    const slotMap = new Map<string, ScheduleTask[]>();
+    slotMap.set('breakfast', []);
+    slotMap.set('after-breakfast', [...[t1, t2]]);
+    f.componentInstance.slotGroupMap.set(slotMap);
+
+    // Obtain the day-view-owned clone of the meal anchor.
+    // After the fix the mealAnchorMap holds shallow-cloned MealAnchor objects with
+    // their own duringMealTasks arrays — separate from serviceOwnedDuringMeal.
+    const clonedMeal = f.componentInstance.mealAnchor(mealId)!;
+
+    // Source list: the day-view-owned slot list for 'after-breakfast'.
+    const sourceSlotList = f.componentInstance.slotTasks('after-breakfast');
+    // Destination list: the day-view-owned during-meal list for the cloned meal.
+    const destMealList = clonedMeal.duringMealTasks;
+
+    const drop = {
+      previousIndex: 0,
+      currentIndex: 0,
+      container: { id: `meal-${mealId}`, data: destMealList },
+      previousContainer: { id: 'slot-after-breakfast', data: sourceSlotList },
+      item: { data: t1 },
+    } as unknown as CdkDragDrop<ScheduleTask[]>;
+
+    f.componentInstance.onMealDrop(drop, mealId);
+
+    // (a) t1 moved into the meal's day-view-owned during-meal list at index 0.
+    expect(clonedMeal.duringMealTasks.map((t: ScheduleTask) => t.id)).toEqual(['t1']);
+
+    // (b) source slot list no longer contains t1.
+    expect(f.componentInstance.slotTasks('after-breakfast').map((t: ScheduleTask) => t.id)).toEqual(['t2']);
+
+    // (c) repositionTask called with mealAnchorId + position.
+    expect(svc.repositionTask).toHaveBeenCalledOnceWith(
+      't1',
+      DROP_DATE,
+      { mealAnchorId: mealId },
+      0,
+    );
+
+    // (d) CRUCIALLY: the service's snapshot object was NOT mutated.
+    // clonedMeal.duringMealTasks must be a different array reference than serviceOwnedDuringMeal.
+    expect(clonedMeal.duringMealTasks).not.toBe(serviceOwnedDuringMeal);
+    expect(serviceOwnedDuringMeal.length).toBe(0, 'service snapshot must not be mutated');
+  });
 });

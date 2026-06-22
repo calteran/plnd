@@ -7,7 +7,7 @@ import { ScheduleService, RepositionTarget } from '../../core/services/schedule.
 import { todayIso } from '../../core/utils/date-only';
 import { BriefingService } from '../../core/services/briefing.service';
 import { TimezoneService } from '../../core/services/timezone.service';
-import { isMealAnchor, ScheduleItem, ScheduleTask, TaskEditPatch } from '../../core/models/schedule';
+import { isMealAnchor, MealAnchor, ScheduleItem, ScheduleTask, TaskEditPatch } from '../../core/models/schedule';
 import { DayZoneViewDto, TimezoneAnchorDto } from '../../core/models/timezone';
 import { DaySwitch, DayZoneView } from '../../core/utils/zone-projection';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
@@ -88,11 +88,13 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
             @for (group of scheduleService.slotGroups(); track group.anchorLabel) {
               @if (group.anchor !== null) {
                 @if (isMealAnchor(group.anchor)) {
+                  @let mealClone = mealAnchor(group.anchor.id);
+                  @if (mealClone) {
                   <app-meal-row
                     [id]="'task-row-' + group.anchor.id"
                     [class.dimmed]="isSpotlightDimmed(group.anchor)"
                     [attr.inert]="isSpotlightDimmed(group.anchor) ? '' : null"
-                    [meal]="group.anchor"
+                    [meal]="mealClone"
                     [date]="scheduleService.date()"
                     [editingId]="editingId()"
                     [dropListId]="'meal-' + group.anchor.id"
@@ -105,6 +107,7 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                     (doneToggle)="scheduleService.toggleMealConsumed($event)"
                     (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
                   />
+                  }
                 } @else {
                   <app-task-row
                     [id]="'task-row-' + group.anchor.id"
@@ -119,8 +122,7 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                   />
                 }
               }
-              @if (slotTasks(group.anchorLabel).length > 0 || true) {
-                <div
+              <div
                   cdkDropList
                   [id]="'slot-' + group.anchorLabel"
                   [cdkDropListData]="slotTasks(group.anchorLabel)"
@@ -144,7 +146,6 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                     />
                   }
                 </div>
-              }
             }
           </div>
         }
@@ -198,23 +199,43 @@ export class DayViewComponent implements OnInit, OnDestroy {
    */
   readonly slotGroupMap = signal<Map<string, ScheduleTask[]>>(new Map());
 
+  /**
+   * Mutable per-meal anchor clones keyed by meal id.
+   * Each clone's `duringMealTasks` is a copied array — CDK and drop handlers
+   * operate only on these copies, never on the service's slotGroups() objects.
+   * Rebuilt (with fresh clones) each time the service emits a new snapshot.
+   */
+  readonly mealAnchorMap = signal<Map<string, MealAnchor>>(new Map());
+
   constructor() {
-    // Rebuild mutable slot map whenever the service emits a fresh slot-groups snapshot.
-    // Use effect() so the rebuild runs inside the Angular signal graph and triggers
-    // OnPush change detection automatically.
+    // Rebuild mutable slot map and meal-anchor map whenever the service emits a
+    // fresh slot-groups snapshot. Use effect() so the rebuild runs inside the
+    // Angular signal graph and triggers OnPush change detection automatically.
     effect(() => {
       const groups = this.scheduleService.slotGroups();
-      const map = new Map<string, ScheduleTask[]>();
+      const slotMap = new Map<string, ScheduleTask[]>();
+      const mealMap = new Map<string, MealAnchor>();
       for (const g of groups) {
-        map.set(g.anchorLabel, [...g.tasks]);
+        slotMap.set(g.anchorLabel, [...g.tasks]);
+        if (g.anchor && isMealAnchor(g.anchor)) {
+          // Shallow-clone the meal anchor with a copied duringMealTasks array so
+          // CDK can mutate it in place without touching the service's snapshot.
+          mealMap.set(g.anchor.id, { ...g.anchor, duringMealTasks: [...g.anchor.duringMealTasks] });
+        }
       }
-      this.slotGroupMap.set(map);
+      this.slotGroupMap.set(slotMap);
+      this.mealAnchorMap.set(mealMap);
     });
   }
 
   /** Returns the mutable task array for a given slot label (empty array if unknown). */
   slotTasks(anchorLabel: string): ScheduleTask[] {
     return this.slotGroupMap().get(anchorLabel) ?? [];
+  }
+
+  /** Returns the day-view-owned mutable clone of a meal anchor (undefined if unknown). */
+  mealAnchor(mealId: string): MealAnchor | undefined {
+    return this.mealAnchorMap().get(mealId);
   }
 
   /** IDs of all CDK drop lists: one per slot and one per meal's during-meal list. */
