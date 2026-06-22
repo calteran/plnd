@@ -30,7 +30,7 @@ pub async fn get_period(
         sqlx::query_as::<_, ScheduleEntry>(sqlx::AssertSqlSafe(format!(
             "SELECT {ENTRY_COLS} FROM schedule_entries
          WHERE user_id = $1 AND date >= $2 AND date <= $3
-         ORDER BY date, scheduled_start"
+         ORDER BY date, slot_position, scheduled_start, entry_id"
         )))
         .bind(user_id)
         .bind(start)
@@ -55,7 +55,7 @@ pub async fn get_carryover(
          WHERE user_id = $1 AND date < $2
            AND status IN ('planned', 'deferred')
            AND one_shot = FALSE
-         ORDER BY date, scheduled_start"
+         ORDER BY date, slot_position, scheduled_start, entry_id"
     )))
     .bind(user_id)
     .bind(before)
@@ -1823,5 +1823,42 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(pos, 0, "new column defaults to 0");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_period_orders_floating_tasks_by_slot_position(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let sched = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+
+        // Insert three floating "lunch" tasks with positions 2,0,1 in that order.
+        for (title, pos) in [("c", 2), ("a", 0), ("b", 1)] {
+            sqlx::query(
+                "INSERT INTO schedule_entries
+                   (user_id, task_type, title, date, status, after_anchor, slot_position)
+                 VALUES ($1, 'work', $2, $3, 'planned', 'lunch', $4)",
+            )
+            .bind(uid)
+            .bind(title)
+            .bind(start)
+            .bind(pos)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        let _ = sched;
+
+        let period = get_period(&pool, uid, start, start).await.unwrap();
+        let titles: Vec<&str> = period
+            .entries
+            .iter()
+            .filter(|e| e.after_anchor.as_deref() == Some("lunch"))
+            .map(|e| e.title.as_deref().unwrap())
+            .collect();
+        assert_eq!(
+            titles,
+            vec!["a", "b", "c"],
+            "must come back in slot_position order"
+        );
     }
 }
