@@ -54,6 +54,9 @@ pub struct ScheduleEntry {
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
     pub one_shot: bool,
+    /// Per-slot ordering for floating/paired tasks (§4.9). 0 for scheduled-task
+    /// anchors, which don't live in a slot.
+    pub slot_position: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

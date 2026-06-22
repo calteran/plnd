@@ -17,7 +17,7 @@ use crate::query_types::{
 const ENTRY_COLS: &str = "entry_id, user_id, routine_id, task_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
      after_anchor, slot_meal_anchor_id, deviation_note,
-     duration_minutes, energy_required, one_shot, created_at, updated_at";
+     duration_minutes, energy_required, one_shot, slot_position, created_at, updated_at";
 
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_period"))]
 pub async fn get_period(
@@ -1796,5 +1796,32 @@ mod tests {
 
         let err = update_entry(&pool, uid, Uuid::new_v4(), &patch).await;
         assert!(matches!(err, Err(DatabaseError::NotFound)));
+    }
+
+    // -----------------------------------------------------------------------
+    // slot_position
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn slot_position_column_exists_and_defaults_zero(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries (user_id, task_type, title, date, status, after_anchor)
+             VALUES ($1, 'work', 'a', $2, 'planned', 'lunch') RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(d)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let pos: i32 =
+            sqlx::query_scalar("SELECT slot_position FROM schedule_entries WHERE entry_id = $1")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(pos, 0, "new column defaults to 0");
     }
 }
