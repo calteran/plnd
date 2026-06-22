@@ -1,13 +1,24 @@
 import { Component, computed, inject, input, ChangeDetectionStrategy } from '@angular/core';
 import { DatePipe, TitleCasePipe } from '@angular/common';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
-import { EnergyLevel } from '../../../../core/models/week-plan';
+import { EnergyLevel, PlannedTask } from '../../../../core/models/week-plan';
+
+/** Derive the slot key from a PlannedTask (matches buildCommitRequest derivation). */
+function taskSlotKey(t: PlannedTask): string {
+  return t.paired_meal_name ?? t.after_anchor ?? '<sched>';
+}
+
+/** CDK drop list ID for a (date, slotKey) pair in the wizard day grid. */
+function wizardDropListId(date: string, slotKey: string): string {
+  return `wizard-slot-${date}-${slotKey}`;
+}
 
 @Component({
   selector: 'app-plan-day-card',
   standalone: true,
-  imports: [DatePipe, TitleCasePipe],
+  imports: [DatePipe, TitleCasePipe, DragDropModule],
   styleUrl: 'plan-day-card.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -48,19 +59,55 @@ import { EnergyLevel } from '../../../../core/models/week-plan';
                 } @else {
                   <span class="empty-val">—</span>
                 }
+                <!-- Drop list for tasks paired with this meal slot -->
+                <div
+                  cdkDropList
+                  [id]="dropListId(entry.name)"
+                  [cdkDropListData]="tasksForSlot(entry.name)"
+                  [cdkDropListConnectedTo]="allDropListIds()"
+                  (cdkDropListDropped)="onDrop($event, entry.name)"
+                  class="slot-drop-list meal-slot-drop-list"
+                >
+                  @for (task of tasksForSlot(entry.name); track task) {
+                    <div
+                      cdkDrag
+                      [cdkDragData]="task"
+                      class="body-row draggable-task"
+                    >
+                      <span class="val">{{ task.title }}</span>
+                      <span class="energy-badge" [class]="energyClass(task.energy)">
+                        {{ energyLabel(task.energy) }}
+                      </span>
+                    </div>
+                  }
+                </div>
               </div>
             }
           </div>
           <div>
             <div class="body-section-label">Tasks</div>
-            @for (task of tasks(); track task) {
-              <div class="body-row">
-                <span class="val">{{ task.title }}</span>
-                <span class="energy-badge" [class]="energyClass(task.energy)">
-                  {{ energyLabel(task.energy) }}
-                </span>
-              </div>
-            }
+            <!-- Drop list for tasks not assigned to a meal slot -->
+            <div
+              cdkDropList
+              [id]="dropListId('<sched>')"
+              [cdkDropListData]="tasksForSlot('<sched>')"
+              [cdkDropListConnectedTo]="allDropListIds()"
+              (cdkDropListDropped)="onDrop($event, '<sched>')"
+              class="slot-drop-list"
+            >
+              @for (task of tasksForSlot('<sched>'); track task) {
+                <div
+                  cdkDrag
+                  [cdkDragData]="task"
+                  class="body-row draggable-task"
+                >
+                  <span class="val">{{ task.title }}</span>
+                  <span class="energy-badge" [class]="energyClass(task.energy)">
+                    {{ energyLabel(task.energy) }}
+                  </span>
+                </div>
+              }
+            </div>
           </div>
         </div>
       </div>
@@ -69,6 +116,8 @@ import { EnergyLevel } from '../../../../core/models/week-plan';
 })
 export class PlanDayCardComponent {
   readonly date = input.required<string>();
+  /** All dates in the wizard horizon — used to compute cross-day connected drop list IDs. */
+  readonly horizonDays = input<string[]>([]);
 
   private readonly weekPlanService = inject(WeekPlanService);
   private readonly dayTypesMealsService = inject(DayTypesMealsService);
@@ -87,6 +136,57 @@ export class PlanDayCardComponent {
   }
 
   protected readonly mealCount = computed(() => this.slots().filter(s => this.getMeal(s.name)).length);
+
+  /** Tasks in a specific slot (meal name or '<sched>' for unanchored). */
+  protected tasksForSlot(slotKey: string): PlannedTask[] {
+    return this.tasks().filter(t => taskSlotKey(t) === slotKey);
+  }
+
+  /** CDK drop list ID for a slot on this card's date. */
+  protected dropListId(slotKey: string): string {
+    return wizardDropListId(this.date(), slotKey);
+  }
+
+  /**
+   * All CDK drop list IDs across the full horizon (for cross-day connections) plus
+   * this card's own meal slot lists.
+   */
+  protected readonly allDropListIds = computed((): string[] => {
+    const ids: string[] = [];
+    const slots = this.slots();
+    for (const date of this.horizonDays()) {
+      // Meal-paired slots per date
+      for (const s of slots) {
+        ids.push(wizardDropListId(date, s.name));
+      }
+      // Unanchored task slot per date
+      ids.push(wizardDropListId(date, '<sched>'));
+    }
+    return ids;
+  });
+
+  protected onDrop(event: CdkDragDrop<PlannedTask[]>, targetSlotKey: string): void {
+    const task: PlannedTask = event.item.data;
+    const prevDate = task.date;
+    const prevSlotKey = taskSlotKey(task);
+    const newDate = this.date();
+
+    if (prevDate !== newDate) {
+      // Cross-day move: update the task's date first
+      this.weekPlanService.moveTaskToDay(task, newDate);
+    }
+
+    // Determine source slot for within-slot reorder vs cross-slot move
+    if (prevDate === newDate && prevSlotKey === targetSlotKey) {
+      // Pure reorder within the same (date, slot)
+      this.weekPlanService.reorderTask(newDate, targetSlotKey, event.previousIndex, event.currentIndex);
+    } else {
+      // Cross-slot or cross-day: update paired_meal_name / after_anchor on the task
+      // We need to mutate the task's slot assignment. Since tasks are plain objects in the signal,
+      // we update by splicing the task out of old slot and patching slot fields.
+      this.weekPlanService.updateTaskSlot(task, newDate, targetSlotKey, event.currentIndex);
+    }
+  }
 
   // Public — called directly in spec tests via componentInstance
   energyClass(energy: EnergyLevel): string {

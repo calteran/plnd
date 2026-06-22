@@ -97,6 +97,9 @@ export interface PlannedTask {
   task_type?: string;
   scheduled_start?: string; // "HH:MM"
   one_shot?: boolean;
+  /** Slot anchor label — task floats after this meal/anchor. Mutually exclusive with `paired_meal_name`. */
+  after_anchor?: string;
+  /** Pre-materialization meal pairing. Mutually exclusive with `after_anchor`. */
   paired_meal_name?: string;
 }
 

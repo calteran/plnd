@@ -19,7 +19,7 @@ import { daysInRange } from '../../utils/date-format.utils';
       <p class="subtitle">Review each day. Tap a card to expand and edit.</p>
       <div class="day-grid">
         @for (day of horizonDays(); track day) {
-          <app-plan-day-card [date]="day" />
+          <app-plan-day-card [date]="day" [horizonDays]="horizonDays()" />
         }
       </div>
     </div>

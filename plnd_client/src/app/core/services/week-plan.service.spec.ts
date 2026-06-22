@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
-import { MealRef, PostSchedulePlanRequest, SchedulePeriodResponse } from '../models/week-plan';
+import { MealRef, PlanEntryRequest, PostSchedulePlanRequest, SchedulePeriodResponse } from '../models/week-plan';
 import { DayTypesMealsService } from './day-types-meals.service';
 
 describe('WeekPlanService', () => {
@@ -614,6 +614,63 @@ describe('WeekPlanService', () => {
       service.setDropReason('task-2', 'No longer needed');
       service.setCarryoverDecision('task-1', 'carry');
       expect(service.dropReasons()['task-2']).toBe('No longer needed');
+    });
+  });
+
+  describe('reorderTask / reorderWithinSlot', () => {
+    it('reorderWithinSlot moves an item within its (date, slot) slice without disturbing other slots', () => {
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'a', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'b', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'c', energy: 'low', after_anchor: 'dinner' });
+
+      // Move 'b' (index 1 in lunch) to before 'a' (index 0)
+      service.reorderTask('2026-06-22', 'lunch', 1, 0);
+
+      const tasks = service.scheduledTasks();
+      const lunch = tasks.filter(t => t.after_anchor === 'lunch');
+      expect(lunch.map(t => t.title)).toEqual(['b', 'a']);
+      const dinner = tasks.filter(t => t.after_anchor === 'dinner');
+      expect(dinner.map(t => t.title)).toEqual(['c']); // untouched
+    });
+
+    it('moveTaskToDay updates date on the matched task only', () => {
+      service.initSession('2026-06-22', '2026-06-23');
+      service.addTask({ date: '2026-06-22', title: 'Walk', energy: 'low' });
+      service.addTask({ date: '2026-06-22', title: 'Run', energy: 'medium' });
+
+      const task = service.scheduledTasks()[0];
+      service.moveTaskToDay(task, '2026-06-23');
+
+      expect(service.scheduledTasks()[0].date).toBe('2026-06-23');
+      expect(service.scheduledTasks()[1].date).toBe('2026-06-22');
+    });
+  });
+
+  describe('buildCommitRequest slot_position derivation', () => {
+    // Note: no initSession — horizonDays() is empty, so only task entries are emitted.
+    it('derives contiguous slot_position per (date, slot) at commit', () => {
+      service.addTask({ date: '2026-06-22', title: 'a', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'b', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'c', energy: 'low', after_anchor: 'dinner' });
+
+      const req = (service as unknown as { buildCommitRequest(id: string, r: boolean): PostSchedulePlanRequest }).buildCommitRequest('task-1', false);
+      const lunch = req.entries.filter((e: PlanEntryRequest) => e.after_anchor === 'lunch');
+      expect(lunch.map((e: PlanEntryRequest) => e.slot_position)).toEqual([0, 1]);
+      const dinner = req.entries.filter((e: PlanEntryRequest) => e.after_anchor === 'dinner');
+      expect(dinner.map((e: PlanEntryRequest) => e.slot_position)).toEqual([0]);
+    });
+
+    it('sends null scheduled_start and no after_anchor for paired tasks', () => {
+      service.addTask({ date: '2026-06-22', title: 'Meds', energy: 'low', paired_meal_name: 'lunch' });
+
+      const req = (service as unknown as { buildCommitRequest(id: string, r: boolean): PostSchedulePlanRequest }).buildCommitRequest('task-1', false);
+      const meds = req.entries.find((e: PlanEntryRequest) => e.title === 'Meds');
+      expect(meds).toBeTruthy();
+      expect(meds!.scheduled_start).toBeNull();
+      expect(meds!.after_anchor).toBeUndefined();
+      expect(meds!.paired_meal_name).toBe('lunch');
+      expect(meds!.slot_position).toBe(0);
     });
   });
 
