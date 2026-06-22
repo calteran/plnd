@@ -769,7 +769,6 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   readonly loadingRoutineCount = signal<number>(0);
   readonly entries = signal<PlaceTasksEntry[]>([]);
   readonly editState = signal<EditState | null>(null);
-  readonly dayCards = signal<DayCard[]>([]);
 
   // ── Date picker options ───────────────────────────────────────────────────
   readonly planDates = signal<{ value: string; label: string }[]>([]);
@@ -858,7 +857,6 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       .subscribe({
         next: (result) => {
           this.entries.set(result);
-          this.dayCards.set(buildDayCards(result, period.start, period.end, (date) => mealsForDate(date, this.stateService.dayTypes())));
           this.isLoading.set(false);
         },
         error: () => {
@@ -913,9 +911,6 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     const edit = this.editState();
     if (!edit) return;
 
-    const period = this.stateService.planPeriod();
-    if (!period) return;
-
     this.entries.update(list => {
       const updated = [...list];
       const hasFixedTime = !!edit.timeWindowStart;
@@ -932,18 +927,11 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     });
 
     this.editState.set(null);
-    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, (date) => mealsForDate(date, this.stateService.dayTypes())));
   }
 
   removeEntry(entryIndex: number): void {
-    const period = this.stateService.planPeriod();
-    if (!period) return;
-
     this.entries.update(list => list.filter((_, i) => i !== entryIndex));
     this.editState.set(null);
-
-    // Re-index: rebuild day cards from the updated (re-indexed) entries
-    this.dayCards.set(buildDayCards(this.entries(), period.start, period.end, (date) => mealsForDate(date, this.stateService.dayTypes())));
   }
 
   // ── Drag & drop ───────────────────────────────────────────────────────────
@@ -992,7 +980,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
         const insertAtListIdx = insertAtSlotIdx < slotEntries.length
           ? slotEntries[insertAtSlotIdx].i
           : (slotEntries.length > 0 ? slotEntries[slotEntries.length - 1].i + 1 : updated.length);
-        updated.splice(insertAtListIdx, 0, droppedEntry);
+        updated.splice(insertAtListIdx, 0, updatedEntry);
       } else {
         // Cross-slot or cross-day: append to the end of the target slot's entries
         const slotEntries = updated

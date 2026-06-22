@@ -694,6 +694,58 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(allWalks[0].paired_meal_name).toBe('breakfast');
   });
 
+  it('same-slot reorder: inserts canonical entry and changes order without duplication', async () => {
+    const { component, httpController, fixture } = await setup();
+    fixture.detectChanges();
+    // Two tasks already in the SAME slot (breakfast) on the SAME date
+    const entryA: PlaceTasksEntry = {
+      title: 'Task A',
+      scheduled_date: '2026-04-28',
+      task_type: 'general',
+      duration_minutes: 15,
+      energy_required: 'low',
+      paired_meal_name: 'breakfast',
+    };
+    const entryB: PlaceTasksEntry = {
+      title: 'Task B',
+      scheduled_date: '2026-04-28',
+      task_type: 'general',
+      duration_minutes: 15,
+      energy_required: 'low',
+      paired_meal_name: 'breakfast',
+    };
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([entryA, entryB]);
+    fixture.detectChanges();
+
+    // Simulate: drag Task A (currentIndex=0) to after Task B (currentIndex=1) within same slot
+    const currentEntry = component.entries()[0]; // Task A reference in signal
+    const dropEvent = {
+      item: { data: currentEntry },
+      previousIndex: 0,
+      currentIndex: 1,
+      container: { data: [currentEntry, component.entries()[1]] },
+      previousContainer: { data: [currentEntry, component.entries()[1]] },
+      isPointerOverContainer: true,
+      distance: { x: 0, y: 0 },
+      dropPoint: { x: 0, y: 0 },
+    } as unknown as CdkDragDrop<PlaceTasksEntry[]>;
+
+    (component as unknown as { onDrop(e: CdkDragDrop<PlaceTasksEntry[]>, date: string, slotKey: string): void })
+      .onDrop(dropEvent, '2026-04-28', 'breakfast');
+
+    // (a) Exactly one instance of Task A
+    const allAs = component.entries().filter(e => e.title === 'Task A');
+    expect(allAs.length).toBe(1);
+
+    // (b) Order changed: Task B should now come before Task A
+    const titles = component.entries().map(e => e.title);
+    expect(titles.indexOf('Task B')).toBeLessThan(titles.indexOf('Task A'));
+
+    // (c) Moved entry holds canonical slot fields (not stale: paired_meal_name preserved)
+    expect(allAs[0].scheduled_date).toBe('2026-04-28');
+    expect(allAs[0].paired_meal_name).toBe('breakfast');
+  });
+
   it('cross-day drop changes scheduled_date and leaves exactly ONE instance', async () => {
     const { component, httpController, fixture } = await setup();
     fixture.detectChanges();
