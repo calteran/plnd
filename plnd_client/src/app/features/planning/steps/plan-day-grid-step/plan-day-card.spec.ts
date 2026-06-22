@@ -2,10 +2,12 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
+import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { PlanDayCardComponent } from './plan-day-card';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { MealPatternEntry } from '../../../../core/models/meal-pattern';
+import { PlannedTask } from '../../../../core/models/week-plan';
 
 const PATTERN_FIXTURE: MealPatternEntry[] = [
   { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
@@ -194,6 +196,44 @@ describe('PlanDayCardComponent', () => {
 
     it('returns "high" for high', () => {
       expect(fixture.componentInstance.energyLabel('high')).toBe('high');
+    });
+  });
+
+  describe('onDrop() cross-day duplicate regression', () => {
+    it('cross-day drop leaves EXACTLY ONE instance of the task on the new date', () => {
+      // Regression: the old onDrop called moveTaskToDay then updateTaskSlot with the
+      // original (stale) task reference. After moveTaskToDay replaced the object in the
+      // signal, filter(t => t !== task) in updateTaskSlot would remove nothing, and
+      // splice would insert a second copy — duplicating the task.
+      //
+      // Fix: onDrop calls updateTaskSlot only; it handles date+slot atomically.
+      service.initSession('2026-03-31', '2026-04-06');
+      service.addTask({ date: '2026-03-31', title: 'Walk', energy: 'low', paired_meal_name: 'breakfast' } as PlannedTask);
+      service.addTask({ date: '2026-03-31', title: 'Run',  energy: 'medium' } as PlannedTask);
+
+      // Card represents '2026-04-01' (day 2); task is dragged from '2026-03-31'.
+      createComponent('2026-04-01');
+
+      const task = service.scheduledTasks().find(t => t.title === 'Walk')!;
+      const dropEvent = {
+        item: { data: task },
+        previousIndex: 0,
+        currentIndex: 0,
+        container: { data: [] },
+        previousContainer: { data: [task] },
+        isPointerOverContainer: true,
+        distance: { x: 0, y: 0 },
+        dropPoint: { x: 0, y: 0 },
+      } as unknown as CdkDragDrop<PlannedTask[]>;
+
+      // Call protected onDrop via cast
+      (fixture.componentInstance as unknown as { onDrop(e: CdkDragDrop<PlannedTask[]>, s: string): void })
+        .onDrop(dropEvent, 'lunch');
+
+      const allWalks = service.scheduledTasks().filter(t => t.title === 'Walk');
+      expect(allWalks.length).toBe(1);
+      expect(allWalks[0].date).toBe('2026-04-01');
+      expect(allWalks[0].paired_meal_name).toBe('lunch');
     });
   });
 });

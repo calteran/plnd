@@ -639,11 +639,55 @@ describe('WeekPlanService', () => {
       service.addTask({ date: '2026-06-22', title: 'Walk', energy: 'low' });
       service.addTask({ date: '2026-06-22', title: 'Run', energy: 'medium' });
 
-      const task = service.scheduledTasks()[0];
-      service.moveTaskToDay(task, '2026-06-23');
+      const walkTask = service.scheduledTasks().find(t => t.title === 'Walk')!;
+      service.moveTaskToDay(walkTask, '2026-06-23');
 
-      expect(service.scheduledTasks()[0].date).toBe('2026-06-23');
-      expect(service.scheduledTasks()[1].date).toBe('2026-06-22');
+      expect(service.scheduledTasks().find(t => t.title === 'Walk')?.date).toBe('2026-06-23');
+      expect(service.scheduledTasks().find(t => t.title === 'Run')?.date).toBe('2026-06-22');
+    });
+
+    it('updateTaskSlot cross-day leaves EXACTLY ONE instance of the task on the new date', () => {
+      // Regression: the old onDrop called moveTaskToDay then updateTaskSlot with a stale
+      // reference, causing the task to be duplicated. updateTaskSlot alone handles both.
+      service.initSession('2026-06-22', '2026-06-23');
+      service.addTask({ date: '2026-06-22', title: 'Walk', energy: 'low', paired_meal_name: 'breakfast' });
+      service.addTask({ date: '2026-06-22', title: 'Run',  energy: 'medium' });
+
+      const task = service.scheduledTasks().find(t => t.title === 'Walk')!;
+      // Simulate the atomic cross-day drop: updateTaskSlot handles date change + slot change.
+      service.updateTaskSlot(task, '2026-06-23', 'lunch', 0);
+
+      const allWalks = service.scheduledTasks().filter(t => t.title === 'Walk');
+      expect(allWalks.length).toBe(1);
+      expect(allWalks[0].date).toBe('2026-06-23');
+      expect(allWalks[0].paired_meal_name).toBe('lunch');
+      expect(allWalks[0].after_anchor).toBeUndefined();
+    });
+
+    it('updateTaskSlot clears after_anchor when moving to a named meal slot', () => {
+      // Regression (F2): after_anchor clearing was conditional — explicit test to verify
+      // both fields are always cleared before setting the correct one.
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'Meds', energy: 'low', after_anchor: 'morning' });
+
+      const task = service.scheduledTasks().find(t => t.title === 'Meds')!;
+      service.updateTaskSlot(task, '2026-06-22', 'breakfast', 0);
+
+      const updated = service.scheduledTasks().find(t => t.title === 'Meds')!;
+      expect(updated.paired_meal_name).toBe('breakfast');
+      expect(updated.after_anchor).toBeUndefined();
+    });
+
+    it('updateTaskSlot clears paired_meal_name when moving to <sched>', () => {
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'Gym', energy: 'high', paired_meal_name: 'lunch' });
+
+      const task = service.scheduledTasks().find(t => t.title === 'Gym')!;
+      service.updateTaskSlot(task, '2026-06-22', '<sched>', 0);
+
+      const updated = service.scheduledTasks().find(t => t.title === 'Gym')!;
+      expect(updated.paired_meal_name).toBeUndefined();
+      expect(updated.after_anchor).toBeUndefined();
     });
   });
 

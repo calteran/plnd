@@ -148,15 +148,18 @@ export class PlanDayCardComponent {
   }
 
   /**
-   * All CDK drop list IDs across the full horizon (for cross-day connections) plus
-   * this card's own meal slot lists.
+   * All CDK drop list IDs across the full horizon (for cross-day connections).
+   * Each date uses that date's own meal slots so IDs match the actual drop lists
+   * rendered on each card. The current card's own IDs are excluded — CDK handles
+   * intra-list drops without needing them in `connectedTo`.
    */
   protected readonly allDropListIds = computed((): string[] => {
     const ids: string[] = [];
-    const slots = this.slots();
+    const thisDate = this.date();
     for (const date of this.horizonDays()) {
-      // Meal-paired slots per date
-      for (const s of slots) {
+      if (date === thisDate) continue; // exclude own lists; CDK handles intra-list natively
+      // Meal-paired slots for this specific date
+      for (const s of this.dayTypesMealsService.mealsForDate(date)) {
         ids.push(wizardDropListId(date, s.name));
       }
       // Unanchored task slot per date
@@ -171,19 +174,12 @@ export class PlanDayCardComponent {
     const prevSlotKey = taskSlotKey(task);
     const newDate = this.date();
 
-    if (prevDate !== newDate) {
-      // Cross-day move: update the task's date first
-      this.weekPlanService.moveTaskToDay(task, newDate);
-    }
-
-    // Determine source slot for within-slot reorder vs cross-slot move
     if (prevDate === newDate && prevSlotKey === targetSlotKey) {
       // Pure reorder within the same (date, slot)
       this.weekPlanService.reorderTask(newDate, targetSlotKey, event.previousIndex, event.currentIndex);
     } else {
-      // Cross-slot or cross-day: update paired_meal_name / after_anchor on the task
-      // We need to mutate the task's slot assignment. Since tasks are plain objects in the signal,
-      // we update by splicing the task out of old slot and patching slot fields.
+      // Cross-slot or cross-day: updateTaskSlot handles both date change and slot patch
+      // atomically in a single signal update, preventing duplicates.
       this.weekPlanService.updateTaskSlot(task, newDate, targetSlotKey, event.currentIndex);
     }
   }

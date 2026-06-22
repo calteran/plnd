@@ -423,26 +423,14 @@ export class WeekPlanService {
       // Remove the task from its current position
       const without = all.filter(t => t !== task);
 
-      // Patch the task with new date and slot
+      // Patch the task: always clear both slot fields, then set only the correct one.
+      // '<sched>' → neither field set; named slot → paired_meal_name (wizard slots are meal names).
       const patched: PlannedTask = {
         ...task,
         date: newDate,
-        after_anchor: slotKey === '<sched>' ? undefined : task.after_anchor,
-        paired_meal_name: undefined,
+        after_anchor: undefined,
+        paired_meal_name: slotKey !== '<sched>' ? slotKey : undefined,
       };
-
-      if (slotKey !== '<sched>') {
-        // In the wizard, slot keys derived from meal names go into paired_meal_name.
-        // after_anchor-based slot keys go into after_anchor.
-        // We can't distinguish here without knowing whether a slot is a meal anchor.
-        // Use `paired_meal_name` for named slots (meal names), `after_anchor` otherwise.
-        // The task's previous value guides us: if it had `paired_meal_name`, new slot is also paired.
-        // If it had `after_anchor`, new slot is also an after-anchor.
-        // Cross-type moves (anchor → meal) are handled by whichever field the target slot uses.
-        // In the wizard day-grid, all named slots come from meal patterns, so use paired_meal_name.
-        patched.paired_meal_name = slotKey;
-        patched.after_anchor = undefined;
-      }
 
       // Find the index to insert at within the new (date, slotKey) slice
       const slotKeyFn = (t: PlannedTask): string =>
