@@ -49,3 +49,12 @@ export function parseItemType(value: string | undefined): ItemType {
 export function isMealAnchor(item: ScheduleItem): item is MealAnchor {
   return 'emoji' in item;
 }
+
+/** A droppable slot: the floating tasks that live after `anchorLabel`. */
+export interface SlotGroup {
+  /** Lower-anchor label, lowercased — the after_anchor value tasks here carry. */
+  anchorLabel: string;
+  /** The rendered anchor row that opens this slot (null for start-of-day). */
+  anchor: MealAnchor | ScheduleTask | null;
+  tasks: ScheduleTask[];
+}

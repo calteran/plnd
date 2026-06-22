@@ -1,27 +1,27 @@
-import { assembleScheduleItems } from './schedule-assembly';
+import { assembleScheduleItems, assembleSlotGroups } from './schedule-assembly';
 import { isMealAnchor, MealAnchor, ScheduleTask } from '../models/schedule';
 import { ScheduleAnchorDto, ScheduleAnchorKind, ScheduleEntryDto } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
 
+let seq = 0;
+
+function anchor(kind: ScheduleAnchorKind, label: string, id: string | null): ScheduleAnchorDto {
+  return {
+    kind, sequence: seq++, time: '08:00:00', label, id,
+    status: kind === 'meal' ? 'planned' : null, consumed_at: null,
+    tolerance_minutes: null, sort_order: null, template_entry_id: null, zone: null,
+  };
+}
+
+function entry(p: Partial<ScheduleEntryDto> & { entry_id: string }): ScheduleEntryDto {
+  return {
+    task_type: 'general', title: 'Task', date: '2026-06-16', status: 'pending', ...p,
+  } as ScheduleEntryDto;
+}
+
+beforeEach(() => { seq = 0; });
+
 describe('assembleScheduleItems', () => {
-  let seq = 0;
-
-  function anchor(kind: ScheduleAnchorKind, label: string, id: string | null): ScheduleAnchorDto {
-    return {
-      kind, sequence: seq++, time: '08:00:00', label, id,
-      status: kind === 'meal' ? 'planned' : null, consumed_at: null,
-      tolerance_minutes: null, sort_order: null, template_entry_id: null, zone: null,
-    };
-  }
-
-  function entry(p: Partial<ScheduleEntryDto> & { entry_id: string }): ScheduleEntryDto {
-    return {
-      task_type: 'general', title: 'Task', date: '2026-06-16', status: 'pending', ...p,
-    } as ScheduleEntryDto;
-  }
-
-  beforeEach(() => { seq = 0; });
-
   it('places a floating task in the start-of-day slot (above the first meal)', () => {
     const anchors = [
       anchor('start_of_day', 'start of day', null),
@@ -116,5 +116,47 @@ describe('assembleScheduleItems', () => {
     expect(items.length).toBe(2);
     expect((items[0] as ScheduleTask).label).toBe('Orphan');
     expect(warn).toHaveBeenCalled();
+  });
+});
+
+describe('assembleSlotGroups', () => {
+  it('groups floating tasks into slots after their anchor, in arrival order', () => {
+    const anchors = [
+      anchor('start_of_day', 'start of day', null),
+      anchor('meal', 'lunch', 'meal-1'),
+    ];
+    const entries = [
+      entry({ entry_id: 't1', task_type: 'work', title: 'first', after_anchor: 'lunch' }),
+      entry({ entry_id: 't2', task_type: 'work', title: 'second', after_anchor: 'lunch' }),
+    ];
+
+    const groups = assembleSlotGroups(anchors, entries, []);
+    const lunch = groups.find(g => g.anchorLabel === 'lunch')!;
+    expect(lunch.tasks.map(t => t.label)).toEqual(['first', 'second']);
+  });
+
+  it('emits one SlotGroup per anchor in sequence order', () => {
+    const anchors = [
+      anchor('start_of_day', 'start of day', null),
+      anchor('meal', 'breakfast', 'meal-1'),
+      anchor('meal', 'lunch', 'meal-2'),
+    ];
+
+    const groups = assembleSlotGroups(anchors, [], []);
+    expect(groups.map(g => g.anchorLabel)).toEqual(['start of day', 'breakfast', 'lunch']);
+  });
+
+  it('assigns null anchor for start-of-day slot and MealAnchor for meal slots', () => {
+    const anchors = [
+      anchor('start_of_day', 'start of day', null),
+      anchor('meal', 'lunch', 'meal-1'),
+    ];
+
+    const groups = assembleSlotGroups(anchors, [], []);
+    const startOfDay = groups.find(g => g.anchorLabel === 'start of day')!;
+    const lunch = groups.find(g => g.anchorLabel === 'lunch')!;
+    expect(startOfDay.anchor).toBeNull();
+    expect(lunch.anchor).not.toBeNull();
+    expect((lunch.anchor as MealAnchor).name).toBe('Lunch');
   });
 });
