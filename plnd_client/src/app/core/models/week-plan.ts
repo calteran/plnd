@@ -97,6 +97,7 @@ export interface PlannedTask {
   task_type?: string;
   scheduled_start?: string; // "HH:MM"
   one_shot?: boolean;
+  paired_meal_name?: string;
 }
 
 export type FloatingTask = Omit<PlannedTask, 'date'>;
@@ -179,6 +180,10 @@ export interface PlanEntryRequest {
   duration_minutes?: number;
   energy_required?: EnergyLevel;
   one_shot?: boolean;
+  /** 0-based order within (date, slot). */
+  slot_position?: number;
+  /** Pre-materialization meal pairing, resolved to slot_meal_anchor_id at commit. */
+  paired_meal_name?: string;
 }
 
 // -- Task Placement ----------------------------------------------------------
@@ -211,6 +216,7 @@ export interface PlaceTasksEntry {
   /** Exact start time "HH:MM" for fixed tasks — mutually exclusive with after_anchor. */
   time_window_start?: string;
   one_shot?: boolean;
+  paired_meal_name?: string;
 }
 
 export interface PostSchedulePlanRequest {
