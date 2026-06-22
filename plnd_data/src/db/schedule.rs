@@ -188,7 +188,33 @@ pub async fn reposition_entry(
         return Err(DatabaseError::NotFound);
     };
 
-    let position = position.max(0);
+    let target_count: i64 = match target {
+        SlotTarget::AfterAnchor(a) => sqlx::query_scalar(
+            "SELECT COUNT(*) FROM schedule_entries
+             WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+               AND slot_meal_anchor_id IS NULL AND entry_id <> $4",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(a)
+        .bind(entry_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?,
+        SlotTarget::MealAnchor(m) => sqlx::query_scalar(
+            "SELECT COUNT(*) FROM schedule_entries
+             WHERE user_id = $1 AND date = $2 AND slot_meal_anchor_id = $3
+               AND after_anchor IS NULL AND entry_id <> $4",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(*m)
+        .bind(entry_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?,
+    };
+    let position = position.clamp(0, target_count as i32);
 
     // Step 1: compact the SOURCE slot (close the hole the entry leaves), excl. entry.
     match (&src_after, &src_meal) {
@@ -2333,6 +2359,41 @@ mod tests {
         assert_eq!(new_date, d2);
         assert_eq!(slot_order(&pool, uid, d2, "lunch").await, vec!["a", "y"]);
         assert!(slot_order(&pool, uid, d1, "lunch").await.is_empty());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_clamps_overlarge_position_to_slot_end(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let _a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+        let _b = insert_floating(&pool, uid, d, "b", "lunch", 1).await;
+        // "c" starts in a different slot (dinner).
+        let c = insert_floating(&pool, uid, d, "c", "dinner", 0).await;
+
+        // Move "c" into the lunch slot at position 99 — should clamp to 2 (end of slot).
+        reposition_entry(
+            &pool,
+            uid,
+            c,
+            d,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            99,
+        )
+        .await
+        .unwrap();
+
+        // Slot must be dense: ["a", "b", "c"] at positions 0, 1, 2.
+        assert_eq!(
+            slot_order(&pool, uid, d, "lunch").await,
+            vec!["a", "b", "c"]
+        );
+        let pos: i32 =
+            sqlx::query_scalar("SELECT slot_position FROM schedule_entries WHERE entry_id = $1")
+                .bind(c)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(pos, 2, "c must land at position 2, not 99");
     }
 
     #[sqlx::test(migrations = "./migrations")]
