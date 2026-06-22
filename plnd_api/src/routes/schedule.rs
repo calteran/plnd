@@ -478,6 +478,7 @@ pub async fn reposition_entry(
         .map(|_| StatusCode::NO_CONTENT)
         .map_err(|e| match e {
             Error::NotFound => StatusCode::NOT_FOUND,
+            Error::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
             _ => {
                 tracing::error!(error = %e, "reposition_entry error");
                 StatusCode::INTERNAL_SERVER_ERROR

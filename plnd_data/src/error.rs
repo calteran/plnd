@@ -39,6 +39,7 @@ impl From<DatabaseError> for Error {
             DatabaseError::MigrationError(s) => Error::Migration(s),
             DatabaseError::ConfigurationError(s) => Error::Configuration(s),
             DatabaseError::QueryError(s) => Error::Query(s),
+            DatabaseError::Validation(s) => Error::Validation(s),
         }
     }
 }

@@ -188,6 +188,29 @@ pub async fn reposition_entry(
         return Err(DatabaseError::NotFound);
     };
 
+    // Validate that a MealAnchor target is an instance owned by this user on this date.
+    // A bogus or foreign uuid would otherwise pass the FK at the final UPDATE (or silently
+    // succeed if the entry itself is owned by another user), surfacing as a 500. Spec §C/§G
+    // require a 422 client error for a slot_meal_anchor_id that isn't an instance for
+    // this user/date.
+    if let SlotTarget::MealAnchor(m) = target {
+        let exists: Option<i32> = sqlx::query_scalar(
+            "SELECT 1 FROM meal_anchor_instances
+             WHERE id = $1 AND user_id = $2 AND date = $3",
+        )
+        .bind(*m)
+        .bind(user_id)
+        .bind(date)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?;
+        if exists.is_none() {
+            return Err(DatabaseError::Validation(format!(
+                "meal_anchor_instance {m} does not exist for user {user_id} on {date}"
+            )));
+        }
+    }
+
     let target_count: i64 = match target {
         SlotTarget::AfterAnchor(a) => sqlx::query_scalar(
             "SELECT COUNT(*) FROM schedule_entries
@@ -2411,5 +2434,112 @@ mod tests {
         .await
         .unwrap_err();
         assert!(matches!(err, DatabaseError::NotFound));
+    }
+
+    // -----------------------------------------------------------------------
+    // §C/§G — MealAnchor target ownership + existence validation → 422
+    // -----------------------------------------------------------------------
+
+    /// Repositioning to a non-existent meal_anchor_instance (bogus UUID) must
+    /// return a Validation error (maps to HTTP 422), not a 500 from a FK
+    /// violation, and must NOT mutate the entry (transaction rolled back).
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_to_nonexistent_meal_anchor_is_rejected(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+
+        // Create a floating task to reposition.
+        let entry_id = insert_floating(&pool, uid, d, "meditate", "morning", 0).await;
+
+        // Attempt to reposition to a completely bogus meal anchor uuid.
+        let bogus_id = Uuid::new_v4();
+        let err = reposition_entry(
+            &pool,
+            uid,
+            entry_id,
+            d,
+            &SlotTarget::MealAnchor(bogus_id),
+            0,
+        )
+        .await
+        .unwrap_err();
+
+        // Must be a Validation error — not QueryError or any other variant.
+        assert!(
+            matches!(err, DatabaseError::Validation(_)),
+            "expected Validation error, got: {err:?}"
+        );
+
+        // The entry must still be in its original slot (transaction was never committed).
+        let (after, meal): (Option<String>, Option<Uuid>) = sqlx::query_as(
+            "SELECT after_anchor, slot_meal_anchor_id FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(entry_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            after.as_deref(),
+            Some("morning"),
+            "after_anchor must be unchanged after rejected reposition"
+        );
+        assert_eq!(meal, None, "slot_meal_anchor_id must remain NULL");
+    }
+
+    /// Repositioning user A's task to a meal_anchor_instance belonging to user B
+    /// must also be rejected (ownership check), even though the instance uuid is
+    /// a valid, existing row in the table.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_to_foreign_user_meal_anchor_is_rejected(pool: PgPool) {
+        let user_a = new_user(&pool).await;
+        let user_b = new_user(&pool).await;
+        let d = tomorrow();
+
+        // Create a floating task for user A.
+        let entry_id = insert_floating(&pool, user_a, d, "stretches", "evening", 0).await;
+
+        // Create a meal anchor instance that belongs to user B on the same date.
+        let foreign_instance = crate::db::meal_anchor_instance::add(
+            &pool,
+            user_b,
+            d,
+            "lunch",
+            NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            60,
+        )
+        .await
+        .unwrap();
+
+        // Attempt to move user A's task into user B's meal anchor slot.
+        let err = reposition_entry(
+            &pool,
+            user_a,
+            entry_id,
+            d,
+            &SlotTarget::MealAnchor(foreign_instance.id),
+            0,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            matches!(err, DatabaseError::Validation(_)),
+            "expected Validation error for foreign-owner anchor, got: {err:?}"
+        );
+
+        // Confirm the entry was not moved.
+        let (after, meal): (Option<String>, Option<Uuid>) = sqlx::query_as(
+            "SELECT after_anchor, slot_meal_anchor_id FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(entry_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            after.as_deref(),
+            Some("evening"),
+            "after_anchor must be unchanged after rejected foreign-owner reposition"
+        );
+        assert_eq!(meal, None, "slot_meal_anchor_id must remain NULL");
     }
 }
