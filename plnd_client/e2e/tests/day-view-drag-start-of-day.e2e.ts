@@ -85,10 +85,15 @@ test.describe('Day View — drag a task above the first anchor', () => {
     await page.mouse.move(startX, startY - 3,  { steps: 3 });   // cross CDK threshold
     await page.mouse.move(startX, startY - 12, { steps: 5 });   // continue moving
     await page.mouse.move(endX,   endY,         { steps: 25 });  // sweep to the top
-    await page.waitForTimeout(50);                              // settle proximity calc
+    await page.waitForTimeout(50); // settle proximity calc
+    // Wait for the actual PATCH /position round-trip (set up before mouse.up so we
+    // can't miss it) rather than a hardcoded timeout — the backend has provably
+    // processed the move before we reload.
+    const repositioned = page.waitForResponse(
+      r => r.url().includes('/position') && r.request().method() === 'PATCH',
+    );
     await page.mouse.up();
-
-    await page.waitForTimeout(500); // let the optimistic move + PATCH settle
+    await repositioned;
 
     // Reload so order comes from the real backend, then assert the task now sits
     // ABOVE Breakfast — i.e., it landed in the start-of-day slot and persisted.
