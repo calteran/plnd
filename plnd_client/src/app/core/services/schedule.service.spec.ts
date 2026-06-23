@@ -2,9 +2,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { ScheduleService } from './schedule.service';
-import { isMealAnchor, MealAnchor, ScheduleItem, ScheduleTask } from '../models/schedule';
+import { isMealAnchor, MealAnchor, ScheduleTask } from '../models/schedule';
 import { ConfigService } from './config.service';
-import { WritableSignal } from '@angular/core';
 
 const MOCK_CONFIG = { api: { baseUrl: 'http://localhost:3000' } };
 
@@ -410,14 +409,12 @@ describe('ScheduleService', () => {
 
   it('toggleItem flips a during-meal task', () => {
     svc.loadDay('2026-04-02');
-    flushDay(httpMock);
-    // Manually inject a MealAnchor with a duringMealTask to test toggle logic
-    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
-      id: 'm1', name: 'Breakfast', emoji: '🥣',
-      status: 'planned', duringMealTasks: [
-        { id: 't-dm2', type: 'general', label: 'Read 10 pages', status: 'pending', oneShot: false, floating: false }
-      ]
-    }]);
+    flushDay(
+      httpMock,
+      [{ entry_id: 't-dm2', task_type: 'general', title: 'Read 10 pages',
+         status: 'planned', date: '2026-04-02', slot_meal_anchor_id: 'm1' }],
+      [anchorDto('m1', 'breakfast')],
+    );
     svc.toggleItem('t-dm2');
     httpMock.expectOne(r => r.url.includes('/schedule/entries/t-dm2/status'))
       .flush(null, { status: 204, statusText: 'No Content' });
@@ -521,10 +518,8 @@ describe('ScheduleService', () => {
   });
 
   it('updateEntry issues no PATCH for a meal-anchor id', () => {
-    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
-      id: 'meal-1', name: 'Breakfast', emoji: '🥣',
-      status: 'planned', duringMealTasks: [],
-    }]);
+    svc.loadDay('2026-04-02');
+    flushDay(httpMock, [], [anchorDto('meal-1', 'breakfast')]);
 
     svc.updateEntry('meal-1', { title: 'x' });
 
@@ -533,13 +528,12 @@ describe('ScheduleService', () => {
 
   it('updateEntry patches a during-meal task nested in a meal anchor', () => {
     svc.loadDay('2026-04-02');
-    flushDay(httpMock);
-    (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
-      id: 'm1', name: 'Breakfast', emoji: '🥣',
-      status: 'planned', duringMealTasks: [
-        { id: 't-dm3', type: 'medication', label: 'Take pill', status: 'pending', oneShot: false, floating: false }
-      ]
-    }]);
+    flushDay(
+      httpMock,
+      [{ entry_id: 't-dm3', task_type: 'medication', title: 'Take pill',
+         status: 'planned', date: '2026-04-02', slot_meal_anchor_id: 'm1' }],
+      [anchorDto('m1', 'breakfast')],
+    );
 
     svc.updateEntry('t-dm3', { oneShot: true });
 
@@ -549,13 +543,6 @@ describe('ScheduleService', () => {
 
     const meal = svc.scheduleItems()[0] as MealAnchor;
     expect(meal.duringMealTasks[0].oneShot).toBe(true);
-  });
-
-  it('addItem appends a ScheduleTask to scheduleItems', () => {
-    const task: ScheduleTask = { id: 'new-1', type: 'general', label: 'call mum', status: 'pending', oneShot: false, floating: false };
-    svc.addItem(task);
-    expect(svc.scheduleItems()).toContain(task);
-    expect(svc.scheduleItems().length).toBe(1);
   });
 
   it('maps one_shot from the DTO onto the task', () => {
@@ -615,10 +602,16 @@ describe('ScheduleService', () => {
 
   describe('setMealConsumption', () => {
     beforeEach(() => {
-      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
-        id: 'meal-1', name: 'Lunch', emoji: '🥗',
-        status: 'planned', description: 'Soup', duringMealTasks: [],
-      }]);
+      // Load a lunch anchor with a planned dish ('Soup') through the real path so
+      // the meal derives a 'planned' (has-dish) UI status, not 'unplanned'.
+      svc.loadDay('2026-04-02');
+      flushDay(
+        httpMock,
+        [],
+        [anchorDto('meal-1', 'lunch')],
+        [{ meal_entry_id: 'pm1', meal_anchor_instance_id: 'meal-1', meal_ref_id: 'r1',
+           meal_ref_type: 'user_dish', title: 'Soup', anchor_date: null, anchor_name: null }],
+      );
     });
 
     it('PATCHes /schedule/anchors/:id/status with the given status', () => {
@@ -674,9 +667,8 @@ describe('ScheduleService', () => {
 
   describe('toggleMealConsumed', () => {
     it('marks consumed when the meal is not done', () => {
-      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
-        id: 'meal-1', name: 'Lunch', emoji: '🥗', status: 'planned', duringMealTasks: [],
-      }]);
+      svc.loadDay('2026-04-02');
+      flushDay(httpMock, [], [anchorDto('meal-1', 'lunch')]);
       svc.toggleMealConsumed('meal-1');
       const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
       expect(req.request.body).toEqual({ status: 'consumed' });
@@ -684,9 +676,8 @@ describe('ScheduleService', () => {
     });
 
     it('reverts to planned when the meal is done', () => {
-      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
-        id: 'meal-1', name: 'Lunch', emoji: '🥗', status: 'done', duringMealTasks: [],
-      }]);
+      svc.loadDay('2026-04-02');
+      flushDay(httpMock, [], [{ ...anchorDto('meal-1', 'lunch'), status: 'consumed' }]);
       svc.toggleMealConsumed('meal-1');
       const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
       expect(req.request.body).toEqual({ status: 'planned' });
@@ -694,9 +685,8 @@ describe('ScheduleService', () => {
     });
 
     it('marks consumed when the meal is skipped', () => {
-      (svc as unknown as { _items: WritableSignal<ScheduleItem[]> })._items.set([{
-        id: 'meal-1', name: 'Lunch', emoji: '🥗', status: 'skipped', duringMealTasks: [],
-      }]);
+      svc.loadDay('2026-04-02');
+      flushDay(httpMock, [], [{ ...anchorDto('meal-1', 'lunch'), status: 'skipped' }]);
       svc.toggleMealConsumed('meal-1');
       const req = httpMock.expectOne('http://localhost:3000/schedule/anchors/meal-1/status');
       expect(req.request.body).toEqual({ status: 'consumed' });
@@ -708,6 +698,53 @@ describe('ScheduleService', () => {
       flushDay(httpMock);
       svc.toggleMealConsumed('nonexistent-id');
       expect(httpMock.match(r => r.url.includes('/schedule/anchors/')).length).toBe(0);
+    });
+  });
+
+  // The raison d'être of #987: scheduleItems and slotGroups are two projections of
+  // one raw payload. A single optimistic mutation must surface in BOTH with no
+  // hand-sync — previously a forgotten dual-write would silently desync the day view.
+  describe('single source of truth (#987)', () => {
+    it('a toggle reflects in BOTH scheduleItems and slotGroups without manual sync', () => {
+      svc.loadDay('2026-04-02');
+      flushDay(
+        httpMock,
+        [{ entry_id: 'f1', task_type: 'general', title: 'Walk dog',
+           status: 'planned', date: '2026-04-02', after_anchor: 'Breakfast' }],
+        [anchorDto('meal-1', 'Breakfast')],
+      );
+
+      const slotTask = () => svc.slotGroups()
+        .find(g => g.anchorLabel === 'breakfast')!.tasks.find(t => t.id === 'f1')!;
+
+      expect((svc.scheduleItems().find(i => i.id === 'f1') as ScheduleTask).status).toBe('pending');
+      expect(slotTask().status).toBe('pending');
+
+      svc.toggleItem('f1');
+      httpMock.expectOne(r => r.url.includes('/schedule/entries/f1/status'))
+        .flush(null, { status: 204, statusText: 'No Content' });
+
+      expect((svc.scheduleItems().find(i => i.id === 'f1') as ScheduleTask).status).toBe('done');
+      expect(slotTask().status).toBe('done');
+    });
+
+    it('an edit reflects in BOTH scheduleItems and slotGroups without manual sync', () => {
+      svc.loadDay('2026-04-02');
+      flushDay(
+        httpMock,
+        [{ entry_id: 'f2', task_type: 'general', title: 'Old',
+           status: 'planned', date: '2026-04-02', after_anchor: 'Breakfast' }],
+        [anchorDto('meal-1', 'Breakfast')],
+      );
+
+      svc.updateEntry('f2', { title: 'New' });
+      httpMock.expectOne(r => r.url.endsWith('/schedule/entries/f2'))
+        .flush(null, { status: 204, statusText: 'No Content' });
+
+      expect((svc.scheduleItems().find(i => i.id === 'f2') as ScheduleTask).label).toBe('New');
+      const slotTask = svc.slotGroups()
+        .find(g => g.anchorLabel === 'breakfast')!.tasks.find(t => t.id === 'f2')!;
+      expect(slotTask.label).toBe('New');
     });
   });
 });
