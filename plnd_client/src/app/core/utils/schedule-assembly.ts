@@ -1,4 +1,4 @@
-import { MealAnchor, ScheduleItem, ScheduleTask, parseItemType } from '../models/schedule';
+import { MealAnchor, ScheduleItem, ScheduleTask, SlotGroup, parseItemType } from '../models/schedule';
 import { ScheduleAnchorDto, ScheduleEntryDto } from '../models/week-plan';
 import { PlannedMealEntryDto } from '../models/planned-meal-entry';
 
@@ -134,4 +134,69 @@ export function assembleScheduleItems(
   }
 
   return [...leftover, ...items];
+}
+
+/**
+ * Produce a flat list of droppable slot groups — one per anchor in sequence
+ * order — each carrying the floating tasks that live after that anchor.
+ * Used by the day-view template to render CDK drop lists (Task 9+).
+ */
+export function assembleSlotGroups(
+  anchors: ScheduleAnchorDto[],
+  entries: ScheduleEntryDto[],
+  plannedMeals: PlannedMealEntryDto[],
+): SlotGroup[] {
+  const mealAnchorIds = new Set(
+    anchors.filter(a => a.kind === 'meal' && a.id !== null).map(a => a.id as string),
+  );
+
+  // Partition floating tasks by their after_anchor label (lowercased).
+  // Entries appear in backend sort order (by slot_position), so insertion
+  // order gives us the correct arrival order within each slot.
+  const floatingByLabel = new Map<string, ScheduleTask[]>();
+  // Index scheduled tasks by their entry_id so we can resolve scheduled_task
+  // anchors below.
+  const scheduledById = new Map<string, ScheduleTask>();
+  // Index during-meal tasks by their meal anchor id.
+  const duringByMealId = new Map<string, ScheduleTask[]>();
+  for (const e of entries) {
+    const mealAnchorId = e.slot_meal_anchor_id;
+    if (mealAnchorId && mealAnchorIds.has(mealAnchorId)) {
+      const list = duringByMealId.get(mealAnchorId) ?? [];
+      list.push(mapEntry(e));
+      duringByMealId.set(mealAnchorId, list);
+      continue;
+    }
+    if (e.scheduled_start) {
+      scheduledById.set(e.entry_id, mapEntry(e));
+      continue;                          // scheduled — is an anchor itself
+    }
+    if (!e.after_anchor) continue;       // orphan — no slot to place it in
+    const key = e.after_anchor.toLowerCase();
+    const list = floatingByLabel.get(key) ?? [];
+    list.push(mapEntry(e));
+    floatingByLabel.set(key, list);
+  }
+
+  const mealByAnchor = new Map<string, PlannedMealEntryDto>(
+    (plannedMeals ?? []).map(pm => [pm.meal_anchor_instance_id, pm]),
+  );
+
+  const groups: SlotGroup[] = [];
+  const seen = new Set<string>();
+  for (const a of anchors) {
+    const label = a.label.toLowerCase();
+    if (seen.has(label)) continue;
+    seen.add(label);
+
+    let anchor: SlotGroup['anchor'] = null;
+    if (a.kind === 'meal' && a.id) {
+      anchor = mapAnchorInstance(a, mealByAnchor.get(a.id), duringByMealId.get(a.id) ?? []);
+    } else if (a.kind === 'scheduled_task' && a.id) {
+      anchor = scheduledById.get(a.id) ?? null;
+    }
+    groups.push({ anchorLabel: label, anchor, tasks: floatingByLabel.get(label) ?? [] });
+  }
+
+  return groups;
 }

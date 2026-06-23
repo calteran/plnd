@@ -264,6 +264,7 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: false,
+            slot_position: 0,
             created_at: Utc.timestamp_opt(0, 0).unwrap(),
             updated_at: Utc.timestamp_opt(0, 0).unwrap(),
         }

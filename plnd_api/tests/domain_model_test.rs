@@ -466,6 +466,7 @@ fn test_schedule_entry_serde_with_after_anchor() {
         "slot_meal_anchor_id": null,
         "deviation_note": null,
         "one_shot": false,
+        "slot_position": 0,
         "created_at": "2026-01-01T00:00:00Z",
         "updated_at": "2026-01-01T00:00:00Z"
     }"#;

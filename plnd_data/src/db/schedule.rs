@@ -13,11 +13,12 @@ use crate::models::{
 use crate::query_types::{
     CommittedEntry, PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse,
 };
+use crate::repository::schedule::SlotTarget;
 
 const ENTRY_COLS: &str = "entry_id, user_id, routine_id, task_type, title,
      date, scheduled_start, scheduled_end, status, actual_start, actual_end,
      after_anchor, slot_meal_anchor_id, deviation_note,
-     duration_minutes, energy_required, one_shot, created_at, updated_at";
+     duration_minutes, energy_required, one_shot, slot_position, created_at, updated_at";
 
 #[tracing::instrument(skip(pool), fields(table = "schedule_entries", op = "get_period"))]
 pub async fn get_period(
@@ -30,7 +31,7 @@ pub async fn get_period(
         sqlx::query_as::<_, ScheduleEntry>(sqlx::AssertSqlSafe(format!(
             "SELECT {ENTRY_COLS} FROM schedule_entries
          WHERE user_id = $1 AND date >= $2 AND date <= $3
-         ORDER BY date, scheduled_start"
+         ORDER BY date, slot_position, scheduled_start, entry_id"
         )))
         .bind(user_id)
         .bind(start)
@@ -55,7 +56,7 @@ pub async fn get_carryover(
          WHERE user_id = $1 AND date < $2
            AND status IN ('planned', 'deferred')
            AND one_shot = FALSE
-         ORDER BY date, scheduled_start"
+         ORDER BY date, slot_position, scheduled_start, entry_id"
     )))
     .bind(user_id)
     .bind(before)
@@ -159,6 +160,184 @@ pub async fn update_entry(
     Ok(())
 }
 
+#[tracing::instrument(
+    skip(pool),
+    fields(table = "schedule_entries", op = "reposition_entry")
+)]
+pub async fn reposition_entry(
+    pool: &PgPool,
+    user_id: Uuid,
+    entry_id: Uuid,
+    date: NaiveDate,
+    target: &SlotTarget,
+    position: i32,
+) -> Result<(), DatabaseError> {
+    let mut tx = pool.begin().await.map_err(DatabaseError::from)?;
+
+    // Load and lock the entry's current slot.
+    let current: Option<(NaiveDate, Option<String>, Option<Uuid>, i32)> = sqlx::query_as(
+        "SELECT date, after_anchor, slot_meal_anchor_id, slot_position
+         FROM schedule_entries WHERE entry_id = $1 AND user_id = $2 FOR UPDATE",
+    )
+    .bind(entry_id)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+    let Some((src_date, src_after, src_meal, src_pos)) = current else {
+        return Err(DatabaseError::NotFound);
+    };
+
+    // Validate that a MealAnchor target is an instance owned by this user on this date.
+    // A bogus or foreign uuid would otherwise pass the FK at the final UPDATE (or silently
+    // succeed if the entry itself is owned by another user), surfacing as a 500. Spec §C/§G
+    // require a 422 client error for a slot_meal_anchor_id that isn't an instance for
+    // this user/date.
+    if let SlotTarget::MealAnchor(m) = target {
+        let exists: Option<i32> = sqlx::query_scalar(
+            "SELECT 1 FROM meal_anchor_instances
+             WHERE id = $1 AND user_id = $2 AND date = $3",
+        )
+        .bind(*m)
+        .bind(user_id)
+        .bind(date)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?;
+        if exists.is_none() {
+            return Err(DatabaseError::Validation(format!(
+                "meal_anchor_instance {m} does not exist for user {user_id} on {date}"
+            )));
+        }
+    }
+
+    let target_count: i64 = match target {
+        SlotTarget::AfterAnchor(a) => sqlx::query_scalar(
+            "SELECT COUNT(*) FROM schedule_entries
+             WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+               AND slot_meal_anchor_id IS NULL AND entry_id <> $4",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(a)
+        .bind(entry_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?,
+        SlotTarget::MealAnchor(m) => sqlx::query_scalar(
+            "SELECT COUNT(*) FROM schedule_entries
+             WHERE user_id = $1 AND date = $2 AND slot_meal_anchor_id = $3
+               AND after_anchor IS NULL AND entry_id <> $4",
+        )
+        .bind(user_id)
+        .bind(date)
+        .bind(*m)
+        .bind(entry_id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(DatabaseError::from)?,
+    };
+    let position = position.clamp(0, target_count as i32);
+
+    // Step 1: compact the SOURCE slot (close the hole the entry leaves), excl. entry.
+    match (&src_after, &src_meal) {
+        (Some(a), None) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position - 1
+                 WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+                   AND slot_meal_anchor_id IS NULL
+                   AND slot_position > $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(src_date)
+            .bind(a)
+            .bind(src_pos)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+        }
+        (None, Some(m)) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position - 1
+                 WHERE user_id = $1 AND date = $2 AND slot_meal_anchor_id = $3
+                   AND after_anchor IS NULL
+                   AND slot_position > $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(src_date)
+            .bind(m)
+            .bind(src_pos)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+        }
+        _ => {} // entry had no slot (e.g. was a scheduled task) — nothing to compact.
+    }
+
+    // Step 2: open a gap in the TARGET slot at `position`, excl. entry.
+    let (tgt_after, tgt_meal): (Option<String>, Option<Uuid>) = match target {
+        SlotTarget::AfterAnchor(a) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position + 1
+                 WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+                   AND slot_meal_anchor_id IS NULL
+                   AND slot_position >= $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(date)
+            .bind(a)
+            .bind(position)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+            (Some(a.clone()), None)
+        }
+        SlotTarget::MealAnchor(m) => {
+            sqlx::query(
+                "UPDATE schedule_entries SET slot_position = slot_position + 1
+                 WHERE user_id = $1 AND date = $2 AND slot_meal_anchor_id = $3
+                   AND after_anchor IS NULL
+                   AND slot_position >= $4 AND entry_id <> $5",
+            )
+            .bind(user_id)
+            .bind(date)
+            .bind(m)
+            .bind(position)
+            .bind(entry_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+            (None, Some(*m))
+        }
+    };
+
+    // Step 3: place the entry. Floating contract: scheduled_start = NULL.
+    let updated = sqlx::query(
+        "UPDATE schedule_entries SET
+             date = $1, after_anchor = $2, slot_meal_anchor_id = $3,
+             scheduled_start = NULL, slot_position = $4, updated_at = NOW()
+         WHERE entry_id = $5 AND user_id = $6",
+    )
+    .bind(date)
+    .bind(&tgt_after)
+    .bind(tgt_meal)
+    .bind(position)
+    .bind(entry_id)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(DatabaseError::from)?;
+    if updated.rows_affected() == 0 {
+        return Err(DatabaseError::NotFound);
+    }
+
+    tx.commit().await.map_err(DatabaseError::from)?;
+    Ok(())
+}
+
 #[derive(sqlx::FromRow)]
 struct InsertedRow {
     entry_id: Uuid,
@@ -234,11 +413,44 @@ pub async fn commit_plan(
     // After #828, schedule_entries is task-only — any meal anchor entries (the
     // legacy task_type=None shape) are silently skipped; meal anchors are
     // owned by meal_anchor_instances and created via /schedule/anchors.
+
+    // Resolve paired_meal_name -> meal_anchor_instances.id for this commit.
+    // Instances are materialized earlier in planning, so they exist by now.
+    let mut paired_lookup: HashMap<(NaiveDate, String), Uuid> = HashMap::new();
+    {
+        let pairs: Vec<(NaiveDate, String)> = req
+            .entries
+            .iter()
+            .filter_map(|e| e.paired_meal_name.clone().map(|n| (e.date, n)))
+            .collect();
+        if !pairs.is_empty() {
+            let dates: Vec<NaiveDate> = pairs.iter().map(|(d, _)| *d).collect();
+            let names: Vec<String> = pairs.iter().map(|(_, n)| n.clone()).collect();
+            let rows: Vec<(NaiveDate, String, Uuid)> = sqlx::query_as(
+                "SELECT mai.date, mai.name, mai.id FROM meal_anchor_instances mai
+                 JOIN UNNEST($2::date[], $3::text[]) AS req(date, name)
+                      ON req.date = mai.date AND req.name = mai.name
+                 WHERE mai.user_id = $1",
+            )
+            .bind(user_id)
+            .bind(&dates)
+            .bind(&names)
+            .fetch_all(&mut *tx)
+            .await
+            .map_err(DatabaseError::from)?;
+            for (d, n, id) in rows {
+                paired_lookup.insert((d, n), id);
+            }
+        }
+    }
+
     let mut task_types: Vec<String> = Vec::new();
     let mut titles: Vec<Option<String>> = Vec::new();
     let mut dates: Vec<NaiveDate> = Vec::new();
     let mut scheduled_starts: Vec<Option<NaiveTime>> = Vec::new();
     let mut after_anchors: Vec<Option<String>> = Vec::new();
+    let mut slot_meal_anchor_ids: Vec<Option<Uuid>> = Vec::new();
+    let mut slot_positions: Vec<i32> = Vec::new();
     let mut duration_minutes_vals: Vec<Option<i32>> = Vec::new();
     let mut energy_required_vals: Vec<Option<String>> = Vec::new();
     let mut one_shot_vals: Vec<bool> = Vec::new();
@@ -247,11 +459,26 @@ pub async fn commit_plan(
         let Some(task_type) = entry.task_type.clone() else {
             continue;
         };
+        // Paired task: resolve the meal name to an instance id. On miss, fall
+        // back to floating in the same-named slot (logged, never dropped).
+        let (after_anchor, slot_meal_anchor_id) = match &entry.paired_meal_name {
+            Some(name) => match paired_lookup.get(&(entry.date, name.clone())) {
+                Some(id) => (None, Some(*id)),
+                None => {
+                    tracing::warn!(date = %entry.date, meal = %name,
+                        "paired_meal_name resolved to no instance; floating in slot");
+                    (Some(name.clone()), None)
+                }
+            },
+            None => (entry.after_anchor.clone(), None),
+        };
         task_types.push(task_type);
         titles.push(entry.title.clone());
         dates.push(entry.date);
         scheduled_starts.push(entry.scheduled_start);
-        after_anchors.push(entry.after_anchor.clone());
+        after_anchors.push(after_anchor);
+        slot_meal_anchor_ids.push(slot_meal_anchor_id);
+        slot_positions.push(entry.slot_position.unwrap_or(0));
         duration_minutes_vals.push(entry.duration_minutes);
         energy_required_vals.push(entry.energy_required.clone());
         one_shot_vals.push(entry.one_shot.unwrap_or(false));
@@ -262,11 +489,13 @@ pub async fn commit_plan(
             "INSERT INTO schedule_entries
                (user_id, task_type, title,
                 date, scheduled_start, status, after_anchor,
+                slot_meal_anchor_id, slot_position,
                 duration_minutes, energy_required, one_shot)
              SELECT $1, unnest($2::text[]),
                     unnest($3::text[]), unnest($4::date[]), unnest($5::time[]),
                     'planned', unnest($6::text[]),
-                    unnest($7::int4[]), unnest($8::text[]), unnest($9::bool[])
+                    unnest($7::uuid[]), unnest($8::int4[]),
+                    unnest($9::int4[]), unnest($10::text[]), unnest($11::bool[])
              RETURNING entry_id, title, date, after_anchor",
         )
         .bind(user_id)
@@ -275,6 +504,8 @@ pub async fn commit_plan(
         .bind(&dates)
         .bind(&scheduled_starts)
         .bind(&after_anchors)
+        .bind(&slot_meal_anchor_ids)
+        .bind(&slot_positions)
         .bind(&duration_minutes_vals)
         .bind(&energy_required_vals)
         .bind(&one_shot_vals)
@@ -531,6 +762,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         }
     }
 
@@ -810,6 +1043,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
         let bad_req = CommitPlanInput {
             plan_start: start,
@@ -861,6 +1096,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
 
         let req = CommitPlanInput {
@@ -912,6 +1149,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
 
         let req = CommitPlanInput {
@@ -954,6 +1193,8 @@ mod tests {
             duration_minutes: Some(45),
             energy_required: Some("medium".to_string()),
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         };
 
         let req = CommitPlanInput {
@@ -1037,6 +1278,8 @@ mod tests {
                 duration_minutes: None,
                 energy_required: None,
                 one_shot: None,
+                slot_position: None,
+                paired_meal_name: None,
             }],
             meal_entries: Vec::new(),
             replace: false,
@@ -1109,6 +1352,182 @@ mod tests {
         assert_eq!(row.1, meal_ref_id);
         assert_eq!(row.2, "user_meal");
         assert_eq!(row.3.as_deref(), Some("Oatmeal Bowl"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_persists_distinct_slot_positions_in_one_slot(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let mk = |title: &str, pos: i32| PlanEntryInput {
+            date: start,
+            task_type: Some("work".to_string()),
+            title: Some(title.to_string()),
+            scheduled_start: None,
+            after_anchor: Some("lunch".to_string()),
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: Some(pos),
+            paired_meal_name: None,
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![mk("a", 0), mk("b", 1), mk("c", 2)],
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        // Without slot_position population this fails the deferred unique constraint
+        // (three rows at (date,'lunch',0)).
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let period = get_period(&pool, uid, start, start).await.unwrap();
+        let mut by_pos: Vec<(i32, String)> = period
+            .entries
+            .iter()
+            .map(|e| (e.slot_position, e.title.clone().unwrap()))
+            .collect();
+        by_pos.sort();
+        assert_eq!(
+            by_pos,
+            vec![(0, "a".into()), (1, "b".into()), (2, "c".into())]
+        );
+    }
+
+    // Regression for the planning-wizard Finish flow: the wizard commits N plain
+    // tasks on the SAME date with after_anchor=NULL (scheduled_start "09:00") and
+    // client-derived slot_position 0,1,... and ALSO emits skipped meal-anchor
+    // entries (task_type=None). NULL after_anchor leaves the tasks unconstrained
+    // by the slot-uniqueness constraints, so distinct slot_positions must NOT
+    // trip the deferred constraint. Mirrors buildCommitRequest exactly.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_accepts_same_date_null_anchor_tasks_with_positions(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let task = |title: &str, pos: i32| PlanEntryInput {
+            date: start,
+            task_type: Some("general".to_string()),
+            title: Some(title.to_string()),
+            scheduled_start: NaiveTime::from_hms_opt(9, 0, 0),
+            after_anchor: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: Some(pos),
+            paired_meal_name: None,
+        };
+        let meal_anchor = |name: &str| PlanEntryInput {
+            date: start,
+            task_type: None,
+            title: Some(format!("({name})")),
+            scheduled_start: NaiveTime::from_hms_opt(8, 0, 0),
+            after_anchor: Some(name.to_string()),
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![
+                meal_anchor("breakfast"),
+                meal_anchor("lunch"),
+                meal_anchor("dinner"),
+                task("Morning run", 0),
+                task("Read book", 1),
+            ],
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &req)
+            .await
+            .expect("same-date null-anchor tasks with distinct slot_position must commit");
+
+        let period = get_period(&pool, uid, start, start).await.unwrap();
+        assert_eq!(
+            period.entries.len(),
+            2,
+            "only the 2 task_type-bearing entries insert; meal anchors are skipped"
+        );
+        let titles: Vec<&str> = period
+            .entries
+            .iter()
+            .map(|e| e.title.as_deref().unwrap())
+            .collect();
+        assert!(titles.contains(&"Morning run") && titles.contains(&"Read book"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_resolves_paired_meal_name_to_instance(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let instance = crate::db::meal_anchor_instance::add(
+            &pool,
+            uid,
+            start,
+            "breakfast",
+            NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+            60,
+        )
+        .await
+        .unwrap();
+
+        let entry = PlanEntryInput {
+            date: start,
+            task_type: Some("medication".to_string()),
+            title: Some("Take pills with food".to_string()),
+            scheduled_start: None,
+            after_anchor: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: Some(0),
+            paired_meal_name: Some("breakfast".to_string()),
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![entry],
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &req).await.unwrap();
+
+        let anchor_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT slot_meal_anchor_id FROM schedule_entries WHERE user_id = $1",
+        )
+        .bind(uid)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            anchor_id,
+            Some(instance.id),
+            "paired_meal_name must resolve to the instance id"
+        );
     }
 
     // The floating-task vs meal-anchor pairing collision test that used to
@@ -1796,5 +2215,403 @@ mod tests {
 
         let err = update_entry(&pool, uid, Uuid::new_v4(), &patch).await;
         assert!(matches!(err, Err(DatabaseError::NotFound)));
+    }
+
+    // -----------------------------------------------------------------------
+    // slot_position
+    // -----------------------------------------------------------------------
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn slot_position_column_exists_and_defaults_zero(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let id: Uuid = sqlx::query_scalar(
+            "INSERT INTO schedule_entries (user_id, task_type, title, date, status, after_anchor)
+             VALUES ($1, 'work', 'a', $2, 'planned', 'lunch') RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(d)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+
+        let pos: i32 =
+            sqlx::query_scalar("SELECT slot_position FROM schedule_entries WHERE entry_id = $1")
+                .bind(id)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(pos, 0, "new column defaults to 0");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn get_period_orders_floating_tasks_by_slot_position(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let sched = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+
+        // Insert three floating "lunch" tasks with positions 2,0,1 in that order.
+        for (title, pos) in [("c", 2), ("a", 0), ("b", 1)] {
+            sqlx::query(
+                "INSERT INTO schedule_entries
+                   (user_id, task_type, title, date, status, after_anchor, slot_position)
+                 VALUES ($1, 'work', $2, $3, 'planned', 'lunch', $4)",
+            )
+            .bind(uid)
+            .bind(title)
+            .bind(start)
+            .bind(pos)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+        let _ = sched;
+
+        let period = get_period(&pool, uid, start, start).await.unwrap();
+        let titles: Vec<&str> = period
+            .entries
+            .iter()
+            .filter(|e| e.after_anchor.as_deref() == Some("lunch"))
+            .map(|e| e.title.as_deref().unwrap())
+            .collect();
+        assert_eq!(
+            titles,
+            vec!["a", "b", "c"],
+            "must come back in slot_position order"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // reposition_entry
+    // -----------------------------------------------------------------------
+
+    use crate::repository::schedule::SlotTarget;
+
+    async fn insert_floating(
+        pool: &PgPool,
+        uid: Uuid,
+        date: NaiveDate,
+        title: &str,
+        anchor: &str,
+        pos: i32,
+    ) -> Uuid {
+        sqlx::query_scalar(
+            "INSERT INTO schedule_entries
+               (user_id, task_type, title, date, status, after_anchor, slot_position)
+             VALUES ($1, 'work', $2, $3, 'planned', $4, $5) RETURNING entry_id",
+        )
+        .bind(uid)
+        .bind(title)
+        .bind(date)
+        .bind(anchor)
+        .bind(pos)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+    }
+
+    async fn slot_order(pool: &PgPool, uid: Uuid, date: NaiveDate, anchor: &str) -> Vec<String> {
+        sqlx::query_scalar(
+            "SELECT title FROM schedule_entries
+             WHERE user_id = $1 AND date = $2 AND after_anchor = $3
+             ORDER BY slot_position",
+        )
+        .bind(uid)
+        .bind(date)
+        .bind(anchor)
+        .fetch_all(pool)
+        .await
+        .unwrap()
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_within_slot_reorders(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+        let _b = insert_floating(&pool, uid, d, "b", "lunch", 1).await;
+        let _c = insert_floating(&pool, uid, d, "c", "lunch", 2).await;
+
+        // Move "a" to the end (position 2).
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            2,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            slot_order(&pool, uid, d, "lunch").await,
+            vec!["b", "c", "a"]
+        );
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_between_slots_moves_and_compacts(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+        let _b = insert_floating(&pool, uid, d, "b", "lunch", 1).await;
+        let _x = insert_floating(&pool, uid, d, "x", "dinner", 0).await;
+
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d,
+            &SlotTarget::AfterAnchor("dinner".into()),
+            0,
+        )
+        .await
+        .unwrap();
+        assert_eq!(slot_order(&pool, uid, d, "lunch").await, vec!["b"]);
+        assert_eq!(slot_order(&pool, uid, d, "dinner").await, vec!["a", "x"]);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_into_and_out_of_meal_pairing(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let instance = crate::db::meal_anchor_instance::add(
+            &pool,
+            uid,
+            d,
+            "lunch",
+            NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            60,
+        )
+        .await
+        .unwrap();
+        let a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+
+        // Into the meal pairing.
+        reposition_entry(&pool, uid, a, d, &SlotTarget::MealAnchor(instance.id), 0)
+            .await
+            .unwrap();
+        let (after, meal, sched): (Option<String>, Option<Uuid>, Option<NaiveTime>) =
+            sqlx::query_as(
+                "SELECT after_anchor, slot_meal_anchor_id, scheduled_start
+                            FROM schedule_entries WHERE entry_id = $1",
+            )
+            .bind(a)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        assert_eq!(after, None);
+        assert_eq!(meal, Some(instance.id));
+        assert_eq!(sched, None, "reposition forces scheduled_start NULL");
+
+        // Back out to a slot.
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d,
+            &SlotTarget::AfterAnchor("dinner".into()),
+            0,
+        )
+        .await
+        .unwrap();
+        let (after2, meal2): (Option<String>, Option<Uuid>) = sqlx::query_as(
+            "SELECT after_anchor, slot_meal_anchor_id
+                            FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(a)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(after2, Some("dinner".to_string()));
+        assert_eq!(meal2, None);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_across_days(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d1 = tomorrow();
+        let d2 = d1 + Duration::days(1);
+        let a = insert_floating(&pool, uid, d1, "a", "lunch", 0).await;
+        let _y = insert_floating(&pool, uid, d2, "y", "lunch", 0).await;
+
+        reposition_entry(
+            &pool,
+            uid,
+            a,
+            d2,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            0,
+        )
+        .await
+        .unwrap();
+        let new_date: NaiveDate =
+            sqlx::query_scalar("SELECT date FROM schedule_entries WHERE entry_id = $1")
+                .bind(a)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(new_date, d2);
+        assert_eq!(slot_order(&pool, uid, d2, "lunch").await, vec!["a", "y"]);
+        assert!(slot_order(&pool, uid, d1, "lunch").await.is_empty());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_clamps_overlarge_position_to_slot_end(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let _a = insert_floating(&pool, uid, d, "a", "lunch", 0).await;
+        let _b = insert_floating(&pool, uid, d, "b", "lunch", 1).await;
+        // "c" starts in a different slot (dinner).
+        let c = insert_floating(&pool, uid, d, "c", "dinner", 0).await;
+
+        // Move "c" into the lunch slot at position 99 — should clamp to 2 (end of slot).
+        reposition_entry(
+            &pool,
+            uid,
+            c,
+            d,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            99,
+        )
+        .await
+        .unwrap();
+
+        // Slot must be dense: ["a", "b", "c"] at positions 0, 1, 2.
+        assert_eq!(
+            slot_order(&pool, uid, d, "lunch").await,
+            vec!["a", "b", "c"]
+        );
+        let pos: i32 =
+            sqlx::query_scalar("SELECT slot_position FROM schedule_entries WHERE entry_id = $1")
+                .bind(c)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(pos, 2, "c must land at position 2, not 99");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_unknown_entry_is_not_found(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+        let err = reposition_entry(
+            &pool,
+            uid,
+            Uuid::new_v4(),
+            d,
+            &SlotTarget::AfterAnchor("lunch".into()),
+            0,
+        )
+        .await
+        .unwrap_err();
+        assert!(matches!(err, DatabaseError::NotFound));
+    }
+
+    // -----------------------------------------------------------------------
+    // §C/§G — MealAnchor target ownership + existence validation → 422
+    // -----------------------------------------------------------------------
+
+    /// Repositioning to a non-existent meal_anchor_instance (bogus UUID) must
+    /// return a Validation error (maps to HTTP 422), not a 500 from a FK
+    /// violation, and must NOT mutate the entry (transaction rolled back).
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_to_nonexistent_meal_anchor_is_rejected(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let d = tomorrow();
+
+        // Create a floating task to reposition.
+        let entry_id = insert_floating(&pool, uid, d, "meditate", "morning", 0).await;
+
+        // Attempt to reposition to a completely bogus meal anchor uuid.
+        let bogus_id = Uuid::new_v4();
+        let err = reposition_entry(
+            &pool,
+            uid,
+            entry_id,
+            d,
+            &SlotTarget::MealAnchor(bogus_id),
+            0,
+        )
+        .await
+        .unwrap_err();
+
+        // Must be a Validation error — not QueryError or any other variant.
+        assert!(
+            matches!(err, DatabaseError::Validation(_)),
+            "expected Validation error, got: {err:?}"
+        );
+
+        // The entry must still be in its original slot (transaction was never committed).
+        let (after, meal): (Option<String>, Option<Uuid>) = sqlx::query_as(
+            "SELECT after_anchor, slot_meal_anchor_id FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(entry_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            after.as_deref(),
+            Some("morning"),
+            "after_anchor must be unchanged after rejected reposition"
+        );
+        assert_eq!(meal, None, "slot_meal_anchor_id must remain NULL");
+    }
+
+    /// Repositioning user A's task to a meal_anchor_instance belonging to user B
+    /// must also be rejected (ownership check), even though the instance uuid is
+    /// a valid, existing row in the table.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn reposition_to_foreign_user_meal_anchor_is_rejected(pool: PgPool) {
+        let user_a = new_user(&pool).await;
+        let user_b = new_user(&pool).await;
+        let d = tomorrow();
+
+        // Create a floating task for user A.
+        let entry_id = insert_floating(&pool, user_a, d, "stretches", "evening", 0).await;
+
+        // Create a meal anchor instance that belongs to user B on the same date.
+        let foreign_instance = crate::db::meal_anchor_instance::add(
+            &pool,
+            user_b,
+            d,
+            "lunch",
+            NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            60,
+        )
+        .await
+        .unwrap();
+
+        // Attempt to move user A's task into user B's meal anchor slot.
+        let err = reposition_entry(
+            &pool,
+            user_a,
+            entry_id,
+            d,
+            &SlotTarget::MealAnchor(foreign_instance.id),
+            0,
+        )
+        .await
+        .unwrap_err();
+
+        assert!(
+            matches!(err, DatabaseError::Validation(_)),
+            "expected Validation error for foreign-owner anchor, got: {err:?}"
+        );
+
+        // Confirm the entry was not moved.
+        let (after, meal): (Option<String>, Option<Uuid>) = sqlx::query_as(
+            "SELECT after_anchor, slot_meal_anchor_id FROM schedule_entries WHERE entry_id = $1",
+        )
+        .bind(entry_id)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+        assert_eq!(
+            after.as_deref(),
+            Some("evening"),
+            "after_anchor must be unchanged after rejected foreign-owner reposition"
+        );
+        assert_eq!(meal, None, "slot_meal_anchor_id must remain NULL");
     }
 }

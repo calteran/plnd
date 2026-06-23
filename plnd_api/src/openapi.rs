@@ -17,8 +17,8 @@ use crate::models::{
     MealEntry, MealEntryRequest, MealPlanRequest, MealPlanResponse, MealPlanState, MealRef,
     MealSuggestRequest, Nutrition, NutritionSummary, PatchEntryRequest, PatchEntryStatusRequest,
     PlaceTasksEntry, PlaceTasksRequest, PlanEntryRequest, PostSchedulePlanRequest, ReadyStatus,
-    SetAnchorStatusRequest, SlotRef, TaskEntryRequest, TaskEntryResponse, UnplannableReason,
-    UpdateMealPatternEntryRequest, UpdateScheduleAnchorRequest,
+    RepositionEntryRequest, SetAnchorStatusRequest, SlotRef, TaskEntryRequest, TaskEntryResponse,
+    UnplannableReason, UpdateMealPatternEntryRequest, UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
     briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
@@ -136,6 +136,7 @@ impl Modify for BearerSecurityAddon {
         crate::routes::schedule::post_plan,
         crate::routes::schedule::patch_entry_status,
         crate::routes::schedule::patch_entry,
+        crate::routes::schedule::reposition_entry,
         // Schedule Anchors (per-date meal anchor instances, #828)
         crate::routes::schedule_anchors::list_for_date,
         crate::routes::schedule_anchors::create,
@@ -216,6 +217,7 @@ impl Modify for BearerSecurityAddon {
         CarryoverDecision,
         PatchEntryStatusRequest,
         PatchEntryRequest,
+        RepositionEntryRequest,
         RoutineResponse,
         CreateRoutineRequest,
         DayTypeResponse,

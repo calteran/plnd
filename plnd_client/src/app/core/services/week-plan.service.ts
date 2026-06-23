@@ -16,6 +16,40 @@ import { addDaysDateOnly } from '../utils/date-only';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
 
+/**
+ * Pure helper: reorders a task within the (date, slotKey) slice of `all`.
+ * Tasks not in the target slice are untouched.
+ * `slotKey` = `paired_meal_name ?? after_anchor ?? '<sched>'`
+ */
+export function reorderWithinSlot(
+  all: PlannedTask[],
+  date: string,
+  slotKey: string,
+  fromIndex: number,
+  toIndex: number,
+): PlannedTask[] {
+  const taskSlotKey = (t: PlannedTask): string =>
+    t.paired_meal_name ?? t.after_anchor ?? '<sched>';
+
+  const sliceIndices: number[] = [];
+  all.forEach((t, i) => {
+    if (t.date === date && taskSlotKey(t) === slotKey) sliceIndices.push(i);
+  });
+
+  if (fromIndex < 0 || fromIndex >= sliceIndices.length) return all;
+  if (toIndex < 0 || toIndex >= sliceIndices.length) return all;
+  if (fromIndex === toIndex) return all;
+
+  // Extract the slice items, reorder them, stitch back.
+  const sliceItems = sliceIndices.map(i => all[i]);
+  const [moved] = sliceItems.splice(fromIndex, 1);
+  sliceItems.splice(toIndex, 0, moved);
+
+  const next = [...all];
+  sliceIndices.forEach((origIdx, j) => { next[origIdx] = sliceItems[j]; });
+  return next;
+}
+
 @Injectable({ providedIn: 'root' })
 export class WeekPlanService {
   private readonly http    = inject(HttpClient);
@@ -360,6 +394,71 @@ export class WeekPlanService {
     this.scheduledTasksSignal.update(t => t.filter((_, i) => i !== index));
   }
 
+  /**
+   * Reorders a task within the (date, slotKey) slice of scheduledTasks, preserving
+   * the relative order of all tasks in other slots. `slotKey` matches
+   * `paired_meal_name ?? after_anchor ?? '<sched>'`.
+   */
+  reorderTask(date: string, slotKey: string, fromIndex: number, toIndex: number): void {
+    this.scheduledTasksSignal.update(all => reorderWithinSlot(all, date, slotKey, fromIndex, toIndex));
+  }
+
+  /** Moves a task to a different date, preserving all other fields. */
+  moveTaskToDay(task: PlannedTask, newDate: string): void {
+    this.scheduledTasksSignal.update(all => all.map(t => t === task ? { ...t, date: newDate } : t));
+  }
+
+  /**
+   * Moves a task to a new (date, slotKey) and inserts it at `toIndex` within that slot.
+   * Clears the old `after_anchor`/`paired_meal_name` and sets the new one per the slot key.
+   * `slotKey` = `'<sched>'` → clears both slot fields; meal name → sets `paired_meal_name`;
+   * anchor label → sets `after_anchor`.
+   *
+   * Note: meal slot names ('breakfast', 'lunch', 'dinner') use `paired_meal_name`;
+   * non-meal after-anchor labels use `after_anchor`.
+   * For simplicity in the wizard, meal slot names are stored as `paired_meal_name`.
+   */
+  updateTaskSlot(task: PlannedTask, newDate: string, slotKey: string, toIndex: number): void {
+    this.scheduledTasksSignal.update(all => {
+      // Remove the task from its current position
+      const without = all.filter(t => t !== task);
+
+      // Patch the task: always clear both slot fields, then set only the correct one.
+      // '<sched>' → neither field set; named slot → paired_meal_name (wizard slots are meal names).
+      const patched: PlannedTask = {
+        ...task,
+        date: newDate,
+        after_anchor: undefined,
+        paired_meal_name: slotKey !== '<sched>' ? slotKey : undefined,
+      };
+
+      // Find the index to insert at within the new (date, slotKey) slice
+      const slotKeyFn = (t: PlannedTask): string =>
+        t.paired_meal_name ?? t.after_anchor ?? '<sched>';
+
+      const sliceIndices: number[] = [];
+      without.forEach((t, i) => {
+        if (t.date === newDate && slotKeyFn(t) === slotKey) sliceIndices.push(i);
+      });
+
+      // Clamp toIndex
+      const insertAt = Math.min(toIndex, sliceIndices.length);
+
+      const result = [...without];
+      if (insertAt >= sliceIndices.length) {
+        // Insert after the last item in the slice, or at end if slice is empty
+        const insertPos = sliceIndices.length > 0
+          ? sliceIndices[sliceIndices.length - 1] + 1
+          : result.length;
+        result.splice(insertPos, 0, patched);
+      } else {
+        result.splice(sliceIndices[insertAt], 0, patched);
+      }
+
+      return result;
+    });
+  }
+
   addFloatingTask(task: FloatingTask): void {
     this.floatingTasksSignal.update(tasks => [...tasks, task]);
   }
@@ -427,13 +526,20 @@ export class WeekPlanService {
       }
     }
 
+    const posByGroup = new Map<string, number>();
     for (const task of tasks) {
       const type = (task.task_type as string) === 'custom' ? 'general' : (task.task_type ?? 'general');
+      const slotKey = `${task.date}::${task.paired_meal_name ?? task.after_anchor ?? '<sched>'}`;
+      const pos = posByGroup.get(slotKey) ?? 0;
+      posByGroup.set(slotKey, pos + 1);
       entries.push({
         date: task.date,
         task_type: type as TaskType,
         title: task.title,
-        scheduled_start: task.scheduled_start ?? '09:00',
+        scheduled_start: task.after_anchor || task.paired_meal_name ? null : (task.scheduled_start ?? '09:00'),
+        after_anchor: task.paired_meal_name ? undefined : task.after_anchor,
+        paired_meal_name: task.paired_meal_name,
+        slot_position: pos,
       });
     }
 

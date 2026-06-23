@@ -1,12 +1,13 @@
-import { Component, DestroyRef, OnDestroy, OnInit, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
-import { ScheduleService } from '../../core/services/schedule.service';
+import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
+import { ScheduleService, RepositionTarget } from '../../core/services/schedule.service';
 import { todayIso } from '../../core/utils/date-only';
 import { BriefingService } from '../../core/services/briefing.service';
 import { TimezoneService } from '../../core/services/timezone.service';
-import { isMealAnchor, ScheduleItem, TaskEditPatch } from '../../core/models/schedule';
+import { isMealAnchor, MealAnchor, ScheduleItem, ScheduleTask, TaskEditPatch } from '../../core/models/schedule';
 import { DayZoneViewDto, TimezoneAnchorDto } from '../../core/models/timezone';
 import { DaySwitch, DayZoneView } from '../../core/utils/zone-projection';
 import { DayHeaderComponent } from '../schedule/components/day-header/day-header';
@@ -22,6 +23,7 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
   selector: 'app-day-view',
   standalone: true,
   imports: [
+    DragDropModule,
     DayHeaderComponent,
     MealRowComponent,
     TaskRowComponent,
@@ -83,35 +85,67 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                 (whyClicked)="openWhy(zoneView()!.switch!.anchor)"
               />
             }
-            @for (item of scheduleService.scheduleItems(); track item.id) {
-              @if (isMealAnchor(item)) {
-                <app-meal-row
-                  [id]="'task-row-' + item.id"
-                  [class.dimmed]="isSpotlightDimmed(item)"
-                  [attr.inert]="isSpotlightDimmed(item) ? '' : null"
-                  [meal]="item"
-                  [date]="scheduleService.date()"
-                  [editingId]="editingId()"
-                  (editRequested)="openEditor($event)"
-                  (save)="onEditSave(editingId()!, $event)"
-                  (closed)="closeEditor()"
-                  (toggled)="scheduleService.toggleItem($event)"
-                  (doneToggle)="scheduleService.toggleMealConsumed($event)"
-                  (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
-                />
-              } @else {
-                <app-task-row
-                  [id]="'task-row-' + item.id"
-                  [class.dimmed]="isSpotlightDimmed(item)"
-                  [attr.inert]="isSpotlightDimmed(item) ? '' : null"
-                  [item]="item"
-                  [editing]="editingId() === item.id"
-                  (editRequested)="openEditor($event)"
-                  (save)="onEditSave(item.id, $event)"
-                  (closed)="closeEditor()"
-                  (toggled)="scheduleService.toggleItem($event)"
-                />
+            @for (group of scheduleService.slotGroups(); track group.anchorLabel) {
+              @if (group.anchor !== null) {
+                @if (isMealAnchor(group.anchor)) {
+                  @let mealClone = mealAnchor(group.anchor.id);
+                  @if (mealClone) {
+                  <app-meal-row
+                    [id]="'task-row-' + group.anchor.id"
+                    [class.dimmed]="isSpotlightDimmed(group.anchor)"
+                    [attr.inert]="isSpotlightDimmed(group.anchor) ? '' : null"
+                    [meal]="mealClone"
+                    [date]="scheduleService.date()"
+                    [editingId]="editingId()"
+                    [dropListId]="'meal-' + group.anchor.id"
+                    [connectedTo]="allDropListIds()"
+                    (mealDrop)="onMealDrop($event, group.anchor.id)"
+                    (editRequested)="openEditor($event)"
+                    (save)="onEditSave(editingId()!, $event)"
+                    (closed)="closeEditor()"
+                    (toggled)="scheduleService.toggleItem($event)"
+                    (doneToggle)="scheduleService.toggleMealConsumed($event)"
+                    (skipped)="scheduleService.setMealConsumption($event, 'skipped')"
+                  />
+                  }
+                } @else {
+                  <app-task-row
+                    [id]="'task-row-' + group.anchor.id"
+                    [class.dimmed]="isSpotlightDimmed(group.anchor)"
+                    [attr.inert]="isSpotlightDimmed(group.anchor) ? '' : null"
+                    [item]="group.anchor"
+                    [editing]="editingId() === group.anchor.id"
+                    (editRequested)="openEditor($event)"
+                    (save)="onEditSave(group.anchor.id, $event)"
+                    (closed)="closeEditor()"
+                    (toggled)="scheduleService.toggleItem($event)"
+                  />
+                }
               }
+              <div
+                  cdkDropList
+                  [id]="'slot-' + group.anchorLabel"
+                  [cdkDropListData]="slotTasks(group.anchorLabel)"
+                  [cdkDropListConnectedTo]="allDropListIds()"
+                  (cdkDropListDropped)="onSlotDrop($event, group.anchorLabel)"
+                  class="slot-drop-list"
+                >
+                  @for (task of slotTasks(group.anchorLabel); track task.id) {
+                    <app-task-row
+                      cdkDrag
+                      [cdkDragData]="task"
+                      [id]="'task-row-' + task.id"
+                      [class.dimmed]="isSpotlightDimmed(task)"
+                      [attr.inert]="isSpotlightDimmed(task) ? '' : null"
+                      [item]="task"
+                      [editing]="editingId() === task.id"
+                      (editRequested)="openEditor($event)"
+                      (save)="onEditSave(task.id, $event)"
+                      (closed)="closeEditor()"
+                      (toggled)="scheduleService.toggleItem($event)"
+                    />
+                  }
+                </div>
             }
           </div>
         }
@@ -157,6 +191,68 @@ export class DayViewComponent implements OnInit, OnDestroy {
   private toastTimer?: ReturnType<typeof setTimeout>;
 
   readonly editingId = signal<string | null>(null);
+
+  /**
+   * Mutable per-slot task lists keyed by anchorLabel.
+   * CDK mutates these arrays in place on drop; built (with fresh copies) each
+   * time the service emits a new slotGroups value.
+   */
+  readonly slotGroupMap = signal<Map<string, ScheduleTask[]>>(new Map());
+
+  /**
+   * Mutable per-meal anchor clones keyed by meal id.
+   * Each clone's `duringMealTasks` is a copied array — CDK and drop handlers
+   * operate only on these copies, never on the service's slotGroups() objects.
+   * Rebuilt (with fresh clones) each time the service emits a new snapshot.
+   */
+  readonly mealAnchorMap = signal<Map<string, MealAnchor>>(new Map());
+
+  constructor() {
+    // Rebuild mutable slot map and meal-anchor map whenever the service emits a
+    // fresh slot-groups snapshot. Use effect() so the rebuild runs inside the
+    // Angular signal graph and triggers OnPush change detection automatically.
+    effect(() => {
+      const groups = this.scheduleService.slotGroups();
+      const slotMap = new Map<string, ScheduleTask[]>();
+      const mealMap = new Map<string, MealAnchor>();
+      for (const g of groups) {
+        slotMap.set(g.anchorLabel, [...g.tasks]);
+        if (g.anchor && isMealAnchor(g.anchor)) {
+          // Shallow-clone the meal anchor with a copied duringMealTasks array so
+          // CDK can mutate it in place without touching the service's snapshot.
+          mealMap.set(g.anchor.id, { ...g.anchor, duringMealTasks: [...g.anchor.duringMealTasks] });
+        }
+      }
+      this.slotGroupMap.set(slotMap);
+      this.mealAnchorMap.set(mealMap);
+    });
+  }
+
+  /** Returns the mutable task array for a given slot label (empty array if unknown). */
+  slotTasks(anchorLabel: string): ScheduleTask[] {
+    return this.slotGroupMap().get(anchorLabel) ?? [];
+  }
+
+  /** Returns the day-view-owned mutable clone of a meal anchor (undefined if unknown). */
+  mealAnchor(mealId: string): MealAnchor | undefined {
+    return this.mealAnchorMap().get(mealId);
+  }
+
+  /**
+   * IDs of all CDK drop lists: one per slot and one per meal's during-meal list.
+   * A `computed` so the template's repeated `allDropListIds()` calls per change
+   * detection memoize against `slotGroups()` (matches `PlanDayCardComponent`).
+   */
+  readonly allDropListIds = computed(() => {
+    const ids: string[] = [];
+    for (const g of this.scheduleService.slotGroups()) {
+      ids.push(`slot-${g.anchorLabel}`);
+      if (g.anchor && isMealAnchor(g.anchor)) {
+        ids.push(`meal-${g.anchor.id}`);
+      }
+    }
+    return ids;
+  });
 
   /**
    * Spotlight rule: a row dims (and goes inert) while *another* row is being
@@ -312,5 +408,67 @@ export class DayViewComponent implements OnInit, OnDestroy {
   closeToast(): void {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastMessage.set(null);
+  }
+
+  /** Drop handler for a slot's floating task list. */
+  onSlotDrop(event: CdkDragDrop<ScheduleTask[]>, anchorLabel: string): void {
+    const tasks = event.container.data;
+    if (event.previousContainer === event.container) {
+      moveItemInArray(tasks, event.previousIndex, event.currentIndex);
+    } else {
+      transferArrayItem(
+        event.previousContainer.data,
+        tasks,
+        event.previousIndex,
+        event.currentIndex,
+      );
+    }
+    const moved = tasks[event.currentIndex];
+    this.persistReposition(
+      moved.id,
+      { afterAnchor: anchorLabel },
+      event.currentIndex,
+    );
+  }
+
+  /** Drop handler for a meal's during-meal task list. */
+  onMealDrop(event: CdkDragDrop<ScheduleTask[]>, mealAnchorId: string): void {
+    const tasks = event.container.data;
+    if (event.previousContainer === event.container) {
+      moveItemInArray(tasks, event.previousIndex, event.currentIndex);
+    } else {
+      transferArrayItem(
+        event.previousContainer.data,
+        tasks,
+        event.previousIndex,
+        event.currentIndex,
+      );
+    }
+    const moved = tasks[event.currentIndex];
+    this.persistReposition(moved.id, { mealAnchorId }, event.currentIndex);
+  }
+
+  private persistReposition(
+    entryId: string,
+    target: RepositionTarget,
+    position: number,
+  ): void {
+    this.scheduleService
+      .repositionTask(entryId, this.scheduleService.date(), target, position)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          // Re-sync ScheduleService signals with the persisted order. Without
+          // this, only the local DayViewComponent maps reflect the move; a
+          // later service update (e.g. a task toggle) would rebuild those maps
+          // from the still-stale `slotGroups()` snapshot and revert the drag.
+          this.scheduleService.loadDay(this.scheduleService.date());
+        },
+        error: () => {
+          // Roll back the optimistic move by re-fetching authoritative state.
+          this.scheduleService.loadDay(this.scheduleService.date());
+          this.onTaskConfirmed('Could not move task — please try again.');
+        },
+      });
   }
 }

@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
 import { WeekPlanService } from './week-plan.service';
-import { MealRef, PostSchedulePlanRequest, SchedulePeriodResponse } from '../models/week-plan';
+import { MealRef, PlanEntryRequest, PostSchedulePlanRequest, SchedulePeriodResponse } from '../models/week-plan';
 import { DayTypesMealsService } from './day-types-meals.service';
 
 describe('WeekPlanService', () => {
@@ -614,6 +614,107 @@ describe('WeekPlanService', () => {
       service.setDropReason('task-2', 'No longer needed');
       service.setCarryoverDecision('task-1', 'carry');
       expect(service.dropReasons()['task-2']).toBe('No longer needed');
+    });
+  });
+
+  describe('reorderTask / reorderWithinSlot', () => {
+    it('reorderWithinSlot moves an item within its (date, slot) slice without disturbing other slots', () => {
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'a', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'b', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'c', energy: 'low', after_anchor: 'dinner' });
+
+      // Move 'b' (index 1 in lunch) to before 'a' (index 0)
+      service.reorderTask('2026-06-22', 'lunch', 1, 0);
+
+      const tasks = service.scheduledTasks();
+      const lunch = tasks.filter(t => t.after_anchor === 'lunch');
+      expect(lunch.map(t => t.title)).toEqual(['b', 'a']);
+      const dinner = tasks.filter(t => t.after_anchor === 'dinner');
+      expect(dinner.map(t => t.title)).toEqual(['c']); // untouched
+    });
+
+    it('moveTaskToDay updates date on the matched task only', () => {
+      service.initSession('2026-06-22', '2026-06-23');
+      service.addTask({ date: '2026-06-22', title: 'Walk', energy: 'low' });
+      service.addTask({ date: '2026-06-22', title: 'Run', energy: 'medium' });
+
+      const walkTask = service.scheduledTasks().find(t => t.title === 'Walk')!;
+      service.moveTaskToDay(walkTask, '2026-06-23');
+
+      expect(service.scheduledTasks().find(t => t.title === 'Walk')?.date).toBe('2026-06-23');
+      expect(service.scheduledTasks().find(t => t.title === 'Run')?.date).toBe('2026-06-22');
+    });
+
+    it('updateTaskSlot cross-day leaves EXACTLY ONE instance of the task on the new date', () => {
+      // Regression: the old onDrop called moveTaskToDay then updateTaskSlot with a stale
+      // reference, causing the task to be duplicated. updateTaskSlot alone handles both.
+      service.initSession('2026-06-22', '2026-06-23');
+      service.addTask({ date: '2026-06-22', title: 'Walk', energy: 'low', paired_meal_name: 'breakfast' });
+      service.addTask({ date: '2026-06-22', title: 'Run',  energy: 'medium' });
+
+      const task = service.scheduledTasks().find(t => t.title === 'Walk')!;
+      // Simulate the atomic cross-day drop: updateTaskSlot handles date change + slot change.
+      service.updateTaskSlot(task, '2026-06-23', 'lunch', 0);
+
+      const allWalks = service.scheduledTasks().filter(t => t.title === 'Walk');
+      expect(allWalks.length).toBe(1);
+      expect(allWalks[0].date).toBe('2026-06-23');
+      expect(allWalks[0].paired_meal_name).toBe('lunch');
+      expect(allWalks[0].after_anchor).toBeUndefined();
+    });
+
+    it('updateTaskSlot clears after_anchor when moving to a named meal slot', () => {
+      // Regression (F2): after_anchor clearing was conditional — explicit test to verify
+      // both fields are always cleared before setting the correct one.
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'Meds', energy: 'low', after_anchor: 'morning' });
+
+      const task = service.scheduledTasks().find(t => t.title === 'Meds')!;
+      service.updateTaskSlot(task, '2026-06-22', 'breakfast', 0);
+
+      const updated = service.scheduledTasks().find(t => t.title === 'Meds')!;
+      expect(updated.paired_meal_name).toBe('breakfast');
+      expect(updated.after_anchor).toBeUndefined();
+    });
+
+    it('updateTaskSlot clears paired_meal_name when moving to <sched>', () => {
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'Gym', energy: 'high', paired_meal_name: 'lunch' });
+
+      const task = service.scheduledTasks().find(t => t.title === 'Gym')!;
+      service.updateTaskSlot(task, '2026-06-22', '<sched>', 0);
+
+      const updated = service.scheduledTasks().find(t => t.title === 'Gym')!;
+      expect(updated.paired_meal_name).toBeUndefined();
+      expect(updated.after_anchor).toBeUndefined();
+    });
+  });
+
+  describe('buildCommitRequest slot_position derivation', () => {
+    // Note: no initSession — horizonDays() is empty, so only task entries are emitted.
+    it('derives contiguous slot_position per (date, slot) at commit', () => {
+      service.addTask({ date: '2026-06-22', title: 'a', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'b', energy: 'low', after_anchor: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'c', energy: 'low', after_anchor: 'dinner' });
+
+      const req = (service as unknown as { buildCommitRequest(id: string, r: boolean): PostSchedulePlanRequest }).buildCommitRequest('task-1', false);
+      const lunch = req.entries.filter((e: PlanEntryRequest) => e.after_anchor === 'lunch');
+      expect(lunch.map((e: PlanEntryRequest) => e.slot_position)).toEqual([0, 1]);
+      const dinner = req.entries.filter((e: PlanEntryRequest) => e.after_anchor === 'dinner');
+      expect(dinner.map((e: PlanEntryRequest) => e.slot_position)).toEqual([0]);
+    });
+
+    it('sends null scheduled_start and no after_anchor for paired tasks', () => {
+      service.addTask({ date: '2026-06-22', title: 'Meds', energy: 'low', paired_meal_name: 'lunch' });
+
+      const req = (service as unknown as { buildCommitRequest(id: string, r: boolean): PostSchedulePlanRequest }).buildCommitRequest('task-1', false);
+      const meds = req.entries.find((e: PlanEntryRequest) => e.title === 'Meds');
+      expect(meds).toBeTruthy();
+      expect(meds!.scheduled_start).toBeNull();
+      expect(meds!.after_anchor).toBeUndefined();
+      expect(meds!.paired_meal_name).toBe('lunch');
+      expect(meds!.slot_position).toBe(0);
     });
   });
 

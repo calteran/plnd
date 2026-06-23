@@ -15,7 +15,7 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
   standalone: true,
   imports: [TaskEditFormComponent],
   template: `
-    <div class="task-row" [class.done]="item().status === 'done'">
+    <div class="task-row" data-testid="task-row" [class.done]="item().status === 'done'">
       <div class="gutter">
         @if (item().scheduledTime) {
           <span class="time">{{ item().scheduledTime }}</span>

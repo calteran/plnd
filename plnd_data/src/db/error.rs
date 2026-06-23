@@ -23,6 +23,9 @@ pub(crate) enum DatabaseError {
 
     #[error("Database connection lost")]
     ConnectionLost,
+
+    #[error("Validation error: {0}")]
+    Validation(String),
 }
 
 impl From<sqlx::Error> for DatabaseError {

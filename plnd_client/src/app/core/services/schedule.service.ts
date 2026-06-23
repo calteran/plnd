@@ -1,12 +1,14 @@
 import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpClient } from '@angular/common/http';
-import { Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
+import { Observable, Subject, of, switchMap, map, catchError, forkJoin } from 'rxjs';
 import { ConfigService } from './config.service';
-import { ScheduleItem, MealAnchor, ScheduleTask, TaskEditPatch, isMealAnchor } from '../models/schedule';
+import { ScheduleItem, MealAnchor, ScheduleTask, SlotGroup, TaskEditPatch, isMealAnchor } from '../models/schedule';
 import { ScheduleAnchorDto, SchedulePeriodResponse } from '../models/week-plan';
 import { todayIso } from '../utils/date-only';
-import { assembleScheduleItems, toMealUiStatus } from '../utils/schedule-assembly';
+import { assembleScheduleItems, assembleSlotGroups, toMealUiStatus } from '../utils/schedule-assembly';
+
+export type RepositionTarget = { afterAnchor: string } | { mealAnchorId: string };
 
 export type MealConsumptionApi = 'planned' | 'consumed' | 'skipped';
 
@@ -17,12 +19,14 @@ export class ScheduleService {
   private readonly destroyRef = inject(DestroyRef);
 
   private readonly _items        = signal<ScheduleItem[]>([]);
+  private readonly _slotGroups   = signal<SlotGroup[]>([]);
   private readonly _loading      = signal(false);
   private readonly _error        = signal<string | null>(null);
   private readonly _date         = signal(todayIso());
   private readonly _loadTrigger$ = new Subject<string>();
 
   readonly scheduleItems = this._items.asReadonly();
+  readonly slotGroups    = this._slotGroups.asReadonly();
   readonly isLoading     = this._loading.asReadonly();
   readonly loadError     = this._error.asReadonly();
   readonly date          = this._date.asReadonly();
@@ -48,7 +52,10 @@ export class ScheduleService {
       takeUntilDestroyed(),
     ).subscribe(({ schedule, anchors }) => {
       if (schedule.error) this._error.set('Failed to load schedule');
-      this._items.set(assembleScheduleItems(anchors, schedule.data.entries, schedule.data.planned_meals ?? []));
+      const entries      = schedule.data.entries;
+      const plannedMeals = schedule.data.planned_meals ?? [];
+      this._items.set(assembleScheduleItems(anchors, entries, plannedMeals));
+      this._slotGroups.set(assembleSlotGroups(anchors, entries, plannedMeals));
       this._loading.set(false);
     });
   }
@@ -79,6 +86,11 @@ export class ScheduleService {
       }),
     );
 
+    // Also update _slotGroups so OnPush rows re-render with the new status.
+    this._slotGroups.update(groups => updateTaskInGroups(groups, id, task => ({
+      ...task, status: flip(task.status),
+    })));
+
     this.http
       .patch(`${this.apiBase}/schedule/entries/${id}/status`, { status: toApiStatus(currentStatus) })
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -92,17 +104,18 @@ export class ScheduleService {
   updateEntry(id: string, patch: TaskEditPatch): void {
     if (findItemStatus(this._items(), id) === null) return;
 
+    const apply = (t: ScheduleTask): ScheduleTask => ({
+      ...t,
+      label:           patch.title ?? t.label,
+      type:            patch.type ?? t.type,
+      scheduledStart:  patch.scheduledStart ?? t.scheduledStart,
+      durationMinutes: patch.durationMinutes ?? t.durationMinutes,
+      energy:          patch.energy ?? t.energy,
+      oneShot:         patch.oneShot ?? t.oneShot,
+    });
+
     this._items.update(items =>
       items.map(item => {
-        const apply = (t: ScheduleTask): ScheduleTask => ({
-          ...t,
-          label:           patch.title ?? t.label,
-          type:            patch.type ?? t.type,
-          scheduledStart:  patch.scheduledStart ?? t.scheduledStart,
-          durationMinutes: patch.durationMinutes ?? t.durationMinutes,
-          energy:          patch.energy ?? t.energy,
-          oneShot:         patch.oneShot ?? t.oneShot,
-        });
         if (isMealAnchor(item)) {
           if (!item.duringMealTasks.some(t => t.id === id)) return item;
           return { ...item, duringMealTasks: item.duringMealTasks.map(t => t.id === id ? apply(t) : t) };
@@ -110,6 +123,9 @@ export class ScheduleService {
         return item.id === id ? apply(item) : item;
       }),
     );
+
+    // Also update _slotGroups so OnPush rows re-render with the edited values.
+    this._slotGroups.update(groups => updateTaskInGroups(groups, id, apply));
 
     this.http
       .patch(`${this.apiBase}/schedule/entries/${id}`, toPatchBody(patch))
@@ -119,12 +135,25 @@ export class ScheduleService {
 
   /** Set a meal anchor's consumption status (planned/consumed/skipped). */
   setMealConsumption(id: string, status: MealConsumptionApi): void {
+    const nextStatus = (desc?: string) => toMealUiStatus(status, desc);
     this._items.update(items =>
       items.map(item =>
         isMealAnchor(item) && item.id === id
-          ? { ...item, status: toMealUiStatus(status, item.description) }
+          ? { ...item, status: nextStatus(item.description) }
           : item,
       ),
+    );
+    // Also update _slotGroups so the meal-row re-renders with the new status.
+    this._slotGroups.update(groups =>
+      groups.map(g => {
+        if (g.anchor !== null && isMealAnchor(g.anchor) && g.anchor.id === id) {
+          return {
+            ...g,
+            anchor: { ...g.anchor, status: nextStatus(g.anchor.description) },
+          };
+        }
+        return g;
+      }),
     );
     this.http
       .patch(`${this.apiBase}/schedule/anchors/${id}/status`, { status })
@@ -142,9 +171,61 @@ export class ScheduleService {
   addItem(task: ScheduleTask): void {
     this._items.update(items => [...items, task]);
   }
+
+  repositionTask(
+    entryId: string,
+    date: string,
+    target: RepositionTarget,
+    position: number,
+  ): Observable<void> {
+    const body: Record<string, unknown> = { date, position };
+    if ('afterAnchor' in target) body['after_anchor'] = target.afterAnchor;
+    else body['slot_meal_anchor_id'] = target.mealAnchorId;
+    return this.http.patch<void>(`${this.apiBase}/schedule/entries/${entryId}/position`, body);
+  }
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────
+
+/**
+ * Returns a new SlotGroup[] with a single task (identified by `id`) mapped
+ * through `fn`. Handles the task appearing as:
+ *   - an anchor ScheduleTask (group.anchor)
+ *   - a floating task in group.tasks
+ *   - a during-meal task in a MealAnchor's duringMealTasks
+ * Used to propagate optimistic updates (toggle, edit) to _slotGroups so
+ * OnPush task-row components re-render without a full reload.
+ */
+function updateTaskInGroups(
+  groups: SlotGroup[],
+  id: string,
+  fn: (t: ScheduleTask) => ScheduleTask,
+): SlotGroup[] {
+  return groups.map(g => {
+    // Check if the anchor is the target task
+    if (g.anchor !== null && !isMealAnchor(g.anchor) && g.anchor.id === id) {
+      return { ...g, anchor: fn(g.anchor) };
+    }
+    // Check if the anchor is a meal and the target is one of its during-meal tasks
+    if (g.anchor !== null && isMealAnchor(g.anchor)) {
+      const meal = g.anchor;
+      if (meal.duringMealTasks.some(t => t.id === id)) {
+        return {
+          ...g,
+          anchor: {
+            ...meal,
+            duringMealTasks: meal.duringMealTasks.map(t => t.id === id ? fn(t) : t),
+          },
+        };
+      }
+    }
+    // Check the floating tasks list
+    if (g.tasks.some(t => t.id === id)) {
+      return { ...g, tasks: g.tasks.map(t => t.id === id ? fn(t) : t) };
+    }
+    return g;
+  });
+}
 
 function flip(status: 'pending' | 'done'): 'pending' | 'done' {
   return status === 'done' ? 'pending' : 'done';

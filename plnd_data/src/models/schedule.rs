@@ -54,6 +54,9 @@ pub struct ScheduleEntry {
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
     pub one_shot: bool,
+    /// Per-slot ordering for floating/paired tasks (§4.9). 0 for scheduled-task
+    /// anchors, which don't live in a slot.
+    pub slot_position: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -103,6 +106,11 @@ pub struct PlanEntryInput {
     pub duration_minutes: Option<i32>,
     pub energy_required: Option<String>,
     pub one_shot: Option<bool>,
+    /// 0-based order within (date, slot). Defaults to 0 when omitted.
+    pub slot_position: Option<i32>,
+    /// Pre-materialization meal pairing: resolved to slot_meal_anchor_id at
+    /// commit by matching (date, name) against meal_anchor_instances.
+    pub paired_meal_name: Option<String>,
 }
 
 /// Partial update for a single schedule entry. `None` fields are left unchanged.

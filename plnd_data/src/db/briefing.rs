@@ -124,6 +124,8 @@ mod tests {
                     duration_minutes: None,
                     energy_required: None,
                     one_shot: None,
+                    slot_position: None,
+                    paired_meal_name: None,
                 },
                 PlanEntryInput {
                     date: yesterday,
@@ -134,6 +136,8 @@ mod tests {
                     duration_minutes: None,
                     energy_required: None,
                     one_shot: None,
+                    slot_position: None,
+                    paired_meal_name: None,
                 },
             ],
             meal_entries: Vec::new(),

@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::db::schedule;
 use crate::models::{CommitPlanInput, EntryPatch, OpenSlot, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
-use crate::repository::schedule::ScheduleRepository;
+use crate::repository::schedule::{ScheduleRepository, SlotTarget};
 
 pub struct PgScheduleRepository {
     pool: PgPool,
@@ -79,6 +79,19 @@ impl ScheduleRepository for PgScheduleRepository {
         patch: &EntryPatch,
     ) -> Result<(), crate::Error> {
         schedule::update_entry(&self.pool, user_id, entry_id, patch)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn reposition_entry(
+        &self,
+        user_id: Uuid,
+        entry_id: Uuid,
+        date: NaiveDate,
+        target: &SlotTarget,
+        position: i32,
+    ) -> Result<(), crate::Error> {
+        schedule::reposition_entry(&self.pool, user_id, entry_id, date, target, position)
             .await
             .map_err(Into::into)
     }

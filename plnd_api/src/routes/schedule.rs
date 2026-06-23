@@ -5,7 +5,7 @@ use crate::api_response::{
 use crate::auth::jwt::Claims;
 use crate::models::{
     CarryoverDecision as HttpCarryoverDecision, MealEntryRequest, PatchEntryRequest,
-    PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest,
+    PatchEntryStatusRequest, PlanEntryRequest, PostSchedulePlanRequest, RepositionEntryRequest,
 };
 use crate::routes::domain_constants::{
     VALID_ENERGY_LEVELS, VALID_MEAL_REF_TYPES, VALID_TASK_TYPES,
@@ -21,6 +21,7 @@ use plnd_data::Error;
 use plnd_data::models::{
     CarryoverDecision, CommitPlanInput, EntryPatch, PlanEntryInput, PlannedMealEntryStaging,
 };
+use plnd_data::repository::schedule::SlotTarget;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -64,6 +65,8 @@ fn map_entry(e: PlanEntryRequest) -> Result<PlanEntryInput, StatusCode> {
             .transpose()?,
         energy_required: e.energy_required,
         one_shot: e.one_shot,
+        slot_position: e.slot_position,
+        paired_meal_name: e.paired_meal_name,
     })
 }
 
@@ -432,6 +435,57 @@ pub async fn patch_entry(
         })
 }
 
+/// Resolve the request's polymorphic slot key into a `SlotTarget`. Exactly one
+/// of `after_anchor` / `slot_meal_anchor_id` must be set.
+fn reposition_target(req: &RepositionEntryRequest) -> Result<SlotTarget, StatusCode> {
+    match (&req.after_anchor, req.slot_meal_anchor_id) {
+        (Some(a), None) if !a.trim().is_empty() => Ok(SlotTarget::AfterAnchor(a.clone())),
+        (None, Some(m)) => Ok(SlotTarget::MealAnchor(m)),
+        _ => Err(StatusCode::BAD_REQUEST),
+    }
+}
+
+#[utoipa::path(
+    patch,
+    path = "/schedule/entries/{id}/position",
+    tag = "Schedule",
+    params(("id" = Uuid, Path, description = "Schedule entry ID")),
+    request_body = RepositionEntryRequest,
+    security(("bearer_auth" = [])),
+    responses(
+        (status = 204, description = "Entry repositioned"),
+        (status = 400, description = "Zero or both slot keys"),
+        (status = 401, description = "Unauthorized"),
+        (status = 404, description = "Entry not found"),
+        (status = 500, description = "Internal server error"),
+    )
+)]
+#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
+pub async fn reposition_entry(
+    State(state): State<Arc<AppState>>,
+    Extension(claims): Extension<Claims>,
+    Path(entry_id): Path<Uuid>,
+    Json(body): Json<RepositionEntryRequest>,
+) -> Result<StatusCode, StatusCode> {
+    let target = reposition_target(&body)?;
+    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
+
+    state
+        .repos
+        .schedule
+        .reposition_entry(user_id, entry_id, body.date, &target, body.position)
+        .await
+        .map(|_| StatusCode::NO_CONTENT)
+        .map_err(|e| match e {
+            Error::NotFound => StatusCode::NOT_FOUND,
+            Error::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
+            _ => {
+                tracing::error!(error = %e, "reposition_entry error");
+                StatusCode::INTERNAL_SERVER_ERROR
+            }
+        })
+}
+
 // ---------------------------------------------------------------------------
 // Unit tests for map_entry validation (no DB needed)
 // ---------------------------------------------------------------------------
@@ -455,6 +509,8 @@ mod tests {
             duration_minutes: None,
             energy_required: None,
             one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
         }
     }
 
@@ -601,5 +657,59 @@ mod tests {
             energy_required: None,
             one_shot: None,
         }
+    }
+
+    #[test]
+    fn reposition_target_requires_exactly_one_slot_key() {
+        use crate::models::RepositionEntryRequest;
+        let neither = RepositionEntryRequest {
+            date: date(2026, 1, 1),
+            after_anchor: None,
+            slot_meal_anchor_id: None,
+            position: 0,
+        };
+        assert!(super::reposition_target(&neither).is_err());
+
+        let both = RepositionEntryRequest {
+            date: date(2026, 1, 1),
+            after_anchor: Some("lunch".into()),
+            slot_meal_anchor_id: Some(Uuid::new_v4()),
+            position: 0,
+        };
+        assert!(super::reposition_target(&both).is_err());
+
+        let ok_anchor = RepositionEntryRequest {
+            date: date(2026, 1, 1),
+            after_anchor: Some("lunch".into()),
+            slot_meal_anchor_id: None,
+            position: 1,
+        };
+        assert!(super::reposition_target(&ok_anchor).is_ok());
+
+        // whitespace-only after_anchor is treated as empty — must reject
+        let whitespace_anchor = RepositionEntryRequest {
+            date: date(2026, 1, 1),
+            after_anchor: Some("   ".into()),
+            slot_meal_anchor_id: None,
+            position: 0,
+        };
+        assert_eq!(
+            super::reposition_target(&whitespace_anchor).unwrap_err(),
+            StatusCode::BAD_REQUEST,
+        );
+
+        // slot_meal_anchor_id-only happy path
+        let meal_anchor_id = Uuid::new_v4();
+        let ok_meal_anchor = RepositionEntryRequest {
+            date: date(2026, 1, 1),
+            after_anchor: None,
+            slot_meal_anchor_id: Some(meal_anchor_id),
+            position: 2,
+        };
+        let target = super::reposition_target(&ok_meal_anchor).expect("should be Ok");
+        assert!(
+            matches!(target, SlotTarget::MealAnchor(id) if id == meal_anchor_id),
+            "expected SlotTarget::MealAnchor({meal_anchor_id:?}), got {target:?}",
+        );
     }
 }

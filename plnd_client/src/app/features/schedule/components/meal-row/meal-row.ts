@@ -1,4 +1,5 @@
 import { Component, input, output, signal, ChangeDetectionStrategy } from '@angular/core';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { MealAnchor, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { TaskRowComponent } from '../task-row/task-row';
 import { MealReviewPaneComponent } from '../../../day-view/components/meal-review-pane/meal-review-pane';
@@ -6,7 +7,7 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
 @Component({
   selector: 'app-meal-row',
   standalone: true,
-  imports: [TaskRowComponent, MealReviewPaneComponent],
+  imports: [DragDropModule, TaskRowComponent, MealReviewPaneComponent],
   template: `
     <div class="meal-band" [class.meal-band--skipped]="meal().status === 'skipped'">
       <div class="meal-header">
@@ -46,23 +47,30 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
         />
       }
 
-      @if (meal().duringMealTasks.length > 0) {
-        <div class="during-meal">
-          @for (task of meal().duringMealTasks; track task.id) {
-            <app-task-row
-              [id]="'task-row-' + task.id"
-              [class.dimmed]="isTaskDimmed(task)"
-              [attr.inert]="isTaskDimmed(task) ? '' : null"
-              [item]="task"
-              [editing]="editingId() === task.id"
-              (editRequested)="editRequested.emit($event)"
-              (save)="save.emit($event)"
-              (closed)="closed.emit()"
-              (toggled)="toggled.emit($event)"
-            />
-          }
-        </div>
-      }
+      <div
+        cdkDropList
+        [id]="dropListId()"
+        [cdkDropListData]="meal().duringMealTasks"
+        [cdkDropListConnectedTo]="connectedTo()"
+        (cdkDropListDropped)="mealDrop.emit($event)"
+        class="during-meal"
+      >
+        @for (task of meal().duringMealTasks; track task.id) {
+          <app-task-row
+            cdkDrag
+            [cdkDragData]="task"
+            [id]="'task-row-' + task.id"
+            [class.dimmed]="isTaskDimmed(task)"
+            [attr.inert]="isTaskDimmed(task) ? '' : null"
+            [item]="task"
+            [editing]="editingId() === task.id"
+            (editRequested)="editRequested.emit($event)"
+            (save)="save.emit($event)"
+            (closed)="closed.emit()"
+            (toggled)="toggled.emit($event)"
+          />
+        }
+      </div>
     </div>
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -84,6 +92,13 @@ export class MealRowComponent {
   readonly editRequested   = output<string>();
   readonly save            = output<TaskEditPatch>();
   readonly closed          = output<void>();
+
+  /** CDK drop list ID for the during-meal task list (set by the parent day-view). */
+  readonly dropListId  = input<string>('');
+  /** IDs of all connected drop lists (slots + other meal lists). */
+  readonly connectedTo = input<string[]>([]);
+  /** Emitted when a task is dropped into/within this meal's during-meal list. */
+  readonly mealDrop    = output<CdkDragDrop<ScheduleTask[]>>();
 
   readonly reviewOpen = signal(false);
 

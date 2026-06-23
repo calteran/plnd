@@ -5,6 +5,14 @@ use uuid::Uuid;
 use crate::models::{CommitPlanInput, EntryPatch, OpenSlot, ScheduleEntry};
 use crate::query_types::{PlanStatusResponse, PostSchedulePlanResponse, SchedulePeriodResponse};
 
+/// Target slot for a reposition. Exactly one slot key — a floating task's
+/// `after_anchor` or a paired task's `slot_meal_anchor_id`.
+#[derive(Debug, Clone)]
+pub enum SlotTarget {
+    AfterAnchor(String),
+    MealAnchor(Uuid),
+}
+
 #[async_trait]
 pub trait ScheduleRepository: Send + Sync {
     async fn get_day_entries(
@@ -45,6 +53,15 @@ pub trait ScheduleRepository: Send + Sync {
         user_id: Uuid,
         entry_id: Uuid,
         patch: &EntryPatch,
+    ) -> Result<(), crate::Error>;
+
+    async fn reposition_entry(
+        &self,
+        user_id: Uuid,
+        entry_id: Uuid,
+        date: NaiveDate,
+        target: &SlotTarget,
+        position: i32,
     ) -> Result<(), crate::Error>;
 
     async fn get_carryover(
