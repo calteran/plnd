@@ -10,8 +10,15 @@
 #     `persist` (and `just dev`) are the sole writers of infra state, so a
 #     concurrent verify can never recreate a peer's live containers.
 #   • Each run gets its own application DB `plnd_verify_<runid>` on the shared
-#     Postgres and ephemeral ports for the API and ng serve — so concurrent runs
-#     across worktrees never collide. No flock.
+#     Postgres and ephemeral ports for the API and ng serve — so the e2e/API path
+#     and the per-run app DB never collide across worktrees.
+#   • The ONE exception is the `nextest` leg. `sqlx::test` names every test DB
+#     deterministically as `_sqlx_test_<sha512(test_path)>` and creates it with a
+#     server-global `CREATE DATABASE` (sqlx 0.9). The name carries no per-run or
+#     per-worktree component and sqlx offers no prefix hook, so two concurrent
+#     runs executing the same test race to create/drop the same DB on the shared
+#     Postgres (issue #989). We therefore serialize ONLY `cargo nextest run`
+#     behind a host-global `flock` — clippy and every other leg stay parallel.
 #   • Run id (branch slug + short random) names the per-run DB and the OTEL
 #     verify.run_id tag, so logs/traces/DB correlate.
 
@@ -54,7 +61,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # ── Prerequisite checks ─────────────────────────────────────────────────────────
-for tool in timeout doppler node openssl git curl cargo npm npx; do
+for tool in timeout flock doppler node openssl git curl cargo npm npx; do
     command -v "$tool" &>/dev/null || { echo "✗ '$tool' not found" >&2; exit 1; }
 done
 # Docker is only needed by subsets that touch infra (rust/e2e/all); quick/ts are
@@ -164,10 +171,19 @@ if need "rust,e2e"; then
     run_sync "cargo build" "$PROJECT_ROOT" cargo build --workspace
 fi
 
-# ── nextest → clippy (shared Postgres; sqlx::test isolates its own test DBs) ─────
+# ── nextest → clippy (shared Postgres) ──────────────────────────────────────────
+# sqlx::test creates server-global `_sqlx_test_<sha512(test_path)>` databases that
+# carry no per-run namespace (issue #989), so concurrent verify runs would race on
+# create/drop. Serialize ONLY `cargo nextest run` behind a host-global flock — the
+# lock is held for the test run and released before clippy, which touches no DB and
+# stays free to overlap another run's nextest. flock auto-releases when the holder
+# exits, so a killed/OOM'd run never strands the lock. `-w 1800` fails loudly rather
+# than hanging forever if a peer's nextest is wedged. A fixed, host-shared path (no
+# mktemp) is what makes the lock visible to every concurrent run/worktree.
+NEXTEST_LOCK="/tmp/plnd-verify-nextest.lock"
 if need "rust"; then
     run_job "nextest → clippy" "$PROJECT_ROOT" doppler run -- bash -c \
-        'export DATABASE_URL="$APP_DATABASE__URL"; cargo nextest run --workspace && cargo clippy --workspace --all-targets --all-features -- -D warnings'
+        'export DATABASE_URL="$APP_DATABASE__URL"; flock -w 1800 "'"$NEXTEST_LOCK"'" cargo nextest run --workspace && cargo clippy --workspace --all-targets --all-features -- -D warnings'
 fi
 
 # ── E2E (per-run DB + ephemeral API + ephemeral ng serve) ───────────────────────
