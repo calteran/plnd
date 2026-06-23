@@ -96,7 +96,7 @@ async function landAtScheduleTypes(page: Page): Promise<void> {
   // Wait for the initial async card load to settle before callers interact with cards.
   // Without this, a fast test can click "Switch to rotating schedule" before the day-
   // types API response arrives and races with the mode-switch, overwriting cards().
-  await expect(page.locator('.schedule-card').first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.locator('.schedule-card').first()).toBeVisible();
 }
 
 // Drives from hub to the Routines & Tasks substep. Caller must have seeded
@@ -162,8 +162,8 @@ async function completeFoodSpoke(page: Page): Promise<void> {
   // btn-continue enabled can pass in the brief window BEFORE plan-meals-step
   // mounts and flips isGenerating=true, clicking through before any meals
   // generate (#970).
-  await expect(page.locator('.gc').first()).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10_000 });
+  await expect(page.locator('.gc').first()).toBeVisible();
+  await expect(page.locator('.btn-continue')).toBeEnabled();
   await page.locator('.btn-continue').click();
 
   await expect(page).toHaveURL(/\/onboarding$/);
@@ -440,7 +440,7 @@ test.describe('Onboarding', () => {
       await completeFoodSpoke(page);
 
       await page.locator('.btn-cta.btn--accent').click();
-      await expect(page).toHaveURL(/\/day\/2026-03-29/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/day\/2026-03-29/);
 
       // Day view renders the committed dish on each anchor row (#889).
       await expect(page.locator('.meal-desc').filter({ hasText: 'Oatmeal' })).toBeVisible();
@@ -473,7 +473,7 @@ test.describe('Onboarding', () => {
 
       await page.locator('.btn-skip').click();
       await page.locator('.btn-gray-primary').click();
-      await expect(page).toHaveURL(/\/day\/2026-03-29/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/day\/2026-03-29/);
 
       const meals = await fetchPlannedMeals(sub, '2026-03-29', '2026-03-29');
       expect(meals).toHaveLength(2);
@@ -823,7 +823,7 @@ test.describe('Onboarding', () => {
       await search.fill('cheese');
 
       const dropdown = page.locator('.search-dropdown');
-      await expect(dropdown).toBeVisible({ timeout: 5_000 });
+      await expect(dropdown).toBeVisible();
       const cheeseResult = dropdown.locator('.search-result', { hasText: /Cheese/i }).first();
       await expect(cheeseResult).toBeVisible();
       await cheeseResult.click();
@@ -866,12 +866,12 @@ test.describe('Onboarding', () => {
       // plan-meals-step has mounted and started generating (response held open).
       // Without this the disabled assertion can race the window before
       // plan-meals-step mounts, when the button is still enabled (#970).
-      await expect(page.locator('app-meal-plan-loading')).toBeVisible({ timeout: 10_000 });
+      await expect(page.locator('app-meal-plan-loading')).toBeVisible();
       // Button is disabled while generation is in flight (response gated open).
       await expect(page.locator('.btn-continue')).toBeDisabled();
       // Releasing the gated response transitions the button to enabled.
       releaseMealPlan();
-      await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
+      await expect(page.locator('.btn-continue')).toBeEnabled();
     });
 
     test('Save & Continue → navigates to hub with Food marked complete', async ({ page }) => {
@@ -888,7 +888,7 @@ test.describe('Onboarding', () => {
       await landAtMealPlanReview(page);
 
       // Wait for generation to finish, then click Save & Continue
-      await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10000 });
+      await expect(page.locator('.btn-continue')).toBeEnabled();
       await page.locator('.btn-continue').click();
 
       // Should return to the hub
@@ -925,12 +925,12 @@ test.describe('Onboarding', () => {
       // The fix: day-types is inserted before plan-meals. Previously the spoke
       // jumped straight to meal planning with no anchors → zero meals.
       await expect(page.locator('.day-types-substep')).toBeVisible();
-      await expect(page.locator('.schedule-card').first()).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('.schedule-card').first()).toBeVisible();
       await page.locator('.day-types-substep .save-btn').click();
 
       // Saving the default day types unblocks meal generation; the meal-plan
       // review step renders and its Save & Continue enables once the plan loads.
-      await expect(page.locator('.btn-continue')).toBeEnabled({ timeout: 10_000 });
+      await expect(page.locator('.btn-continue')).toBeEnabled();
     });
   });
 
@@ -959,7 +959,7 @@ test.describe('Onboarding', () => {
       // redirect a generous timeout so the assertion survives CPU starvation
       // when the full suite runs in parallel under `just verify`. Redirect target
       // is plan_start (the day after today), Sun 2026-03-29.
-      await expect(page).toHaveURL(/\/day\/2026-03-29/, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/day\/2026-03-29/);
     });
   });
 

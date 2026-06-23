@@ -29,14 +29,14 @@ test.describe('Day View — Add Entry', () => {
     test('"Add something…" row is visible in the schedule list', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await expect(dayView.getAddRow()).toBeVisible();
     });
 
     test('clicking "Add something…" opens the entry input', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await dayView.openAddEntry();
       await expect(dayView.getEntryInput()).toBeVisible();
       // "Add something…" trigger row should no longer be visible
@@ -46,7 +46,7 @@ test.describe('Day View — Add Entry', () => {
     test('Cancel button closes the form and "Add something…" row reappears', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await dayView.openAddEntry();
       await dayView.getEntryInput().fill('some text');
       await dayView.getCancelButton().click();
@@ -57,7 +57,7 @@ test.describe('Day View — Add Entry', () => {
     test('Escape key closes the form', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await dayView.openAddEntry();
       await dayView.getEntryInput().press('Escape');
       await expect(dayView.getEntryInput()).not.toBeVisible();
@@ -67,7 +67,7 @@ test.describe('Day View — Add Entry', () => {
     test('Add button is disabled when input is empty', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await dayView.openAddEntry();
       await expect(dayView.getAddButton()).toBeDisabled();
     });
@@ -77,7 +77,7 @@ test.describe('Day View — Add Entry', () => {
     async function openAndFill(page: Page, text: string) {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await dayView.openAddEntry();
       await dayView.getEntryInput().fill(text);
       return dayView;
@@ -99,7 +99,7 @@ test.describe('Day View — Add Entry', () => {
       const dayView = await openAndFill(page, 'call mum');
       await dayView.getAddButton().click();
       await expect(dayView.getLoadingIndicator()).toBeVisible();
-      await expect(dayView.getAgentConfirmation()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getAgentConfirmation()).toBeVisible();
     });
 
     test('shows confirmation message after agent responds', async ({ page }) => {
@@ -115,7 +115,7 @@ test.describe('Day View — Add Entry', () => {
 
       const dayView = await openAndFill(page, 'call mum');
       await dayView.getAddButton().click();
-      await expect(dayView.getAgentConfirmation()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getAgentConfirmation()).toBeVisible();
       await expect(dayView.getAgentConfirmation()).toContainText('Task scheduled!');
     });
 
@@ -129,7 +129,7 @@ test.describe('Day View — Add Entry', () => {
 
       const dayView = await openAndFill(page, 'call mum');
       await dayView.getAddButton().click();
-      await expect(dayView.getAgentError()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getAgentError()).toBeVisible();
       await expect(dayView.getAgentError()).toContainText('Something went wrong');
     });
 
@@ -161,11 +161,11 @@ test.describe('Day View — Add Entry', () => {
 
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-03-28');
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await dayView.openAddEntry();
       await dayView.getEntryInput().fill('call mum');
       await dayView.getAddButton().click();
-      await expect(dayView.getScheduleList()).toContainText('call mum', { timeout: 5_000 });
+      await expect(dayView.getScheduleList()).toContainText('call mum');
     });
   });
 

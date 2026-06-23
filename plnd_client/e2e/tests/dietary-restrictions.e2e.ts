@@ -24,7 +24,7 @@ test.describe('Dietary Restrictions', () => {
     await page.goto('/dietary-restrictions');
 
     await expect(page.locator('h1')).toHaveText('Dietary Restrictions');
-    await expect(page.locator('.restriction-item').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.restriction-item').first()).toBeVisible();
     await expect(page.locator('body')).toContainText('peanuts');
     await expect(page.locator('body')).toContainText('lactose');
     await expect(page.locator('body')).toContainText('mild');
@@ -35,14 +35,14 @@ test.describe('Dietary Restrictions', () => {
     await seedDietaryRestrictions(sub, [SEED_PEANUTS, SEED_LACTOSE]);
 
     await page.goto('/dietary-restrictions');
-    await expect(page.locator('.restriction-item').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.restriction-item').first()).toBeVisible();
 
     await page.locator('select#restriction-type').selectOption('preference');
     await page.locator('input#name').fill('vegan');
     await page.locator('textarea#notes').fill('plant-based only');
 
     await page.getByRole('button', { name: 'Add Restriction' }).click();
-    await expect(page.locator('.status-success')).toHaveText('Restriction added.', { timeout: 10_000 });
+    await expect(page.locator('.status-success')).toHaveText('Restriction added.');
     await expect(page.locator('body')).toContainText('vegan');
     await expect(page.locator('body')).toContainText('plant-based only');
   });
@@ -53,7 +53,7 @@ test.describe('Dietary Restrictions', () => {
     await seedDietaryRestrictions(sub, [SEED_PEANUTS, SEED_LACTOSE]);
 
     await page.goto('/dietary-restrictions');
-    await expect(page.locator('.restriction-item').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.restriction-item').first()).toBeVisible();
 
     // Items are grouped by restriction_type in the order
     // [allergy, intolerance, preference, cultural_religious] (see
@@ -67,7 +67,7 @@ test.describe('Dietary Restrictions', () => {
     await editTextarea.fill('severe');
 
     await page.getByRole('button', { name: 'Save' }).click();
-    await expect(page.locator('.status-success')).toHaveText('Updated successfully.', { timeout: 10_000 });
+    await expect(page.locator('.status-success')).toHaveText('Updated successfully.');
     await expect(page.locator('body')).toContainText('severe');
   });
 
@@ -76,14 +76,14 @@ test.describe('Dietary Restrictions', () => {
     await seedDietaryRestrictions(sub, [SEED_PEANUTS, SEED_LACTOSE]);
 
     await page.goto('/dietary-restrictions');
-    await expect(page.locator('.restriction-item').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.restriction-item').first()).toBeVisible();
 
     const initialCount = await page.locator('.restriction-item').count();
     expect(initialCount).toBe(2);
 
     // Delete the first item (peanuts/allergy)
     await page.locator('.restriction-item').first().getByRole('button', { name: 'Delete' }).click();
-    await expect(page.locator('.status-success')).toHaveText('Restriction removed.', { timeout: 10_000 });
+    await expect(page.locator('.status-success')).toHaveText('Restriction removed.');
     await expect(page.locator('.restriction-item')).toHaveCount(1);
   });
 });

@@ -71,7 +71,7 @@ test.describe('Profile', () => {
 
     await profile.getDisplayNameInput().fill('Updated Name');
     await profile.getSaveButton().click();
-    await expect(profile.getSuccessMessage()).toHaveText('Profile updated.', { timeout: 5_000 });
+    await expect(profile.getSuccessMessage()).toHaveText('Profile updated.');
     // Real backend echoes the patched value back; the form should now hold it.
     await expect(profile.getDisplayNameInput()).toHaveValue('Updated Name');
   });
@@ -82,7 +82,7 @@ test.describe('Profile', () => {
 
     await profile.getAvatarUrlInput().fill('https://example.com/avatar.jpg');
     await profile.getSaveButton().click();
-    await expect(profile.getSuccessMessage()).toHaveText('Profile updated.', { timeout: 5_000 });
+    await expect(profile.getSuccessMessage()).toHaveText('Profile updated.');
     await expect(profile.getAvatarUrlInput()).toHaveValue('https://example.com/avatar.jpg');
   });
 

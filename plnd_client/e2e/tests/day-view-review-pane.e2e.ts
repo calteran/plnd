@@ -16,7 +16,7 @@ test.describe('Day View — Meal Review Pane', () => {
   test('Review button opens the review pane', async ({ page }) => {
     const dayView = new DayViewPage(page);
     await dayView.gotoDate(TEST_DATE);
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     const mealRow = dayView.getMealRows().first();
     await expect(dayView.getMealRowReviewBtn(mealRow)).toBeVisible();
@@ -28,7 +28,7 @@ test.describe('Day View — Meal Review Pane', () => {
   test('done checkbox does not open the review pane', async ({ page }) => {
     const dayView = new DayViewPage(page);
     await dayView.gotoDate(TEST_DATE);
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     const mealRow = dayView.getMealRows().first();
     await dayView.getMealRowDoneCheckbox(mealRow).click();
@@ -46,7 +46,7 @@ test.describe('Day View — Meal Review Pane', () => {
 
     const dayView = new DayViewPage(page);
     await dayView.gotoDate(TEST_DATE);
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     const mealRow = dayView.getMealRows().first();
 

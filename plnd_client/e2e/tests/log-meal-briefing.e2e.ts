@@ -20,7 +20,7 @@ test('marking a meal consumed in the day view is reflected in the briefing meals
 
   const dayView = new DayViewPage(page);
   await dayView.gotoDate(yesterday);
-  await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+  await expect(dayView.getScheduleList()).toBeVisible();
 
   const row = dayView.getMealRows().first();
   await expect(row).toBeVisible();

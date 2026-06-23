@@ -83,7 +83,7 @@ test.describe('Day View', () => {
 
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
-        await expect(dayView.getSkeletonList()).toBeVisible({ timeout: 2_000 });
+        await expect(dayView.getSkeletonList()).toBeVisible();
         releaseResponse();
         await expect(dayView.getSkeletonList()).not.toBeVisible({ timeout: 2_000 });
       });
@@ -94,7 +94,7 @@ test.describe('Day View', () => {
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
 
-        await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+        await expect(dayView.getScheduleList()).toBeVisible();
         await expect(dayView.getMealRows().first()).toBeVisible();
         await expect(dayView.getTaskRows().first()).toBeVisible();
       });
@@ -102,7 +102,7 @@ test.describe('Day View', () => {
       test('meal row shows emoji and name', async ({ page }) => {
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
-        await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+        await expect(dayView.getScheduleList()).toBeVisible();
 
         // Seeded breakfast meal anchor; MEAL_SLOTS maps 'breakfast' → 🥣
         await expect(dayView.getMealRows().first()).toContainText('Breakfast');
@@ -112,7 +112,7 @@ test.describe('Day View', () => {
       test('task row shows task label', async ({ page }) => {
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
-        await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+        await expect(dayView.getScheduleList()).toBeVisible();
 
         // Seeded 'Morning stretch' task placed for 2026-03-28
         await expect(dayView.getTaskRows().first()).toContainText('stretch');
@@ -131,7 +131,7 @@ test.describe('Day View', () => {
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
 
-        await expect(dayView.getErrorState()).toBeVisible({ timeout: 5_000 });
+        await expect(dayView.getErrorState()).toBeVisible();
         await expect(dayView.getRetryButton()).toBeVisible();
       });
 
@@ -152,10 +152,10 @@ test.describe('Day View', () => {
 
         const dayView = new DayViewPage(page);
         await dayView.gotoDate('2026-03-28');
-        await expect(dayView.getErrorState()).toBeVisible({ timeout: 5_000 });
+        await expect(dayView.getErrorState()).toBeVisible();
 
         await dayView.getRetryButton().click();
-        await expect(dayView.getScheduleList()).toBeVisible({ timeout: 5_000 });
+        await expect(dayView.getScheduleList()).toBeVisible();
       });
     });
 
@@ -176,7 +176,7 @@ test.describe('Day View', () => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate('2026-04-15');
 
-      await expect(dayView.getEmptyState()).toBeVisible({ timeout: 5_000 });
+      await expect(dayView.getEmptyState()).toBeVisible();
       await expect(dayView.getEmptyState()).toContainText('Nothing planned yet');
     });
   });

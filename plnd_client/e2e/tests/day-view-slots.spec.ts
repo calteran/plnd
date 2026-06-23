@@ -69,11 +69,11 @@ test.describe('Day View — floating tasks render in their slots', () => {
     await dayView.gotoDate(TEST_DATE);
 
     // Wait for the schedule to finish loading
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 5_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     // Collect all task and meal rows in rendered DOM order
     const rows = page.locator('.schedule-list > app-task-row, .schedule-list > app-meal-row');
-    await expect(rows.first()).toBeVisible({ timeout: 5_000 });
+    await expect(rows.first()).toBeVisible();
 
     // Join all row texts into a single newline-delimited string; indexOf gives
     // relative positions that encode DOM order.

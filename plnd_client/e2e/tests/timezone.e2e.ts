@@ -63,11 +63,11 @@ test.describe('Timezone surfacing — day view', () => {
     await dayView.gotoDate(TRAVEL_DATE);
 
     // Wait for schedule list to load (not just skeleton).
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 5_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     // The switch row should be the first element inside the schedule list.
     const switchRow = page.locator('app-timezone-switch-row');
-    await expect(switchRow).toBeVisible({ timeout: 3_000 });
+    await expect(switchRow).toBeVisible();
     await expect(switchRow).toContainText('Switch to');
   });
 
@@ -85,11 +85,11 @@ test.describe('Timezone surfacing — day view', () => {
     await dayView.gotoDate(DOWNSTREAM_DATE);
 
     // Wait for the schedule to settle.
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 5_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     // The day header should show the divergent timezone banner (chip + subtext).
     const banner = page.locator('.tz-banner');
-    await expect(banner).toBeVisible({ timeout: 3_000 });
+    await expect(banner).toBeVisible();
     // The chip should contain city text from the destination zone (zone-format
     // uppercases IANA city names, so match case-insensitively).
     await expect(banner).toContainText(/honolulu/i);
@@ -111,9 +111,9 @@ test.describe('Timezone surfacing — day view', () => {
     await dayView.gotoDate(TRAVEL_DATE);
 
     // Confirm the switch row is present before the correction.
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 5_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
     const switchRow = page.locator('app-timezone-switch-row');
-    await expect(switchRow).toBeVisible({ timeout: 3_000 });
+    await expect(switchRow).toBeVisible();
 
     // Open the why-popover via the "(why?)" button on the switch row.
     const whyBtn = switchRow.getByRole('button', { name: /why/i });
@@ -121,7 +121,7 @@ test.describe('Timezone surfacing — day view', () => {
 
     // The why-popover should appear.
     const whyPop = page.locator('app-timezone-why');
-    await expect(whyPop).toBeVisible({ timeout: 2_000 });
+    await expect(whyPop).toBeVisible();
 
     // Click "Use my current zone".
     await whyPop.getByRole('button', { name: /Use my current zone/i }).click();

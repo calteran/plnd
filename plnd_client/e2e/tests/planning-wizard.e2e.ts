@@ -316,13 +316,13 @@ test.describe('Planning Wizard', () => {
 
       // ── Step 1: day view renders both rows and marks only the one-shot one ───
       await page.goto('/day/2026-03-22');
-      await expect(page.locator('.schedule-list')).toBeVisible({ timeout: 2_000 });
+      await expect(page.locator('.schedule-list')).toBeVisible();
 
       const taskRows = page.locator('.schedule-list > app-task-row');
       const controlRow = taskRows.filter({ hasText: 'e2e control task' });
       const oneShotRow = taskRows.filter({ hasText: 'e2e one-time meds' });
-      await expect(controlRow).toBeVisible({ timeout: 2_000 });
-      await expect(oneShotRow).toBeVisible({ timeout: 2_000 });
+      await expect(controlRow).toBeVisible();
+      await expect(oneShotRow).toBeVisible();
 
       // The read-only indicator appears only on the one-shot task.
       await expect(oneShotRow.locator('.one-shot-indicator')).toBeVisible();
@@ -330,7 +330,7 @@ test.describe('Planning Wizard', () => {
 
       // ── Step 2: open the planning wizard and assert carryover exclusion ──────
       await page.goto('/plan/week');
-      await expect(page.locator('.carryover-list')).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('.carryover-list')).toBeVisible();
 
       const items = page.locator('.carryover-item');
       const titles = items.locator('.item-title');
