@@ -107,8 +107,8 @@ describe('UserDishesService', () => {
     expect(req.request.body).toEqual({ name: 'Modified Stir Fry' });
     req.flush(updated);
 
-    expect(result?.has_personal_recipe).toBeTrue();
-    expect(service.dishes()[0].has_personal_recipe).toBeTrue();
+    expect(result?.has_personal_recipe).toBe(true);
+    expect(service.dishes()[0].has_personal_recipe).toBe(true);
     expect(service.dishes()[0].source).toBe('personal');
   });
 

@@ -68,7 +68,7 @@ describe('PlanReviewStepComponent', () => {
   // ── Cycling behavior ─────────────────────────────────────────────────────
 
   it('cycles Carry → Defer on first badge tap', () => {
-    spyOn(service, 'setCarryoverDecision');
+    vi.spyOn(service, 'setCarryoverDecision');
     flush([MOCK_ITEM]);
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
     badge.click();
@@ -77,10 +77,11 @@ describe('PlanReviewStepComponent', () => {
 
   it('cycles Defer → Drop on second badge tap', () => {
     flush([MOCK_ITEM]);
-    // Set state to defer via the real impl BEFORE spying (spy replaces without calling through)
+    // Establish the 'defer' precondition before spying so the assertion below only
+    // sees the tap's call. (vi.spyOn calls through by default, so state still advances.)
     service.setCarryoverDecision('e1', 'defer');
     fixture.detectChanges();
-    spyOn(service, 'setCarryoverDecision');
+    vi.spyOn(service, 'setCarryoverDecision');
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
     badge.click();
     expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'drop');
@@ -90,7 +91,7 @@ describe('PlanReviewStepComponent', () => {
     flush([MOCK_ITEM]);
     service.setCarryoverDecision('e1', 'drop');
     fixture.detectChanges();
-    spyOn(service, 'setCarryoverDecision');
+    vi.spyOn(service, 'setCarryoverDecision');
     const badge: HTMLButtonElement = fixture.nativeElement.querySelector('.decision-badge');
     badge.click();
     expect(service.setCarryoverDecision).toHaveBeenCalledWith('e1', 'carry');
@@ -117,7 +118,7 @@ describe('PlanReviewStepComponent', () => {
     flush([MOCK_ITEM]);
     service.setCarryoverDecision('e1', 'drop');
     fixture.detectChanges();
-    spyOn(service, 'setDropReason');
+    vi.spyOn(service, 'setDropReason');
     const chip: HTMLButtonElement = fixture.nativeElement.querySelector('.reason-chip');
     const expectedReason = chip.textContent?.trim() ?? '';
     chip.click();

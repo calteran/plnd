@@ -48,12 +48,12 @@ describe('DayTypesMealsService', () => {
 
   describe('load()', () => {
     it('fetches day types then each type\'s meals, sets loaded=true', () => {
-      expect(service.loaded()).toBeFalse();
+      expect(service.loaded()).toBe(false);
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush(DAY_TYPES);
       httpMock.expectOne(r => r.url.includes('/day-types/dt-work/meals')).flush(WORKDAY_MEALS);
       httpMock.expectOne(r => r.url.includes('/day-types/dt-wknd/meals')).flush(WEEKEND_MEALS);
-      expect(service.loaded()).toBeTrue();
+      expect(service.loaded()).toBe(true);
     });
 
     it('is idempotent — second call fires no HTTP requests', () => {
@@ -66,14 +66,14 @@ describe('DayTypesMealsService', () => {
     it('sets loaded=true even when day types list is empty', () => {
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
-      expect(service.loaded()).toBeTrue();
+      expect(service.loaded()).toBe(true);
     });
 
     it('resets requested on error so a retry fires a new HTTP request', () => {
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
         .flush('error', { status: 500, statusText: 'Server Error' });
-      expect(service.loaded()).toBeFalse();
+      expect(service.loaded()).toBe(false);
       // After error, a second load() should fire a new HTTP request
       service.load();
       const req = httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'));
@@ -81,27 +81,27 @@ describe('DayTypesMealsService', () => {
     });
 
     it('sets loadError=true when HTTP request fails', () => {
-      expect(service.loadError()).toBeFalse();
+      expect(service.loadError()).toBe(false);
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
         .flush('error', { status: 401, statusText: 'Unauthorized' });
-      expect(service.loadError()).toBeTrue();
+      expect(service.loadError()).toBe(true);
     });
 
     it('loadError starts false and stays false on success', () => {
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
-      expect(service.loadError()).toBeFalse();
+      expect(service.loadError()).toBe(false);
     });
 
     it('loadError resets to false when load() is retried after an error', () => {
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
         .flush('error', { status: 500, statusText: 'Server Error' });
-      expect(service.loadError()).toBeTrue();
+      expect(service.loadError()).toBe(true);
       // Retry: requested was reset on error, so a second load() fires
       service.load();
-      expect(service.loadError()).toBeFalse(); // cleared at start of retry
+      expect(service.loadError()).toBe(false); // cleared at start of retry
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
     });
   });
@@ -178,9 +178,9 @@ describe('DayTypesMealsService', () => {
     it('resets signals and allows reload', () => {
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
-      expect(service.loaded()).toBeTrue();
+      expect(service.loaded()).toBe(true);
       service.clear();
-      expect(service.loaded()).toBeFalse();
+      expect(service.loaded()).toBe(false);
       expect(service.allEntries()).toEqual([]);
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals')).flush([]);
@@ -190,9 +190,9 @@ describe('DayTypesMealsService', () => {
       service.load();
       httpMock.expectOne(r => r.url.includes('/day-types') && !r.url.includes('/meals'))
         .flush('error', { status: 500, statusText: 'Server Error' });
-      expect(service.loadError()).toBeTrue();
+      expect(service.loadError()).toBe(true);
       service.clear();
-      expect(service.loadError()).toBeFalse();
+      expect(service.loadError()).toBe(false);
     });
   });
 });

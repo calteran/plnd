@@ -92,8 +92,8 @@ describe('UserMealsService', () => {
     expect(req.request.body).toEqual({ name: 'Custom Breakfast Bowl' });
     req.flush(updated);
 
-    expect(result?.has_personal_recipe).toBeTrue();
-    expect(service.meals()[0].has_personal_recipe).toBeTrue();
+    expect(result?.has_personal_recipe).toBe(true);
+    expect(service.meals()[0].has_personal_recipe).toBe(true);
     expect(service.meals()[0].source).toBe('personal');
   });
 
@@ -109,7 +109,7 @@ describe('UserMealsService', () => {
     req.flush(updated);
 
     expect(result?.rating).toBe(4);
-    expect(service.meals()[0].is_safe_food).toBeTrue();
+    expect(service.meals()[0].is_safe_food).toBe(true);
   });
 
   it('remove() sends DELETE and filters the meals signal', () => {

@@ -116,8 +116,8 @@ jobs:
       - name: Angular – dependency health
         run: cd plnd_client && npm run check-dependencies && npm run check-licenses && npm run check-circular
 
-      - name: Run Angular unit tests (headless)
-        run: cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
+      - name: Run Angular unit tests (Vitest + jsdom)
+        run: cd plnd_client && npx ng test --no-watch --coverage
 
   # ── Job 3: End-to-end tests ─────────────────────────────────────────────────
   e2e:

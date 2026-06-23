@@ -1,3 +1,4 @@
+import { createSpyObj, type SpyObj } from '../../../../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { Subject, of, throwError } from 'rxjs';
@@ -20,11 +21,11 @@ function makeSuccessResponse(confirmation = 'Task added!'): TaskEntryResponse {
 }
 
 describe('AddEntryComponent', () => {
-  let agentSpy: jasmine.SpyObj<AgentService>;
+  let agentSpy: SpyObj<AgentService>;
 
   async function setup(date = '2026-01-15') {
-    agentSpy = jasmine.createSpyObj<AgentService>('AgentService', ['createTask']);
-    agentSpy.createTask.and.returnValue(of(makeSuccessResponse()));
+    agentSpy = createSpyObj<AgentService>(['createTask']);
+    agentSpy.createTask.mockReturnValue(of(makeSuccessResponse()));
 
     await TestBed.configureTestingModule({
       imports: [AddEntryComponent],
@@ -87,18 +88,18 @@ describe('AddEntryComponent', () => {
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f);
-    expect(agentSpy.createTask).toHaveBeenCalledOnceWith({ input: 'buy groceries', date: '2026-01-15', context: [] });
+    expect(agentSpy.createTask).toHaveBeenCalledExactlyOnceWith({ input: 'buy groceries', date: '2026-01-15', context: [] });
   });
 
   it('shows loading state while the request is in flight', async () => {
     const subject = new Subject<TaskEntryResponse>();
     const f = await setup();
-    agentSpy.createTask.and.returnValue(subject.asObservable());
+    agentSpy.createTask.mockReturnValue(subject.asObservable());
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f);
 
-    expect(f.componentInstance.isLoading()).toBeTrue();
+    expect(f.componentInstance.isLoading()).toBe(true);
     // Spinner is rendered inside the input wrapper
     expect(f.debugElement.query(By.css('.input-spinner'))).toBeTruthy();
     // Input has .loading class (drives shimmer animation)
@@ -109,7 +110,7 @@ describe('AddEntryComponent', () => {
 
   it('emits confirmed and clears loading after successful response with no signals', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(of(makeSuccessResponse('Task added!')));
+    agentSpy.createTask.mockReturnValue(of(makeSuccessResponse('Task added!')));
     openPanel(f);
     typeText(f, 'buy groceries');
 
@@ -118,14 +119,14 @@ describe('AddEntryComponent', () => {
     clickSubmit(f);
 
     expect(confirmedMsg).toBe('Task added!');
-    expect(f.componentInstance.isLoading()).toBeFalse();
+    expect(f.componentInstance.isLoading()).toBe(false);
     // No inline confirmation text
     expect(f.debugElement.query(By.css('.agent-confirmation'))).toBeNull();
   });
 
   it('renders a checkbox for a show_checkbox ui_signal', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
+    agentSpy.createTask.mockReturnValue(
       of(makeResponse({
         ui_signals: [{ type: 'show_checkbox', field: 'urgent', label: 'Is this urgent?' }],
       })),
@@ -141,7 +142,7 @@ describe('AddEntryComponent', () => {
 
   it('renders a select for a show_select ui_signal', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
+    agentSpy.createTask.mockReturnValue(
       of(makeResponse({
         ui_signals: [{ type: 'show_select', field: 'category', label: 'Category', options: ['work', 'home'] }],
       })),
@@ -161,7 +162,7 @@ describe('AddEntryComponent', () => {
   it('does not call createTask a second time while a request is already in flight', async () => {
     const subject = new Subject<TaskEntryResponse>();
     const f = await setup();
-    agentSpy.createTask.and.returnValue(subject.asObservable());
+    agentSpy.createTask.mockReturnValue(subject.asObservable());
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f);
@@ -172,10 +173,9 @@ describe('AddEntryComponent', () => {
   it('merges sig.default into answers for fields the user did not interact with', async () => {
     const checkboxSignal = { type: 'show_checkbox' as const, field: 'urgent', label: 'Urgent?', default: true };
     const f = await setup();
-    agentSpy.createTask.and.returnValues(
-      of(makeResponse({ ui_signals: [checkboxSignal] })),
-      of(makeSuccessResponse('Done!')),
-    );
+    agentSpy.createTask
+      .mockReturnValueOnce(of(makeResponse({ ui_signals: [checkboxSignal] })))
+      .mockReturnValueOnce(of(makeSuccessResponse('Done!')));
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f);
@@ -185,17 +185,16 @@ describe('AddEntryComponent', () => {
     continueBtn.nativeElement.click();
     f.detectChanges();
 
-    const secondCall = agentSpy.createTask.calls.mostRecent().args[0];
+    const secondCall = agentSpy.createTask.mock.lastCall![0];
     expect(secondCall.context?.[0].answers['urgent']).toBe(true);
   });
 
   it('discards conversation context when input text changes between turns', async () => {
     const checkboxSignal = { type: 'show_checkbox' as const, field: 'urgent', label: 'Urgent?' };
     const f = await setup();
-    agentSpy.createTask.and.returnValues(
-      of(makeResponse({ ui_signals: [checkboxSignal] })),
-      of(makeResponse({ confirmation: 'Done!', ui_signals: [] })),
-    );
+    agentSpy.createTask
+      .mockReturnValueOnce(of(makeResponse({ ui_signals: [checkboxSignal] })))
+      .mockReturnValueOnce(of(makeResponse({ confirmation: 'Done!', ui_signals: [] })));
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f); // first turn — gets signals back
@@ -206,17 +205,16 @@ describe('AddEntryComponent', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     f.detectChanges();
 
-    const secondCall = agentSpy.createTask.calls.mostRecent().args[0];
+    const secondCall = agentSpy.createTask.mock.lastCall![0];
     expect(secondCall.context).toEqual([]);
   });
 
   it('re-calls createTask with accumulated context when Continue is clicked', async () => {
     const firstSignals = [{ type: 'show_checkbox' as const, field: 'urgent', label: 'Urgent?' }];
     const f = await setup();
-    agentSpy.createTask.and.returnValues(
-      of(makeResponse({ ui_signals: firstSignals })),
-      of(makeSuccessResponse('Done!')),
-    );
+    agentSpy.createTask
+      .mockReturnValueOnce(of(makeResponse({ ui_signals: firstSignals })))
+      .mockReturnValueOnce(of(makeSuccessResponse('Done!')));
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f);
@@ -227,26 +225,26 @@ describe('AddEntryComponent', () => {
     f.detectChanges();
 
     expect(agentSpy.createTask).toHaveBeenCalledTimes(2);
-    const secondCall = agentSpy.createTask.calls.mostRecent().args[0];
+    const secondCall = agentSpy.createTask.mock.lastCall![0];
     expect(secondCall.context?.length).toBe(1);
     expect(secondCall.context?.[0].signals).toEqual(firstSignals);
   });
 
   it('shows an error message when the agent call fails', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(throwError(() => new Error('Network error')));
+    agentSpy.createTask.mockReturnValue(throwError(() => new Error('Network error')));
     openPanel(f);
     typeText(f, 'buy groceries');
     clickSubmit(f);
 
     expect(f.debugElement.query(By.css('.agent-error'))).toBeTruthy();
     expect(f.nativeElement.textContent).toContain('Something went wrong');
-    expect(f.componentInstance.isLoading()).toBeFalse();
+    expect(f.componentInstance.isLoading()).toBe(false);
   });
 
   it('emits the type from actions_taken[0].type when the agent returns a known type', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
+    agentSpy.createTask.mockReturnValue(
       of(makeResponse({
         actions_taken: [{ type: 'exercise', task_id: 'abc' }],
         confirmation: 'Exercise scheduled!',
@@ -264,7 +262,7 @@ describe('AddEntryComponent', () => {
 
   it('emits "appointment" when actions_taken[0].type is "appointment"', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
+    agentSpy.createTask.mockReturnValue(
       of(makeResponse({
         actions_taken: [{ type: 'appointment', task_id: 'appt-1' }],
         confirmation: 'Appointment scheduled!',
@@ -282,7 +280,7 @@ describe('AddEntryComponent', () => {
 
   it('emits "work" when agent returns work action type', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(of(makeResponse({
+    agentSpy.createTask.mockReturnValue(of(makeResponse({
       actions_taken: [{ type: 'work', task_id: 'w1' }],
       confirmation: 'Work task added!',
     })));
@@ -296,7 +294,7 @@ describe('AddEntryComponent', () => {
 
   it('emits "leisure" when agent returns leisure action type', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(of(makeResponse({
+    agentSpy.createTask.mockReturnValue(of(makeResponse({
       actions_taken: [{ type: 'leisure', task_id: 'l1' }],
       confirmation: 'Leisure task added!',
     })));
@@ -310,7 +308,7 @@ describe('AddEntryComponent', () => {
 
   it('emits type "general" as fallback for an unrecognised action type', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
+    agentSpy.createTask.mockReturnValue(
       of(makeResponse({ actions_taken: [{ type: 'future_thing', task_id: 'id-1' }], confirmation: 'Done!' })),
     );
     openPanel(f);
@@ -325,7 +323,7 @@ describe('AddEntryComponent', () => {
 
   it('does not emit added when actions_taken is empty and ui_signals is empty', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
+    agentSpy.createTask.mockReturnValue(
       of(makeResponse({ actions_taken: [], confirmation: '', ui_signals: [] })),
     );
     openPanel(f);
@@ -336,12 +334,12 @@ describe('AddEntryComponent', () => {
     clickSubmit(f);
 
     expect(emitted).toBeUndefined();
-    expect(f.componentInstance.isOpen()).toBeTrue(); // stays open
+    expect(f.componentInstance.isOpen()).toBe(true); // stays open
   });
 
   it('emits the task_id from actions_taken[0] as id', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(
+    agentSpy.createTask.mockReturnValue(
       of(makeResponse({
         actions_taken: [{ type: 'work', task_id: 'server-id-123' }],
         confirmation: 'Task added!',
@@ -364,24 +362,24 @@ describe('AddEntryComponent', () => {
     openPanel(f);
     const checkbox = f.debugElement.query(By.css('.toggle-adding-more input[type="checkbox"]'));
     expect(checkbox).toBeTruthy();
-    expect((checkbox.nativeElement as HTMLInputElement).checked).toBeFalse();
+    expect((checkbox.nativeElement as HTMLInputElement).checked).toBe(false);
   });
 
   it('closes the form after success when addingMore is false', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(of(makeSuccessResponse('Done!')));
+    agentSpy.createTask.mockReturnValue(of(makeSuccessResponse('Done!')));
     openPanel(f);
     typeText(f, 'buy groceries');
     // addingMore is false by default
     clickSubmit(f);
 
-    expect(f.componentInstance.isOpen()).toBeFalse();
+    expect(f.componentInstance.isOpen()).toBe(false);
     expect(f.debugElement.query(By.css('.entry-panel'))).toBeNull();
   });
 
   it('clears input and stays open after success when addingMore is true', async () => {
     const f = await setup();
-    agentSpy.createTask.and.returnValue(of(makeSuccessResponse('Done!')));
+    agentSpy.createTask.mockReturnValue(of(makeSuccessResponse('Done!')));
     openPanel(f);
     typeText(f, 'buy groceries');
 
@@ -395,7 +393,7 @@ describe('AddEntryComponent', () => {
 
     clickSubmit(f);
 
-    expect(f.componentInstance.isOpen()).toBeTrue();
+    expect(f.componentInstance.isOpen()).toBe(true);
     expect(f.componentInstance['_text']()).toBe('');
   });
 
@@ -410,7 +408,7 @@ describe('AddEntryComponent', () => {
     checkbox.checked = true;
     checkbox.dispatchEvent(new Event('change'));
     f.detectChanges();
-    expect(f.componentInstance['addingMore']()).toBeTrue();
+    expect(f.componentInstance['addingMore']()).toBe(true);
 
     // Close and reopen
     f.debugElement.query(By.css('.btn-cancel')).nativeElement.click();
@@ -421,6 +419,6 @@ describe('AddEntryComponent', () => {
     const reopenedCheckbox = f.debugElement
       .query(By.css('.toggle-adding-more input[type="checkbox"]'))
       .nativeElement as HTMLInputElement;
-    expect(reopenedCheckbox.checked).toBeFalse();
+    expect(reopenedCheckbox.checked).toBe(false);
   });
 });

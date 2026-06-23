@@ -1,3 +1,4 @@
+import { createSpyObj, type Mock } from '../../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { ThemeService } from './theme.service';
 
@@ -5,12 +6,12 @@ const OVERRIDE_KEY = 'plnd_theme_override';
 
 interface MockMql {
   matches: boolean;
-  addEventListener: jasmine.Spy;
-  removeEventListener: jasmine.Spy;
+  addEventListener: Mock;
+  removeEventListener: Mock;
 }
 
 function createMqlSpy(matches: boolean): MockMql {
-  const spy = jasmine.createSpyObj<MockMql>('MediaQueryList', ['addEventListener', 'removeEventListener']);
+  const spy = createSpyObj<MockMql>(['addEventListener', 'removeEventListener']);
   spy.matches = matches;
   return spy;
 }
@@ -24,10 +25,10 @@ describe('ThemeService', () => {
     localStorage.clear();
     capturedHandler = undefined;
     mqlSpy = createMqlSpy(false);
-    mqlSpy.addEventListener.and.callFake((_: string, handler: (e: MediaQueryListEvent) => void) => {
+    mqlSpy.addEventListener.mockImplementation((_: string, handler: (e: MediaQueryListEvent) => void) => {
       capturedHandler = handler;
     });
-    spyOn(window, 'matchMedia').and.returnValue(mqlSpy as unknown as MediaQueryList);
+    vi.spyOn(window, 'matchMedia').mockReturnValue(mqlSpy as unknown as MediaQueryList);
     TestBed.configureTestingModule({});
     service = TestBed.inject(ThemeService);
   });
@@ -41,29 +42,29 @@ describe('ThemeService', () => {
   });
 
   it('isOverridden defaults to false when key is absent', () => {
-    expect(service.isOverridden()).toBeFalse();
+    expect(service.isOverridden()).toBe(false);
   });
 
   it('isOverridden reads true from localStorage on init', () => {
     localStorage.setItem(OVERRIDE_KEY, '1');
     TestBed.resetTestingModule();
     const freshMql = createMqlSpy(false);
-    (window.matchMedia as jasmine.Spy).and.returnValue(freshMql as unknown as MediaQueryList);
+    (window.matchMedia as Mock).mockReturnValue(freshMql as unknown as MediaQueryList);
     TestBed.configureTestingModule({});
     const fresh = TestBed.inject(ThemeService);
-    expect(fresh.isOverridden()).toBeTrue();
+    expect(fresh.isOverridden()).toBe(true);
   });
 
   it('toggle() sets isOverridden to true and writes localStorage', () => {
     service.toggle();
-    expect(service.isOverridden()).toBeTrue();
+    expect(service.isOverridden()).toBe(true);
     expect(localStorage.getItem(OVERRIDE_KEY)).toBe('1');
   });
 
   it('toggle() a second time sets isOverridden to false and removes key', () => {
     service.toggle();
     service.toggle();
-    expect(service.isOverridden()).toBeFalse();
+    expect(service.isOverridden()).toBe(false);
     expect(localStorage.getItem(OVERRIDE_KEY)).toBeNull();
   });
 
@@ -80,7 +81,7 @@ describe('ThemeService', () => {
 
   it('effectiveTheme() returns "dark" when device is dark and not overridden', () => {
     const darkMql = createMqlSpy(true);
-    (window.matchMedia as jasmine.Spy).and.returnValue(darkMql as unknown as MediaQueryList);
+    (window.matchMedia as Mock).mockReturnValue(darkMql as unknown as MediaQueryList);
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
     const fresh = TestBed.inject(ThemeService);
@@ -89,7 +90,7 @@ describe('ThemeService', () => {
 
   it('effectiveTheme() returns "light" when device is dark and overridden', () => {
     const darkMql = createMqlSpy(true);
-    (window.matchMedia as jasmine.Spy).and.returnValue(darkMql as unknown as MediaQueryList);
+    (window.matchMedia as Mock).mockReturnValue(darkMql as unknown as MediaQueryList);
     localStorage.setItem(OVERRIDE_KEY, '1');
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({});
@@ -101,15 +102,15 @@ describe('ThemeService', () => {
     // device = light (beforeEach), no override — OS flips to dark
     fireOsChange(true);
     expect(service.effectiveTheme()).toBe('dark');
-    expect(service.isOverridden()).toBeFalse();
+    expect(service.isOverridden()).toBe(false);
   });
 
   it('OS changes to light while override is active clears override', () => {
     service.toggle(); // override on: device=light → theme=dark
-    expect(service.isOverridden()).toBeTrue();
+    expect(service.isOverridden()).toBe(true);
     fireOsChange(false); // OS changes to light — override cleared
     expect(service.effectiveTheme()).toBe('light');
-    expect(service.isOverridden()).toBeFalse();
+    expect(service.isOverridden()).toBe(false);
     expect(localStorage.getItem(OVERRIDE_KEY)).toBeNull();
   });
 });

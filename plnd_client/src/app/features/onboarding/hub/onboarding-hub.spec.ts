@@ -1,3 +1,4 @@
+import { type Mock } from '../../../../testing/spy';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { signal } from '@angular/core';
@@ -37,7 +38,7 @@ function makeStateMock() {
   return {
     sectionStatus: statusSignal.asReadonly(),
     allSectionsComplete: allCompleteSignal.asReadonly(),
-    markComplete: jasmine.createSpy('markComplete').and.callFake((s: SectionId) => {
+    markComplete: vi.fn().mockImplementation((s: SectionId) => {
       statusSignal.update(prev => ({ ...prev, [s]: 'complete' }));
       if (Object.values(statusSignal()).every(v => v === 'complete')) {
         allCompleteSignal.set(true);
@@ -60,11 +61,11 @@ describe('OnboardingHubComponent', () => {
   let fixture: ComponentFixture<OnboardingHubComponent>;
   let stateMock: ReturnType<typeof makeStateMock>;
   let router: Router;
-  let userServiceStub: { completeOnboarding: jasmine.Spy };
+  let userServiceStub: { completeOnboarding: Mock };
 
   beforeEach(async () => {
     stateMock = makeStateMock();
-    userServiceStub = { completeOnboarding: jasmine.createSpy('completeOnboarding').and.returnValue(of(undefined)) };
+    userServiceStub = { completeOnboarding: vi.fn().mockReturnValue(of(undefined)) };
     await TestBed.configureTestingModule({
       imports: [OnboardingHubComponent],
       providers: [
@@ -96,7 +97,7 @@ describe('OnboardingHubComponent', () => {
   it('Exercise card (index 3) has disabled attribute', () => {
     const cards: NodeListOf<HTMLButtonElement> =
       fixture.nativeElement.querySelectorAll('.section-card');
-    expect(cards[3].disabled).toBeTrue();
+    expect(cards[3].disabled).toBe(true);
   });
 
   it('Exercise card has aria-disabled="true"', () => {
@@ -109,7 +110,7 @@ describe('OnboardingHubComponent', () => {
     const cards: NodeListOf<HTMLButtonElement> =
       fixture.nativeElement.querySelectorAll('.section-card');
     for (let i = 0; i < 3; i++) {
-      expect(cards[i].disabled).toBeFalse();
+      expect(cards[i].disabled).toBe(false);
     }
   });
 
@@ -295,7 +296,7 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('"Skip for now" calls completeOnboarding() then navigates to /day/<today>', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     // open via UI
     (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
     fixture.detectChanges();
@@ -308,7 +309,7 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('"Skip for now" dismisses the modal immediately so any commit error is visible', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
     fixture.detectChanges();
     (fixture.nativeElement.querySelector('.btn-gray-primary') as HTMLButtonElement).click();
@@ -318,7 +319,7 @@ describe('OnboardingHubComponent', () => {
 
   it('"Skip for now" persists a completed meal plan via /schedule/plan before completing onboarding', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
 
     // User finished the Food spoke (meals held in client state) but skips the rest.
     const meal: MealEntry = {
@@ -359,7 +360,7 @@ describe('OnboardingHubComponent', () => {
 
   it('"Skip for now" does NOT POST /schedule/plan when no schedule work was completed', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
 
     // open the skip modal and confirm — nothing was completed, planPeriod is null
     (fixture.nativeElement.querySelector('.btn-skip') as HTMLButtonElement).click();
@@ -393,7 +394,7 @@ describe('OnboardingHubComponent', () => {
   // ── Navigation ──────────────────────────────────────────────────────────────
 
   it('clicking Account card navigates to /onboarding/account', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     const cards: NodeListOf<HTMLButtonElement> =
       fixture.nativeElement.querySelectorAll('.section-card');
     cards[0].click();
@@ -401,7 +402,7 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('clicking Tasks card navigates to /onboarding/tasks', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     const cards: NodeListOf<HTMLButtonElement> =
       fixture.nativeElement.querySelectorAll('.section-card');
     cards[1].click();
@@ -409,7 +410,7 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('clicking Food card navigates to /onboarding/food', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     const cards: NodeListOf<HTMLButtonElement> =
       fixture.nativeElement.querySelectorAll('.section-card');
     cards[2].click();
@@ -417,7 +418,7 @@ describe('OnboardingHubComponent', () => {
   });
 
   it('navigate() guard: disabled section does not call router.navigate', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     fixture.componentInstance.navigate({
       id: 'exercise', icon: '🏃', title: 'Exercise',
       description: '', route: '', disabled: true,
@@ -434,7 +435,7 @@ describe('OnboardingHubComponent', () => {
 
   it('"Approve Plan →" is disabled (ghost) when sections are incomplete', () => {
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
-    expect(btn?.disabled).toBeTrue();
+    expect(btn?.disabled).toBe(true);
     expect(btn?.classList).toContain('btn--ghost');
   });
 
@@ -442,12 +443,12 @@ describe('OnboardingHubComponent', () => {
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
     fixture.detectChanges();
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
-    expect(btn?.disabled).toBeFalse();
+    expect(btn?.disabled).toBe(false);
     expect(btn?.classList).toContain('btn--accent');
   });
 
   it('"Approve Plan →" click binding wires to commitPlan()', () => {
-    spyOn(fixture.componentInstance, 'commitPlan');
+    vi.spyOn(fixture.componentInstance, 'commitPlan');
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
     fixture.detectChanges();
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
@@ -457,7 +458,7 @@ describe('OnboardingHubComponent', () => {
 
   it('commitPlan() posts to /schedule/plan then calls completeOnboarding', () => {
     const httpTesting = TestBed.inject(HttpTestingController);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     // Give the mock a valid plan period so commitPlan() doesn't bail early
     stateMock.planPeriodSignal.set({ start: '2026-05-01', end: '2026-05-14' });
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => stateMock.markComplete(s));
@@ -484,7 +485,7 @@ describe('OnboardingHubComponent', () => {
     (fixture.componentInstance as any).isSubmitting.set(true);
     fixture.detectChanges();
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
-    expect(btn?.disabled).toBeTrue();
+    expect(btn?.disabled).toBe(true);
     expect(btn?.textContent).toContain('Saving');
   });
 
@@ -620,7 +621,7 @@ describe('OnboardingHubComponent', () => {
 
     // CTA re-enables
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.btn-cta');
-    expect(btn?.disabled).toBeFalse();
+    expect(btn?.disabled).toBe(false);
 
     // error banner visible
     const err: HTMLElement = fixture.nativeElement.querySelector('.commit-error');

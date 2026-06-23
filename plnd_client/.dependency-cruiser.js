@@ -103,7 +103,12 @@ module.exports = {
         "This module depends on a module that cannot be found ('resolved to disk'). If it's an npm " +
         'module: add it to your package.json. In all other cases you likely already know what to do.',
       severity: 'error',
-      from: {},
+      from: {
+        // Test infrastructure under src/testing/ may import build-tool-aliased
+        // specifiers (e.g. the zone.js Vitest patch) that dependency-cruiser
+        // cannot resolve statically.
+        pathNot: '^src/testing/'
+      },
       to: {
         couldNotResolve: true
       }
@@ -149,7 +154,9 @@ module.exports = {
         'from.pathNot re of the not-to-dev-dep rule in the dependency-cruiser configuration',
       from: {
         path: '^(src)',
-        pathNot: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$'
+        // Spec files and src/testing/ test infrastructure are development-only and
+        // may import devDependencies (e.g. vitest).
+        pathNot: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$|^src/testing/'
       },
       to: {
         dependencyTypes: [

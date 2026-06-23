@@ -1,3 +1,4 @@
+import { type Mock } from '../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { ErrorHandler } from '@angular/core';
 import { GlobalErrorHandlerService } from './error-handler.service';
@@ -5,7 +6,7 @@ import { environment } from '../../environments/environment';
 
 describe('GlobalErrorHandlerService', () => {
   let handler: GlobalErrorHandlerService;
-  let fetchSpy: jasmine.Spy;
+  let fetchSpy: Mock;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
@@ -16,7 +17,7 @@ describe('GlobalErrorHandlerService', () => {
     handler = TestBed.inject(ErrorHandler) as GlobalErrorHandlerService;
 
     // Spy on the global fetch so we can verify the POST without a real network
-    fetchSpy = spyOn(window, 'fetch').and.returnValue(
+    fetchSpy = vi.spyOn(window, 'fetch').mockReturnValue(
       Promise.resolve(new Response(null, { status: 204 }))
     );
   });
@@ -24,9 +25,9 @@ describe('GlobalErrorHandlerService', () => {
   it('calls fetch with POST to the backend client_error endpoint on handleError', () => {
     const err = new Error('test unhandled error');
     handler.handleError(err);
-    expect(fetchSpy).toHaveBeenCalledOnceWith(
+    expect(fetchSpy).toHaveBeenCalledExactlyOnceWith(
       `${environment.api.baseUrl}/client_error`,
-      jasmine.objectContaining({
+      expect.objectContaining({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       })
@@ -36,7 +37,7 @@ describe('GlobalErrorHandlerService', () => {
   it('includes message and user_agent in the payload', () => {
     const err = new Error('boom');
     handler.handleError(err);
-    const [, init] = fetchSpy.calls.first().args as [string, RequestInit];
+    const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse(init.body as string);
     expect(body.message).toContain('boom');
     expect(body.user_agent).toBe(navigator.userAgent);

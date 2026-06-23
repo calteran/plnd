@@ -77,7 +77,7 @@ describe('TimezoneWhyComponent', () => {
       .find(b => b.nativeElement.textContent.trim() === 'Use my current zone')!;
     btn.nativeElement.click();
     f.detectChanges();
-    expect(emitted).toBeTrue();
+    expect(emitted).toBe(true);
   });
 
   it('shows zone select after clicking "Pick a different zone…" and emits pickZone on selection', () => {

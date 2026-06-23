@@ -22,7 +22,7 @@ function makeMockBriefing(overrides: {
     newsError:      newsError.asReadonly(),
     yesterday:      signal(null).asReadonly(),
     yesterdayError: signal(null).asReadonly(),
-    load: jasmine.createSpy('load'),
+    load: vi.fn(),
   };
 }
 

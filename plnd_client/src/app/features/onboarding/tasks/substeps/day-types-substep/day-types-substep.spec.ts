@@ -1,3 +1,4 @@
+import { createSpyObj } from '../../../../../../testing/spy';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
@@ -28,12 +29,12 @@ function makeStateMock(storedTypes: DayTypeResponse[] = []) {
   const typesSignal: WritableSignal<DayTypeResponse[]> = signal(storedTypes);
   return {
     dayTypes: typesSignal.asReadonly(),
-    setDayTypes: jasmine.createSpy('setDayTypes'),
+    setDayTypes: vi.fn(),
   };
 }
 
 function makeDayTypesSvcMock() {
-  const spy = jasmine.createSpyObj<DayTypesService>('DayTypesService', [
+  const spy = createSpyObj<DayTypesService>([
     'create',
     'update',
     'list',
@@ -42,30 +43,30 @@ function makeDayTypesSvcMock() {
     'createMeal',
     'deleteMeal',
   ]);
-  spy.list.and.returnValue(of([]));
-  spy.listMeals.and.returnValue(of([]));
-  spy.createMeal.and.returnValue(
+  spy.list.mockReturnValue(of([]));
+  spy.listMeals.mockReturnValue(of([]));
+  spy.createMeal.mockReturnValue(
     of({ id: 'new-meal', day_type_id: 'dt1', user_id: 'u1', name: 'Breakfast',
          preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 0,
          created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z' })
   );
-  spy.deleteMeal.and.returnValue(of(undefined));
+  spy.deleteMeal.mockReturnValue(of(undefined));
   return spy;
 }
 
 describe('DayTypesSubstepComponent', () => {
-  async function setup(storedTypes: DayTypeResponse[] = []) {
+  function setup(storedTypes: DayTypeResponse[] = []) {
     const stateMock = makeStateMock(storedTypes);
     const svcMock = makeDayTypesSvcMock();
-    svcMock.create.and.returnValue(of(MOCK_RESPONSE));
-    svcMock.update.and.returnValue(of(MOCK_RESPONSE));
+    svcMock.create.mockReturnValue(of(MOCK_RESPONSE));
+    svcMock.update.mockReturnValue(of(MOCK_RESPONSE));
 
     // PreferencesService is needed by OnboardingStateService constructor
     const prefsMock = {
-      preferences: jasmine.createSpy('preferences').and.returnValue(null),
+      preferences: vi.fn().mockReturnValue(null),
     };
 
-    await TestBed.configureTestingModule({
+    TestBed.configureTestingModule({
       imports: [DayTypesSubstepComponent],
       providers: [
         provideHttpClient(),
@@ -75,7 +76,7 @@ describe('DayTypesSubstepComponent', () => {
         { provide: DayTypesService, useValue: svcMock },
         { provide: PreferencesService, useValue: prefsMock },
       ],
-    }).compileComponents();
+    });
 
     const fixture: ComponentFixture<DayTypesSubstepComponent> =
       TestBed.createComponent(DayTypesSubstepComponent);
@@ -86,7 +87,7 @@ describe('DayTypesSubstepComponent', () => {
   // ── 1. Default cards on first visit ─────────────────────────────────────────
 
   it('renders two default cards (Weekdays + Weekends) when stateService has no stored types', async () => {
-    const { fixture } = await setup();
+    const { fixture } = setup();
     fixture.detectChanges();
     const cards = fixture.nativeElement.querySelectorAll('.schedule-card');
     expect(cards.length).toBe(2);
@@ -106,8 +107,8 @@ describe('DayTypesSubstepComponent', () => {
       { ...MOCK_RESPONSE, id: 'srv-1', name: 'Work Days', days_bitmask: 62 },
       { ...MOCK_RESPONSE, id: 'srv-2', name: 'Rest Days', days_bitmask: 65 },
     ];
-    const { fixture, svcMock } = await setup(); // state empty
-    svcMock.list.and.returnValue(of(serverTypes));
+    const { fixture, svcMock } = setup(); // state empty
+    svcMock.list.mockReturnValue(of(serverTypes));
     fixture.detectChanges(); // triggers ngOnInit → list() → cards set from server
     const inputs: NodeListOf<HTMLInputElement> =
       fixture.nativeElement.querySelectorAll('.card-name-input');
@@ -121,7 +122,7 @@ describe('DayTypesSubstepComponent', () => {
       { ...MOCK_RESPONSE, id: 'id-1', name: 'Work Days', days_bitmask: 62 },
       { ...MOCK_RESPONSE, id: 'id-2', name: 'Rest Days', days_bitmask: 65 },
     ];
-    const { fixture } = await setup(stored);
+    const { fixture } = setup(stored);
     fixture.detectChanges();
     const inputs: NodeListOf<HTMLInputElement> =
       fixture.nativeElement.querySelectorAll('.card-name-input');
@@ -133,7 +134,7 @@ describe('DayTypesSubstepComponent', () => {
   // ── 3. Claiming a day moves it to the clicked card ───────────────────────────
 
   it('clicking a day pill claims it for that card and removes it from the previous owner', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     // Card 0 is "Weekdays" (bitmask 62, Mon–Fri). Card 1 is "Weekends" (bitmask 65, Sat+Sun, bit 0=Sun).
     // Click Sunday pill (bit 0, last pill in DAY_PILLS order M T W T F S S) on card 0.
@@ -149,7 +150,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('clicking an already-active day pill is a no-op', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     // Monday is bit 1, already set on Weekdays (bitmask 62).
     component.toggleDay(0, 1);
@@ -158,7 +159,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('toggleDay is a no-op when in cycle mode', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     const before = component.cards()[0].days_bitmask;
@@ -169,16 +170,16 @@ describe('DayTypesSubstepComponent', () => {
   // ── 4. ✕ button is disabled when bitmask > 0 ────────────────────────────────
 
   it('remove button is disabled when days_bitmask is non-zero in DOW mode', async () => {
-    const { fixture } = await setup();
+    const { fixture } = setup();
     fixture.detectChanges();
     const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
     const removeBtn: HTMLButtonElement = firstCard.querySelector('.remove-btn')!;
     // days_bitmask=62 for Weekdays, so button should be disabled
-    expect(removeBtn.disabled).toBeTrue();
+    expect(removeBtn.disabled).toBe(true);
   });
 
   it('remove button has aria-disabled=true when bitmask > 0', async () => {
-    const { fixture } = await setup();
+    const { fixture } = setup();
     fixture.detectChanges();
     const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
     const removeBtn: HTMLButtonElement = firstCard.querySelector('.remove-btn')!;
@@ -188,20 +189,20 @@ describe('DayTypesSubstepComponent', () => {
   // ── 5. ✕ button enabled when bitmask = 0 ────────────────────────────────────
 
   it('remove button is enabled when days_bitmask is zero', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     // Set card 0 bitmask to 0
     component.updateCard(0, { days_bitmask: 0 });
     fixture.detectChanges();
     const firstCard = fixture.nativeElement.querySelectorAll('.schedule-card')[0];
     const removeBtn: HTMLButtonElement = firstCard.querySelector('.remove-btn')!;
-    expect(removeBtn.disabled).toBeFalse();
+    expect(removeBtn.disabled).toBe(false);
   });
 
   // ── 6. Tapping disabled ✕ shows inline hint text ────────────────────────────
 
-  it('clicking disabled remove button shows inline hint text', fakeAsync(async () => {
-    const { fixture, component } = await setup();
+  it('clicking disabled remove button shows inline hint text', fakeAsync(() => {
+    const { fixture, component } = setup();
     fixture.detectChanges();
     // days_bitmask=62, button is disabled — call onRemoveClick directly since disabled btn won't fire click
     component.onRemoveClick(0);
@@ -214,8 +215,8 @@ describe('DayTypesSubstepComponent', () => {
 
   // ── 7. Hint auto-dismisses after 3 seconds ──────────────────────────────────
 
-  it('inline hint auto-dismisses after 3 seconds', fakeAsync(async () => {
-    const { fixture, component } = await setup();
+  it('inline hint auto-dismisses after 3 seconds', fakeAsync(() => {
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.onRemoveClick(0);
     fixture.detectChanges();
@@ -228,7 +229,7 @@ describe('DayTypesSubstepComponent', () => {
   // ── 8. "+ Add day type" appends a blank card ────────────────────────────────
 
   it('clicking "+ Add day type" appends a new blank card', async () => {
-    const { fixture } = await setup();
+    const { fixture } = setup();
     fixture.detectChanges();
     const addBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.add-link');
     addBtn.click();
@@ -243,7 +244,7 @@ describe('DayTypesSubstepComponent', () => {
   // ── 8b. enterCycleMode wipes DOW cards and starts a single cycle card ───────
 
   it('enterCycleMode wipes existing DOW cards and creates a single cycle card claiming all 7 positions', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     expect(component.cards().length).toBe(2);
     component.enterCycleMode();
@@ -257,7 +258,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('"Switch to rotating schedule" link calls enterCycleMode and reveals cycle-length / anchor-date inputs', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     const addLinks = fixture.nativeElement.querySelectorAll('.add-link') as NodeListOf<HTMLButtonElement>;
     // First link is "+ Add day type", second is the mode switch
@@ -273,7 +274,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('enterDOWMode wipes cycle cards and restores the default DOW two-card setup', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     fixture.detectChanges();
@@ -291,7 +292,7 @@ describe('DayTypesSubstepComponent', () => {
   // ── 9. Cycle position toggle: auto-steal between cards ──────────────────────
 
   it('clicking a cycle position on another card steals it from the original owner', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     component.addCard(); // second cycle card, cycle_bitmask=0
@@ -305,7 +306,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('clicking a cycle position the card already owns is a no-op', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     fixture.detectChanges();
@@ -315,7 +316,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('toggleCycleDay is a no-op when in DOW mode', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     // We're in DOW mode by default. Cards have cycle_bitmask=0; toggleCycleDay should not change them.
     component.toggleCycleDay(0, 1);
@@ -325,7 +326,7 @@ describe('DayTypesSubstepComponent', () => {
   // ── 9b. setCycleLength adjusts coverage ──────────────────────────────────────
 
   it('setCycleLength expanding moves new positions to the top card', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode(); // length=7, top card claims 0b1111111
     fixture.detectChanges();
@@ -336,7 +337,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('setCycleLength shrinking masks bits beyond the new length off every card', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode(); // length=7
     component.addCard();
@@ -353,7 +354,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('setCycleLength clamps to 1..30', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     component.setCycleLength(99);
@@ -365,7 +366,7 @@ describe('DayTypesSubstepComponent', () => {
   it('setCycleLength is a no-op when given NaN', async () => {
     // Regression: 1 << NaN evaluates to 1 in JS (NaN→0 coercion), so without a guard
     // a NaN input would silently clear every position's bit on every card.
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.enterCycleMode(); // length=7, top card bitmask=127
     component.setCycleLength(NaN);
@@ -380,7 +381,7 @@ describe('DayTypesSubstepComponent', () => {
       { ...MOCK_RESPONSE, id: 'srv-1', name: 'Weekdays', days_bitmask: 62 },
       { ...MOCK_RESPONSE, id: 'srv-2', name: 'Weekends', days_bitmask: 65 },
     ];
-    const { fixture, component } = await setup(stored);
+    const { fixture, component } = setup(stored);
     fixture.detectChanges();
     expect(component.pendingDeletions()).toEqual([]);
     component.enterCycleMode();
@@ -392,14 +393,14 @@ describe('DayTypesSubstepComponent', () => {
       { ...MOCK_RESPONSE, id: 'cyc-1', name: 'Day', is_cycle: true, cycle_length: 2, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b01 },
       { ...MOCK_RESPONSE, id: 'cyc-2', name: 'Night', is_cycle: true, cycle_length: 2, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b10 },
     ];
-    const { fixture, component } = await setup(stored);
+    const { fixture, component } = setup(stored);
     fixture.detectChanges();
     component.enterDOWMode();
     expect(component.pendingDeletions().sort()).toEqual(['cyc-1', 'cyc-2']);
   });
 
   it('mode switch on client-only (id=null) cards leaves pendingDeletions empty', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     // Default cards have id=null on first visit
     component.enterCycleMode();
@@ -411,8 +412,8 @@ describe('DayTypesSubstepComponent', () => {
       { ...MOCK_RESPONSE, id: 'srv-1', name: 'Weekdays', days_bitmask: 62 },
       { ...MOCK_RESPONSE, id: 'srv-2', name: 'Weekends', days_bitmask: 65 },
     ];
-    const { fixture, component, svcMock } = await setup(stored);
-    svcMock.delete.and.returnValue(of(undefined));
+    const { fixture, component, svcMock } = setup(stored);
+    svcMock.delete.mockReturnValue(of(undefined));
     fixture.detectChanges();
     component.enterCycleMode();
     component.anchorDate.set('2026-05-11');
@@ -427,38 +428,38 @@ describe('DayTypesSubstepComponent', () => {
   // ── 10. Save: create() called, setDayTypes called, complete emitted ─────────
 
   it('save() calls DayTypesService.create() for new cards and emits complete', async () => {
-    const { fixture, component, stateMock, svcMock } = await setup();
+    const { fixture, component, stateMock, svcMock } = setup();
     fixture.detectChanges();
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
     component.save();
     fixture.detectChanges();
     // Two default cards, both new (no id)
     expect(svcMock.create).toHaveBeenCalledTimes(2);
     expect(stateMock.setDayTypes).toHaveBeenCalledTimes(1);
-    expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+    expect(completeSpy).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   it('save() calls DayTypesService.update() for cards with existing ids', async () => {
     const stored: DayTypeResponse[] = [
       { ...MOCK_RESPONSE, id: 'existing-id', name: 'Weekdays', days_bitmask: 62 },
     ];
-    const { fixture, component, svcMock } = await setup(stored);
+    const { fixture, component, svcMock } = setup(stored);
     fixture.detectChanges();
     component.save();
-    expect(svcMock.update).toHaveBeenCalledWith('existing-id', jasmine.any(Object));
+    expect(svcMock.update).toHaveBeenCalledWith('existing-id', expect.any(Object));
     expect(svcMock.create).not.toHaveBeenCalled();
   });
 
   it('save() in cycle mode sends cycle_bitmask + cycle_length + anchor_date and zeros days_bitmask', async () => {
-    const { fixture, component, svcMock } = await setup();
+    const { fixture, component, svcMock } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     component.anchorDate.set('2026-05-11');
     component.save();
     expect(svcMock.create).toHaveBeenCalledTimes(1);
-    const payload = svcMock.create.calls.mostRecent().args[0];
-    expect(payload.is_cycle).toBeTrue();
+    const payload = svcMock.create.mock.lastCall![0];
+    expect(payload.is_cycle).toBe(true);
     expect(payload.cycle_length).toBe(7);
     expect(payload.anchor_date).toBe('2026-05-11');
     expect(payload.cycle_bitmask).toBe(127);
@@ -466,11 +467,11 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('save() in DOW mode sends cycle_bitmask=0 and is_cycle=false', async () => {
-    const { fixture, component, svcMock } = await setup();
+    const { fixture, component, svcMock } = setup();
     fixture.detectChanges();
     component.save();
-    const payload = svcMock.create.calls.first().args[0];
-    expect(payload.is_cycle).toBeFalse();
+    const payload = svcMock.create.mock.calls[0][0];
+    expect(payload.is_cycle).toBe(false);
     expect(payload.cycle_bitmask).toBe(0);
     expect(payload.cycle_length).toBeNull();
     expect(payload.anchor_date).toBeNull();
@@ -479,11 +480,11 @@ describe('DayTypesSubstepComponent', () => {
   // ── 11. Validation: does NOT save when a 7-day card has days_bitmask = 0 ────
 
   it('save() does NOT emit complete when a 7-day card has days_bitmask = 0', async () => {
-    const { fixture, component, svcMock } = await setup();
+    const { fixture, component, svcMock } = setup();
     fixture.detectChanges();
     // Force card 0 to have no days selected
     component.updateCard(0, { days_bitmask: 0 });
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
     component.save();
     expect(svcMock.create).not.toHaveBeenCalled();
@@ -491,7 +492,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('save() shows validation error when a card has days_bitmask = 0', async () => {
-    const { fixture, component } = await setup();
+    const { fixture, component } = setup();
     fixture.detectChanges();
     component.updateCard(0, { days_bitmask: 0 });
     component.save();
@@ -502,7 +503,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('save() in cycle mode shows error when anchor_date is missing', async () => {
-    const { fixture, component, svcMock } = await setup();
+    const { fixture, component, svcMock } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     component.anchorDate.set(null);
@@ -515,7 +516,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('save() in cycle mode shows error when a card has cycle_bitmask = 0', async () => {
-    const { fixture, component, svcMock } = await setup();
+    const { fixture, component, svcMock } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     component.addCard(); // appends a cycle card with cycle_bitmask=0
@@ -528,7 +529,7 @@ describe('DayTypesSubstepComponent', () => {
   });
 
   it('save() in cycle mode shows error when combined bitmask does not cover every position', async () => {
-    const { fixture, component, svcMock } = await setup();
+    const { fixture, component, svcMock } = setup();
     fixture.detectChanges();
     component.enterCycleMode();
     // Manually leave a gap: clear bit 0 from the top card without claiming it elsewhere.
@@ -544,9 +545,9 @@ describe('DayTypesSubstepComponent', () => {
   // ── 12. Save error shown on API failure ──────────────────────────────────────
 
   it('save() shows save-error message when API call fails', async () => {
-    const { fixture, component, svcMock } = await setup();
+    const { fixture, component, svcMock } = setup();
     fixture.detectChanges();
-    svcMock.create.and.returnValue(throwError(() => new Error('Network error')));
+    svcMock.create.mockReturnValue(throwError(() => new Error('Network error')));
     component.save();
     fixture.detectChanges();
     const errorEl = fixture.nativeElement.querySelector('.save-error');
@@ -560,8 +561,8 @@ describe('DayTypesSubstepComponent', () => {
     const stored: DayTypeResponse[] = [
       { ...MOCK_RESPONSE, id: 'del-id', name: 'To Delete', days_bitmask: 0 },
     ];
-    const { component, svcMock } = await setup(stored);
-    svcMock.delete.and.returnValue(of(undefined));
+    const { component, svcMock } = setup(stored);
+    svcMock.delete.mockReturnValue(of(undefined));
     component.ngOnInit();
 
     expect(component.cards().length).toBe(1);
@@ -574,19 +575,19 @@ describe('DayTypesSubstepComponent', () => {
     const stored: DayTypeResponse[] = [
       { ...MOCK_RESPONSE, id: 'del-id', name: 'To Delete', days_bitmask: 0 },
     ];
-    const { fixture, component, svcMock } = await setup(stored);
-    svcMock.delete.and.returnValue(throwError(() => new Error('Network error')));
+    const { fixture, component, svcMock } = setup(stored);
+    svcMock.delete.mockReturnValue(throwError(() => new Error('Network error')));
     fixture.detectChanges();
 
     component.onRemoveClick(0);
     fixture.detectChanges();
 
-    expect(component.deleteError()).toBeTrue();
+    expect(component.deleteError()).toBe(true);
     expect(component.cards().length).toBe(1); // card not removed on error
   });
 
   it('onRemoveClick() removes client-only card immediately (no server call)', async () => {
-    const { component, svcMock } = await setup();
+    const { component, svcMock } = setup();
     component.ngOnInit();
     // Default cards have id=null; clear bitmask to enable removal
     component.updateCard(0, { days_bitmask: 0 });
@@ -604,8 +605,8 @@ describe('DayTypesSubstepComponent', () => {
       { ...MOCK_RESPONSE, id: 'cyc-1', name: 'Day', is_cycle: true, cycle_length: 4, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b0011 },
       { ...MOCK_RESPONSE, id: 'cyc-2', name: 'Night', is_cycle: true, cycle_length: 4, anchor_date: '2026-01-01', days_bitmask: 0, cycle_bitmask: 0b1100 },
     ];
-    const { fixture, component, svcMock } = await setup();
-    svcMock.list.and.returnValue(of(serverTypes));
+    const { fixture, component, svcMock } = setup();
+    svcMock.list.mockReturnValue(of(serverTypes));
     fixture.detectChanges();
     expect(component.mode()).toBe('cycle');
     expect(component.cycleLength()).toBe(4);
@@ -619,7 +620,7 @@ describe('DayTypesSubstepComponent', () => {
 
   describe('addMeal', () => {
     it('adds a new draft meal to the specified card', async () => {
-      const { component } = await setup();
+      const { component } = setup();
       component.cards.set([{
         localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
         wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,
@@ -635,7 +636,7 @@ describe('DayTypesSubstepComponent', () => {
 
   describe('removeMeal', () => {
     it('removes a meal by localId', async () => {
-      const { component } = await setup();
+      const { component } = setup();
       component.cards.set([{
         localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
         wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,
@@ -650,7 +651,7 @@ describe('DayTypesSubstepComponent', () => {
     });
 
     it('does not remove the last meal', async () => {
-      const { component } = await setup();
+      const { component } = setup();
       component.cards.set([{
         localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
         wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,
@@ -665,7 +666,7 @@ describe('DayTypesSubstepComponent', () => {
 
   describe('updateMeal', () => {
     it('patches a meal by localId', async () => {
-      const { component } = await setup();
+      const { component } = setup();
       component.cards.set([{
         localId: 'c1', id: null, name: 'Weekdays', days_bitmask: 62, cycle_bitmask: 0,
         wake_time: '07:00', sleep_time: '22:00', showRemoveHint: false,

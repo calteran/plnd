@@ -1,3 +1,4 @@
+import { createSpyObj, type SpyObj } from '../../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { noop } from 'rxjs';
 import { provideHttpClient, withInterceptors, HttpClient, HttpContext } from '@angular/common/http';
@@ -10,11 +11,11 @@ import { environment } from '../../../environments/environment';
 describe('authErrorInterceptor', () => {
   let httpMock: HttpTestingController;
   let http: HttpClient;
-  let authService: jasmine.SpyObj<AuthService>;
+  let authService: SpyObj<AuthService>;
 
   beforeEach(() => {
-    authService = jasmine.createSpyObj('AuthService', ['logout', 'isAuthenticated']);
-    authService.isAuthenticated.and.returnValue(true);
+    authService = createSpyObj(['logout', 'isAuthenticated']);
+    authService.isAuthenticated.mockReturnValue(true);
 
     TestBed.configureTestingModule({
       providers: [
@@ -78,7 +79,7 @@ describe('authErrorInterceptor', () => {
   });
 
   it('does not call logout when already unauthenticated (prevents loop on /auth/logout 401)', () => {
-    authService.isAuthenticated.and.returnValue(false);
+    authService.isAuthenticated.mockReturnValue(false);
     http.get('/api/test').subscribe({ error: noop });
     httpMock.expectOne('/api/test').flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(authService.logout).not.toHaveBeenCalled();

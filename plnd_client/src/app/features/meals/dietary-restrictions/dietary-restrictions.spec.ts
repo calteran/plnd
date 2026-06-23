@@ -90,7 +90,7 @@ describe('DietaryRestrictionsComponent', () => {
 
     // Verify the form is valid before calling save() directly — the button
     // selector approach was unreliable (contradictory attribute selector).
-    expect(component.addForm.valid).toBeTrue();
+    expect(component.addForm.valid).toBe(true);
 
     component.save();
     const newItem: DietaryRestriction = { ...base, restriction_id: 'id-3', restriction_type: 'allergy', name: 'shellfish' };
@@ -179,7 +179,7 @@ describe('DietaryRestrictionsComponent', () => {
     fixture.detectChanges();
 
     expect(component.errorMessage()).toBeTruthy();
-    expect(component.pending()).toBeFalse();
+    expect(component.pending()).toBe(false);
   });
 
   it('saveEdit() no-ops when pending is true', () => {
@@ -193,7 +193,7 @@ describe('DietaryRestrictionsComponent', () => {
     component.pending.set(true);
     component.saveEdit('id-2');
     httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions/id-2') && r.method === 'PATCH');
-    expect(component.pending()).toBeTrue();
+    expect(component.pending()).toBe(true);
   });
 
   it('deleteRestriction() shows error on HTTP 500', () => {
@@ -209,7 +209,7 @@ describe('DietaryRestrictionsComponent', () => {
     fixture.detectChanges();
 
     expect(component.errorMessage()).toBeTruthy();
-    expect(component.pending()).toBeFalse();
+    expect(component.pending()).toBe(false);
   });
 
   it('deleteRestriction() no-ops when pending is true', () => {
@@ -222,7 +222,7 @@ describe('DietaryRestrictionsComponent', () => {
     component.pending.set(true);
     component.deleteRestriction('id-1');
     httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions/id-1') && r.method === 'DELETE');
-    expect(component.pending()).toBeTrue();
+    expect(component.pending()).toBe(true);
   });
 
   it('save() no-ops when form invalid (empty name)', () => {
@@ -235,7 +235,7 @@ describe('DietaryRestrictionsComponent', () => {
     component.addForm.setValue({ restriction_type: 'allergy', name: '', notes: null });
     component.save();
     httpMock.expectNone(r => r.url.endsWith('/dietary-restrictions') && r.method === 'POST');
-    expect(component.pending()).toBeFalse();
+    expect(component.pending()).toBe(false);
   });
 
   it('save() shows generic error for non-409 failure', () => {
@@ -319,7 +319,7 @@ describe('DietaryRestrictionsComponent', () => {
     fixture.detectChanges();
 
     const router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     fixture.componentInstance.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/today']);
   });

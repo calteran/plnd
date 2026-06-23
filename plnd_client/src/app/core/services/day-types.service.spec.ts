@@ -119,7 +119,7 @@ describe('DayTypesService', () => {
     const req = httpMock.expectOne(r => r.url === 'http://localhost:3000/day-types/type-uuid-1' && r.method === 'DELETE');
     req.flush(null, { status: 204, statusText: 'No Content' });
 
-    expect(completed).toBeTrue();
+    expect(completed).toBe(true);
   });
 
   describe('listMeals', () => {
@@ -174,7 +174,7 @@ describe('DayTypesService', () => {
       service.deleteMeal('dt1', 'm1').subscribe({ complete: () => (completed = true) });
       const req = httpMock.expectOne(r => r.url.endsWith('/day-types/dt1/meals/m1') && r.method === 'DELETE');
       req.flush(null, { status: 204, statusText: 'No Content' });
-      expect(completed).toBeTrue();
+      expect(completed).toBe(true);
     });
   });
 });

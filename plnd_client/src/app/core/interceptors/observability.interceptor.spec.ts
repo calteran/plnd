@@ -33,7 +33,7 @@ describe('observabilityInterceptor', () => {
   it('attaches X-Request-ID header to every outbound request', () => {
     http.get('/api/test').subscribe();
     const req = httpTesting.expectOne('/api/test');
-    expect(req.request.headers.has('X-Request-ID')).toBeTrue();
+    expect(req.request.headers.has('X-Request-ID')).toBe(true);
     req.flush({});
   });
 
@@ -56,7 +56,7 @@ describe('observabilityInterceptor', () => {
   });
 
   it('calls fetch to report 4xx/5xx errors', () => {
-    const fetchSpy = spyOn(window, 'fetch').and.returnValue(
+    const fetchSpy = vi.spyOn(window, 'fetch').mockReturnValue(
       Promise.resolve(new Response(null, { status: 204 }))
     );
     // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -65,9 +65,9 @@ describe('observabilityInterceptor', () => {
       { message: 'Not Found' },
       { status: 404, statusText: 'Not Found' }
     );
-    expect(fetchSpy).toHaveBeenCalledOnceWith(
+    expect(fetchSpy).toHaveBeenCalledExactlyOnceWith(
       `${configService.getConfig().api.baseUrl}/client_error`,
-      jasmine.objectContaining({ method: 'POST', keepalive: true })
+      expect.objectContaining({ method: 'POST', keepalive: true })
     );
   });
 });

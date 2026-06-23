@@ -14,7 +14,7 @@ function makeMockBriefing(yesterday: YesterdaySnapshot | null, yesterdayError: s
     newsError:      signal(null).asReadonly(),
     yesterday:      y.asReadonly(),
     yesterdayError: ye.asReadonly(),
-    load: jasmine.createSpy('load'),
+    load: vi.fn(),
   };
 }
 

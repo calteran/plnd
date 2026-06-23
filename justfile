@@ -237,10 +237,10 @@ test-run-server:
 # For full pre-commit validation: use `verify` — it is parallel, faster, and more comprehensive
 # Note: `just test` and `just test-ci` have been removed; use `verify` instead
 
-# Run Angular tests with headless Chrome
+# Run Angular unit tests (Vitest + jsdom, headless in-process)
 test-ng-headless:
-    @echo "🧪 Running Angular tests with headless Chrome..."
-    cd plnd_client && npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
+    @echo "🧪 Running Angular unit tests (Vitest + jsdom)..."
+    cd plnd_client && npx ng test --no-watch --coverage
 
 # Open Playwright HTML report from last run
 test-e2e-report:

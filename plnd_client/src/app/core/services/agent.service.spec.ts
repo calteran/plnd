@@ -78,7 +78,7 @@ describe('AgentService', () => {
       .expectOne('http://localhost:3000/agent/task')
       .error(new ErrorEvent('Network error'));
 
-    expect(errorCaught).toBeTrue();
+    expect(errorCaught).toBe(true);
   });
 
   it('returns a cold Observable (no request until subscribed)', () => {

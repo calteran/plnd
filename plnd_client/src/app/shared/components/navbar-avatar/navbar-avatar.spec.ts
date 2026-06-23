@@ -1,3 +1,4 @@
+import { createSpyObj, type SpyObj } from '../../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
@@ -26,7 +27,7 @@ describe('NavbarAvatarComponent', () => {
   let component: NavbarAvatarComponent;
   let mockUserSignal: ReturnType<typeof signal<User | null>>;
   let mockEffectiveThemeSignal: ReturnType<typeof signal<EffectiveTheme>>;
-  let themeServiceSpy: jasmine.SpyObj<ThemeService>;
+  let themeServiceSpy: SpyObj<ThemeService>;
   let router: Router;
 
   beforeEach(async () => {
@@ -35,14 +36,14 @@ describe('NavbarAvatarComponent', () => {
 
     const userServiceMock = {
       user: mockUserSignal.asReadonly(),
-      loadUser: jasmine.createSpy('loadUser')
+      loadUser: vi.fn()
     };
 
     const authServiceMock = {
-      logout: jasmine.createSpy('logout')
+      logout: vi.fn()
     };
 
-    themeServiceSpy = jasmine.createSpyObj('ThemeService', ['toggle'], {
+    themeServiceSpy = createSpyObj(['toggle'], {
       effectiveTheme: mockEffectiveThemeSignal.asReadonly()
     });
 
@@ -91,16 +92,16 @@ describe('NavbarAvatarComponent', () => {
   });
 
   it('toggles dropdown on avatar button click', () => {
-    expect(component.dropdownOpen()).toBeFalse();
+    expect(component.dropdownOpen()).toBe(false);
     const btn: HTMLButtonElement = fixture.nativeElement.querySelector('.avatar-btn');
     btn.click();
     fixture.detectChanges();
-    expect(component.dropdownOpen()).toBeTrue();
+    expect(component.dropdownOpen()).toBe(true);
     expect(fixture.nativeElement.querySelector('.dropdown-panel')).toBeTruthy();
   });
 
   it('navigates to /profile when "My Profile" is clicked', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     component.dropdownOpen.set(true);
     fixture.detectChanges();
     const items = fixture.nativeElement.querySelectorAll('.dropdown-item') as NodeListOf<HTMLButtonElement>;
@@ -123,7 +124,7 @@ describe('NavbarAvatarComponent', () => {
   });
 
   it('goToSettings() navigates to /settings', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     component.goToSettings();
     expect(router.navigate).toHaveBeenCalledWith(['/settings']);
   });
@@ -133,7 +134,7 @@ describe('NavbarAvatarComponent', () => {
     fixture.detectChanges();
     document.dispatchEvent(new MouseEvent('click'));
     fixture.detectChanges();
-    expect(component.dropdownOpen()).toBeFalse();
+    expect(component.dropdownOpen()).toBe(false);
   });
 
   it('initials() uses email initial when display_name is null', () => {
@@ -167,6 +168,6 @@ describe('NavbarAvatarComponent', () => {
     items[2].click(); // Theme row is index 2
     fixture.detectChanges();
     expect(themeServiceSpy.toggle).toHaveBeenCalled();
-    expect(component.dropdownOpen()).toBeTrue();
+    expect(component.dropdownOpen()).toBe(true);
   });
 });

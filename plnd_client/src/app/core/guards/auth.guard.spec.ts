@@ -1,3 +1,4 @@
+import { createSpyObj } from '../../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -17,7 +18,7 @@ describe('authGuard', () => {
   }
 
   beforeEach(() => {
-    const oauthMock = jasmine.createSpyObj('OAuthService', ['configure', 'logOut', 'loadDiscoveryDocumentAndLogin', 'getIdToken']);
+    const oauthMock = createSpyObj(['configure', 'logOut', 'loadDiscoveryDocumentAndLogin', 'getIdToken']);
     TestBed.configureTestingModule({
       providers: [provideHttpClient(), provideHttpClientTesting(), { provide: OAuthService, useValue: oauthMock }, provideRouter([])]
     });
@@ -26,18 +27,18 @@ describe('authGuard', () => {
   });
 
   it('should allow access when authenticated', () => {
-    spyOn(authService, 'isAuthenticated').and.returnValue(true);
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(true);
     expect(runGuard()).toBe(true);
   });
 
   it('should redirect to /login when not authenticated', () => {
-    spyOn(authService, 'isAuthenticated').and.returnValue(false);
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(false);
     const result = runGuard();
     expect(result).not.toBe(true);
   });
 
   it('redirect target is specifically /login (not another route)', () => {
-    spyOn(authService, 'isAuthenticated').and.returnValue(false);
+    vi.spyOn(authService, 'isAuthenticated').mockReturnValue(false);
     const result = runGuard();
     expect((result as UrlTree).toString()).toBe('/login');
   });

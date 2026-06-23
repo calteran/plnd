@@ -1,3 +1,4 @@
+import { type Mock } from '../../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
@@ -18,9 +19,9 @@ describe('WeekPlanService', () => {
         {
           provide: DayTypesMealsService,
           useValue: {
-            load: jasmine.createSpy('load'),
+            load: vi.fn(),
             loaded: signal(true).asReadonly(),
-            mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => [
+            mealsForDate: vi.fn().mockImplementation(() => [
               { id: '1', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
               { id: '2', name: 'lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
               { id: '3', name: 'dinner',    preferred_time: '18:00:00', tolerance_minutes: 60, sort_order: 3, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
@@ -365,7 +366,7 @@ describe('WeekPlanService', () => {
       // Plan POST must fire immediately — no suggestion preloads
       const planReq = httpMock.expectOne(r => r.url.includes('/schedule/plan') && r.method === 'POST');
       planReq.flush({ committed: 3, planning_task_status: 'completed' });
-      expect(planPosted).toBeTrue();
+      expect(planPosted).toBe(true);
     });
 
     it('buildCommitRequest omits task_type from meal anchor entries', () => {
@@ -376,7 +377,7 @@ describe('WeekPlanService', () => {
       const body = req.request.body as PostSchedulePlanRequest;
       const breakfast = body.entries.find(e => e.after_anchor === 'breakfast');
       expect(breakfast).toBeTruthy();
-      expect('task_type' in breakfast!).toBeFalse();
+      expect('task_type' in breakfast!).toBe(false);
       req.flush({ committed: 3, planning_task_status: 'completed' });
     });
 
@@ -489,9 +490,9 @@ describe('WeekPlanService', () => {
       service.initSession('2026-03-24', '2026-03-25'); // two days
       // Re-configure the spy to return different slots per date
       const mock = TestBed.inject(DayTypesMealsService) as unknown as {
-        mealsForDate: jasmine.Spy;
+        mealsForDate: Mock;
       };
-      mock.mealsForDate.and.callFake((date: string) => {
+      mock.mealsForDate.mockImplementation((date: string) => {
         if (date === '2026-03-24') {
           return [
             { id: 'a', name: 'breakfast', preferred_time: '08:00:00', tolerance_minutes: 30, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
@@ -568,7 +569,7 @@ describe('WeekPlanService', () => {
       service.initSession('2026-03-24', '2026-03-24');
       service.setGenerating(true);
       service.applyAgentMeals([]);
-      expect(service.isGenerating()).toBeFalse();
+      expect(service.isGenerating()).toBe(false);
     });
 
     it('should default title to empty string when entry has no title', () => {
@@ -734,15 +735,15 @@ describe('WeekPlanService', () => {
       const state = service.currentState();
       const entry = state.approved.find(m => m.meal_name === 'breakfast');
       expect(entry?.meal_ref).toEqual(ref);
-      expect(state.skipped.some(s => s.meal_name === 'breakfast')).toBeFalse();
+      expect(state.skipped.some(s => s.meal_name === 'breakfast')).toBe(false);
     });
 
     it('excludes an approved meal with null mealRef from all arrays', () => {
       service.initSession('2026-03-24', '2026-03-24');
       service.setMeal('2026-03-24', 'lunch', { approvalState: 'approved', mealRef: null, title: 'No ref yet' });
       const state = service.currentState();
-      expect(state.approved.some(m => m.meal_name === 'lunch')).toBeFalse();
-      expect(state.skipped.some(s => s.meal_name === 'lunch')).toBeFalse();
+      expect(state.approved.some(m => m.meal_name === 'lunch')).toBe(false);
+      expect(state.skipped.some(s => s.meal_name === 'lunch')).toBe(false);
     });
 
     it('puts a skipped meal into the skipped array', () => {
@@ -752,7 +753,7 @@ describe('WeekPlanService', () => {
       const state = service.currentState();
       const entry = state.skipped.find(s => s.meal_name === 'dinner');
       expect(entry?.date).toBe('2026-03-24');
-      expect(state.approved.some(m => m.meal_name === 'dinner')).toBeFalse();
+      expect(state.approved.some(m => m.meal_name === 'dinner')).toBe(false);
     });
   });
 });

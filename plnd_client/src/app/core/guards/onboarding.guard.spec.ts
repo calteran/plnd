@@ -66,7 +66,7 @@ describe('onboardingNotCompletedGuard', () => {
     const result = await TestBed.runInInjectionContext(() =>
       resolveGuard(() => onboardingNotCompletedGuard(mockRoute, mockState))
     );
-    expect(result instanceof UrlTree).toBeTrue();
+    expect(result instanceof UrlTree).toBe(true);
     expect((result as UrlTree).toString()).toBe('/today');
   });
 
@@ -114,7 +114,7 @@ describe('onboardingCompletedGuard', () => {
     const result = await TestBed.runInInjectionContext(() =>
       resolveGuard(() => onboardingCompletedGuard(mockRoute, mockState))
     );
-    expect(result instanceof UrlTree).toBeTrue();
+    expect(result instanceof UrlTree).toBe(true);
     expect((result as UrlTree).toString()).toBe('/onboarding');
   });
 
@@ -128,7 +128,7 @@ describe('onboardingCompletedGuard', () => {
       .flush({ ...BASE_USER, onboarding_completed: false });
 
     const result = await resultPromise;
-    expect(result instanceof UrlTree).toBeTrue();
+    expect(result instanceof UrlTree).toBe(true);
     expect((result as UrlTree).toString()).toBe('/onboarding');
   });
 });

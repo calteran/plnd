@@ -1,3 +1,4 @@
+import { createSpyObj, type SpyObj } from '../../../../../../testing/spy';
 import { signal } from '@angular/core';
 import { TestBed, fakeAsync, flush, tick } from '@angular/core/testing';
 import { ComponentFixture } from '@angular/core/testing';
@@ -11,30 +12,30 @@ import { of, Subject } from 'rxjs';
 describe('DietaryPreferencesSubstepComponent', () => {
   let component: DietaryPreferencesSubstepComponent;
   let fixture: ComponentFixture<DietaryPreferencesSubstepComponent>;
-  let mealsSvc: jasmine.SpyObj<UserMealsService>;
-  let restrictionsSvc: jasmine.SpyObj<DietaryRestrictionsService>;
-  let catalogSvc: jasmine.SpyObj<CatalogService>;
-  let ingredientPrefsSvc: jasmine.SpyObj<UserIngredientPrefsService>;
+  let mealsSvc: SpyObj<UserMealsService>;
+  let restrictionsSvc: SpyObj<DietaryRestrictionsService>;
+  let catalogSvc: SpyObj<CatalogService>;
+  let ingredientPrefsSvc: SpyObj<UserIngredientPrefsService>;
 
   beforeEach(async () => {
-    mealsSvc = jasmine.createSpyObj('UserMealsService', ['createFromScratch', 'updateMetadata']);
-    restrictionsSvc = jasmine.createSpyObj('DietaryRestrictionsService', ['create', 'load', 'restrictions']);
-    restrictionsSvc.restrictions.and.returnValue(null);
+    mealsSvc = createSpyObj(['createFromScratch', 'updateMetadata']);
+    restrictionsSvc = createSpyObj(['create', 'load', 'restrictions']);
+    restrictionsSvc.restrictions.mockReturnValue(null);
 
-    catalogSvc = jasmine.createSpyObj('CatalogService', ['searchIngredients', 'promoteIngredient']);
-    catalogSvc.searchIngredients.and.returnValue(
+    catalogSvc = createSpyObj(['searchIngredients', 'promoteIngredient']);
+    catalogSvc.searchIngredients.mockReturnValue(
       of({ local: [], external: [], providers_queried: [], providers_from_cache: [] })
     );
-    catalogSvc.promoteIngredient.and.returnValue(of({ ingredient_id: 'promoted-1' }));
+    catalogSvc.promoteIngredient.mockReturnValue(of({ ingredient_id: 'promoted-1' }));
 
-    ingredientPrefsSvc = jasmine.createSpyObj('UserIngredientPrefsService', ['upsert', 'remove', 'load']);
+    ingredientPrefsSvc = createSpyObj(['upsert', 'remove', 'load']);
     Object.defineProperty(ingredientPrefsSvc, 'prefs', { value: signal([]), configurable: true });
-    ingredientPrefsSvc.upsert.and.returnValue(of({
+    ingredientPrefsSvc.upsert.mockReturnValue(of({
       user_ingredient_pref_id: 'pref-1', user_id: 'u1',
       catalog_ingredient_id: 'ing-1', preference_score: 2,
       notes: null, created_at: '', updated_at: '',
     }));
-    ingredientPrefsSvc.remove.and.returnValue(of(undefined));
+    ingredientPrefsSvc.remove.mockReturnValue(of(undefined));
 
     await TestBed.configureTestingModule({
       imports: [DietaryPreferencesSubstepComponent],
@@ -72,7 +73,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
       fixture.nativeElement.querySelectorAll('.chip--amber') as NodeListOf<HTMLElement>
     );
     const customChip = amberChips.find(c => c.textContent?.includes('low FODMAP'));
-    expect(customChip).withContext('expected an amber chip showing the custom lifestyle').toBeTruthy();
+    expect(customChip, 'expected an amber chip showing the custom lifestyle').toBeTruthy();
   });
 
   it('addIngredientRating() calls upsert with correct score mapping and adds to local list', fakeAsync(() => {
@@ -158,8 +159,8 @@ describe('DietaryPreferencesSubstepComponent', () => {
       is_blocked: false, notes: null, origin_external_source: null,
       created_at: '', updated_at: '',
     };
-    mealsSvc.createFromScratch.and.returnValue(of(mockMeal));
-    mealsSvc.updateMetadata.and.returnValue(of({ ...mockMeal, rating: 5 }));
+    mealsSvc.createFromScratch.mockReturnValue(of(mockMeal));
+    mealsSvc.updateMetadata.mockReturnValue(of({ ...mockMeal, rating: 5 }));
 
     component.mealInput.set('Pasta');
     component.pendingMealScore.set(4); // index 4 = 😍 = rating 5
@@ -173,7 +174,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
   }));
 
   it('save() saves each selected lifestyle as a preference restriction and emits complete', fakeAsync(() => {
-    restrictionsSvc.create.and.returnValue(of({
+    restrictionsSvc.create.mockReturnValue(of({
       restriction_id: 'r1', user_id: 'u1', restriction_type: 'preference',
       name: 'vegan', notes: null, created_at: '', updated_at: '',
     }));
@@ -198,7 +199,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
   }));
 
   it('merges external results into the dropdown after local ones', fakeAsync(() => {
-    catalogSvc.searchIngredients.and.returnValue(of({
+    catalogSvc.searchIngredients.mockReturnValue(of({
       local: [{ ingredient_id: 'loc-1', name: 'Cheese, cheddar', description: null, allergens: [], occasion_tags: [], external_source: null }],
       external: [{ external_id: '99', name: 'Cheese, mozzarella', description: null, thumbnail_url: null }],
       providers_queried: ['usda_fdc'], providers_from_cache: [],
@@ -222,7 +223,7 @@ describe('DietaryPreferencesSubstepComponent', () => {
 
   it('editing the field cancels an in-flight promote so no stale catalog id is applied', fakeAsync(() => {
     const promote$ = new Subject<{ ingredient_id: string }>();
-    catalogSvc.promoteIngredient.and.returnValue(promote$.asObservable());
+    catalogSvc.promoteIngredient.mockReturnValue(promote$.asObservable());
 
     component.selectIngredientResult({ kind: 'external', external_source: 'usda_fdc', external_id: '99', name: 'Cheese, mozzarella', allergens: [] });
     // User starts typing a different ingredient before the promote resolves.

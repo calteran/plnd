@@ -81,7 +81,7 @@ describe('DayHeaderComponent', () => {
       const why = f.debugElement.query(By.css('.tz-why'));
       expect(why).toBeTruthy();
       why.nativeElement.click();
-      expect(emitted).toBeTrue();
+      expect(emitted).toBe(true);
     });
   });
 

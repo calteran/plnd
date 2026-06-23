@@ -101,8 +101,8 @@ function makeStateMock(
     routines: routinesSignal.asReadonly(),
     totalRoutines: routineCountSignal.asReadonly(),
     dayTypes: dayTypesSignal.asReadonly(),
-    setPlacedTasks: jasmine.createSpy('setPlacedTasks'),
-    markComplete: jasmine.createSpy('markComplete'),
+    setPlacedTasks: vi.fn(),
+    markComplete: vi.fn(),
   };
 }
 
@@ -112,14 +112,14 @@ const CONFIG_MOCK = {
 
 // ── Setup helper ──────────────────────────────────────────────────────────────
 
-async function setup(
+function setup(
   taskNames: string[] = ['Morning Walk', 'Read Book', 'Evening Run'],
   period: { start: string; end: string } | null = PLAN_PERIOD,
   routines: Routine[] = [],
 ) {
   const stateMock = makeStateMock(taskNames, period, routines);
 
-  await TestBed.configureTestingModule({
+  TestBed.configureTestingModule({
     imports: [TaskPlacementReviewSubstepComponent],
     providers: [
       provideHttpClient(),
@@ -128,7 +128,7 @@ async function setup(
       { provide: OnboardingStateService, useValue: stateMock },
       { provide: ConfigService, useValue: CONFIG_MOCK },
     ],
-  }).compileComponents();
+  });
 
   const fixture: ComponentFixture<TaskPlacementReviewSubstepComponent> =
     TestBed.createComponent(TaskPlacementReviewSubstepComponent);
@@ -150,7 +150,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 1. Empty state when upcomingTaskNames is empty ───────────────────────────
 
   it('shows empty state when both upcomingTaskNames and routines are empty', async () => {
-    const { fixture } = await setup([], PLAN_PERIOD, []);
+    const { fixture } = setup([], PLAN_PERIOD, []);
     fixture.detectChanges();
     const emptyMsg: HTMLElement | null = fixture.nativeElement.querySelector('.empty-msg');
     expect(emptyMsg).not.toBeNull();
@@ -158,7 +158,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('shows empty state when planPeriod is null', async () => {
-    const { fixture } = await setup(['Task A'], null, []);
+    const { fixture } = setup(['Task A'], null, []);
     fixture.detectChanges();
     const emptyMsg: HTMLElement | null = fixture.nativeElement.querySelector('.empty-msg');
     expect(emptyMsg).not.toBeNull();
@@ -167,8 +167,8 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
   // ── 2. Loading state while API call is in flight ─────────────────────────────
 
-  it('shows loading screen while API call is in flight', fakeAsync(async () => {
-    const { fixture, httpController } = await setup();
+  it('shows loading screen while API call is in flight', fakeAsync(() => {
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     const loadingScreen: HTMLElement | null =
@@ -186,7 +186,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 3. Calls POST /agent/place-tasks with correct body ───────────────────────
 
   it('calls POST /agent/place-tasks with correct body on init', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     const req = httpController.expectOne(`${API_BASE}/agent/place-tasks`);
@@ -204,7 +204,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 4. Renders day cards grouped by date after successful API response ────────
 
   it('renders day cards grouped by date after successful API response', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -216,7 +216,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('shows task titles in the correct day cards', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -232,7 +232,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 5. Meal slot dividers appear in each day card ────────────────────────────
 
   it('renders BREAKFAST, LUNCH, DINNER dividers in each day card', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -251,7 +251,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 6. Meal slot note appears below grid ────────────────────────────────────
 
   it('shows meal slot note below grid', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -265,7 +265,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 7. Edit button opens edit form; closes other open editors ────────────────
 
   it('clicking Edit opens the edit form for that task row', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -281,7 +281,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('clicking Edit on a second task closes the first editor and opens the new one', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -307,7 +307,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 8. Save in edit form updates the entry ────────────────────────────────────
 
   it('saving edit form updates date, time, duration, and energy', async () => {
-    const { fixture, component, httpController } = await setup();
+    const { fixture, component, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -339,7 +339,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── 9. Remove in edit form deletes the entry ─────────────────────────────────
 
   it('removing an entry from the edit form deletes it from the list', async () => {
-    const { fixture, component, httpController } = await setup();
+    const { fixture, component, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -360,17 +360,17 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
   // ── 10. Save & Return calls setPlacedTasks, markComplete, navigates, emits ───
 
-  it('"Save & Return to Hub" calls setPlacedTasks, markComplete, navigates, and emits complete', fakeAsync(async () => {
-    const { fixture, component, stateMock, httpController, router } = await setup();
+  it('"Save & Return to Hub" calls setPlacedTasks, markComplete, navigates, and emits complete', fakeAsync(() => {
+    const { fixture, component, stateMock, httpController, router } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
     fixture.detectChanges();
 
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
 
-    const navigateSpy = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    const navigateSpy = vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
 
     const saveBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
     saveBtn.click();
@@ -379,7 +379,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
     // Verify setPlacedTasks called with mapped entries
     expect(stateMock.setPlacedTasks).toHaveBeenCalledTimes(1);
-    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
+    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.mock.calls[0][0];
     expect(placedArg.length).toBe(3);
     expect(placedArg[0].date).toBe(MOCK_ENTRIES[0].scheduled_date);
     expect(placedArg[0].scheduled_start).toBe(MOCK_ENTRIES[0].time_window_start!);
@@ -387,13 +387,13 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
     expect(stateMock.markComplete).toHaveBeenCalledWith('tasks');
     expect(navigateSpy).toHaveBeenCalledWith(['/onboarding']);
-    expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+    expect(completeSpy).toHaveBeenCalledExactlyOnceWith(undefined);
   }));
 
   // ── 10b. Floating (anchor-relative) tasks are saved with no scheduled_start ──
 
-  it('saves an anchor-relative task with no scheduled_start so the day view keeps it in its slot', fakeAsync(async () => {
-    const { fixture, component, stateMock, httpController, router } = await setup(['Meds'], PLAN_PERIOD, []);
+  it('saves an anchor-relative task with no scheduled_start so the day view keeps it in its slot', fakeAsync(() => {
+    const { fixture, component, stateMock, httpController, router } = setup(['Meds'], PLAN_PERIOD, []);
     fixture.detectChanges();
 
     // A floating task: placed by anchor, with NO fixed clock time.
@@ -408,14 +408,14 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([floatingEntry]);
     fixture.detectChanges();
 
-    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
-    component.complete.subscribe(jasmine.createSpy('complete'));
+    vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
+    component.complete.subscribe(vi.fn());
 
     (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.save-btn')!.click();
     fixture.detectChanges();
     tick();
 
-    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
+    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.mock.calls[0][0];
     expect(placedArg.length).toBe(1);
     expect(placedArg[0].after_anchor).toBe('breakfast');
     // Must NOT fabricate a noon clock time — that would reclassify the task as a
@@ -425,8 +425,8 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
   // ── 11. Save & Return works with empty task list ─────────────────────────────
 
-  it('"Save & Return to Hub" works correctly with an empty task list', fakeAsync(async () => {
-    const { fixture, component, stateMock, httpController, router } = await setup();
+  it('"Save & Return to Hub" works correctly with an empty task list', fakeAsync(() => {
+    const { fixture, component, stateMock, httpController, router } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -441,10 +441,10 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
     expect(component.entries().length).toBe(0);
 
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
 
-    const navigateSpy = spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
+    const navigateSpy = vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
 
     const saveBtn: HTMLButtonElement = fixture.nativeElement.querySelector('.save-btn');
     saveBtn.click();
@@ -454,13 +454,13 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(stateMock.setPlacedTasks).toHaveBeenCalledWith([]);
     expect(stateMock.markComplete).toHaveBeenCalledWith('tasks');
     expect(navigateSpy).toHaveBeenCalledWith(['/onboarding']);
-    expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+    expect(completeSpy).toHaveBeenCalledExactlyOnceWith(undefined);
   }));
 
   // ── Error state ───────────────────────────────────────────────────────────────
 
   it('shows error message when API call fails', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).error(new ProgressEvent('error'));
@@ -472,7 +472,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('retry button calls loadPlacement again', async () => {
-    const { fixture, httpController } = await setup();
+    const { fixture, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).error(new ProgressEvent('error'));
@@ -492,14 +492,14 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
   // ── Routines-only (no tasks) ─────────────────────────────────────────────────
 
-  it('shows loading screen, calls agent, and shows Edit buttons for routines-only scenario', fakeAsync(async () => {
+  it('shows loading screen, calls agent, and shows Edit buttons for routines-only scenario', fakeAsync(() => {
     const template = makeTemplate({ recurrence_rule: 'FREQ=DAILY' });
     const routinePlacedEntries: PlaceTasksEntry[] = [
       { title: 'Daily Routine', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
       { title: 'Daily Routine', scheduled_date: '2026-04-29', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
       { title: 'Daily Routine', scheduled_date: '2026-04-30', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
     ];
-    const { fixture, component, stateMock, httpController, router } = await setup([], PLAN_PERIOD, [template]);
+    const { fixture, component, stateMock, httpController, router } = setup([], PLAN_PERIOD, [template]);
     fixture.detectChanges();
 
     // Loading screen visible while agent is in flight
@@ -526,26 +526,26 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(3);
 
     // Save & Return sends LLM-placed routine entries as placed_tasks
-    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
-    component.complete.subscribe(jasmine.createSpy('complete'));
+    vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
+    component.complete.subscribe(vi.fn());
     (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.save-btn')!.click();
     fixture.detectChanges();
     tick();
 
-    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
+    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.mock.calls[0][0];
     expect(placedArg.length).toBe(3);
     expect(placedArg[0].title).toBe('Daily Routine');
   }));
 
   // ── Routines + tasks (unified agent response) ─────────────────────────────────
 
-  it('shows both routine instances and one-off tasks from a unified agent response', fakeAsync(async () => {
+  it('shows both routine instances and one-off tasks from a unified agent response', fakeAsync(() => {
     const template = makeTemplate({ title: 'Medication', recurrence_rule: 'FREQ=DAILY' });
     const agentEntries: PlaceTasksEntry[] = [
       MOCK_ENTRIES[0], // Morning Walk
       { title: 'Medication', scheduled_date: '2026-04-28', time_window_start: '08:00', duration_minutes: 30, energy_required: 'low', task_type: 'general' },
     ];
-    const { fixture, component, stateMock, httpController, router } = await setup(
+    const { fixture, component, stateMock, httpController, router } = setup(
       ['Morning Walk'],
       PLAN_PERIOD,
       [template],
@@ -571,13 +571,13 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(fixture.nativeElement.querySelectorAll('.edit-btn').length).toBe(2);
 
     // Save & Return sends ALL entries (routine + one-off) as placed_tasks
-    spyOn(router, 'navigate').and.returnValue(Promise.resolve(true));
-    component.complete.subscribe(jasmine.createSpy('complete'));
+    vi.spyOn(router, 'navigate').mockReturnValue(Promise.resolve(true));
+    component.complete.subscribe(vi.fn());
     (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('.save-btn')!.click();
     fixture.detectChanges();
     tick();
 
-    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.calls.first().args[0];
+    const placedArg: PlanEntryRequest[] = stateMock.setPlacedTasks.mock.calls[0][0];
     expect(placedArg.length).toBe(2);
     expect(placedArg.map(e => e.title)).toContain('Morning Walk');
     expect(placedArg.map(e => e.title)).toContain('Medication');
@@ -586,7 +586,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── Edit / remove work on any row ────────────────────────────────────────────
 
   it('opening Edit on any row opens the edit form and saves correctly', async () => {
-    const { fixture, component, httpController } = await setup();
+    const { fixture, component, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -610,7 +610,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('removing an entry re-indexes the list so subsequent edits target the correct entry', async () => {
-    const { fixture, component, httpController } = await setup();
+    const { fixture, component, httpController } = setup();
     fixture.detectChanges();
 
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush(MOCK_ENTRIES);
@@ -631,7 +631,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── toPlanEntries() mapping ───────────────────────────────────────────────────
 
   it('maps reordered placements to contiguous slot_position and paired_meal_name', async () => {
-    const { component } = await setup();
+    const { component } = setup();
     // Don't call detectChanges — we bypass the HTTP load and set entries directly.
     component.entries.set([
       { title: 'a', scheduled_date: '2026-06-22', task_type: 'work', duration_minutes: 30,
@@ -649,7 +649,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('paired task carries paired_meal_name and null scheduled_start', async () => {
-    const { component } = await setup();
+    const { component } = setup();
     component.entries.set([
       { title: 'take meds', scheduled_date: '2026-06-22', task_type: 'medication',
         duration_minutes: 5, energy_required: 'low', paired_meal_name: 'breakfast' },
@@ -664,7 +664,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   // ── onDrop() same-day cross-slot (into-meal pairing) ─────────────────────────
 
   it('same-day drop into meal slot sets paired_meal_name and leaves exactly ONE instance', async () => {
-    const { component, httpController, fixture } = await setup();
+    const { component, httpController, fixture } = setup();
     fixture.detectChanges();
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([
       { title: 'Walk', scheduled_date: '2026-04-28', task_type: 'exercise',
@@ -695,7 +695,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('same-slot reorder: inserts canonical entry and changes order without duplication', async () => {
-    const { component, httpController, fixture } = await setup();
+    const { component, httpController, fixture } = setup();
     fixture.detectChanges();
     // Two tasks already in the SAME slot (breakfast) on the SAME date
     const entryA: PlaceTasksEntry = {
@@ -747,7 +747,7 @@ describe('TaskPlacementReviewSubstepComponent', () => {
   });
 
   it('cross-day drop changes scheduled_date and leaves exactly ONE instance', async () => {
-    const { component, httpController, fixture } = await setup();
+    const { component, httpController, fixture } = setup();
     fixture.detectChanges();
     httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([
       { title: 'Walk', scheduled_date: '2026-04-28', task_type: 'exercise',
