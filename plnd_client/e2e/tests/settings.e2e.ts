@@ -42,11 +42,11 @@ test.describe('Settings', () => {
 
     const settings = new SettingsPage(page);
     await settings.goto();
-    await expect(settings.getWeekStartSelect()).toBeVisible({ timeout: 5_000 });
+    await expect(settings.getWeekStartSelect()).toBeVisible();
 
     await settings.getWeekStartSelect().selectOption({ label: 'Sunday' });
     await settings.getSaveButton().click();
-    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
+    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.');
 
     // Round-trip: the real backend echoed week_start_day=0 (Sunday) and the
     // form re-binds to the persisted value.
@@ -61,12 +61,12 @@ test.describe('Settings', () => {
 
     const settings = new SettingsPage(page);
     await settings.goto();
-    await expect(settings.getPlanLengthInput()).toBeVisible({ timeout: 5_000 });
+    await expect(settings.getPlanLengthInput()).toBeVisible();
 
     await settings.getPlanLengthInput().fill('14');
     await settings.getSaveButton().click();
 
-    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
+    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.');
     await expect(settings.getPlanLengthInput()).toHaveValue('14');
   });
 
@@ -75,12 +75,12 @@ test.describe('Settings', () => {
 
     const settings = new SettingsPage(page);
     await settings.goto();
-    await expect(settings.getPlanningTriggerInput()).toBeVisible({ timeout: 5_000 });
+    await expect(settings.getPlanningTriggerInput()).toBeVisible();
 
     await settings.getPlanningTriggerInput().fill('-3');
     await settings.getSaveButton().click();
 
-    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
+    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.');
     await expect(settings.getPlanningTriggerInput()).toHaveValue('-3');
   });
 
@@ -89,13 +89,13 @@ test.describe('Settings', () => {
 
     const settings = new SettingsPage(page);
     await settings.goto();
-    await expect(settings.getPlanLengthInput()).toBeVisible({ timeout: 5_000 });
+    await expect(settings.getPlanLengthInput()).toBeVisible();
 
     await settings.getPlanLengthInput().fill('0');
     await settings.getSaveButton().click();
 
     // Client-side validation surfaces the error; the success message must not appear.
-    await expect(settings.getErrorMessage()).toBeVisible({ timeout: 5_000 });
+    await expect(settings.getErrorMessage()).toBeVisible();
     await expect(settings.getSuccessMessage()).not.toBeVisible();
   });
 
@@ -104,12 +104,12 @@ test.describe('Settings', () => {
 
     const settings = new SettingsPage(page);
     await settings.goto();
-    await expect(settings.getWeekStartSelect()).toBeVisible({ timeout: 5_000 });
+    await expect(settings.getWeekStartSelect()).toBeVisible();
 
     // Change to Sunday and save
     await settings.getWeekStartSelect().selectOption({ label: 'Sunday' });
     await settings.getSaveButton().click();
-    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.', { timeout: 10_000 });
+    await expect(settings.getSuccessMessage()).toHaveText('Settings saved.');
 
     // Navigate away via the Back button — Angular router navigation keeps service state alive
     await settings.getBackButton().click();
@@ -122,7 +122,7 @@ test.describe('Settings', () => {
     await panel.getByRole('menuitem', { name: 'Settings' }).click();
     await expect(page).toHaveURL(/\/settings/);
 
-    await expect(settings.getWeekStartSelect()).toBeVisible({ timeout: 5_000 });
+    await expect(settings.getWeekStartSelect()).toBeVisible();
 
     // The form should reflect the saved value (Sunday).
     // Angular [ngValue] uses an internal key format for the option value attribute,

@@ -26,6 +26,19 @@ export default defineConfig({
   retries: process.env['GITHUB_ACTIONS'] ? 2 : process.env['CI'] ? 1 : 0,
   // `reporter` is a CI-runner concern (GHA annotation format); gate on `CI`.
   reporter: process.env['CI'] ? 'github' : 'list',
+  // Per-assertion budget. Playwright's default is 5s, but a positive wait
+  // (`toBeVisible`/`toHaveText`/`toHaveURL`…) should tolerate as long as the whole
+  // test may run — not a stingy 5s (or a hardcoded 2s) slice. Under CPU starvation,
+  // when many `just verify` agents contend for cores (#988), the awaited condition
+  // is still eventually satisfied; a low ceiling just guillotines it first. Matching
+  // the per-test `timeout` default (30s, left unchanged) lets a single positive
+  // assertion ride the test's full budget. Spec call sites therefore drop their
+  // explicit positive-wait ceilings and inherit this. The carve-outs that must
+  // stay bounded keep explicit short ceilings instead: the `not.toBeVisible`
+  // absence checks where a held-visible element should fail fast, and the
+  // `test.fail()` waits (which must throw fast to register as expected failures
+  // rather than racing the per-test timeout).
+  expect: { timeout: 30_000 },
   globalSetup: require.resolve('./e2e/global-setup.ts'),
   use: {
     baseURL: BASE_URL,

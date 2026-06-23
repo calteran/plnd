@@ -30,7 +30,7 @@ test.describe('Day View — Task Completion Toggle', () => {
     test('clicking the checkbox sets aria-checked to true', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate(PENDING_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       const row = dayView.getTaskRows().first();
       const checkbox = dayView.getTaskRowCheckbox(row);
@@ -43,7 +43,7 @@ test.describe('Day View — Task Completion Toggle', () => {
     test('the task row gains the done class after toggling', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate(PENDING_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       const row = dayView.getTaskRows().first();
       await expect(dayView.getTaskRowInner(row)).not.toHaveClass(/done/);
@@ -54,7 +54,7 @@ test.describe('Day View — Task Completion Toggle', () => {
     test('the task label gains the struck class after toggling', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate(PENDING_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       const row = dayView.getTaskRows().first();
       await expect(dayView.getTaskRowLabel(row)).not.toHaveClass(/struck/);
@@ -70,7 +70,7 @@ test.describe('Day View — Task Completion Toggle', () => {
     test('clicking the checkbox sets aria-checked to false', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate(TODAY_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       const row = dayView.getTaskRows().first();
       const checkbox = dayView.getTaskRowCheckbox(row);
@@ -83,7 +83,7 @@ test.describe('Day View — Task Completion Toggle', () => {
     test('the task row loses the done class after toggling', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate(TODAY_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       const row = dayView.getTaskRows().first();
       await expect(dayView.getTaskRowInner(row)).toHaveClass(/done/);
@@ -94,7 +94,7 @@ test.describe('Day View — Task Completion Toggle', () => {
     test('the task label loses the struck class after toggling', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate(TODAY_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       const row = dayView.getTaskRows().first();
       await expect(dayView.getTaskRowLabel(row)).toHaveClass(/struck/);
@@ -110,7 +110,7 @@ test.describe('Day View — Task Completion Toggle', () => {
     test('toggling a task persists after navigating away and back', async ({ page }) => {
       const dayView = new DayViewPage(page);
       await dayView.gotoDate(PENDING_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       await expect(dayView.getTaskRowCheckbox(dayView.getTaskRows().first()))
         .toHaveAttribute('aria-checked', 'false');
@@ -119,7 +119,6 @@ test.describe('Day View — Task Completion Toggle', () => {
       const [patchResponse] = await Promise.all([
         page.waitForResponse(
           r => r.url().includes('/schedule/entries/') && r.request().method() === 'PATCH',
-          { timeout: 5_000 },
         ),
         dayView.getTaskRowCheckbox(dayView.getTaskRows().first()).click(),
       ]);
@@ -127,9 +126,9 @@ test.describe('Day View — Task Completion Toggle', () => {
 
       // Navigate to a different date and back — forces a fresh GET /schedule/period
       await dayView.gotoDate(TODAY_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
       await dayView.gotoDate(PENDING_DATE);
-      await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+      await expect(dayView.getScheduleList()).toBeVisible();
 
       // Backend-persisted status must still be reflected
       await expect(dayView.getTaskRowCheckbox(dayView.getTaskRows().first()))

@@ -32,7 +32,7 @@ test.describe('Day View — inline task edit', () => {
 
     const dayView = new DayViewPage(page);
     await dayView.gotoDate(DATE);
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     // Open the inline editor by clicking the task label (role=button span).
     await page.getByText('Call dentist').click();
@@ -56,7 +56,7 @@ test.describe('Day View — inline task edit', () => {
 
     // Reload to force a fresh GET /schedule/period from the real backend.
     await page.reload();
-    await expect(dayView.getScheduleList()).toBeVisible({ timeout: 2_000 });
+    await expect(dayView.getScheduleList()).toBeVisible();
 
     await expect(page.getByText('Call orthodontist')).toBeVisible();
     await expect(page.locator('.one-shot-indicator')).toBeVisible();

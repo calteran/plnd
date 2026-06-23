@@ -63,7 +63,7 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     // Auto-generation runs on entry and the grid only renders once it finishes
     // (while generating, the loader replaces the grid). Gate on the first cell
     // so no test races the generation-complete settle under parallel load (#970).
-    await expect(page.locator('.gc').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.gc').first()).toBeVisible();
   });
 
   // ── Grid structure ───────────────────────────────────────────────────────────
@@ -78,10 +78,11 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     });
 
     test('meals-grid renders 9 cells total (3 days × 3 slots)', async ({ page }) => {
-      // Generous timeout: the cell count is days × deduped slots, and the slot
-      // set settles after the day-types load resolves. The default 5s ceiling
-      // could expire mid-settle under parallel load and observe 6 (#970).
-      await expect(page.locator('.gc')).toHaveCount(9, { timeout: 10_000 });
+      // The cell count is days × deduped slots, and the slot set settles after
+      // the day-types load resolves. Inherits the generous global expect.timeout
+      // (30s) so the wait survives a mid-settle stall under parallel load instead
+      // of observing 6 against Playwright's default 5s ceiling (#970, #988).
+      await expect(page.locator('.gc')).toHaveCount(9);
     });
   });
 
@@ -220,7 +221,12 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     const cell = page.locator('.gc').first();
     await cell.locator('.gc-pick').click();
     await cell.locator('.mock-input').fill('chi');
-    await expect(page.locator('.autocomplete-dropdown')).toBeVisible();
+    // Expected-failure wait (test.fail above): autocomplete is not built yet, so
+    // this must fail FAST within the per-test budget. Keep an explicit short
+    // ceiling — it must NOT inherit the generous global expect.timeout (#988),
+    // or the assertion races the per-test timeout and reports a hard failure
+    // instead of the clean expected failure.
+    await expect(page.locator('.autocomplete-dropdown')).toBeVisible({ timeout: 3_000 });
   });
 
   test('clicking a suggestion fills the cell and closes the editor', async ({ page }) => {
@@ -228,8 +234,11 @@ test.describe('Planning Wizard — Step 3: Meals Planning', () => {
     const cell = page.locator('.gc').first();
     await cell.locator('.gc-pick').click();
     await cell.locator('.mock-input').fill('chi');
-    // Autocomplete dropdown does not yet exist — fail fast so test.fail() registers correctly
-    await expect(page.locator('.autocomplete-dropdown')).toBeVisible({ timeout: 3000 });
+    // Autocomplete dropdown does not yet exist — fail fast so test.fail() registers
+    // correctly. Explicit short ceiling on purpose: it must NOT inherit the generous
+    // global expect.timeout (#988), else it races the per-test timeout and reports a
+    // hard failure instead of the expected failure.
+    await expect(page.locator('.autocomplete-dropdown')).toBeVisible({ timeout: 3_000 });
     await page.locator('.autocomplete-dropdown .suggestion-item').first().click();
     await expect(cell).toHaveClass(/approved-g/);
     await expect(cell.locator('.mock-input')).not.toBeVisible();
@@ -285,7 +294,7 @@ test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
     // Auto-generation runs on entry and the grid only renders once it finishes
     // (while generating, the loader replaces the grid). Gate on the first cell
     // so no test races the generation-complete settle under parallel load (#970).
-    await expect(page.locator('.gc').first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.gc').first()).toBeVisible();
   });
 
   test('auto-generate populates all cells with proposed meals on first entry', async ({ page }) => {
@@ -309,7 +318,7 @@ test.describe('Planning Wizard — Step 3: Agent-driven meal flow', () => {
     await expect(page.locator('.gc').first().locator('.gc-approve')).toBeVisible();
     // Approve one meal first
     await page.locator('.gc').first().locator('.gc-approve').click();
-    await expect(page.locator('.btn-refresh-all')).toBeVisible({ timeout: 8_000 });
+    await expect(page.locator('.btn-refresh-all')).toBeVisible();
     const badge = page.locator('.badge');
     // 9 total − 1 approved = 8 unapproved
     await expect(badge).toHaveText('8');

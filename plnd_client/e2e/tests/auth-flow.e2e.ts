@@ -22,7 +22,7 @@ test.describe('OAuth login flow', () => {
 
     // Playwright follows the cross-origin redirect chain:
     // Angular :4200 → Angular OIDC lib initiates code flow → mock OAuth :8080
-    await page.waitForURL(/localhost:8080/, { timeout: 10_000 });
+    await page.waitForURL(/localhost:8080/);
 
     // The mock OAuth server shows a username form.
     await page.fill('input[name="username"]', 'testuser');
@@ -31,8 +31,8 @@ test.describe('OAuth login flow', () => {
     // mock-oauth2-server redirects to /auth/callback?code=...
     // AuthCallbackComponent exchanges the code for an ID token via the OIDC lib,
     // then POSTs to the real /auth/token to get the backend JWT.
-    await page.waitForURL(/\/day\//, { timeout: 15_000 });
-    await expect(page.locator('.schedule-view')).toBeVisible({ timeout: 15_000 });
+    await page.waitForURL(/\/day\//);
+    await expect(page.locator('.schedule-view')).toBeVisible();
   });
 
   test('logout clears token and returns to /login', async ({ page }) => {

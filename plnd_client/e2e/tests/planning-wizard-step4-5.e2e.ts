@@ -183,7 +183,7 @@ test.describe('Planning Wizard — Step 6: Confirmation', () => {
       await page.locator('.btn-finish').click();
       await submitResponse;
 
-      await expect(page).toHaveURL(/\/day\//, { timeout: 15_000 });
+      await expect(page).toHaveURL(/\/day\//);
     });
   });
 
