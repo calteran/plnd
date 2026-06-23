@@ -1401,6 +1401,78 @@ mod tests {
         );
     }
 
+    // Regression for the planning-wizard Finish flow: the wizard commits N plain
+    // tasks on the SAME date with after_anchor=NULL (scheduled_start "09:00") and
+    // client-derived slot_position 0,1,... and ALSO emits skipped meal-anchor
+    // entries (task_type=None). NULL after_anchor leaves the tasks unconstrained
+    // by the slot-uniqueness constraints, so distinct slot_positions must NOT
+    // trip the deferred constraint. Mirrors buildCommitRequest exactly.
+    #[sqlx::test(migrations = "./migrations")]
+    async fn commit_plan_accepts_same_date_null_anchor_tasks_with_positions(pool: PgPool) {
+        let uid = new_user(&pool).await;
+        let start = tomorrow();
+        let end = start + Duration::days(6);
+        let task_id = make_planning_task(&pool, uid, start).await;
+
+        let task = |title: &str, pos: i32| PlanEntryInput {
+            date: start,
+            task_type: Some("general".to_string()),
+            title: Some(title.to_string()),
+            scheduled_start: NaiveTime::from_hms_opt(9, 0, 0),
+            after_anchor: None,
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: Some(pos),
+            paired_meal_name: None,
+        };
+        let meal_anchor = |name: &str| PlanEntryInput {
+            date: start,
+            task_type: None,
+            title: Some(format!("({name})")),
+            scheduled_start: NaiveTime::from_hms_opt(8, 0, 0),
+            after_anchor: Some(name.to_string()),
+            duration_minutes: None,
+            energy_required: None,
+            one_shot: None,
+            slot_position: None,
+            paired_meal_name: None,
+        };
+
+        let req = CommitPlanInput {
+            plan_start: start,
+            plan_end: end,
+            planning_task_id: task_id,
+            entries: vec![
+                meal_anchor("breakfast"),
+                meal_anchor("lunch"),
+                meal_anchor("dinner"),
+                task("Morning run", 0),
+                task("Read book", 1),
+            ],
+            meal_entries: Vec::new(),
+            replace: false,
+            carryover_decisions: HashMap::new(),
+            drop_reasons: HashMap::new(),
+        };
+        commit_plan(&pool, uid, &req)
+            .await
+            .expect("same-date null-anchor tasks with distinct slot_position must commit");
+
+        let period = get_period(&pool, uid, start, start).await.unwrap();
+        assert_eq!(
+            period.entries.len(),
+            2,
+            "only the 2 task_type-bearing entries insert; meal anchors are skipped"
+        );
+        let titles: Vec<&str> = period
+            .entries
+            .iter()
+            .map(|e| e.title.as_deref().unwrap())
+            .collect();
+        assert!(titles.contains(&"Morning run") && titles.contains(&"Read book"));
+    }
+
     #[sqlx::test(migrations = "./migrations")]
     async fn commit_plan_resolves_paired_meal_name_to_instance(pool: PgPool) {
         let uid = new_user(&pool).await;
