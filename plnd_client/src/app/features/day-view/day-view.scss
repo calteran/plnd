@@ -13,6 +13,35 @@
   flex-direction: column;
 }
 
+// ── Floating-task slot drop zones ───────────────────────────────────
+// Each slot ('start of day', after each meal, …) is a bare drop-list with no
+// label of its own. When it holds no tasks it would collapse to zero height, so
+// CDK's drop-target geometry (_canReceive → isInsideClientRect / elementFromPoint)
+// could never match it — you couldn't drop a task there. Most visibly, the
+// 'start of day' slot above the first anchor is empty by default, which made it
+// impossible to drag a task above the first anchor of the day.
+//
+// The min-height MUST be permanent (not gated on a drag-only class): CDK caches
+// a drop list's hit-rect at drag *start* (inside _startReceiving, re-measured
+// only on scroll), which happens before Angular can apply a `.cdk-drop-list-*`
+// class — so a drag-only height lands too late and is never seen. A permanent
+// height is captured correctly. Populated slots are already taller, so this only
+// materialises the empty ones.
+.slot-drop-list {
+  min-height: 1.5rem;
+}
+
+// Cosmetic affordance while a drag is active: CDK marks every connected list
+// `.cdk-drop-list-receiving`, so highlight the droppable gaps to show where a
+// task will land. Uses `outline` (not `border`) so it doesn't alter the box and
+// the cached hit-rect — the permanent min-height above owns the geometry.
+.slot-drop-list.cdk-drop-list-receiving {
+  outline: 2px dashed var(--color-accent-border);
+  outline-offset: -2px;
+  border-radius: 8px;
+  background: var(--color-accent-light);
+}
+
 app-task-row.dimmed,
 app-meal-row.dimmed { opacity: 0.4; transition: opacity 150ms ease; }
 @media (prefers-reduced-motion: reduce) {
