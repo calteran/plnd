@@ -1,3 +1,4 @@
+import { createSpyObj, type SpyObj } from '../../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { ProfileComponent } from './profile';
@@ -22,16 +23,16 @@ describe('ProfileComponent', () => {
   let fixture: ComponentFixture<ProfileComponent>;
   let component: ProfileComponent;
   let mockUserSignal: ReturnType<typeof signal<User | null>>;
-  let userService: jasmine.SpyObj<UserService>;
+  let userService: SpyObj<UserService>;
   let router: Router;
 
   beforeEach(async () => {
     mockUserSignal = signal<User | null>(mockUser);
 
-    userService = jasmine.createSpyObj('UserService', ['loadUser', 'updateUser'], {
+    userService = createSpyObj(['loadUser', 'updateUser'], {
       user: mockUserSignal.asReadonly()
     });
-    userService.updateUser.and.returnValue(of(mockUser));
+    userService.updateUser.mockReturnValue(of(mockUser));
 
     await TestBed.configureTestingModule({
       imports: [ProfileComponent],
@@ -63,16 +64,16 @@ describe('ProfileComponent', () => {
 
     expect(userService.updateUser).toHaveBeenCalled();
     expect(component.successMessage()).toBe('Profile updated.');
-    expect(component.pending()).toBeFalse();
+    expect(component.pending()).toBe(false);
   });
 
   it('save shows error message on failure', () => {
-    userService.updateUser.and.returnValue(throwError(() => new Error('500')));
+    userService.updateUser.mockReturnValue(throwError(() => new Error('500')));
     component.form.setValue({ display_name: 'New Name', avatar_url: '' });
     component.save();
 
     expect(component.errorMessage()).toBe('Failed to save. Please try again.');
-    expect(component.pending()).toBeFalse();
+    expect(component.pending()).toBe(false);
   });
 
   it('cancel resets the form to current user values', () => {
@@ -84,7 +85,7 @@ describe('ProfileComponent', () => {
   });
 
   it('goBack navigates to /today', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     component.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/today']);
   });
@@ -130,7 +131,7 @@ describe('ProfileComponent', () => {
     const el2 = fixture.nativeElement as HTMLElement;
     const errors = el2.querySelectorAll<Element>('.field-error');
     const texts = Array.from(errors).map(e => e.textContent ?? '');
-    expect(texts.some(t => t.includes('500 characters'))).toBeTrue();
+    expect(texts.some(t => t.includes('500 characters'))).toBe(true);
   });
 
   describe('avatar_url pattern validator', () => {

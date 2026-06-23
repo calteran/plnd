@@ -1,3 +1,4 @@
+import { createSpyObj, type SpyObj } from '../../../../../../testing/spy';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { DietaryRestrictionsSubstepComponent } from './dietary-restrictions-substep';
 import { DietaryRestrictionsService } from '../../../../../core/services/dietary-restrictions.service';
@@ -6,11 +7,11 @@ import { of } from 'rxjs';
 describe('DietaryRestrictionsSubstepComponent', () => {
   let component: DietaryRestrictionsSubstepComponent;
   let fixture: ComponentFixture<DietaryRestrictionsSubstepComponent>;
-  let restrictionsSvc: jasmine.SpyObj<DietaryRestrictionsService>;
+  let restrictionsSvc: SpyObj<DietaryRestrictionsService>;
 
   beforeEach(async () => {
-    restrictionsSvc = jasmine.createSpyObj('DietaryRestrictionsService', ['load', 'create', 'update', 'delete'], {
-      restrictions: jasmine.createSpy().and.returnValue([]),
+    restrictionsSvc = createSpyObj(['load', 'create', 'update', 'delete'], {
+      restrictions: vi.fn().mockReturnValue([]),
     });
 
     await TestBed.configureTestingModule({
@@ -33,7 +34,7 @@ describe('DietaryRestrictionsSubstepComponent', () => {
   });
 
   it('adds an allergy restriction via the service', fakeAsync(() => {
-    restrictionsSvc.create.and.returnValue(of({
+    restrictionsSvc.create.mockReturnValue(of({
       restriction_id: 'r1', user_id: 'u1', restriction_type: 'allergy',
       name: 'Peanuts', notes: null, created_at: '', updated_at: '',
     }));
@@ -50,7 +51,7 @@ describe('DietaryRestrictionsSubstepComponent', () => {
   }));
 
   it('sends cultural_religious type directly to the API', fakeAsync(() => {
-    restrictionsSvc.create.and.returnValue(of({
+    restrictionsSvc.create.mockReturnValue(of({
       restriction_id: 'r2', user_id: 'u1', restriction_type: 'cultural_religious',
       name: 'Pork', notes: null, created_at: '', updated_at: '',
     }));

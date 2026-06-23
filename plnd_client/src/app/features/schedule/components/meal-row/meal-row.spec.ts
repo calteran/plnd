@@ -58,13 +58,13 @@ describe('MealRowComponent', () => {
   it('shows done checkbox checked for a done meal', async () => {
     const f = await setup(doneMeal);
     const checkbox: HTMLInputElement = f.debugElement.query(By.css('.done-checkbox')).nativeElement;
-    expect(checkbox.checked).toBeTrue();
+    expect(checkbox.checked).toBe(true);
   });
 
   it('shows done checkbox unchecked for an unplanned meal', async () => {
     const f = await setup(unplanned);
     const checkbox: HTMLInputElement = f.debugElement.query(By.css('.done-checkbox')).nativeElement;
-    expect(checkbox.checked).toBeFalse();
+    expect(checkbox.checked).toBe(false);
   });
 
   it('emits doneToggle when checkbox clicked without opening the pane', async () => {
@@ -143,7 +143,7 @@ describe('MealRowComponent', () => {
     f.componentInstance.closed.subscribe(() => closed = true);
     f.debugElement.query(By.css('app-task-edit-form'))
       .triggerEventHandler('closed', undefined);
-    expect(closed).toBeTrue();
+    expect(closed).toBe(true);
   });
 
   it('dims and inerts sibling during-meal tasks while one is being edited', async () => {
@@ -160,9 +160,9 @@ describe('MealRowComponent', () => {
     const rows = f.debugElement.queryAll(By.css('app-task-row'));
     const [edited, sibling] = rows.map(r => r.nativeElement as HTMLElement);
     expect(edited.classList).not.toContain('dimmed');   // the edited task stays lit
-    expect(edited.hasAttribute('inert')).toBeFalse();
+    expect(edited.hasAttribute('inert')).toBe(false);
     expect(sibling.classList).toContain('dimmed');       // its sibling is spotlit out
-    expect(sibling.hasAttribute('inert')).toBeTrue();
+    expect(sibling.hasAttribute('inert')).toBe(true);
   });
 
   it('does not dim during-meal tasks when the edit target is outside this meal', async () => {
@@ -173,7 +173,7 @@ describe('MealRowComponent', () => {
     // The day view dims the whole meal-row host in this case; dimming here too
     // would stack opacity, so the nested row must stay un-dimmed.
     expect(row.classList).not.toContain('dimmed');
-    expect(row.hasAttribute('inert')).toBeFalse();
+    expect(row.hasAttribute('inert')).toBe(false);
   });
 
   it('applies the skipped modifier class for a skipped meal', async () => {

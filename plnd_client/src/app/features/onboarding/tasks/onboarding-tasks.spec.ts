@@ -177,7 +177,7 @@ describe('OnboardingTasksComponent', () => {
   it('onBack() on schedule-types navigates to /onboarding when prefs complete', async () => {
     const { component } = await setup(true);
     const router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     component.onBack();
     expect(router.navigate).toHaveBeenCalledWith(['/onboarding']);
   });
@@ -187,7 +187,7 @@ describe('OnboardingTasksComponent', () => {
   it('onBack() on planning-prefs navigates to /onboarding', async () => {
     const { component } = await setup(false);
     const router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     expect(component.activeSubstep()).toBe('planning-prefs');
     component.onBack();
     expect(router.navigate).toHaveBeenCalledWith(['/onboarding']);

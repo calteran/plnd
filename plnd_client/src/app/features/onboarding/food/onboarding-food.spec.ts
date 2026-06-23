@@ -1,3 +1,4 @@
+import { createSpyObj } from '../../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { OnboardingFoodComponent } from './onboarding-food';
@@ -13,22 +14,21 @@ describe('OnboardingFoodComponent', () => {
   let component: OnboardingFoodComponent;
 
   function buildMocks(planningPrefsComplete: boolean, dayTypes: unknown[] = []) {
-    const mockState = jasmine.createSpyObj('OnboardingStateService',
-      ['markComplete', 'setMealPlan', 'setPlanningPrefsComplete', 'computeAndSetPlanPeriod'],
+    const mockState = createSpyObj(['markComplete', 'setMealPlan', 'setPlanningPrefsComplete', 'computeAndSetPlanPeriod'],
       {
-        planningPrefsComplete: jasmine.createSpy().and.returnValue(planningPrefsComplete),
-        planPeriod: jasmine.createSpy().and.returnValue(null),
-        dayTypes: jasmine.createSpy().and.returnValue(dayTypes),
+        planningPrefsComplete: vi.fn().mockReturnValue(planningPrefsComplete),
+        planPeriod: vi.fn().mockReturnValue(null),
+        dayTypes: vi.fn().mockReturnValue(dayTypes),
       });
-    const mockWPS = jasmine.createSpyObj('WeekPlanService', ['initSession'], {
-      planStart: jasmine.createSpy().and.returnValue(''),
-      planEnd: jasmine.createSpy().and.returnValue(''),
-      isGenerating: jasmine.createSpy().and.returnValue(false),
-      horizonDays: jasmine.createSpy().and.returnValue([]),
-      scheduledMeals: jasmine.createSpy().and.returnValue({}),
+    const mockWPS = createSpyObj(['initSession'], {
+      planStart: vi.fn().mockReturnValue(''),
+      planEnd: vi.fn().mockReturnValue(''),
+      isGenerating: vi.fn().mockReturnValue(false),
+      horizonDays: vi.fn().mockReturnValue([]),
+      scheduledMeals: vi.fn().mockReturnValue({}),
     });
-    const mockPrefs = jasmine.createSpyObj('PreferencesService', ['loadPreferences'], {
-      preferences: jasmine.createSpy().and.returnValue(null),
+    const mockPrefs = createSpyObj(['loadPreferences'], {
+      preferences: vi.fn().mockReturnValue(null),
     });
     return { mockState, mockWPS, mockPrefs };
   }
@@ -42,9 +42,9 @@ describe('OnboardingFoodComponent', () => {
         { provide: OnboardingStateService, useValue: mockState },
         { provide: WeekPlanService, useValue: mockWPS },
         { provide: PreferencesService, useValue: mockPrefs },
-        { provide: DietaryRestrictionsService, useValue: jasmine.createSpyObj('DRS', ['load', 'create', 'update', 'delete'], { restrictions: () => [] }) },
-        { provide: UserMealsService, useValue: jasmine.createSpyObj('UMS', ['createFromScratch', 'updateMetadata']) },
-        { provide: DayTypesService, useValue: jasmine.createSpyObj('DTS', ['list', 'listMeals', 'create', 'update', 'delete', 'createMeal', 'deleteMeal']) },
+        { provide: DietaryRestrictionsService, useValue: createSpyObj(['load', 'create', 'update', 'delete'], { restrictions: () => [] }) },
+        { provide: UserMealsService, useValue: createSpyObj(['createFromScratch', 'updateMetadata']) },
+        { provide: DayTypesService, useValue: createSpyObj(['list', 'listMeals', 'create', 'update', 'delete', 'createMeal', 'deleteMeal']) },
       ],
     }).compileComponents();
     fixture = TestBed.createComponent(OnboardingFoodComponent);

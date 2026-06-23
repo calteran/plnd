@@ -23,14 +23,14 @@ function makeStateMock(planningPrefsComplete: boolean) {
   const prefsCompleteSignal: WritableSignal<boolean> = signal(planningPrefsComplete);
   return {
     planningPrefsComplete: prefsCompleteSignal.asReadonly(),
-    setPlanningPrefsComplete: jasmine.createSpy('setPlanningPrefsComplete'),
-    computeAndSetPlanPeriod: jasmine.createSpy('computeAndSetPlanPeriod'),
+    setPlanningPrefsComplete: vi.fn(),
+    computeAndSetPlanPeriod: vi.fn(),
   };
 }
 
 function makePrefsMock() {
   return {
-    patchPreferences: jasmine.createSpy('patchPreferences').and.returnValue(of(MOCK_PREFS)),
+    patchPreferences: vi.fn().mockReturnValue(of(MOCK_PREFS)),
   };
 }
 
@@ -57,10 +57,10 @@ describe('PlanningPrefsSubstepComponent', () => {
 
   it('emits complete on ngOnInit when planningPrefsComplete is already true', async () => {
     const { fixture, component } = await setup(true);
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
     fixture.detectChanges(); // triggers ngOnInit
-    expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+    expect(completeSpy).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   it('does not render form content when planningPrefsComplete is true', async () => {
@@ -73,7 +73,7 @@ describe('PlanningPrefsSubstepComponent', () => {
 
   it('does not emit complete on init when planningPrefsComplete is false', async () => {
     const { fixture, component } = await setup(false);
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
     fixture.detectChanges();
     expect(completeSpy).not.toHaveBeenCalled();
@@ -171,7 +171,7 @@ describe('PlanningPrefsSubstepComponent', () => {
     component.planningTime.set('09:30');
     component.save();
     expect(prefsMock.patchPreferences).toHaveBeenCalledWith(
-      jasmine.objectContaining({ planning_time: '09:30:00' })
+      expect.objectContaining({ planning_time: '09:30:00' })
     );
   });
 
@@ -182,7 +182,7 @@ describe('PlanningPrefsSubstepComponent', () => {
     component.planningDay.set(1); // Monday
     component.save();
     expect(prefsMock.patchPreferences).toHaveBeenCalledWith(
-      jasmine.objectContaining({ planning_trigger_offset: 0 })
+      expect.objectContaining({ planning_trigger_offset: 0 })
     );
   });
 
@@ -193,7 +193,7 @@ describe('PlanningPrefsSubstepComponent', () => {
     component.planningDay.set(6); // Saturday
     component.save();
     expect(prefsMock.patchPreferences).toHaveBeenCalledWith(
-      jasmine.objectContaining({ planning_trigger_offset: -2 })
+      expect.objectContaining({ planning_trigger_offset: -2 })
     );
   });
 
@@ -210,34 +210,34 @@ describe('PlanningPrefsSubstepComponent', () => {
     component.save();
     expect(stateMock.computeAndSetPlanPeriod).toHaveBeenCalledTimes(1);
     expect(stateMock.computeAndSetPlanPeriod).toHaveBeenCalledWith(
-      jasmine.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
+      expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/)
     );
   });
 
   it('save() emits complete on success', async () => {
     const { fixture, component } = await setup(false);
     fixture.detectChanges();
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
     component.save();
-    expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+    expect(completeSpy).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   it('save() sets saveError to true when patchPreferences fails', async () => {
     const { fixture, component, prefsMock } = await setup(false);
     fixture.detectChanges();
     const { throwError } = await import('rxjs');
-    prefsMock.patchPreferences.and.returnValue(throwError(() => new Error('Network error')));
+    prefsMock.patchPreferences.mockReturnValue(throwError(() => new Error('Network error')));
     component.save();
-    expect(component.saveError()).toBeTrue();
+    expect(component.saveError()).toBe(true);
   });
 
   it('save() does not emit complete when patchPreferences fails', async () => {
     const { fixture, component, prefsMock } = await setup(false);
     fixture.detectChanges();
     const { throwError } = await import('rxjs');
-    prefsMock.patchPreferences.and.returnValue(throwError(() => new Error('Network error')));
-    const completeSpy = jasmine.createSpy('complete');
+    prefsMock.patchPreferences.mockReturnValue(throwError(() => new Error('Network error')));
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
     component.save();
     expect(completeSpy).not.toHaveBeenCalled();

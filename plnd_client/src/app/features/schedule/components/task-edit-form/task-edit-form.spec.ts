@@ -47,7 +47,7 @@ describe('TaskEditFormComponent', () => {
     fixture.componentRef.setInput('task', task({ floating: true, scheduledStart: undefined }));
     fixture.detectChanges();
     const time: HTMLInputElement = fixture.nativeElement.querySelector('input[name="time"]');
-    expect(time.disabled).toBeTrue();
+    expect(time.disabled).toBe(true);
   });
 
   it('does not emit a save when the time field is cleared (empty value)', () => {
@@ -98,7 +98,7 @@ describe('TaskEditFormComponent', () => {
     const energy: HTMLSelectElement = fixture.nativeElement.querySelector('select[name="energy"]');
     energy.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
-    expect(closed).toBeTrue();
+    expect(closed).toBe(true);
   });
 
   it('one-shot toggle has switch semantics and a state-dependent label', () => {

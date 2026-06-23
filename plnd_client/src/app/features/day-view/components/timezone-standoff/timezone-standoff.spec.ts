@@ -43,7 +43,7 @@ describe('TimezoneStandoffComponent', () => {
     const movedBtn = buttons.find(b => b.nativeElement.textContent.trim() === 'I moved here')!;
     movedBtn.nativeElement.click();
     f.detectChanges();
-    expect(f.componentInstance.movedCalled).toBeTrue();
+    expect(f.componentInstance.movedCalled).toBe(true);
   });
 
   it('emits clockOff when the "Clock\'s off" button is clicked', () => {
@@ -53,6 +53,6 @@ describe('TimezoneStandoffComponent', () => {
     const clockOffBtn = buttons.find(b => b.nativeElement.textContent.trim() === "Clock's off")!;
     clockOffBtn.nativeElement.click();
     f.detectChanges();
-    expect(f.componentInstance.clockOffCalled).toBeTrue();
+    expect(f.componentInstance.clockOffCalled).toBe(true);
   });
 });

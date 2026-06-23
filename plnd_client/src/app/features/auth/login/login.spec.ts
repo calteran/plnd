@@ -1,10 +1,11 @@
+import { createSpyObj, type SpyObj } from '../../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
 import { LoginComponent } from './login';
 import { AuthService } from '../../../core/services/auth.service';
 
 function createFixture(queryParams: Record<string, string> = {}): ComponentFixture<LoginComponent> {
-  const spy = jasmine.createSpyObj('AuthService', ['login']);
+  const spy = createSpyObj(['login']);
   const paramMap = { get: (key: string) => queryParams[key] ?? null };
 
   TestBed.configureTestingModule({
@@ -23,11 +24,11 @@ function createFixture(queryParams: Record<string, string> = {}): ComponentFixtu
 
 describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
-  let authService: jasmine.SpyObj<AuthService>;
+  let authService: SpyObj<AuthService>;
 
   beforeEach(async () => {
     fixture = createFixture();
-    authService = TestBed.inject(AuthService) as jasmine.SpyObj<AuthService>;
+    authService = TestBed.inject(AuthService) as unknown as SpyObj<AuthService>;
   });
 
   it('should create', () => {

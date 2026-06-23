@@ -27,7 +27,7 @@ describe('SettingsComponent', () => {
     }).compileComponents();
 
     httpMock = TestBed.inject(HttpTestingController);
-    spyOn(console, 'error');
+    vi.spyOn(console, 'error');
   });
 
   afterEach(() => {
@@ -58,7 +58,7 @@ describe('SettingsComponent', () => {
     httpMock.expectOne(r => r.method === 'GET').flush(MOCK_PREFS);
     fixture.detectChanges();
     const router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     fixture.componentInstance.goBack();
     expect(router.navigate).toHaveBeenCalledWith(['/today']);
   });
@@ -130,8 +130,8 @@ describe('SettingsComponent', () => {
 
     const control = fixture.componentInstance.form.controls.planLengthDays;
     control.setValue(15);
-    expect(control.valid).toBeFalse();
+    expect(control.valid).toBe(false);
     control.setValue(14);
-    expect(control.valid).toBeTrue();
+    expect(control.valid).toBe(true);
   });
 });

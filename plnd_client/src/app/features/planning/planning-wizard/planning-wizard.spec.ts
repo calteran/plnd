@@ -25,12 +25,12 @@ describe('PlanningWizardComponent', () => {
     mealLoaded    = signal(false);
     mealLoadError = signal(false);
     const dayTypesMealsMock = {
-      load: jasmine.createSpy('load'),
+      load: vi.fn(),
       allEntries: mealEntries.asReadonly(),
       loaded: mealLoaded.asReadonly(),
       loadError: mealLoadError.asReadonly(),
       mealsForDate: (_date: string) => mealEntries(),
-      clear: jasmine.createSpy('clear'),
+      clear: vi.fn(),
     };
 
     await TestBed.configureTestingModule({
@@ -313,7 +313,7 @@ describe('PlanningWizardComponent', () => {
     // Spy on next() without callThrough — if the guard still delegates, the spy
     // blocks navigation and currentStep stays at 3. After the fix the guard calls
     // goToStep(5) directly, so next() is never touched.
-    const nextSpy = spyOn(fixture.componentInstance, 'next');
+    const nextSpy = vi.spyOn(fixture.componentInstance, 'next');
 
     mealLoaded.set(false);
     fixture.componentInstance.weekPlanService.goToStep(3);
@@ -327,7 +327,7 @@ describe('PlanningWizardComponent', () => {
   });
 
   it('guard effect logs console.warn when no enabled step follows the disabled step', () => {
-    const warnSpy = spyOn(console, 'warn');
+    const warnSpy = vi.spyOn(console, 'warn');
 
     // Replace the computed steps with a writable signal to simulate a future
     // state where every step after the current one is also disabled.

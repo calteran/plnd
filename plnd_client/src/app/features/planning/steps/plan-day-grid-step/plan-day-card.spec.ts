@@ -1,3 +1,4 @@
+import { type Mock } from '../../../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -17,11 +18,11 @@ const PATTERN_FIXTURE: MealPatternEntry[] = [
 
 function makeDayTypesMealsMock() {
   return {
-    load: jasmine.createSpy('load'),
+    load: vi.fn(),
     allEntries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
     loaded: signal(true).asReadonly(),
-    mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => PATTERN_FIXTURE),
-    clear: jasmine.createSpy('clear'),
+    mealsForDate: vi.fn().mockImplementation(() => PATTERN_FIXTURE),
+    clear: vi.fn(),
   };
 }
 
@@ -59,7 +60,7 @@ describe('PlanDayCardComponent', () => {
   });
 
   it('should call mealsForDate with the card\'s own date input', () => {
-    const mockService = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: jasmine.Spy };
+    const mockService = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: Mock };
     createComponent('2026-03-31');
     expect(mockService.mealsForDate).toHaveBeenCalledWith('2026-03-31');
   });
@@ -96,7 +97,7 @@ describe('PlanDayCardComponent', () => {
 
     it('should NOT have .expanded class when collapsed', () => {
       const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
-      expect(card.classList.contains('expanded')).toBeFalse();
+      expect(card.classList.contains('expanded')).toBe(false);
     });
   });
 
@@ -110,13 +111,13 @@ describe('PlanDayCardComponent', () => {
     it('should apply .zero class to tasks badge when task count is 0', () => {
       const statVals = fixture.nativeElement.querySelectorAll('.stat-val');
       const tasksBadge: HTMLElement = statVals[0];
-      expect(tasksBadge.classList.contains('zero')).toBeTrue();
+      expect(tasksBadge.classList.contains('zero')).toBe(true);
     });
 
     it('should apply .zero class to meals badge when meal count is 0', () => {
       const statVals = fixture.nativeElement.querySelectorAll('.stat-val');
       const mealsBadge: HTMLElement = statVals[1];
-      expect(mealsBadge.classList.contains('zero')).toBeTrue();
+      expect(mealsBadge.classList.contains('zero')).toBe(true);
     });
   });
 
@@ -127,7 +128,7 @@ describe('PlanDayCardComponent', () => {
       const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
       card.click();
       fixture.detectChanges();
-      expect(card.classList.contains('expanded')).toBeTrue();
+      expect(card.classList.contains('expanded')).toBe(true);
     });
 
     it('should remove .expanded class on second click', () => {
@@ -136,7 +137,7 @@ describe('PlanDayCardComponent', () => {
       fixture.detectChanges();
       card.click();
       fixture.detectChanges();
-      expect(card.classList.contains('expanded')).toBeFalse();
+      expect(card.classList.contains('expanded')).toBe(false);
     });
   });
 
@@ -147,14 +148,14 @@ describe('PlanDayCardComponent', () => {
       const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
       card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       fixture.detectChanges();
-      expect(card.classList.contains('expanded')).toBeTrue();
+      expect(card.classList.contains('expanded')).toBe(true);
     });
 
     it('should toggle expanded on Space key', () => {
       const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
       card.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
       fixture.detectChanges();
-      expect(card.classList.contains('expanded')).toBeTrue();
+      expect(card.classList.contains('expanded')).toBe(true);
     });
 
     it('should collapse on second Enter key press', () => {
@@ -163,7 +164,7 @@ describe('PlanDayCardComponent', () => {
       fixture.detectChanges();
       card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
       fixture.detectChanges();
-      expect(card.classList.contains('expanded')).toBeFalse();
+      expect(card.classList.contains('expanded')).toBe(false);
     });
   });
 

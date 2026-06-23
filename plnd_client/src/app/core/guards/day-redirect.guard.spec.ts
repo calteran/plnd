@@ -71,8 +71,8 @@ describe('validateDayDateGuard', () => {
   describe('invalid dates redirect to /not-found', () => {
     function expectNotFound(date: string) {
       const result = run(date);
-      expect(result instanceof UrlTree).withContext(`date: "${date}"`).toBe(true);
-      expect((result as UrlTree).toString()).withContext(`date: "${date}"`).toBe('/not-found');
+      expect(result instanceof UrlTree, `date: "${date}"`).toBe(true);
+      expect((result as UrlTree).toString(), `date: "${date}"`).toBe('/not-found');
     }
 
     it('rejects a non-numeric string', () => expectNotFound('definitelynotadate'));

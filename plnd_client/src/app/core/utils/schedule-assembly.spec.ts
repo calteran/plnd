@@ -45,7 +45,7 @@ describe('assembleScheduleItems', () => {
     const task = items[1] as ScheduleTask;
     expect(task.label).toBe('Standup');
     expect(task.scheduledStart).toBe('09:00');
-    expect(task.floating).toBeFalse();
+    expect(task.floating).toBe(false);
   });
 
   it('treats an entry with both scheduled_start and after_anchor as a scheduled task (own row, not floating)', () => {
@@ -61,7 +61,7 @@ describe('assembleScheduleItems', () => {
     const task = items[0] as ScheduleTask;
     expect(task.label).toBe('Standup');
     expect(task.scheduledStart).toBe('09:00');
-    expect(task.floating).toBeFalse();
+    expect(task.floating).toBe(false);
   });
 
   it('interleaves a floating task into the slot after a scheduled-task anchor', () => {
@@ -111,7 +111,7 @@ describe('assembleScheduleItems', () => {
   it('renders an unmatched floating task at the top instead of dropping it', () => {
     const anchors = [anchor('meal', 'Breakfast', 'meal-1')];
     const entries = [entry({ entry_id: 't4', title: 'Orphan', after_anchor: 'Dinner' })];
-    const warn = spyOn(console, 'warn');
+    const warn = vi.spyOn(console, 'warn');
     const items = assembleScheduleItems(anchors, entries, []);
     expect(items.length).toBe(2);
     expect((items[0] as ScheduleTask).label).toBe('Orphan');

@@ -1,3 +1,4 @@
+import { createSpyObj } from '../../../../testing/spy';
 import { TestBed, fakeAsync, flushMicrotasks } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
@@ -7,20 +8,20 @@ import { AuthService } from '../../../core/services/auth.service';
 
 describe('AuthCallbackComponent', () => {
   function setup(idToken: string | null, exchangeOutcome: 'success' | 'error' = 'success') {
-    const oauthServiceMock = jasmine.createSpyObj('OAuthService', [
+    const oauthServiceMock = createSpyObj([
       'loadDiscoveryDocumentAndTryLogin',
       'getIdToken',
     ]);
-    oauthServiceMock.loadDiscoveryDocumentAndTryLogin.and.returnValue(Promise.resolve(true));
+    oauthServiceMock.loadDiscoveryDocumentAndTryLogin.mockReturnValue(Promise.resolve(true));
     // Empty string is falsy — treated the same as null in the component's `!idToken` check.
-    oauthServiceMock.getIdToken.and.returnValue(idToken ?? '');
+    oauthServiceMock.getIdToken.mockReturnValue(idToken ?? '');
 
-    const authServiceMock = jasmine.createSpyObj('AuthService', [
+    const authServiceMock = createSpyObj([
       'exchangeToken',
       'handleCallback',
       'logout',
     ]);
-    authServiceMock.exchangeToken.and.returnValue(
+    authServiceMock.exchangeToken.mockReturnValue(
       exchangeOutcome === 'success'
         ? of('backend-jwt')
         : throwError(() => new Error('exchange failed'))

@@ -161,9 +161,10 @@ if need "quick,ts"; then
     run_job "color-tokens" "$PROJECT_ROOT/plnd_client" npm run check-color-tokens
 fi
 if need "ts"; then
-    KARMA_PORT="$("$SCRIPT_DIR/free-port.sh")"
+    # Vitest runs in-process under jsdom (no browser, no bound port), so concurrent
+    # verify runs in separate worktrees never collide — no per-run port plumbing needed.
     run_job "ng test" "$PROJECT_ROOT/plnd_client" \
-        env KARMA_PORT="$KARMA_PORT" npx ng test --browsers=ChromeHeadless --watch=false --code-coverage
+        npx ng test --no-watch --coverage
 fi
 
 # ── Cargo build (gates nextest/clippy/e2e) ──────────────────────────────────────

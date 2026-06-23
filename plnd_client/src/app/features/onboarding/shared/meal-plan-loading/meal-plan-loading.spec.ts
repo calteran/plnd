@@ -226,7 +226,7 @@ describe('MealPlanLoadingComponent', () => {
         if (text) seen.push(text);
       }
       const sawBlocked = seen.some(t => /mushrooms|cilantro/.test(t));
-      expect(sawBlocked).toBeTrue();
+      expect(sawBlocked).toBe(true);
 
       teardown(fixture);
     }));
@@ -244,7 +244,7 @@ describe('MealPlanLoadingComponent', () => {
         if (text) seen.push(text);
       }
       const anyBlocked = seen.some(t => /Avoiding |Skipping /.test(t));
-      expect(anyBlocked).toBeFalse();
+      expect(anyBlocked).toBe(false);
 
       teardown(fixture);
     }));
@@ -354,7 +354,7 @@ describe('MealPlanLoadingComponent', () => {
     tick(FOOD_INTERVAL_MS + 50);
     fixture.destroy();
     tick(MODE_DURATION_MS * 3); // no errors means timers were cleared
-    expect(true).toBeTrue();    // explicit assertion to satisfy Jasmine spec-no-expectations check
+    expect(true).toBe(true);    // explicit assertion to satisfy Jasmine spec-no-expectations check
   }));
 
   it('exposes its constants for tunability', () => {

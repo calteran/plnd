@@ -40,12 +40,12 @@ describe('OnboardingStateService', () => {
   it('allSectionsComplete is false while any section is not-started', () => {
     service.markComplete('account');
     service.markComplete('tasks');
-    expect(service.allSectionsComplete()).toBeFalse();
+    expect(service.allSectionsComplete()).toBe(false);
   });
 
   it('allSectionsComplete is true when all three sections are marked complete', () => {
     (['account', 'tasks', 'food'] as SectionId[]).forEach(s => service.markComplete(s));
-    expect(service.allSectionsComplete()).toBeTrue();
+    expect(service.allSectionsComplete()).toBe(true);
   });
 
   it('setMealPlan stores and exposes the meal plan', () => {
@@ -89,7 +89,7 @@ describe('OnboardingStateService', () => {
   // ── New signal initial state ────────────────────────────────────────────
 
   it('initial state: planningPrefsComplete false, arrays empty', () => {
-    expect(service.planningPrefsComplete()).toBeFalse();
+    expect(service.planningPrefsComplete()).toBe(false);
     expect(service.upcomingTaskNames()).toEqual([]);
     expect(service.placedTasks()).toEqual([]);
     expect(service.dayTypes()).toEqual([]);
@@ -100,13 +100,13 @@ describe('OnboardingStateService', () => {
 
   it('setPlanningPrefsComplete sets the flag to true', () => {
     service.setPlanningPrefsComplete();
-    expect(service.planningPrefsComplete()).toBeTrue();
+    expect(service.planningPrefsComplete()).toBe(true);
   });
 
   it('setPlanningPrefsComplete is idempotent — calling twice stays true', () => {
     service.setPlanningPrefsComplete();
     service.setPlanningPrefsComplete();
-    expect(service.planningPrefsComplete()).toBeTrue();
+    expect(service.planningPrefsComplete()).toBe(true);
   });
 
   it('setUpcomingTaskNames stores the names', () => {

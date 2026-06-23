@@ -116,7 +116,7 @@ describe('MealReviewPaneComponent', () => {
     f.detectChanges();
 
     const req = http.expectOne('http://test/agent/meal-plan/resolve');
-    expect(req.request.body).toEqual(jasmine.objectContaining({
+    expect(req.request.body).toEqual(expect.objectContaining({
       text: 'Greek yogurt bowl',
       meal_name: 'breakfast',
     }));
@@ -139,7 +139,7 @@ describe('MealReviewPaneComponent', () => {
     f.detectChanges();
 
     const req = http.expectOne('http://test/agent/meal-plan/resolve');
-    expect(req.request.body).toEqual(jasmine.objectContaining({
+    expect(req.request.body).toEqual(expect.objectContaining({
       meal_name: 'brunch',
     }));
     req.flush({ meal_ref: null, confirmation: 'ok' });
@@ -163,6 +163,6 @@ describe('MealReviewPaneComponent', () => {
       meal_ref: null, confirmation: 'Done'
     });
     f.detectChanges();
-    expect(closed).toBeTrue();
+    expect(closed).toBe(true);
   });
 });

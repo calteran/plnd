@@ -1,3 +1,4 @@
+import { type Mock } from '../../../testing/spy';
 import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -31,12 +32,12 @@ function makeScheduleServiceMock(overrides: Partial<{
     isLoading:     loading.asReadonly(),
     loadError:     error.asReadonly(),
     date:          date.asReadonly(),
-    loadDay:             jasmine.createSpy('loadDay'),
-    toggleItem:          jasmine.createSpy('toggleItem'),
-    toggleMealConsumed:  jasmine.createSpy('toggleMealConsumed'),
-    setMealConsumption:  jasmine.createSpy('setMealConsumption'),
-    addItem:             jasmine.createSpy('addItem'),
-    repositionTask:      jasmine.createSpy('repositionTask').and.returnValue(of(undefined)),
+    loadDay:             vi.fn(),
+    toggleItem:          vi.fn(),
+    toggleMealConsumed:  vi.fn(),
+    setMealConsumption:  vi.fn(),
+    addItem:             vi.fn(),
+    repositionTask:      vi.fn().mockReturnValue(of(undefined)),
     // Plain method (not a pre-installed spy) so individual tests can spyOn it.
     updateEntry(_id: string, _patch: unknown): void {
       // no-op stub; overridden per-test via spyOn
@@ -53,7 +54,7 @@ function makeBriefingServiceMock() {
     weatherError:   signal(null).asReadonly(),
     newsError:      signal(null).asReadonly(),
     yesterdayError: signal(null).asReadonly(),
-    load: jasmine.createSpy('load'),
+    load: vi.fn(),
   };
 }
 
@@ -65,14 +66,14 @@ function makeTimezoneServiceMock(overrides: {
   const anchors = overrides.anchors ?? [];
   const zone    = overrides.deviceZone ?? 'America/New_York';
   return {
-    listAnchors: jasmine.createSpy('listAnchors').and.returnValue(of(anchors)),
-    deviceZone:  jasmine.createSpy('deviceZone').and.returnValue(zone),
-    createAnchor:  jasmine.createSpy('createAnchor').and.returnValue(of({})),
-    deleteAnchor:  jasmine.createSpy('deleteAnchor').and.returnValue(of(undefined)),
-    deleteGroup:   jasmine.createSpy('deleteGroup').and.returnValue(of({ deleted: 1 })),
-    reportDeviceZone: jasmine.createSpy('reportDeviceZone').and.returnValue(of({})),
-    resolve:          jasmine.createSpy('resolve').and.returnValue(of({ zone: null, day_view: { kind: 'same', incoming_zone: null, current_zone: zone, switch: null } })),
-    dismissStandoff:  jasmine.createSpy('dismissStandoff').and.returnValue(of(undefined)),
+    listAnchors: vi.fn().mockReturnValue(of(anchors)),
+    deviceZone:  vi.fn().mockReturnValue(zone),
+    createAnchor:  vi.fn().mockReturnValue(of({})),
+    deleteAnchor:  vi.fn().mockReturnValue(of(undefined)),
+    deleteGroup:   vi.fn().mockReturnValue(of({ deleted: 1 })),
+    reportDeviceZone: vi.fn().mockReturnValue(of({})),
+    resolve:          vi.fn().mockReturnValue(of({ zone: null, day_view: { kind: 'same', incoming_zone: null, current_zone: zone, switch: null } })),
+    dismissStandoff:  vi.fn().mockReturnValue(of(undefined)),
   };
 }
 
@@ -253,11 +254,11 @@ describe('DayViewComponent (onItemAdded)', () => {
 
     const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
-    svc.loadDay.calls.reset(); // clear the init call
+    svc.loadDay.mockClear(); // clear the init call
 
     f.componentInstance.onItemAdded({ label: 'call mum', type: 'general', id: 'srv-1' });
 
-    expect(svc.loadDay).toHaveBeenCalledOnceWith('2026-03-20');
+    expect(svc.loadDay).toHaveBeenCalledExactlyOnceWith('2026-03-20');
     expect(svc.addItem).not.toHaveBeenCalled();
   });
 });
@@ -292,7 +293,7 @@ describe('DayViewComponent (inline editor)', () => {
 
   it('routes a save patch to ScheduleService.updateEntry', async () => {
     const { component } = await setupEditor();
-    const spy = spyOn(component['scheduleService'], 'updateEntry');
+    const spy = vi.spyOn(component['scheduleService'], 'updateEntry');
     component.onEditSave('entry-1', { title: 'X' });
     expect(spy).toHaveBeenCalledWith('entry-1', { title: 'X' });
   });
@@ -301,11 +302,11 @@ describe('DayViewComponent (inline editor)', () => {
     const { component } = await setupEditor();
     const task: ScheduleItem = { id: 't1', type: 'general', label: 'Task', status: 'pending', oneShot: false, floating: false };
     component.editingId.set(null);
-    expect(component['isSpotlightDimmed'](task)).toBeFalse();      // nothing editing
+    expect(component['isSpotlightDimmed'](task)).toBe(false);      // nothing editing
     component.editingId.set('t1');
-    expect(component['isSpotlightDimmed'](task)).toBeFalse();      // editing self
+    expect(component['isSpotlightDimmed'](task)).toBe(false);      // editing self
     component.editingId.set('other');
-    expect(component['isSpotlightDimmed'](task)).toBeTrue();       // editing another row
+    expect(component['isSpotlightDimmed'](task)).toBe(true);       // editing another row
   });
 
   it('keeps a meal row lit while one of its during-meal tasks is being edited', async () => {
@@ -317,16 +318,16 @@ describe('DayViewComponent (inline editor)', () => {
       ],
     };
     component.editingId.set('dt1');
-    expect(component['isSpotlightDimmed'](meal)).toBeFalse();
+    expect(component['isSpotlightDimmed'](meal)).toBe(false);
     component.editingId.set('elsewhere');
-    expect(component['isSpotlightDimmed'](meal)).toBeTrue();
+    expect(component['isSpotlightDimmed'](meal)).toBe(true);
   });
 });
 
 describe('DayViewComponent (toast)', () => {
-  async function setupToast() {
+  function setupToast() {
     const svc = makeScheduleServiceMock();
-    await TestBed.configureTestingModule({
+    TestBed.configureTestingModule({
       imports: [DayViewComponent],
       providers: [
         { provide: ScheduleService,  useValue: svc },
@@ -335,14 +336,14 @@ describe('DayViewComponent (toast)', () => {
         provideRouter([]),
         { provide: ActivatedRoute,   useValue: mockActivatedRoute },
       ],
-    }).compileComponents();
+    });
     const f = TestBed.createComponent(DayViewComponent);
     f.detectChanges();
     return f;
   }
 
   it('shows a toast when onTaskConfirmed is called', async () => {
-    const f = await setupToast();
+    const f = setupToast();
     f.componentInstance.onTaskConfirmed('Walk added for after lunch');
     f.detectChanges();
     const toast = f.debugElement.query(By.css('.toast'));
@@ -350,8 +351,8 @@ describe('DayViewComponent (toast)', () => {
     expect(toast.nativeElement.textContent).toContain('Walk added for after lunch');
   });
 
-  it('hides the toast after 5000ms', fakeAsync(async () => {
-    const f = await setupToast();
+  it('hides the toast after 5000ms', fakeAsync(() => {
+    const f = setupToast();
     f.componentInstance.onTaskConfirmed('Walk added');
     f.detectChanges();
     expect(f.debugElement.query(By.css('.toast'))).toBeTruthy();
@@ -361,8 +362,8 @@ describe('DayViewComponent (toast)', () => {
     expect(f.debugElement.query(By.css('.toast'))).toBeNull();
   }));
 
-  it('replaces an in-flight toast when a second confirmation arrives', fakeAsync(async () => {
-    const f = await setupToast();
+  it('replaces an in-flight toast when a second confirmation arrives', fakeAsync(() => {
+    const f = setupToast();
     const inst = f.componentInstance;
     inst.onTaskConfirmed('First task added');
     f.detectChanges();
@@ -379,8 +380,8 @@ describe('DayViewComponent (toast)', () => {
     expect(f.debugElement.query(By.css('.toast'))).toBeNull();
   }));
 
-  it('hides the toast immediately when the close button is clicked', fakeAsync(async () => {
-    const f = await setupToast();
+  it('hides the toast immediately when the close button is clicked', fakeAsync(() => {
+    const f = setupToast();
     f.componentInstance.onTaskConfirmed('Walk added');
     f.detectChanges();
     expect(f.debugElement.query(By.css('.toast'))).toBeTruthy();
@@ -425,7 +426,7 @@ describe('DayViewComponent (timezone: divergent day)', () => {
     ];
     const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
     // Server resolves to divergent: incoming zone (from anchor) differs from current device zone.
-    (tzSvc.resolve as jasmine.Spy).and.returnValue(of({
+    (tzSvc.resolve as Mock).mockReturnValue(of({
       zone: 'America/Denver',
       day_view: { kind: 'divergent', incoming_zone: 'America/Denver', current_zone: 'America/New_York', switch: null },
     }));
@@ -454,7 +455,7 @@ describe('DayViewComponent (timezone: divergent day)', () => {
 
   it('does not break when timezone API errors', async () => {
     const tzSvc = makeTimezoneServiceMock();
-    (tzSvc.listAnchors as jasmine.Spy).and.returnValue(throwError(() => new Error('network')));
+    (tzSvc.listAnchors as Mock).mockReturnValue(throwError(() => new Error('network')));
     const svc = makeScheduleServiceMock();
     await TestBed.configureTestingModule({
       imports: [DayViewComponent],
@@ -474,7 +475,7 @@ describe('DayViewComponent (timezone: divergent day)', () => {
 
   it('does not break when tz.resolve errors (listAnchors succeeds)', async () => {
     const tzSvc = makeTimezoneServiceMock();
-    (tzSvc.resolve as jasmine.Spy).and.returnValue(throwError(() => new Error('resolve failed')));
+    (tzSvc.resolve as Mock).mockReturnValue(throwError(() => new Error('resolve failed')));
     const svc = makeScheduleServiceMock();
     await TestBed.configureTestingModule({
       imports: [DayViewComponent],
@@ -512,7 +513,7 @@ describe('DayViewComponent (timezone: travel day)', () => {
     // Device zone differs from anchor zone; incoming zone = null (no prior anchor).
     const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
     // Server resolves to travel: intra-day switch from New_York to Honolulu.
-    (tzSvc.resolve as jasmine.Spy).and.returnValue(of({
+    (tzSvc.resolve as Mock).mockReturnValue(of({
       zone: 'America/New_York',
       day_view: { kind: 'travel', incoming_zone: null, current_zone: 'America/New_York', switch: { from_zone: 'America/New_York', to_zone: 'Pacific/Honolulu', anchor_id: 'anchor-travel' } },
     }));
@@ -556,7 +557,7 @@ describe('DayViewComponent (timezone: travel day)', () => {
     ];
     const tzSvc = makeTimezoneServiceMock({ anchors, deviceZone: 'America/New_York' });
     // Server resolves to travel; component resolves switch anchor from listAnchors result.
-    (tzSvc.resolve as jasmine.Spy).and.returnValue(of({
+    (tzSvc.resolve as Mock).mockReturnValue(of({
       zone: 'America/New_York',
       day_view: { kind: 'travel', incoming_zone: null, current_zone: 'America/New_York', switch: { from_zone: 'America/New_York', to_zone: 'Pacific/Honolulu', anchor_id: 'anchor-travel' } },
     }));
@@ -670,7 +671,7 @@ describe('DayViewComponent (drag-and-drop)', () => {
     expect(component.slotTasks('lunch').map(t => t.id)).toEqual(['t2', 't1']);
 
     // (b) repositionTask called with correct args
-    expect(svc.repositionTask).toHaveBeenCalledOnceWith(
+    expect(svc.repositionTask).toHaveBeenCalledExactlyOnceWith(
       't1',
       DROP_DATE,
       { afterAnchor: 'lunch' },
@@ -693,7 +694,7 @@ describe('DayViewComponent (drag-and-drop)', () => {
     component.onSlotDrop(drop, 'lunch');
 
     expect(component.slotTasks('lunch').map(t => t.id)).toEqual(['t1', 't2']);
-    expect(svc.repositionTask).toHaveBeenCalledOnceWith('t1', DROP_DATE, { afterAnchor: 'lunch' }, 0);
+    expect(svc.repositionTask).toHaveBeenCalledExactlyOnceWith('t1', DROP_DATE, { afterAnchor: 'lunch' }, 0);
   });
 
   it('transfers a task from a slot into a meal during-meal list and never mutates the service snapshot', async () => {
@@ -764,7 +765,7 @@ describe('DayViewComponent (drag-and-drop)', () => {
     expect(f.componentInstance.slotTasks('after-breakfast').map((t: ScheduleTask) => t.id)).toEqual(['t2']);
 
     // (c) repositionTask called with mealAnchorId + position.
-    expect(svc.repositionTask).toHaveBeenCalledOnceWith(
+    expect(svc.repositionTask).toHaveBeenCalledExactlyOnceWith(
       't1',
       DROP_DATE,
       { mealAnchorId: mealId },
@@ -774,6 +775,6 @@ describe('DayViewComponent (drag-and-drop)', () => {
     // (d) CRUCIALLY: the service's snapshot object was NOT mutated.
     // clonedMeal.duringMealTasks must be a different array reference than serviceOwnedDuringMeal.
     expect(clonedMeal.duringMealTasks).not.toBe(serviceOwnedDuringMeal);
-    expect(serviceOwnedDuringMeal.length).toBe(0, 'service snapshot must not be mutated');
+    expect(serviceOwnedDuringMeal.length, 'service snapshot must not be mutated').toBe(0);
   });
 });

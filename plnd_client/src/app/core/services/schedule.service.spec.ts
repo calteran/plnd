@@ -56,16 +56,16 @@ describe('ScheduleService', () => {
 
   it('starts with empty items and not loading', () => {
     expect(svc.scheduleItems()).toEqual([]);
-    expect(svc.isLoading()).toBeFalse();
+    expect(svc.isLoading()).toBe(false);
   });
 
   it('loadDay sets isLoading then clears it after response', () => {
     svc.loadDay('2026-04-02');
-    expect(svc.isLoading()).toBeTrue();
+    expect(svc.isLoading()).toBe(true);
 
     flushDay(httpMock);
 
-    expect(svc.isLoading()).toBeFalse();
+    expect(svc.isLoading()).toBe(false);
   });
 
   it('loadDay GETs /schedule/period with start and end both set to the date', () => {
@@ -188,7 +188,7 @@ describe('ScheduleService', () => {
       entry_id: 'e-float', task_type: 'general', title: 'Stretch',
       status: 'planned', date: '2026-04-02', scheduled_start: null, after_anchor: 'lunch',
     }]);
-    expect((svc.scheduleItems()[0] as ScheduleTask).floating).toBeTrue();
+    expect((svc.scheduleItems()[0] as ScheduleTask).floating).toBe(true);
   });
 
   it('does not mark a task floating when it has neither a time nor an anchor', () => {
@@ -197,7 +197,7 @@ describe('ScheduleService', () => {
       entry_id: 'e-unscheduled', task_type: 'general', title: 'Errand',
       status: 'planned', date: '2026-04-02', scheduled_start: null,
     }]);
-    expect((svc.scheduleItems()[0] as ScheduleTask).floating).toBeFalse();
+    expect((svc.scheduleItems()[0] as ScheduleTask).floating).toBe(false);
   });
 
   it('maps a meal anchor instance to MealAnchor with MEAL_SLOTS name and emoji', () => {
@@ -206,7 +206,7 @@ describe('ScheduleService', () => {
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(1);
-    expect(isMealAnchor(items[0])).toBeTrue();
+    expect(isMealAnchor(items[0])).toBe(true);
     const meal = items[0] as MealAnchor;
     expect(meal.id).toBe('m1');
     expect(meal.name).toBe('Breakfast');
@@ -274,8 +274,8 @@ describe('ScheduleService', () => {
 
     const items = svc.scheduleItems();
     expect(items.length).toBe(2);
-    expect(isMealAnchor(items[0])).toBeTrue();   // meal anchor first
-    expect(isMealAnchor(items[1])).toBeFalse(); // floating task immediately after
+    expect(isMealAnchor(items[0])).toBe(true);   // meal anchor first
+    expect(isMealAnchor(items[1])).toBe(false); // floating task immediately after
   });
 
   it('nests an entry linked by slot_meal_anchor_id into its anchor as a during-meal task', () => {
@@ -350,7 +350,7 @@ describe('ScheduleService', () => {
       .flush('server error', { status: 500, statusText: 'Internal Server Error' });
     httpMock.expectOne(r => r.url.includes('/schedule/anchors')).flush(EMPTY_ANCHORS);
 
-    expect(svc.isLoading()).toBeFalse();
+    expect(svc.isLoading()).toBe(false);
     expect(svc.scheduleItems()).toEqual([]);
   });
 
@@ -361,15 +361,15 @@ describe('ScheduleService', () => {
     // switchMap cancels the first forkJoin (both period + anchors for 04-01)
     const periodReqs = httpMock.match(r => r.url.includes('/schedule/period'));
     expect(periodReqs.length).toBe(2);
-    expect(periodReqs[0].cancelled).toBeTrue();
+    expect(periodReqs[0].cancelled).toBe(true);
     periodReqs[1].flush(EMPTY_PERIOD);
 
     const anchorReqs = httpMock.match(r => r.url.includes('/schedule/anchors'));
     expect(anchorReqs.length).toBe(2);
-    expect(anchorReqs[0].cancelled).toBeTrue();
+    expect(anchorReqs[0].cancelled).toBe(true);
     anchorReqs[1].flush(EMPTY_ANCHORS);
 
-    expect(svc.isLoading()).toBeFalse();
+    expect(svc.isLoading()).toBe(false);
     expect(svc.date()).toBe('2026-04-02');
   });
 
@@ -378,14 +378,14 @@ describe('ScheduleService', () => {
     svc.loadDay('2026-04-02');
 
     const periodReqs = httpMock.match(r => r.url.includes('/schedule/period'));
-    expect(periodReqs[0].cancelled).toBeTrue();
+    expect(periodReqs[0].cancelled).toBe(true);
     periodReqs[1].flush('server error', { status: 500, statusText: 'Internal Server Error' });
 
     const anchorReqs = httpMock.match(r => r.url.includes('/schedule/anchors'));
-    expect(anchorReqs[0].cancelled).toBeTrue();
+    expect(anchorReqs[0].cancelled).toBe(true);
     anchorReqs[1].flush(EMPTY_ANCHORS);
 
-    expect(svc.isLoading()).toBeFalse();
+    expect(svc.isLoading()).toBe(false);
     expect(svc.loadError()).toBe('Failed to load schedule');
   });
 
@@ -493,7 +493,7 @@ describe('ScheduleService', () => {
 
     const item = svc.scheduleItems().find(i => i.id === 'entry-1') as ScheduleTask;
     expect(item.label).toBe('New title');
-    expect(item.oneShot).toBeTrue();
+    expect(item.oneShot).toBe(true);
 
     const req = httpMock.expectOne(r =>
       r.method === 'PATCH' && r.url.endsWith('/schedule/entries/entry-1'));

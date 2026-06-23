@@ -89,18 +89,18 @@ describe('SpokeChromeComponent', () => {
 
   it('emits backClick when back button clicked', () => {
     const fixture = setup(3, 2);
-    const spy = jasmine.createSpy('backClick');
+    const spy = vi.fn();
     fixture.componentInstance.backClick.subscribe(spy);
     fixture.nativeElement.querySelector('.btn-back').click();
-    expect(spy).toHaveBeenCalledOnceWith(undefined);
+    expect(spy).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   it('emits continueClick when continue button clicked', () => {
     const fixture = setup(3, 1);
-    const spy = jasmine.createSpy('continueClick');
+    const spy = vi.fn();
     fixture.componentInstance.continueClick.subscribe(spy);
     fixture.nativeElement.querySelector('.btn-continue').click();
-    expect(spy).toHaveBeenCalledOnceWith(undefined);
+    expect(spy).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   it('continue button is present by default (showContinue not set)', () => {

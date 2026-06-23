@@ -51,10 +51,10 @@ describe('PlanTasksStepComponent', () => {
   });
 
   it('onTaskAdded should call weekPlanService.addTask with correct fields for exercise', () => {
-    spyOn(service, 'addTask');
+    vi.spyOn(service, 'addTask');
     const entry: AddedEntry = { label: 'Morning run', type: 'exercise', duration: 30 };
     fixture.componentInstance.onTaskAdded('2026-03-24', entry);
-    expect(service.addTask).toHaveBeenCalledWith(jasmine.objectContaining({
+    expect(service.addTask).toHaveBeenCalledWith(expect.objectContaining({
       date: '2026-03-24',
       title: 'Morning run',
       task_type: 'exercise',
@@ -64,19 +64,19 @@ describe('PlanTasksStepComponent', () => {
   });
 
   it('onTaskAdded should set task_type to general for non-exercise entries', () => {
-    spyOn(service, 'addTask');
+    vi.spyOn(service, 'addTask');
     const entry: AddedEntry = { label: 'Call dentist', type: 'appointment' };
     fixture.componentInstance.onTaskAdded('2026-03-25', entry);
-    expect(service.addTask).toHaveBeenCalledWith(jasmine.objectContaining({
+    expect(service.addTask).toHaveBeenCalledWith(expect.objectContaining({
       task_type: 'general',
     }));
   });
 
   it('onFloatingTaskAdded should call weekPlanService.addFloatingTask', () => {
-    spyOn(service, 'addFloatingTask');
+    vi.spyOn(service, 'addFloatingTask');
     const entry: AddedEntry = { label: 'Buy groceries', type: 'general' };
     fixture.componentInstance.onFloatingTaskAdded(entry);
-    expect(service.addFloatingTask).toHaveBeenCalledWith(jasmine.objectContaining({
+    expect(service.addFloatingTask).toHaveBeenCalledWith(expect.objectContaining({
       title: 'Buy groceries',
       energy: 'medium',
       task_type: 'general',
@@ -84,10 +84,10 @@ describe('PlanTasksStepComponent', () => {
   });
 
   it('onFloatingTaskAdded should set task_type to exercise for exercise entries', () => {
-    spyOn(service, 'addFloatingTask');
+    vi.spyOn(service, 'addFloatingTask');
     const entry: AddedEntry = { label: '30 min yoga', type: 'exercise', duration: 30 };
     fixture.componentInstance.onFloatingTaskAdded(entry);
-    expect(service.addFloatingTask).toHaveBeenCalledWith(jasmine.objectContaining({
+    expect(service.addFloatingTask).toHaveBeenCalledWith(expect.objectContaining({
       task_type: 'exercise',
       duration: 30,
     }));
@@ -102,7 +102,7 @@ describe('PlanTasksStepComponent', () => {
   });
 
   it('should call weekPlanService.removeFloatingTask when floating remove button is clicked', () => {
-    spyOn(service, 'removeFloatingTask');
+    vi.spyOn(service, 'removeFloatingTask');
     service.addFloatingTask({ title: 'Task to remove', energy: 'low', task_type: 'general' });
     fixture.detectChanges();
     const btn: HTMLElement = fixture.nativeElement.querySelector('.floating-remove');
@@ -118,7 +118,7 @@ describe('PlanTasksStepComponent', () => {
   });
 
   it('removeTask should remove the correct task by day-local index', () => {
-    spyOn(service, 'removeTask');
+    vi.spyOn(service, 'removeTask');
     service.addTask({ date: '2026-03-24', title: 'First', energy: 'low', task_type: 'general' });
     service.addTask({ date: '2026-03-24', title: 'Second', energy: 'high', task_type: 'general' });
     fixture.detectChanges();
@@ -128,7 +128,7 @@ describe('PlanTasksStepComponent', () => {
   });
 
   it('removeTask should resolve global index when tasks from other days precede', () => {
-    spyOn(service, 'removeTask');
+    vi.spyOn(service, 'removeTask');
     service.addTask({ date: '2026-03-24', title: 'Day1 Task', energy: 'low', task_type: 'general' });
     service.addTask({ date: '2026-03-25', title: 'Day2 Task', energy: 'medium', task_type: 'general' });
     fixture.detectChanges();

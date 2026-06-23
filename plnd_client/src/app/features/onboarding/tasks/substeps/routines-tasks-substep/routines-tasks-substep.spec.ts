@@ -1,3 +1,4 @@
+import { createSpyObj } from '../../../../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { signal, WritableSignal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
@@ -32,9 +33,7 @@ function makeTemplate(overrides: Partial<Routine> = {}): Routine {
 
 function makeTemplatesSvcMock(initialTemplates: Routine[] = []) {
   const templatesSignal: WritableSignal<Routine[] | null> = signal(initialTemplates);
-  const mock = jasmine.createSpyObj<RoutinesService>(
-    'RoutinesService',
-    ['load', 'create', 'delete', 'update', 'clear'],
+  const mock = createSpyObj<RoutinesService>(['load', 'create', 'delete', 'update', 'clear'],
     { routines: templatesSignal.asReadonly() }
   );
   return { mock, templatesSignal };
@@ -42,8 +41,8 @@ function makeTemplatesSvcMock(initialTemplates: Routine[] = []) {
 
 function makeStateMock() {
   return {
-    setRoutines: jasmine.createSpy('setRoutines'),
-    setUpcomingTaskNames: jasmine.createSpy('setUpcomingTaskNames'),
+    setRoutines: vi.fn(),
+    setUpcomingTaskNames: vi.fn(),
   };
 }
 
@@ -51,9 +50,9 @@ async function setup(initialTemplates: Routine[] = []) {
   const { mock: templatesSvcMock, templatesSignal } = makeTemplatesSvcMock(initialTemplates);
   const stateMock = makeStateMock();
 
-  templatesSvcMock.create.and.returnValue(of(makeTemplate()));
-  templatesSvcMock.delete.and.returnValue(of(undefined));
-  templatesSvcMock.update.and.returnValue(of(makeTemplate()));
+  templatesSvcMock.create.mockReturnValue(of(makeTemplate()));
+  templatesSvcMock.delete.mockReturnValue(of(undefined));
+  templatesSvcMock.update.mockReturnValue(of(makeTemplate()));
 
   await TestBed.configureTestingModule({
     imports: [RoutinesTasksSubstepComponent],
@@ -83,7 +82,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     fixture.detectChanges();
     const subtitles: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.section-subtitle');
     const texts = Array.from(subtitles).map(el => el.textContent ?? '');
-    expect(texts.some(t => t.includes('Things you do on a regular schedule'))).toBeTrue();
+    expect(texts.some(t => t.includes('Things you do on a regular schedule'))).toBe(true);
   });
 
   it('renders the Upcoming Tasks section subtitle', async () => {
@@ -91,7 +90,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     fixture.detectChanges();
     const subtitles: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.section-subtitle');
     const texts = Array.from(subtitles).map(el => el.textContent ?? '');
-    expect(texts.some(t => t.includes('One-off things to get done'))).toBeTrue();
+    expect(texts.some(t => t.includes('One-off things to get done'))).toBe(true);
   });
 
   // ── 2. Add button disabled when name input is empty ─────────────────────────
@@ -101,7 +100,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     fixture.detectChanges();
     const addBtns: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll('.add-btn');
     // First add button belongs to the routines section
-    expect(addBtns[0].disabled).toBeTrue();
+    expect(addBtns[0].disabled).toBe(true);
   });
 
   it('task Add button is disabled when task name is empty', async () => {
@@ -109,7 +108,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     fixture.detectChanges();
     const addBtns: NodeListOf<HTMLButtonElement> = fixture.nativeElement.querySelectorAll('.add-btn');
     // Second add button belongs to the tasks section
-    expect(addBtns[1].disabled).toBeTrue();
+    expect(addBtns[1].disabled).toBe(true);
   });
 
   // ── 3. Adding a routine via form calls create() and shows a chip ────────────
@@ -129,8 +128,8 @@ describe('RoutinesTasksSubstepComponent', () => {
     addBtns[0].click();
     fixture.detectChanges();
 
-    expect(templatesSvcMock.create).toHaveBeenCalledOnceWith(
-      jasmine.objectContaining({ title: 'Yoga', recurrence_rule: 'FREQ=DAILY' })
+    expect(templatesSvcMock.create).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'Yoga', recurrence_rule: 'FREQ=DAILY' })
     );
 
     const chips = fixture.nativeElement.querySelectorAll('.routine-chip');
@@ -173,7 +172,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     removeBtn.click();
     fixture.detectChanges();
 
-    expect(templatesSvcMock.delete).toHaveBeenCalledOnceWith('tmpl-99');
+    expect(templatesSvcMock.delete).toHaveBeenCalledExactlyOnceWith('tmpl-99');
 
     chips = fixture.nativeElement.querySelectorAll('.routine-chip');
     expect(chips.length).toBe(0);
@@ -231,7 +230,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     const { fixture, component, stateMock } = await setup();
     fixture.detectChanges();
 
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
 
     component.taskName = 'Walk the cat';
@@ -242,8 +241,8 @@ describe('RoutinesTasksSubstepComponent', () => {
     fixture.detectChanges();
 
     expect(stateMock.setRoutines).toHaveBeenCalledTimes(1);
-    expect(stateMock.setUpcomingTaskNames).toHaveBeenCalledWith(jasmine.arrayContaining(['Walk the cat']));
-    expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+    expect(stateMock.setUpcomingTaskNames).toHaveBeenCalledWith(expect.arrayContaining(['Walk the cat']));
+    expect(completeSpy).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   // ── 9. Save works with zero routines and zero tasks ─────────────────────────
@@ -252,7 +251,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     const { fixture, component, stateMock } = await setup();
     fixture.detectChanges();
 
-    const completeSpy = jasmine.createSpy('complete');
+    const completeSpy = vi.fn();
     component.complete.subscribe(completeSpy);
 
     component.save();
@@ -260,7 +259,7 @@ describe('RoutinesTasksSubstepComponent', () => {
 
     expect(stateMock.setRoutines).toHaveBeenCalledTimes(1);
     expect(stateMock.setUpcomingTaskNames).toHaveBeenCalledWith([]);
-    expect(completeSpy).toHaveBeenCalledOnceWith(undefined);
+    expect(completeSpy).toHaveBeenCalledExactlyOnceWith(undefined);
   });
 
   // ── 10. Day picker shows when "Weekly" recurrence is selected ───────────────
@@ -328,7 +327,7 @@ describe('RoutinesTasksSubstepComponent', () => {
     const existing = makeTemplate({ routine_id: 'tmpl-1', title: 'Morning walk', recurrence_rule: 'FREQ=DAILY' });
     const updated = makeTemplate({ routine_id: 'tmpl-1', title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' });
     const { fixture, component, templatesSvcMock } = await setup([existing]);
-    templatesSvcMock.update.and.returnValue(of(updated));
+    templatesSvcMock.update.mockReturnValue(of(updated));
     fixture.detectChanges();
 
     // Open edit, change title
@@ -343,9 +342,9 @@ describe('RoutinesTasksSubstepComponent', () => {
     saveBtn.click();
     fixture.detectChanges();
 
-    expect(templatesSvcMock.update).toHaveBeenCalledOnceWith(
+    expect(templatesSvcMock.update).toHaveBeenCalledExactlyOnceWith(
       'tmpl-1',
-      jasmine.objectContaining({ title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' })
+      expect.objectContaining({ title: 'Evening walk', recurrence_rule: 'FREQ=DAILY' })
     );
     expect(fixture.nativeElement.querySelector('.routine-edit-card')).toBeNull();
     const chipBodyEl: HTMLButtonElement = fixture.nativeElement.querySelector('.chip-body--clickable');
@@ -357,7 +356,7 @@ describe('RoutinesTasksSubstepComponent', () => {
   it('a failed save shows an error message and keeps the edit card open', async () => {
     const existing = makeTemplate();
     const { fixture, component, templatesSvcMock } = await setup([existing]);
-    templatesSvcMock.update.and.returnValue(throwError(() => new Error('network error')));
+    templatesSvcMock.update.mockReturnValue(throwError(() => new Error('network error')));
     fixture.detectChanges();
 
     component.openEdit(component.routines()[0]);

@@ -99,22 +99,10 @@ vm bash -c '
 '
 echo "  ✓ System packages installed"
 
-# ── Chromium (for Angular unit tests via karma-chrome-launcher) ───────────────
-echo "  → Installing Chromium..."
-vm bash -c '
-    set -euo pipefail
-    if command -v chromium &>/dev/null || command -v chromium-browser &>/dev/null; then
-        echo "Chromium already installed — skipping"
-        exit 0
-    fi
-    export DEBIAN_FRONTEND=noninteractive
-    # Install Chromium dependencies then the snap package.
-    # On Ubuntu 24.04, chromium-browser from apt is a snap transitional package;
-    # installing the snap directly is more reliable in OrbStack VMs.
-    sudo apt-get install -y -qq snapd
-    sudo snap install chromium
-'
-echo "  ✓ Chromium installed"
+# Note: a system Chromium snap was previously installed here for Angular unit
+# tests via karma-chrome-launcher. Unit tests now run on Vitest + jsdom (no
+# browser), and Playwright e2e uses its own bundled Chromium, so that install
+# was removed.
 
 # ── Playwright system dependencies (for Chromium headless in e2e tests) ──────
 # Pre-installing these avoids a ~14s apt-get run inside each CI e2e job.
@@ -260,11 +248,8 @@ HOOK
     grep -v "^ACTIONS_RUNNER_HOOK_JOB_\|^CHROMIUM_FLAGS\|^CHROME_BIN\|^PATH=" "$ENV_FILE" > "$ENV_FILE.tmp" && mv "$ENV_FILE.tmp" "$ENV_FILE" || true
     echo "ACTIONS_RUNNER_HOOK_JOB_STARTED=$HOME/actions-runner/_hooks/pre-job-cleanup.sh"  >> "$ENV_FILE"
     echo "ACTIONS_RUNNER_HOOK_JOB_COMPLETED=$HOME/actions-runner/_hooks/post-job-cleanup.sh" >> "$ENV_FILE"
-    # Chromium flags: --no-sandbox is required in VMs (no user namespace support).
-    # CHROME_BIN: karma-chrome-launcher looks for chromium-browser or google-chrome;
-    # snap installs chromium at /snap/bin/chromium, so we point to it explicitly.
-    echo "CHROMIUM_FLAGS=--no-sandbox" >> "$ENV_FILE"
-    echo "CHROME_BIN=/snap/bin/chromium" >> "$ENV_FILE"
+    # (CHROME_BIN/CHROMIUM_FLAGS were dropped with the Karma→Vitest migration; the
+    # grep above still strips any stale values left in an existing runner's .env.)
     # Include ~/.local/bin so tools installed there (e.g. junie from JetBrains/junie-github-action)
     # are found in subsequent steps. The runner .env file is read as key=value (not shell), so
     # $HOME is expanded here at setup time rather than job time.

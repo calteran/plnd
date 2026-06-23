@@ -20,7 +20,10 @@ export function formatDayName(isoDate: string): string {
   return parseDateOnly(isoDate).toLocaleDateString('en-US', { weekday: 'short' });
 }
 
-export const formatWeekDate = formatDayDate;
+/** "Jan 6" — alias of {@link formatDayDate} used by the planning week-range headers. */
+export function formatWeekDate(isoDate: string): string {
+  return formatDayDate(isoDate);
+}
 
 /** ISO date strings from start to end inclusive. */
 export function daysInRange(start: string, end: string): string[] {

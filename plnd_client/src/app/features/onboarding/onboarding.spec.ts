@@ -25,6 +25,6 @@ describe('OnboardingComponent (shell)', () => {
     const fixture = TestBed.createComponent(OnboardingComponent);
     const svc = fixture.debugElement.injector.get(OnboardingStateService);
     expect(svc).toBeTruthy();
-    expect(svc.allSectionsComplete()).toBeFalse();
+    expect(svc.allSectionsComplete()).toBe(false);
   });
 });

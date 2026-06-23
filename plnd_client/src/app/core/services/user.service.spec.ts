@@ -100,7 +100,7 @@ describe('UserService', () => {
     httpMock.expectOne(r => r.url.endsWith('/users/me/complete-onboarding') && r.method === 'POST')
       .flush(null, { status: 200, statusText: 'OK' });
 
-    expect(service.user()?.onboarding_completed).toBeTrue();
+    expect(service.user()?.onboarding_completed).toBe(true);
   });
 
   it('completeOnboarding() tap does not crash when user signal is null', () => {
@@ -113,7 +113,7 @@ describe('UserService', () => {
   });
 
   it('loadUser() handles HTTP error without crashing', () => {
-    spyOn(console, 'error');
+    vi.spyOn(console, 'error');
     service.loadUser();
     httpMock.expectOne(r => r.url.endsWith('/users/me'))
       .flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });

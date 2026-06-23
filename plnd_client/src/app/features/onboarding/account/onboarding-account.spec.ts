@@ -23,8 +23,8 @@ function makeUserServiceMock(displayName: string | null = 'Alice', email = 'alic
       created_at: '',
       updated_at: '',
     }).asReadonly(),
-    loadUser: jasmine.createSpy('loadUser'),
-    updateUser: jasmine.createSpy('updateUser').and.returnValue(of({})),
+    loadUser: vi.fn(),
+    updateUser: vi.fn().mockReturnValue(of({})),
   };
 }
 
@@ -42,14 +42,14 @@ function makePrefsServiceMock() {
       created_at: '',
       updated_at: '',
     }).asReadonly(),
-    loadPreferences: jasmine.createSpy('loadPreferences'),
-    patchPreferences: jasmine.createSpy('patchPreferences').and.returnValue(of({})),
+    loadPreferences: vi.fn(),
+    patchPreferences: vi.fn().mockReturnValue(of({})),
   };
 }
 
 function makeStateMock() {
   return {
-    markComplete: jasmine.createSpy('markComplete'),
+    markComplete: vi.fn(),
   };
 }
 
@@ -145,16 +145,16 @@ describe('OnboardingAccountComponent', () => {
   });
 
   it('onSave marks account complete and navigates on success', () => {
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     fixture.componentInstance.onSave();
     expect(stateMock.markComplete).toHaveBeenCalledWith('account');
     expect(router.navigate).toHaveBeenCalledWith(['/onboarding']);
   });
 
   it('onSave sets saveError on failure', () => {
-    prefsMock.patchPreferences.and.returnValue(throwError(() => new Error('fail')));
+    prefsMock.patchPreferences.mockReturnValue(throwError(() => new Error('fail')));
     fixture.componentInstance.onSave();
-    expect(fixture.componentInstance.saveError()).toBeTrue();
+    expect(fixture.componentInstance.saveError()).toBe(true);
   });
 
   describe('device-zone seeding', () => {
@@ -181,7 +181,7 @@ describe('OnboardingAccountComponent', () => {
     });
 
     it('does not POST to /timezone/device when save fails', () => {
-      prefsMock.patchPreferences.and.returnValue(throwError(() => new Error('fail')));
+      prefsMock.patchPreferences.mockReturnValue(throwError(() => new Error('fail')));
       fixture.componentInstance.onSave();
       const requests = httpMock.match('http://localhost:3000/timezone/device');
       expect(requests.length).toBe(0);

@@ -1,3 +1,4 @@
+import { createSpyObj } from '../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { AppComponent } from './app';
 import { provideRouter } from '@angular/router';
@@ -9,9 +10,9 @@ describe('AppComponent', () => {
 
   beforeEach(() => {
     localStorage.clear();
-    const mql = jasmine.createSpyObj('MediaQueryList', ['addEventListener', 'removeEventListener']);
+    const mql = createSpyObj(['addEventListener', 'removeEventListener']);
     mql.matches = false;
-    spyOn(window, 'matchMedia').and.returnValue(mql as unknown as MediaQueryList);
+    vi.spyOn(window, 'matchMedia').mockReturnValue(mql as unknown as MediaQueryList);
   });
 
   beforeEach(async () => {

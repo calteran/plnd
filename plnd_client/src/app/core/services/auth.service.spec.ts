@@ -1,3 +1,4 @@
+import { createSpyObj, type SpyObj } from '../../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
@@ -9,7 +10,7 @@ import { SessionStateService } from './session-state.service';
 const API_BASE = 'http://localhost:3000';
 
 function buildOAuthMock() {
-  return jasmine.createSpyObj('OAuthService', [
+  return createSpyObj([
     'configure',
     'loadDiscoveryDocumentAndLogin',
     'loadDiscoveryDocumentAndTryLogin',
@@ -21,7 +22,7 @@ function buildOAuthMock() {
 describe('AuthService', () => {
   let service: AuthService;
   let httpMock: HttpTestingController;
-  let mockOauthService: jasmine.SpyObj<OAuthService>;
+  let mockOauthService: SpyObj<OAuthService>;
 
   beforeEach(() => {
     localStorage.clear();
@@ -51,34 +52,34 @@ describe('AuthService', () => {
   });
 
   it('calls oauthService.configure() on construction with OIDC settings', () => {
-    expect(mockOauthService.configure).toHaveBeenCalledWith(jasmine.objectContaining({
-      issuer: jasmine.any(String),
-      clientId: jasmine.any(String),
+    expect(mockOauthService.configure).toHaveBeenCalledWith(expect.objectContaining({
+      issuer: expect.any(String),
+      clientId: expect.any(String),
       responseType: 'code',
     }));
   });
 
   it('passes strictDiscoveryDocumentValidation from config to oauthService.configure()', () => {
     // The dev environment sets strictDiscoveryDocumentValidation: false for the mock IdP.
-    expect(mockOauthService.configure).toHaveBeenCalledWith(jasmine.objectContaining({
+    expect(mockOauthService.configure).toHaveBeenCalledWith(expect.objectContaining({
       strictDiscoveryDocumentValidation: false,
     }));
   });
 
   it('should not be authenticated initially', () => {
-    expect(service.isAuthenticated()).toBeFalse();
+    expect(service.isAuthenticated()).toBe(false);
   });
 
   it('should be authenticated after handleCallback', () => {
     service.handleCallback('test-jwt-token');
-    expect(service.isAuthenticated()).toBeTrue();
+    expect(service.isAuthenticated()).toBe(true);
     expect(service.getToken()).toBe('test-jwt-token');
   });
 
   it('should clear token after logout', () => {
     service.handleCallback('test-jwt-token');
     service.logout();
-    expect(service.isAuthenticated()).toBeFalse();
+    expect(service.isAuthenticated()).toBe(false);
     expect(service.getToken()).toBeNull();
   });
 
@@ -92,7 +93,7 @@ describe('AuthService', () => {
   });
 
   it('exchangeToken() POSTs id_token to /auth/token and returns access_token', () => {
-    mockOauthService.getIdToken.and.returnValue('id-token-value');
+    mockOauthService.getIdToken.mockReturnValue('id-token-value');
 
     let result: string | undefined;
     service.exchangeToken().subscribe(token => (result = token));
@@ -122,14 +123,14 @@ describe('AuthService', () => {
 
   it('logout() calls clearAll() on SessionStateService', () => {
     const sessionState = TestBed.inject(SessionStateService);
-    spyOn(sessionState, 'clearAll');
+    vi.spyOn(sessionState, 'clearAll');
     service.logout();
     expect(sessionState.clearAll).toHaveBeenCalled();
   });
 
   it('logout() with a reason navigates to /login with that reason as a query param', () => {
     const router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     service.logout('session_expired');
     expect(router.navigate).toHaveBeenCalledWith(
       ['/login'], { queryParams: { reason: 'session_expired' } }
@@ -138,7 +139,7 @@ describe('AuthService', () => {
 
   it('logout() without a reason navigates to /login without query params', () => {
     const router = TestBed.inject(Router);
-    spyOn(router, 'navigate');
+    vi.spyOn(router, 'navigate');
     service.logout();
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {});
   });
@@ -162,7 +163,7 @@ describe('AuthService', () => {
 
     it('should be authenticated on construction', () => {
       const svc = TestBed.inject(AuthService);
-      expect(svc.isAuthenticated()).toBeTrue();
+      expect(svc.isAuthenticated()).toBe(true);
       expect(svc.getToken()).toBe('pre-existing-token');
     });
   });

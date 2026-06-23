@@ -1,7 +1,8 @@
+import { type Mock } from '../../../../../testing/spy';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting, HttpTestingController } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { signal } from '@angular/core';
 import { of } from 'rxjs';
 import { PlanConfirmStepComponent } from './plan-confirm-step';
@@ -30,11 +31,11 @@ describe('PlanConfirmStepComponent', () => {
         {
           provide: DayTypesMealsService,
           useValue: {
-            load: jasmine.createSpy('load'),
+            load: vi.fn(),
             allEntries: signal<MealPatternEntry[]>(PATTERN_FIXTURE).asReadonly(),
             loaded: signal(true).asReadonly(),
-            mealsForDate: jasmine.createSpy('mealsForDate').and.callFake(() => PATTERN_FIXTURE),
-            clear: jasmine.createSpy('clear'),
+            mealsForDate: vi.fn().mockImplementation(() => PATTERN_FIXTURE),
+            clear: vi.fn(),
           },
         },
       ],
@@ -61,9 +62,12 @@ describe('PlanConfirmStepComponent', () => {
   });
 
   it('should call commitPlan on finish click', () => {
-    spyOn(service, 'commitPlan').and.returnValue(
+    vi.spyOn(service, 'commitPlan').mockReturnValue(
       of({ committed: 0, planning_task_status: 'completed' })
     );
+    // On success the component navigates to /day/<start>; stub it so the real
+    // (route-less) router doesn't reject asynchronously after the test ends.
+    vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     fixture.detectChanges();
     const btn = fixture.nativeElement.querySelector('.btn-finish');
     btn.click();
@@ -121,9 +125,9 @@ describe('PlanConfirmStepComponent', () => {
   });
 
   it('should accumulate totalSlots per day when day types have different slot counts', () => {
-    const dtSvc = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: jasmine.Spy };
+    const dtSvc = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: Mock };
     // Mon–Fri get 3 slots; Sat/Sun get only 1 slot (dinner)
-    dtSvc.mealsForDate.and.callFake((date: string) => {
+    dtSvc.mealsForDate.mockImplementation((date: string) => {
       const dow = new Date(`${date}T12:00:00`).getDay();
       return (dow === 0 || dow === 6) ? [PATTERN_FIXTURE[2]] : PATTERN_FIXTURE;
     });

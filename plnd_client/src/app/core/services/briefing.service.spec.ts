@@ -1,3 +1,4 @@
+import { type Mock } from '../../../testing/spy';
 import { TestBed } from '@angular/core/testing';
 import {
   HttpTestingController,
@@ -26,7 +27,7 @@ describe('BriefingService', () => {
     service = TestBed.inject(BriefingService);
     httpMock = TestBed.inject(HttpTestingController);
 
-    spyOn(navigator.geolocation, 'getCurrentPosition').and.callFake(
+    vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
       (success: PositionCallback) => {
         success({
           coords: {
@@ -148,7 +149,7 @@ describe('BriefingService', () => {
   });
 
   it('sets weatherError and newsError when geolocation is denied', () => {
-    (navigator.geolocation.getCurrentPosition as jasmine.Spy).and.callFake(
+    (navigator.geolocation.getCurrentPosition as Mock).mockImplementation(
       (_success: PositionCallback, error?: PositionErrorCallback) => {
         error?.({
           code: 1, message: 'Permission denied',

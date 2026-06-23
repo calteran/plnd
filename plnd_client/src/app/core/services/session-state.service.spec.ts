@@ -26,49 +26,49 @@ describe('SessionStateService', () => {
 
   it('clearAll() calls clearUser() on UserService', () => {
     const userService = TestBed.inject(UserService);
-    spyOn(userService, 'clearUser');
+    vi.spyOn(userService, 'clearUser');
     service.clearAll();
     expect(userService.clearUser).toHaveBeenCalled();
   });
 
   it('clearAll() calls clearPreferences() on PreferencesService', () => {
     const prefsService = TestBed.inject(PreferencesService);
-    spyOn(prefsService, 'clearPreferences');
+    vi.spyOn(prefsService, 'clearPreferences');
     service.clearAll();
     expect(prefsService.clearPreferences).toHaveBeenCalled();
   });
 
   it('clearAll() calls clear() on DietaryRestrictionsService', () => {
     const dietaryService = TestBed.inject(DietaryRestrictionsService);
-    spyOn(dietaryService, 'clear');
+    vi.spyOn(dietaryService, 'clear');
     service.clearAll();
     expect(dietaryService.clear).toHaveBeenCalled();
   });
 
   it('clearAll() calls clear() on UserDishesService', () => {
     const userDishesService = TestBed.inject(UserDishesService);
-    spyOn(userDishesService, 'clear');
+    vi.spyOn(userDishesService, 'clear');
     service.clearAll();
     expect(userDishesService.clear).toHaveBeenCalled();
   });
 
   it('clearAll() calls clear() on UserMealsService', () => {
     const userMealsService = TestBed.inject(UserMealsService);
-    spyOn(userMealsService, 'clear');
+    vi.spyOn(userMealsService, 'clear');
     service.clearAll();
     expect(userMealsService.clear).toHaveBeenCalled();
   });
 
   it('clearAll() calls clear() on UserIngredientPrefsService', () => {
     const userIngredientPrefsService = TestBed.inject(UserIngredientPrefsService);
-    spyOn(userIngredientPrefsService, 'clear');
+    vi.spyOn(userIngredientPrefsService, 'clear');
     service.clearAll();
     expect(userIngredientPrefsService.clear).toHaveBeenCalled();
   });
 
   it('clearAll() calls clear() on WeekPlanService', () => {
     const weekPlanService = TestBed.inject(WeekPlanService);
-    spyOn(weekPlanService, 'clear');
+    vi.spyOn(weekPlanService, 'clear');
     service.clearAll();
     expect(weekPlanService.clear).toHaveBeenCalled();
   });
