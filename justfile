@@ -69,7 +69,7 @@ dev:
     doppler run -- docker compose up -d --wait --wait-timeout 120
     echo "→ Infrastructure healthy."
     echo "→ Installing client dependencies (npm ci)..."
-    cd plnd_client && npm ci && cd ..
+    just install-deps
     echo "→ Starting API and client (API auto-reloads on Rust changes)..."
     mprocs
 
