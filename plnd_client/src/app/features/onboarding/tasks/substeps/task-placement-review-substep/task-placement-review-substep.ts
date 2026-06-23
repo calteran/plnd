@@ -950,9 +950,6 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       const fromIdx = list.indexOf(droppedEntry);
       if (fromIdx === -1) return list;
 
-      const prevSlotKey = entrySlotKey(droppedEntry);
-      const prevDate = droppedEntry.scheduled_date;
-
       // Build the fully updated entry in one step (atomic: date + slot)
       const updatedEntry: PlaceTasksEntry = {
         ...droppedEntry,
@@ -969,29 +966,20 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       const updated = [...list];
       updated.splice(fromIdx, 1);
 
-      if (prevDate === targetDate && prevSlotKey === targetSlotKey) {
-        // Pure same-slot reorder: insert at the CDK-computed index within the slot
-        // Find the insertion offset among entries in this slot
-        const slotEntries = updated
-          .map((e, i) => ({ e, i }))
-          .filter(({ e }) => e.scheduled_date === targetDate && entrySlotKey(e) === targetSlotKey);
+      // Insert at the CDK-computed index within the target slot. This handles
+      // same-slot reorder AND cross-slot/cross-day moves identically, so a task
+      // can be dropped into a specific position even when changing slot/day
+      // (consistent with WeekPlanService.updateTaskSlot, which also honours
+      // currentIndex).
+      const slotEntries = updated
+        .map((e, i) => ({ e, i }))
+        .filter(({ e }) => e.scheduled_date === targetDate && entrySlotKey(e) === targetSlotKey);
 
-        const insertAtSlotIdx = Math.min(event.currentIndex, slotEntries.length);
-        const insertAtListIdx = insertAtSlotIdx < slotEntries.length
-          ? slotEntries[insertAtSlotIdx].i
-          : (slotEntries.length > 0 ? slotEntries[slotEntries.length - 1].i + 1 : updated.length);
-        updated.splice(insertAtListIdx, 0, updatedEntry);
-      } else {
-        // Cross-slot or cross-day: append to the end of the target slot's entries
-        const slotEntries = updated
-          .map((e, i) => ({ e, i }))
-          .filter(({ e }) => e.scheduled_date === targetDate && entrySlotKey(e) === targetSlotKey);
-
-        const insertAtListIdx = slotEntries.length > 0
-          ? slotEntries[slotEntries.length - 1].i + 1
-          : updated.length;
-        updated.splice(insertAtListIdx, 0, updatedEntry);
-      }
+      const insertAtSlotIdx = Math.min(event.currentIndex, slotEntries.length);
+      const insertAtListIdx = insertAtSlotIdx < slotEntries.length
+        ? slotEntries[insertAtSlotIdx].i
+        : (slotEntries.length > 0 ? slotEntries[slotEntries.length - 1].i + 1 : updated.length);
+      updated.splice(insertAtListIdx, 0, updatedEntry);
 
       return updated;
     });

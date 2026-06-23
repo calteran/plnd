@@ -238,8 +238,12 @@ export class DayViewComponent implements OnInit, OnDestroy {
     return this.mealAnchorMap().get(mealId);
   }
 
-  /** IDs of all CDK drop lists: one per slot and one per meal's during-meal list. */
-  allDropListIds(): string[] {
+  /**
+   * IDs of all CDK drop lists: one per slot and one per meal's during-meal list.
+   * A `computed` so the template's repeated `allDropListIds()` calls per change
+   * detection memoize against `slotGroups()` (matches `PlanDayCardComponent`).
+   */
+  readonly allDropListIds = computed(() => {
     const ids: string[] = [];
     for (const g of this.scheduleService.slotGroups()) {
       ids.push(`slot-${g.anchorLabel}`);
@@ -248,7 +252,7 @@ export class DayViewComponent implements OnInit, OnDestroy {
       }
     }
     return ids;
-  }
+  });
 
   /**
    * Spotlight rule: a row dims (and goes inert) while *another* row is being
@@ -453,6 +457,13 @@ export class DayViewComponent implements OnInit, OnDestroy {
       .repositionTask(entryId, this.scheduleService.date(), target, position)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
+        next: () => {
+          // Re-sync ScheduleService signals with the persisted order. Without
+          // this, only the local DayViewComponent maps reflect the move; a
+          // later service update (e.g. a task toggle) would rebuild those maps
+          // from the still-stale `slotGroups()` snapshot and revert the drag.
+          this.scheduleService.loadDay(this.scheduleService.date());
+        },
         error: () => {
           // Roll back the optimistic move by re-fetching authoritative state.
           this.scheduleService.loadDay(this.scheduleService.date());
