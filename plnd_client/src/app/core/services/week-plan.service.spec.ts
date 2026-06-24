@@ -635,6 +635,21 @@ describe('WeekPlanService', () => {
       expect(dinner.map(t => t.title)).toEqual(['c']); // untouched
     });
 
+    it('reorderWithinSlot groups drifted-casing tasks into one slice (case-insensitive)', () => {
+      // Production meal names are Capitalized ('Lunch'); the place_tasks agent echoes the
+      // anchor label but its casing is unenforced, so one task may drift to 'lunch'. Both
+      // belong to the same logical slot and must reorder together (#1005).
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'a', energy: 'low', paired_meal_name: 'Lunch' });
+      service.addTask({ date: '2026-06-22', title: 'b', energy: 'low', paired_meal_name: 'lunch' });
+
+      // Drop key comes from the rendered (canonical) meal slot: 'Lunch'.
+      service.reorderTask('2026-06-22', 'Lunch', 1, 0);
+
+      const lunch = service.scheduledTasks().filter(t => t.paired_meal_name?.toLowerCase() === 'lunch');
+      expect(lunch.map(t => t.title)).toEqual(['b', 'a']);
+    });
+
     it('moveTaskToDay updates date on the matched task only', () => {
       service.initSession('2026-06-22', '2026-06-23');
       service.addTask({ date: '2026-06-22', title: 'Walk', energy: 'low' });
@@ -679,6 +694,26 @@ describe('WeekPlanService', () => {
       expect(updated.after_anchor).toBeUndefined();
     });
 
+    it('updateTaskSlot stores the target slot raw but matches the slice case-insensitively', () => {
+      // The Lunch slice already holds two drifted-casing tasks ('lunch' and 'Lunch').
+      // Inserting the mover at index 1 must land BETWEEN them — which only works if the
+      // slice is gathered case-insensitively against the canonical drop key 'Lunch'. With a
+      // raw match only 'Lunch' would be in the slice and the mover would land at the end.
+      // The stored paired_meal_name must keep the canonical display casing 'Lunch' (#1005).
+      service.initSession('2026-06-22', '2026-06-22');
+      service.addTask({ date: '2026-06-22', title: 'x', energy: 'low', paired_meal_name: 'lunch' });
+      service.addTask({ date: '2026-06-22', title: 'y', energy: 'low', paired_meal_name: 'Lunch' });
+      service.addTask({ date: '2026-06-22', title: 'mover', energy: 'low', after_anchor: 'morning' });
+
+      const mover = service.scheduledTasks().find(t => t.title === 'mover')!;
+      service.updateTaskSlot(mover, '2026-06-22', 'Lunch', 1);
+
+      const updated = service.scheduledTasks().find(t => t.title === 'mover')!;
+      expect(updated.paired_meal_name).toBe('Lunch'); // stored raw, not lowercased
+      const lunchSlice = service.scheduledTasks().filter(t => t.paired_meal_name?.toLowerCase() === 'lunch');
+      expect(lunchSlice.map(t => t.title)).toEqual(['x', 'mover', 'y']); // inserted between the drifted tasks
+    });
+
     it('updateTaskSlot clears paired_meal_name when moving to <sched>', () => {
       service.initSession('2026-06-22', '2026-06-22');
       service.addTask({ date: '2026-06-22', title: 'Gym', energy: 'high', paired_meal_name: 'lunch' });
@@ -704,6 +739,21 @@ describe('WeekPlanService', () => {
       expect(lunch.map((e: PlanEntryRequest) => e.slot_position)).toEqual([0, 1]);
       const dinner = req.entries.filter((e: PlanEntryRequest) => e.after_anchor === 'dinner');
       expect(dinner.map((e: PlanEntryRequest) => e.slot_position)).toEqual([0]);
+    });
+
+    it('coalesces drifted-casing slots into one slot_position group while keeping emitted anchors raw', () => {
+      // Two tasks in the same logical slot whose anchor casing drifted ('Lunch' vs 'lunch').
+      // They must share one contiguous slot_position sequence ([0, 1]) — not collide at 0 —
+      // yet the emitted after_anchor must preserve each task's original display casing (#1005).
+      service.addTask({ date: '2026-06-22', title: 'a', energy: 'low', after_anchor: 'Lunch' });
+      service.addTask({ date: '2026-06-22', title: 'b', energy: 'low', after_anchor: 'lunch' });
+
+      const req = (service as unknown as { buildCommitRequest(id: string, r: boolean): PostSchedulePlanRequest }).buildCommitRequest('task-1', false);
+      const a = req.entries.find((e: PlanEntryRequest) => e.title === 'a')!;
+      const b = req.entries.find((e: PlanEntryRequest) => e.title === 'b')!;
+      expect([a.slot_position, b.slot_position]).toEqual([0, 1]);
+      expect(a.after_anchor).toBe('Lunch'); // emitted raw
+      expect(b.after_anchor).toBe('lunch'); // emitted raw
     });
 
     it('sends null scheduled_start and no after_anchor for paired tasks', () => {

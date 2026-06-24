@@ -13,13 +13,15 @@ import { TaskType } from '../models/routine';
 import { DayTypesMealsService } from './day-types-meals.service';
 import { preferredTimeHHMM } from '../models/meal-pattern';
 import { addDaysDateOnly } from '../utils/date-only';
+import { UNANCHORED_SLOT, slotKeysMatch, slotMatchKey } from '../utils/slot-key';
 
 interface WeeklyPlanTaskResponse { task_id: string; }
 
 /**
  * Pure helper: reorders a task within the (date, slotKey) slice of `all`.
  * Tasks not in the target slice are untouched.
- * `slotKey` = `paired_meal_name ?? after_anchor ?? '<sched>'`
+ * `slotKey` = `paired_meal_name ?? after_anchor ?? '<sched>'`, matched
+ * case-insensitively (see `slotKeysMatch`).
  */
 export function reorderWithinSlot(
   all: PlannedTask[],
@@ -28,12 +30,9 @@ export function reorderWithinSlot(
   fromIndex: number,
   toIndex: number,
 ): PlannedTask[] {
-  const taskSlotKey = (t: PlannedTask): string =>
-    t.paired_meal_name ?? t.after_anchor ?? '<sched>';
-
   const sliceIndices: number[] = [];
   all.forEach((t, i) => {
-    if (t.date === date && taskSlotKey(t) === slotKey) sliceIndices.push(i);
+    if (t.date === date && slotKeysMatch(t, slotKey)) sliceIndices.push(i);
   });
 
   if (fromIndex < 0 || fromIndex >= sliceIndices.length) return all;
@@ -425,20 +424,19 @@ export class WeekPlanService {
 
       // Patch the task: always clear both slot fields, then set only the correct one.
       // '<sched>' → neither field set; named slot → paired_meal_name (wizard slots are meal names).
+      // `paired_meal_name` keeps the drop key's display casing (raw); only the slice
+      // comparison below is case-folded.
       const patched: PlannedTask = {
         ...task,
         date: newDate,
         after_anchor: undefined,
-        paired_meal_name: slotKey !== '<sched>' ? slotKey : undefined,
+        paired_meal_name: slotKey !== UNANCHORED_SLOT ? slotKey : undefined,
       };
 
-      // Find the index to insert at within the new (date, slotKey) slice
-      const slotKeyFn = (t: PlannedTask): string =>
-        t.paired_meal_name ?? t.after_anchor ?? '<sched>';
-
+      // Find the index to insert at within the new (date, slotKey) slice (case-insensitive).
       const sliceIndices: number[] = [];
       without.forEach((t, i) => {
-        if (t.date === newDate && slotKeyFn(t) === slotKey) sliceIndices.push(i);
+        if (t.date === newDate && slotKeysMatch(t, slotKey)) sliceIndices.push(i);
       });
 
       // Clamp toIndex
@@ -529,7 +527,9 @@ export class WeekPlanService {
     const posByGroup = new Map<string, number>();
     for (const task of tasks) {
       const type = (task.task_type as string) === 'custom' ? 'general' : (task.task_type ?? 'general');
-      const slotKey = `${task.date}::${task.paired_meal_name ?? task.after_anchor ?? '<sched>'}`;
+      // Group case-insensitively so drifted-casing entries coalesce into one
+      // slot_position sequence; the emitted after_anchor/paired_meal_name stay raw below.
+      const slotKey = `${task.date}::${slotMatchKey(task)}`;
       const pos = posByGroup.get(slotKey) ?? 0;
       posByGroup.set(slotKey, pos + 1);
       entries.push({
