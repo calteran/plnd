@@ -200,9 +200,15 @@ export function onboardingDropListId(date: string, slotKey: string): string {
   return `onboarding-slot-${date}-${slotKey}`;
 }
 
-/** Derive the slot key for an entry. Mirrors toPlanEntries slotKey derivation. */
+/**
+ * Derive the canonical slot key for an entry. Meal section keys are lowercased
+ * meal-pattern names, but the place_tasks agent echoes anchor labels in the
+ * stored meal-name casing (e.g. "Breakfast" from the default day type), so the
+ * key MUST be lowercased to match — otherwise every meal task falls through to
+ * the '<sched>' section. Mirrors bucketOf's `after_anchor.toLowerCase()`.
+ */
 function entrySlotKey(entry: PlaceTasksEntry): string {
-  return entry.paired_meal_name ?? entry.after_anchor ?? '<sched>';
+  return (entry.paired_meal_name ?? entry.after_anchor ?? '<sched>').toLowerCase();
 }
 
 /**
@@ -211,7 +217,7 @@ function entrySlotKey(entry: PlaceTasksEntry): string {
  * section; tasks are placed into the section whose slotKey matches the task's
  * entrySlotKey. Unmatched tasks fall into the '<sched>' section.
  */
-function buildDaySections(
+export function buildDaySections(
   date: string,
   entries: PlaceTasksEntry[],
   pattern: MealPatternEntry[],
@@ -995,7 +1001,10 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   toPlanEntries(): PlanEntryRequest[] {
     const posByGroup = new Map<string, number>();
     return this.entries().map(entry => {
-      const slotKey = `${entry.scheduled_date}::${entry.paired_meal_name ?? entry.after_anchor ?? '<sched>'}`;
+      // Group for slot_position by the canonical (lowercased) slot key so LLM
+      // anchors ("Breakfast") and drag-assigned keys ("breakfast") coalesce.
+      // The emitted after_anchor/paired_meal_name fields below stay raw.
+      const slotKey = `${entry.scheduled_date}::${entrySlotKey(entry)}`;
       const pos = posByGroup.get(slotKey) ?? 0;
       posByGroup.set(slotKey, pos + 1);
       return {

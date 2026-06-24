@@ -10,6 +10,7 @@ import {
   TaskPlacementReviewSubstepComponent,
   bucketOf,
   buildDayCards,
+  buildDaySections,
 } from './task-placement-review-substep';
 import { MealPatternEntry } from '../../../../../core/models/meal-pattern';
 import { OnboardingStateService } from '../../../onboarding-state.service';
@@ -865,6 +866,77 @@ describe('buildDayCards start-of-day rendering', () => {
     expect(rows.every(r => r.kind === 'task')).toBe(true);
     // The start-of-day task is included.
     expect(rows.find(r => r.kind === 'task' && r.entry.title === 'Walk')).toBeDefined();
+  });
+});
+
+describe('buildDaySections anchor matching', () => {
+  function meal(name: string, sortOrder: number): MealPatternEntry {
+    return {
+      id: `m-${sortOrder}`,
+      day_type_id: 'd-1',
+      user_id: 'u-1' as unknown as MealPatternEntry['user_id'],
+      name,
+      preferred_time: '08:00:00',
+      tolerance_minutes: 30,
+      sort_order: sortOrder,
+      created_at: '2026-04-01T00:00:00Z',
+      updated_at: '2026-04-01T00:00:00Z',
+    } as MealPatternEntry;
+  }
+
+  function entry(overrides: Partial<PlaceTasksEntry>): PlaceTasksEntry {
+    return {
+      title: 'task',
+      scheduled_date: '2026-04-28',
+      duration_minutes: 30,
+      energy_required: 'low',
+      task_type: 'general',
+      ...overrides,
+    };
+  }
+
+  function sectionFor(sections: ReturnType<typeof buildDaySections>, slotKey: string) {
+    return sections.find(s => s.slotKey === slotKey);
+  }
+
+  // Default onboarding meal names are Capitalized ('Breakfast'/'Lunch'/'Dinner'),
+  // and the place_tasks agent echoes that casing verbatim into `after_anchor`
+  // (per place_tasks.md: "exactly as it appears in [Anchors]"). The matcher must
+  // be case-insensitive or every meal task falls through to the unanchored
+  // '<sched>' section, which renders above the first divider (the "pre-breakfast"
+  // slot). Regression guard for the case-sensitivity bug introduced in #991.
+  it('places a capitalized after_anchor task in its meal section, not <sched>', () => {
+    const pattern = [meal('Breakfast', 1), meal('Lunch', 2), meal('Dinner', 3)];
+    const entries = [entry({ title: 'Meds', after_anchor: 'Breakfast' })];
+
+    const sections = buildDaySections('2026-04-28', entries, pattern);
+
+    expect(sectionFor(sections, 'breakfast')?.taskRows.map(r => r.entry.title)).toEqual(['Meds']);
+    expect(sectionFor(sections, '<sched>')?.taskRows).toEqual([]);
+  });
+
+  it('matches anchor casing that differs from the stored meal name', () => {
+    const pattern = [meal('Breakfast', 1), meal('Lunch', 2), meal('Dinner', 3)];
+    const entries = [
+      entry({ title: 'Walk', after_anchor: 'lunch' }),   // lowercase anchor, Capitalized meal
+      entry({ title: 'Read', after_anchor: 'DINNER' }),  // uppercase anchor, Capitalized meal
+    ];
+
+    const sections = buildDaySections('2026-04-28', entries, pattern);
+
+    expect(sectionFor(sections, 'lunch')?.taskRows.map(r => r.entry.title)).toEqual(['Walk']);
+    expect(sectionFor(sections, 'dinner')?.taskRows.map(r => r.entry.title)).toEqual(['Read']);
+    expect(sectionFor(sections, '<sched>')?.taskRows).toEqual([]);
+  });
+
+  it('keeps genuinely unanchored / fixed-time tasks in the <sched> section', () => {
+    const pattern = [meal('Breakfast', 1)];
+    const entries = [entry({ title: 'Call', time_window_start: '14:00' })];
+
+    const sections = buildDaySections('2026-04-28', entries, pattern);
+
+    expect(sectionFor(sections, '<sched>')?.taskRows.map(r => r.entry.title)).toEqual(['Call']);
+    expect(sectionFor(sections, 'breakfast')?.taskRows).toEqual([]);
   });
 });
 
