@@ -979,13 +979,19 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
    * that slot, mutating the `entries` signal atomically (single splice pair so
    * no duplicate entry can appear). Shared by drag-drop (`onDrop`) and the
    * keyboard handlers (`onMove`/`onDayJump`) so both paths reorder identically.
+   *
+   * Returns the new global index of the inserted entry in `entries()` so
+   * keyboard handlers can refocus the exact moved row without a title search
+   * (title is not unique — a user can have two tasks with the same name).
+   * Returns -1 if the entry was not found (no-op).
    */
   private applyMove(
     droppedEntry: PlaceTasksEntry,
     targetDate: string,
     targetSlotKey: string,
     index: number,
-  ): void {
+  ): number {
+    let insertedListIdx = -1;
     this.entries.update(list => {
       // Find the dropped entry's current index by reference identity
       const fromIdx = list.indexOf(droppedEntry);
@@ -1017,13 +1023,17 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
         .filter(({ e }) => e.scheduled_date === targetDate && entrySlotKey(e) === targetSlotKey);
 
       const insertAtSlotIdx = Math.min(index, slotEntries.length);
-      const insertAtListIdx = insertAtSlotIdx < slotEntries.length
+      const computedListIdx = insertAtSlotIdx < slotEntries.length
         ? slotEntries[insertAtSlotIdx].i
         : (slotEntries.length > 0 ? slotEntries[slotEntries.length - 1].i + 1 : updated.length);
-      updated.splice(insertAtListIdx, 0, updatedEntry);
+      updated.splice(computedListIdx, 0, updatedEntry);
+
+      // Capture for the caller — the global index of the newly inserted entry.
+      insertedListIdx = computedListIdx;
 
       return updated;
     });
+    return insertedListIdx;
   }
 
   // ── Keyboard reorder + cross-day jump ───────────────────────────────────────
@@ -1077,7 +1087,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
 
     // Capture sourceLabel BEFORE applyMove mutates entries (entry ref is stale after).
     const sourceLabel = this.slotLabelFor(date, entry);
-    this.applyMove(entry, date, result.slotKey, result.index);
+    const newEntryIndex = this.applyMove(entry, date, result.slotKey, result.index);
     // Derive targetLabel from the MoveResult (after applyMove so daySections() is
     // up-to-date), NOT from the old entry object whose slot fields still reflect the
     // pre-move state. Using the stale entry would yield undefined for into-meal crossings.
@@ -1090,7 +1100,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       sourceLabel,
     }), 'polite');
 
-    this.refocusReorderButton(entry, dir);
+    this.refocusReorderButton(newEntryIndex, dir);
   }
 
   /** Move a task to the previous/next day, into the same slot if present else unanchored. */
@@ -1104,7 +1114,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     // Append at the end of the resolved slot on the target day.
     const targetLen = this.dayLayoutFor(targetDate).find(s => s.slotKey === targetSlot)?.taskIds.length ?? 0;
 
-    this.applyMove(entry, targetDate, targetSlot, targetLen);
+    const newEntryIndex = this.applyMove(entry, targetDate, targetSlot, targetLen);
 
     // Derive the label directly from the resolved targetSlot key (not from the stale
     // entry object) so the announcer never emits "undefined".
@@ -1117,7 +1127,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       targetLabel,
     }), 'polite');
 
-    this.refocusReorderButton(entry, delta === 1 ? 'down' : 'up');
+    this.refocusReorderButton(newEntryIndex, delta === 1 ? 'down' : 'up');
   }
 
   /** Human-readable label for an entry's current slot ('unanchored' for <sched>). */
@@ -1155,15 +1165,16 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
    * direction button; if it is disabled at a boundary, fall back to its sibling,
    * else leave focus on the edit button. Defer with setTimeout(0) so Angular has
    * updated the `[disabled]` bindings before we read them.
+   *
+   * `newEntryIndex` is the global index returned by `applyMove` — the ACTUAL
+   * position of the moved entry in `entries()` after the move. Using the index
+   * directly (rather than searching by title) is robust when two tasks share the
+   * same title.
    */
-  private refocusReorderButton(entry: PlaceTasksEntry, dir: 'up' | 'down'): void {
+  private refocusReorderButton(newEntryIndex: number, dir: 'up' | 'down'): void {
     setTimeout(() => {
-      // `applyMove` creates a new entry object via spread, so the original `entry`
-      // reference is no longer in the list. Find the moved entry by title (assumed
-      // unique within a plan) so cross-slot and cross-day moves also resolve.
-      const newIdx = this.entries().findIndex(e => e.title === entry.title);
-      if (newIdx === -1) return;
-      const row = document.getElementById(this.rowDomId(newIdx));
+      if (newEntryIndex === -1) return;
+      const row = document.getElementById(this.rowDomId(newEntryIndex));
       if (!row) return;
 
       // Reveal the controls: focus an always-visible element to set :focus-within.

@@ -844,6 +844,52 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(announced).toMatch(/moved into/i);
   }));
 
+  // ── Keyboard reorder: duplicate-title focus fix ──────────────────────────────
+
+  it('keyboard move focuses the CORRECT row when two tasks share the same title', fakeAsync(() => {
+    // Arrange: two tasks with the IDENTICAL title in the same slot on the same date.
+    // Moving the SECOND one UP (index 1 → becomes index 0 after swap) must focus
+    // the moved row (now at entryIndex=0), NOT the other same-titled row.
+    const { component, httpController, fixture } = setup(['Duplicate', 'Duplicate'], PLAN_PERIOD, []);
+    fixture.detectChanges();
+
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([
+      { title: 'Duplicate', scheduled_date: '2026-04-28', time_window_start: '09:00',
+        task_type: 'general', duration_minutes: 15, energy_required: 'low' },
+      { title: 'Duplicate', scheduled_date: '2026-04-28', time_window_start: '10:00',
+        task_type: 'general', duration_minutes: 15, energy_required: 'low' },
+    ] as PlaceTasksEntry[]);
+    fixture.detectChanges();
+
+    // Both rows have the same title; they both sit in the <sched> slot on Apr 28.
+    // ↑ buttons are rendered for ALL rows (disabled at boundary). The FIRST row
+    // (09:00, entryIndex=0) has canUp=false; the SECOND (10:00, entryIndex=1) has
+    // canUp=true. We want the ENABLED ↑ button — at index 1 in the full upBtns list.
+    const upBtns = fixture.debugElement.queryAll(By.css('[data-testid="reorder-up"]'));
+    expect(upBtns.length).toBeGreaterThanOrEqual(2);
+
+    // upBtns[1] is the second row's ↑ button (enabled). After the move, 10:00 goes
+    // to global index 0 in entries() and is rendered in the first task row.
+    upBtns[1].nativeElement.click();
+    fixture.detectChanges();
+
+    // Flush the setTimeout(0) that refocusReorderButton uses.
+    tick(0);
+
+    // The moved entry (10:00) is now at global index 0 in entries().
+    expect(component.entries()[0].time_window_start).toBe('10:00');
+
+    // The row with id `onboarding-task-row-0` (the moved entry) must hold focus —
+    // specifically a button inside it, not a button in the other same-titled row.
+    const focusedEl = document.activeElement as HTMLElement | null;
+    expect(focusedEl).not.toBeNull();
+    const focusedRow = focusedEl?.closest('.task-row');
+    expect(focusedRow?.id).toBe('onboarding-task-row-0');
+    // Confirm the OTHER same-titled row does NOT hold focus.
+    const otherRow = fixture.nativeElement.querySelector('#onboarding-task-row-1');
+    expect(otherRow?.contains(focusedEl)).toBe(false);
+  }));
+
   // ── Keyboard day-jump: next day ──────────────────────────────────────────────
 
   it('next-day jump moves an entry to the following date in the unanchored slot', async () => {
