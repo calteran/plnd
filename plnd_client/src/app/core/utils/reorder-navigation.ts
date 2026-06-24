@@ -1,3 +1,5 @@
+import { UNANCHORED_SLOT } from './slot-key';
+
 export type SlotKind = 'slot' | 'meal';
 
 /** One drop target within a single day, in visual reading order. */
@@ -67,9 +69,16 @@ export function stepWithinDay(layout: DayLayout, taskId: string, dir: 'up' | 'do
   return { slotKey: next.slotKey, kind: next.kind, index: 0, crossing: crossingFor(cur.kind, next.kind) };
 }
 
-/** The slot key a day-jumped task lands in on the target day: same key if present, else unanchored. */
+/**
+ * The slot key a day-jumped task lands in on the target day. Matches the task's slot
+ * to the target day's slots CASE-INSENSITIVELY (the #1005 casing contract — production
+ * meal names are Capitalized while stored anchor casing can drift), and returns the
+ * target day's slot key in ITS original (display) casing so the emitted
+ * `paired_meal_name`/`after_anchor` matches the rendered meal. Falls back to unanchored.
+ */
 export function resolveDayJump(currentSlotKey: string, targetDaySlotKeys: string[]): string {
-  return targetDaySlotKeys.includes(currentSlotKey) ? currentSlotKey : '<sched>';
+  const folded = currentSlotKey.toLowerCase();
+  return targetDaySlotKeys.find(k => k.toLowerCase() === folded) ?? UNANCHORED_SLOT;
 }
 
 /** Compose the aria-live message for a within-day move. */

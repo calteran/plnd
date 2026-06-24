@@ -69,6 +69,11 @@ describe('resolveDayJump', () => {
   it('falls back to <sched> when the target day lacks the slot', () => {
     expect(resolveDayJump('brunch', ['<sched>', 'lunch'])).toBe('<sched>');
   });
+  it('matches case-insensitively and returns the target day\'s display casing (#1005)', () => {
+    // Drifted lower-case task key resolves to the target day's Capitalized slot.
+    expect(resolveDayJump('breakfast', ['<sched>', 'Breakfast', 'Lunch'])).toBe('Breakfast');
+    expect(resolveDayJump('Dinner', ['<sched>', 'dinner'])).toBe('dinner');
+  });
 });
 
 describe('describeMove / describeDayJump', () => {

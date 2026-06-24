@@ -8,6 +8,7 @@ import { EnergyLevel, PlannedTask } from '../../../../core/models/week-plan';
 import { slotKeysMatch, slotMatchKey } from '../../../../core/utils/slot-key';
 import {
   stepWithinDay,
+  resolveDayJump,
   describeMove,
   describeDayJump,
   DayLayout,
@@ -300,11 +301,9 @@ export class PlanDayCardComponent {
     if (!targetDate) return;
 
     const targetKeys = this.dayTypesMealsService.mealsForDate(targetDate).map(s => s.name).concat('<sched>');
-    // Match the task's slot to the target day case-insensitively (#1005 casing
-    // contract), but land it in that day's slot key in ITS display casing so the
-    // emitted paired_meal_name matches the rendered meal. Falls back to unanchored.
-    const taskKey = slotMatchKey(task);
-    const targetSlot = targetKeys.find(k => k.toLowerCase() === taskKey) ?? '<sched>';
+    // resolveDayJump matches the task's slot to the target day case-insensitively and
+    // returns that day's slot key in its display casing (#1005 emit-raw contract).
+    const targetSlot = resolveDayJump(slotMatchKey(task), targetKeys);
     const endIndex = this.weekPlanService.scheduledTasks()
       .filter(t => t.date === targetDate && slotKeysMatch(t, targetSlot)).length;
 
