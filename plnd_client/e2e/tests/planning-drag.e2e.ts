@@ -32,7 +32,16 @@ async function stableBoundingBox(locator: Locator): Promise<{ x: number; y: numb
   for (let i = 0; i < 30; i++) {
     await locator.page().waitForTimeout(50);
     const cur = await locator.boundingBox();
-    if (prev && cur && Math.abs(cur.x - prev.x) < 0.5 && Math.abs(cur.y - prev.y) < 0.5) {
+    if (
+      prev && cur &&
+      Math.abs(cur.x - prev.x) < 0.5 &&
+      Math.abs(cur.y - prev.y) < 0.5 &&
+      Math.abs(cur.width - prev.width) < 0.5 &&
+      Math.abs(cur.height - prev.height) < 0.5
+    ) {
+      // x/y AND width/height must settle: the drag path is built from the
+      // element's centre (x + width/2, y + height/2), so a still-resizing box
+      // would yield a wrong target point even once its origin stopped moving.
       return cur;
     }
     prev = cur;
