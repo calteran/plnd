@@ -150,6 +150,13 @@ if need "quick,rust"; then
     run_job "tracing-skip"  "$PROJECT_ROOT" just check-tracing-skip
 fi
 
+# ── Repo-hygiene guards (no infra, no deps) ─────────────────────────────────────
+# Runs under every subset that could exercise e2e (and `quick`/`all`) so a stray
+# *.spec.ts under e2e/ is caught even by an isolated `just verify e2e`.
+if need "quick,rust,ts,e2e"; then
+    run_job "e2e-naming"    "$PROJECT_ROOT" just check-e2e-naming
+fi
+
 # ── TypeScript ──────────────────────────────────────────────────────────────────
 if need "quick,ts,e2e"; then
     run_sync "npm ci" "$PROJECT_ROOT/plnd_client" npm ci

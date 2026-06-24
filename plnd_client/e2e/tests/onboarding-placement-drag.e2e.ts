@@ -35,17 +35,22 @@ test.describe('Onboarding Task Placement Review — drag-reorder', () => {
     await page.clock.setSystemTime('2026-03-28T00:00:00');
     const { sub } = await seedOnboarding(page);
 
-    // Seed a day type with meal slots so the placement review renders
-    // section dividers (matching the onboarding.e2e.ts pattern).
-    const weekends = await seedDayType(sub, {
-      name: 'Weekends',
-      days_bitmask: 65, // Sat+Sun bits
+    // Seed a day type with meal slots so the placement review renders section
+    // dividers. The bitmask MUST cover EVERY day in the plan-period week, not
+    // just weekends: the placement grid resolves each date's day type via
+    // activeDayTypeForDate(), which THROWS ("No day type covers date …") on any
+    // uncovered date. That throw crashes the daySections computed and renders
+    // zero day cards. The first onboarding plan window spans weekdays too, so a
+    // weekend-only mask left every weekday date uncovered. Cover all 7 days.
+    const everyDay = await seedDayType(sub, {
+      name: 'Every Day',
+      days_bitmask: 127, // all 7 days: bits 0 (Sun) – 6 (Sat)
       wake_time: '08:00',
       sleep_time: '23:00',
     });
-    await seedDayTypeMeal(sub, weekends.id, { name: 'Breakfast', preferred_time: '08:00', sort_order: 0 });
-    await seedDayTypeMeal(sub, weekends.id, { name: 'Lunch',     preferred_time: '12:00', sort_order: 1 });
-    await seedDayTypeMeal(sub, weekends.id, { name: 'Dinner',    preferred_time: '18:00', sort_order: 2 });
+    await seedDayTypeMeal(sub, everyDay.id, { name: 'Breakfast', preferred_time: '08:00', sort_order: 0 });
+    await seedDayTypeMeal(sub, everyDay.id, { name: 'Lunch',     preferred_time: '12:00', sort_order: 1 });
+    await seedDayTypeMeal(sub, everyDay.id, { name: 'Dinner',    preferred_time: '18:00', sort_order: 2 });
 
     // ── Mock /agent/place-tasks (LLM endpoint — only mock allowed) ───────────
     //
@@ -89,8 +94,13 @@ test.describe('Onboarding Task Placement Review — drag-reorder', () => {
     await expect(page.locator('.planning-prefs')).toBeVisible();
     await page.locator('.btn-continue').click();
 
-    // Step 2: Schedule Types — accept seeded Weekends day type as-is
+    // Step 2: Schedule Types — accept the seeded "Every Day" day type as-is.
+    // Wait for the seeded day types to finish loading into cards BEFORE saving:
+    // the substep fetches them async in ngOnInit, and clicking save first
+    // persists an empty day-types list — which leaves the later Placement Review
+    // with no meal slots and no day cards (matches onboarding.e2e.ts's wait).
     await expect(page.locator('.day-types-substep')).toBeVisible();
+    await expect(page.locator('.schedule-card').first()).toBeVisible();
     await page.locator('.day-types-substep .save-btn').click();
 
     // Step 3: Routines & Tasks — add a task name so placement fires
@@ -120,8 +130,8 @@ test.describe('Onboarding Task Placement Review — drag-reorder', () => {
 
     // ── CDK drag via explicit mouse sequence ──────────────────────────────────
     //
-    // Same proven pattern as day-view-drag.spec.ts (Task 10) and
-    // planning-drag.spec.ts: mouse.move to source, mouse.down, incremental
+    // Same proven pattern as day-view-drag.e2e.ts (Task 10) and
+    // planning-drag.e2e.ts: mouse.move to source, mouse.down, incremental
     // moves past CDK threshold, mouse.up over target.
     const source = taskItems.nth(1); // TASK_B — drag this one up
     const target = taskItems.nth(0); // TASK_A — drop above this one

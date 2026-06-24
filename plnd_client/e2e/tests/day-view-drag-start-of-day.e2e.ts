@@ -1,8 +1,9 @@
 // e2e: a floating task can be dragged into the empty 'start of day' slot,
 // i.e. above the first real anchor of the day.
 //
-// (Naming note: this file is *.e2e.ts on purpose — Playwright's testMatch only
-// collects *.e2e.ts, so the older e2e/tests/*.spec.ts files never run; see #999.)
+// (Naming note: every e2e test must end in *.e2e.ts — Playwright's testMatch
+// only collects that suffix; a *.spec.ts under e2e/ silently never runs. The
+// `check-e2e-naming` guard now enforces this; see #999.)
 //
 // The 'start of day' slot renders as a bare .slot-drop-list div with no label.
 // When it holds no tasks it would collapse to zero height, so CDK's drop-target

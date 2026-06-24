@@ -71,8 +71,12 @@ test.describe('Day View — floating tasks render in their slots', () => {
     // Wait for the schedule to finish loading
     await expect(dayView.getScheduleList()).toBeVisible();
 
-    // Collect all task and meal rows in rendered DOM order
-    const rows = page.locator('.schedule-list > app-task-row, .schedule-list > app-meal-row');
+    // Collect all task and meal rows in rendered DOM order. Use a descendant
+    // (not direct-child) combinator: anchor rows are direct children of
+    // .schedule-list, but floating tasks render inside per-slot .slot-drop-list
+    // wrappers, so a `>` combinator silently misses them (and the join would
+    // never contain the floating task titles).
+    const rows = page.locator('.schedule-list app-task-row, .schedule-list app-meal-row');
     await expect(rows.first()).toBeVisible();
 
     // Join all row texts into a single newline-delimited string; indexOf gives

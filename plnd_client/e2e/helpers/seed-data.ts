@@ -29,6 +29,16 @@ export interface ScheduleEntryInput {
   energy_required?: 'low' | 'medium' | 'high';
   one_shot?: boolean;
   /**
+   * 0-based order within a (date, after_anchor) slot. The DB enforces
+   * `UNIQUE (user_id, date, after_anchor, slot_position)` (migration 0053), and
+   * commit_plan does NOT auto-number — it persists whatever the caller sends,
+   * defaulting to 0. So seeding two tasks in the same slot without distinct
+   * positions collides and 500s. Leave this unset and the helper auto-assigns
+   * incrementing positions per slot in input order (mirroring the real wizards,
+   * which derive slot_position in toPlanEntries()); set it to pin an exact order.
+   */
+  slot_position?: number;
+  /**
    * Desired post-commit status. Entries default to 'planned' after commit_plan.
    * If set to anything else (e.g. 'completed'), the helper performs a follow-up
    * GET /schedule/period + PATCH /schedule/entries/{id}/status round-trip to
@@ -99,6 +109,15 @@ export async function seedScheduleEntries(
   const entries = opts.entries ?? [];
   const placedTasks = opts.placed_tasks ?? [];
 
+  // Auto-number tasks within each (date, after_anchor) slot so two tasks in the
+  // same slot don't collide on the slot_position UNIQUE constraint (see the
+  // ScheduleEntryInput.slot_position doc). entries and placed_tasks share one
+  // counter map because both land in `schedule_entries` and the constraint spans
+  // the whole table; positions are assigned in input order (entries first).
+  const slotCounters = new Map<string, number>();
+  const positionedEntries = entries.map(e => withSlotPosition(e, slotCounters));
+  const positionedPlaced = placedTasks.map(e => withSlotPosition(e, slotCounters));
+
   const commitRes = await fetch(`${API_BASE}/schedule/plan`, {
     method: 'POST',
     headers: jsonAuth,
@@ -106,8 +125,8 @@ export async function seedScheduleEntries(
       plan_start: opts.plan_start,
       plan_end: opts.plan_end,
       planning_task_id: planningTask.task_id,
-      entries: entries.map(stripStatus),
-      placed_tasks: placedTasks.map(stripStatus),
+      entries: positionedEntries.map(stripStatus),
+      placed_tasks: positionedPlaced.map(stripStatus),
       replace: true,
     }),
   });
@@ -149,6 +168,24 @@ export async function seedScheduleEntries(
       );
     }
   }
+}
+
+/**
+ * Returns a copy of `e` with `slot_position` filled in (unless the caller pinned
+ * one). Only slot tasks (a non-null `after_anchor`) are constrained — scheduled
+ * tasks have a NULL `after_anchor`, and Postgres treats NULLs as distinct, so
+ * they never collide regardless of position. `counters` is keyed by
+ * `(date, after_anchor)` and mutated to hand out 0, 1, 2, … in call order.
+ */
+function withSlotPosition(
+  e: ScheduleEntryInput,
+  counters: Map<string, number>,
+): ScheduleEntryInput {
+  if (e.slot_position !== undefined || !e.after_anchor) return e;
+  const key = `${e.date}|${e.after_anchor}`;
+  const next = counters.get(key) ?? 0;
+  counters.set(key, next + 1);
+  return { ...e, slot_position: next };
 }
 
 function stripStatus(e: ScheduleEntryInput): Omit<ScheduleEntryInput, 'status'> {
