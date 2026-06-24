@@ -112,6 +112,11 @@
   }
 }
 
+// Note: the reorder-control reveal rule (.reorder-controls { visibility: visible })
+// lives in reorder-controls.scss via :host-context(.task-row:focus-within) —
+// a cross-component descendant selector here would be broken by Angular's emulated
+// view encapsulation, which scopes each component's _ngcontent-* separately.
+
 .type-badge {
   font-size: 9px;
   font-weight: 600;

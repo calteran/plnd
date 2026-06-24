@@ -3,7 +3,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
 import { CdkDragDrop, moveItemInArray, transferArrayItem, DragDropModule } from '@angular/cdk/drag-drop';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { ScheduleService, RepositionTarget } from '../../core/services/schedule.service';
+import { DayLayout, MoveResult, stepWithinDay, describeMove } from '../../core/utils/reorder-navigation';
 import { todayIso } from '../../core/utils/date-only';
 import { BriefingService } from '../../core/services/briefing.service';
 import { TimezoneService } from '../../core/services/timezone.service';
@@ -97,8 +99,11 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                     [meal]="mealClone"
                     [date]="scheduleService.date()"
                     [editingId]="editingId()"
+                    [taskCaps]="moveCaps()"
                     [dropListId]="'meal-' + group.anchor.id"
                     [connectedTo]="allDropListIds()"
+                    (moveTaskUp)="onKeyboardMove($event, 'up')"
+                    (moveTaskDown)="onKeyboardMove($event, 'down')"
                     (dragStarted)="onDragStarted()"
                     (dragEnded)="onDragEnded()"
                     (mealDrop)="onMealDrop($event, group.anchor.id)"
@@ -143,6 +148,10 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                       [attr.inert]="isSpotlightDimmed(task) ? '' : null"
                       [item]="task"
                       [editing]="editingId() === task.id"
+                      [canMoveUp]="moveCaps().get(task.id)?.up ?? false"
+                      [canMoveDown]="moveCaps().get(task.id)?.down ?? false"
+                      (moveUp)="onKeyboardMove($event, 'up')"
+                      (moveDown)="onKeyboardMove($event, 'down')"
                       (editRequested)="openEditor($event)"
                       (save)="onEditSave(task.id, $event)"
                       (closed)="closeEditor()"
@@ -185,6 +194,7 @@ export class DayViewComponent implements OnInit, OnDestroy {
   private  readonly router           = inject(Router);
   private  readonly destroyRef       = inject(DestroyRef);
   private  readonly renderer         = inject(Renderer2);
+  private  readonly announcer        = inject(LiveAnnouncer);
 
   /** The schedule list element — host of the drag-only `dragging` class. */
   private readonly scheduleList = viewChild<ElementRef<HTMLElement>>('scheduleList');
@@ -215,6 +225,15 @@ export class DayViewComponent implements OnInit, OnDestroy {
    */
   readonly mealAnchorMap = signal<Map<string, MealAnchor>>(new Map());
 
+  /**
+   * A stashed focus request that survives the async loadDay re-sync. Set when a
+   * keyboard move runs; cleared after focus has been re-applied following the
+   * loadDay re-sync (i.e., the second applyPendingFocus pass). The constructor
+   * effect re-applies it after slotGroups() re-emits — see
+   * refocusReorderButton / applyPendingFocus.
+   */
+  private readonly pendingFocus = signal<{ taskId: string; dir: 'up' | 'down' } | null>(null);
+
   constructor() {
     // Rebuild mutable slot map and meal-anchor map whenever the service emits a
     // fresh slot-groups snapshot. Use effect() so the rebuild runs inside the
@@ -233,6 +252,15 @@ export class DayViewComponent implements OnInit, OnDestroy {
       }
       this.slotGroupMap.set(slotMap);
       this.mealAnchorMap.set(mealMap);
+
+      // After a loadDay re-sync rebuilds the rows, re-apply any pending keyboard
+      // focus. setTimeout(0) defers focus until after Angular's change detection
+      // has run (a microtask would fire before CD, focusing a button that CD then
+      // immediately disables — causing the browser to drop focus to body). This
+      // effect re-runs because it reads slotGroups(), which the reload re-emits.
+      // Pass fromReSync=true so applyPendingFocus clears pendingFocus after this
+      // second pass (the optimistic pass left it set for the re-sync pass to clear).
+      setTimeout(() => this.applyPendingFocus(true), 0);
     });
   }
 
@@ -260,6 +288,35 @@ export class DayViewComponent implements OnInit, OnDestroy {
       }
     }
     return ids;
+  });
+
+  /**
+   * Day layout in reading order: each meal group emits its during-meal list then
+   * its slot list. Built from the mutable maps (not slotGroups()) so it tracks
+   * optimistic keyboard moves between the persist and the loadDay re-sync.
+   */
+  readonly dayLayout = computed<DayLayout>(() => {
+    const layout: DayLayout = [];
+    for (const g of this.scheduleService.slotGroups()) {
+      if (g.anchor && isMealAnchor(g.anchor)) {
+        const meal = this.mealAnchor(g.anchor.id);
+        layout.push({ slotKey: g.anchor.id, kind: 'meal', taskIds: (meal?.duringMealTasks ?? []).map(t => t.id) });
+      }
+      layout.push({ slotKey: g.anchorLabel, kind: 'slot', taskIds: this.slotTasks(g.anchorLabel).map(t => t.id) });
+    }
+    return layout;
+  });
+
+  /** Per-task move capability for the template + meal-row. */
+  readonly moveCaps = computed(() => {
+    const layout = this.dayLayout();
+    const caps = new Map<string, { up: boolean; down: boolean }>();
+    for (const slot of layout) {
+      for (const id of slot.taskIds) {
+        caps.set(id, { up: stepWithinDay(layout, id, 'up') !== null, down: stepWithinDay(layout, id, 'down') !== null });
+      }
+    }
+    return caps;
   });
 
   /**
@@ -501,6 +558,123 @@ export class DayViewComponent implements OnInit, OnDestroy {
     }
     const moved = tasks[event.currentIndex];
     this.persistReposition(moved.id, { mealAnchorId }, event.currentIndex);
+  }
+
+  /** Find the mutable array + index holding a task id across slot maps and meal clones. */
+  private findTaskArray(taskId: string): { arr: ScheduleTask[]; index: number } | null {
+    for (const arr of this.slotGroupMap().values()) {
+      const i = arr.findIndex(t => t.id === taskId);
+      if (i !== -1) return { arr, index: i };
+    }
+    for (const meal of this.mealAnchorMap().values()) {
+      const i = meal.duringMealTasks.findIndex(t => t.id === taskId);
+      if (i !== -1) return { arr: meal.duringMealTasks, index: i };
+    }
+    return null;
+  }
+
+  /** Target mutable array for a resolved MoveResult slot key. */
+  private targetArray(result: MoveResult): ScheduleTask[] | null {
+    return result.kind === 'meal'
+      ? this.mealAnchorMap().get(result.slotKey)?.duringMealTasks ?? null
+      : this.slotGroupMap().get(result.slotKey) ?? null;
+  }
+
+  /** Display label for a slot key (meal name for a meal, the capitalized anchor label otherwise). */
+  private slotLabel(result: MoveResult): string {
+    if (result.kind === 'meal') return this.mealAnchor(result.slotKey)?.name ?? 'meal';
+    return result.slotKey === 'start of day' ? 'start of day' : `after ${result.slotKey}`;
+  }
+
+  /**
+   * Keyboard / button reorder handler. Mirrors onSlotDrop/onMealDrop: resolve the
+   * one-step move via the pure helper, apply it optimistically to the right
+   * mutable array, re-render, announce, persist (reusing persistReposition), and
+   * follow focus to the moved row.
+   */
+  onKeyboardMove(taskId: string, dir: 'up' | 'down'): void {
+    const result = stepWithinDay(this.dayLayout(), taskId, dir);
+    if (!result) return; // at the day edge — control was disabled anyway
+    const src = this.findTaskArray(taskId);
+    const dst = this.targetArray(result);
+    if (!src || !dst) return;
+
+    // Capture source meal name (for an out-of-meal announcement) before mutating.
+    const sourceMeal = [...this.mealAnchorMap().values()].find(m => m.duringMealTasks.some(t => t.id === taskId));
+
+    const [moved] = src.arr.splice(src.index, 1);
+    dst.splice(result.index, 0, moved);
+
+    // Trigger OnPush re-render by re-setting the signal maps (mutated in place).
+    this.slotGroupMap.set(new Map(this.slotGroupMap()));
+    this.mealAnchorMap.set(new Map(this.mealAnchorMap()));
+
+    this.announcer.announce(describeMove({
+      crossing: result.crossing, dir,
+      targetLabel: this.slotLabel(result),
+      sourceLabel: sourceMeal?.name,
+    }), 'polite');
+
+    const target = result.kind === 'meal' ? { mealAnchorId: result.slotKey } : { afterAnchor: result.slotKey };
+    this.persistReposition(moved.id, target, result.index);
+    this.refocusReorderButton(taskId, dir);
+  }
+
+  /**
+   * Re-focus the moved task's control. Runs once immediately (the optimistic
+   * re-render already placed the button) AND again after the async loadDay
+   * re-sync rebuilds the rows — the second pass is why we stash a pending focus
+   * request that the constructor effect re-applies (via `fromReSync=true`) once
+   * slotGroups() re-emits. The re-sync pass clears the request after applying it.
+   */
+  private refocusReorderButton(taskId: string, dir: 'up' | 'down'): void {
+    this.pendingFocus.set({ taskId, dir });
+    // setTimeout(0) rather than queueMicrotask: microtasks fire before Angular's
+    // change detection, so the moved button's [disabled] binding hasn't updated
+    // yet — focusing an about-to-be-disabled button causes the browser to
+    // immediately drop focus to <body> once CD disables it. A macro-task delay
+    // ensures CD has re-rendered the row (with correct disabled states) before
+    // we read them to pick the best focus target.
+    setTimeout(() => this.applyPendingFocus(false), 0);
+  }
+
+  /**
+   * @param fromReSync true when called from the constructor effect after a
+   *   loadDay re-sync; false when called from the initial optimistic pass.
+   *   On the initial pass we leave the request set so the effect's second call
+   *   (after the HTTP round-trip) re-applies focus to the rebuilt row — preventing
+   *   the DOM rebuild from silently dropping focus. The re-sync pass clears it.
+   */
+  private applyPendingFocus(fromReSync: boolean): void {
+    const req = this.pendingFocus();
+    if (!req) return;
+    const row = document.getElementById(`task-row-${req.taskId}`);
+    if (!row) return; // row absent (rolled back / not yet rebuilt) — leave pending for the next pass
+
+    // The reorder buttons have `visibility: hidden` by default and are only
+    // revealed via `:focus-within` on `.task-row`. This means we CANNOT focus
+    // them directly — a `visibility: hidden` element refuses `focus()`.
+    // Strategy: focus the `.label` first (always visible, always focusable),
+    // which gives the row `:focus-within` and makes the buttons visible.
+    // Then focus the preferred button if it is not disabled.
+    const label = row.querySelector<HTMLElement>('.label');
+    label?.focus(); // give the row :focus-within so buttons become focusable
+
+    const same = row.querySelector<HTMLButtonElement>(`[data-testid="reorder-${req.dir}"]`);
+    if (same && !same.disabled) {
+      same.focus();
+      if (fromReSync) { this.pendingFocus.set(null); }
+      return;
+    }
+    const other = row.querySelector<HTMLButtonElement>(`[data-testid="reorder-${req.dir === 'up' ? 'down' : 'up'}"]`);
+    if (other && !other.disabled) {
+      other.focus();
+      if (fromReSync) { this.pendingFocus.set(null); }
+      return;
+    }
+    // Both buttons are disabled (impossible in theory — always one enabled unless
+    // the slot has only one task). Fall back to the label we already focused.
+    this.pendingFocus.set(null);
   }
 
   private persistReposition(

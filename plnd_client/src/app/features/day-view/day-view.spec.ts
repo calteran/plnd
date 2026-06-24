@@ -810,3 +810,82 @@ describe('DayViewComponent (drag-and-drop)', () => {
     expect(list.classList.contains('dragging')).toBe(false);
   });
 });
+
+// ── Keyboard / button reorder tests ──────────────────────────────────────────
+
+describe('DayViewComponent (keyboard reorder)', () => {
+  it('keyboard down on a slot task calls repositionTask with the next position', () => {
+    const tasks: ScheduleTask[] = [
+      { id: 'a', type: 'general', label: 'A', status: 'pending', oneShot: false, floating: true },
+      { id: 'b', type: 'general', label: 'B', status: 'pending', oneShot: false, floating: true },
+    ];
+    const slotGroups: SlotGroup[] = [{ anchorLabel: 'start of day', anchor: null, tasks }];
+    const svc = makeScheduleServiceMock({ scheduleItems: tasks, slotGroups });
+    TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: '2026-03-19' }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(DayViewComponent);
+    fixture.detectChanges();
+
+    // First task's down control.
+    const downBtns = fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'));
+    downBtns[0].nativeElement.click();
+
+    expect(svc.repositionTask).toHaveBeenCalledWith('a', '2026-03-19', { afterAnchor: 'start of day' }, 1);
+  });
+
+  it('keyboard up on the top slot task moves it into the preceding meal pairing', () => {
+    const meal: MealAnchor = {
+      id: 'm1', name: 'Breakfast', emoji: '🥣', status: 'planned', duringMealTasks: [],
+    };
+    const slotTask: ScheduleTask = { id: 'c', type: 'general', label: 'C', status: 'pending', oneShot: false, floating: true };
+    const slotGroups: SlotGroup[] = [{ anchorLabel: 'breakfast', anchor: meal, tasks: [slotTask] }];
+    const svc = makeScheduleServiceMock({ scheduleItems: [meal, slotTask], slotGroups });
+    TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: '2026-03-19' }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(DayViewComponent);
+    fixture.detectChanges();
+    // The slot task's up control (the meal's during-meal list is empty, so this is the only up button).
+    fixture.debugElement.queryAll(By.css('[data-testid="reorder-up"]'))
+      .at(-1)!.nativeElement.click();
+    expect(svc.repositionTask).toHaveBeenCalledWith('c', '2026-03-19', { mealAnchorId: 'm1' }, 0);
+  });
+
+  it('rolls back via loadDay when reposition fails', () => {
+    const tasks: ScheduleTask[] = [
+      { id: 'a', type: 'general', label: 'A', status: 'pending', oneShot: false, floating: true },
+      { id: 'b', type: 'general', label: 'B', status: 'pending', oneShot: false, floating: true },
+    ];
+    const svc = makeScheduleServiceMock({ scheduleItems: tasks, slotGroups: [{ anchorLabel: 'start of day', anchor: null, tasks }] });
+    svc.repositionTask = vi.fn().mockReturnValue(throwError(() => new Error('boom')));
+    TestBed.configureTestingModule({
+      imports: [DayViewComponent],
+      providers: [
+        { provide: ScheduleService, useValue: svc },
+        { provide: BriefingService, useValue: makeBriefingServiceMock() },
+        { provide: TimezoneService, useValue: makeTimezoneServiceMock() },
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { params: of({ date: '2026-03-19' }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(DayViewComponent);
+    fixture.detectChanges();
+    fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'))[0].nativeElement.click();
+    expect(svc.loadDay).toHaveBeenCalledWith('2026-03-19');
+  });
+});

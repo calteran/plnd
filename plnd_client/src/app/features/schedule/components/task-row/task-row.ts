@@ -1,6 +1,7 @@
 import { Component, computed, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { ItemType, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { TaskEditFormComponent } from '../task-edit-form/task-edit-form';
+import { ReorderControlsComponent } from '../reorder-controls/reorder-controls';
 
 const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
   work:        'work',
@@ -13,7 +14,7 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
 @Component({
   selector: 'app-task-row',
   standalone: true,
-  imports: [TaskEditFormComponent],
+  imports: [TaskEditFormComponent, ReorderControlsComponent],
   template: `
     <div class="task-row" data-testid="task-row" [class.done]="item().status === 'done'">
       <div class="gutter">
@@ -42,6 +43,13 @@ const TYPE_BADGE_LABELS: Partial<Record<ItemType, string>> = {
             (click)="editRequested.emit(item().id)"
             (keydown.enter)="editRequested.emit(item().id)"
             (keydown.space)="$event.preventDefault(); editRequested.emit(item().id)">{{ item().label }}</span>
+      <app-reorder-controls
+        [label]="item().label"
+        [canUp]="canMoveUp()" [canDown]="canMoveDown()"
+        [canPrevDay]="canMovePrevDay()" [canNextDay]="canMoveNextDay()"
+        (up)="moveUp.emit(item().id)" (down)="moveDown.emit(item().id)"
+        (prevDay)="movePrevDay.emit(item().id)" (nextDay)="moveNextDay.emit(item().id)"
+      />
       @if (typeBadge()) {
         <span class="type-badge type-badge--{{ item().type }}">{{ typeBadge() }}</span>
       }
@@ -78,6 +86,18 @@ export class TaskRowComponent {
   readonly editRequested = output<string>();
   readonly save          = output<TaskEditPatch>();
   readonly closed        = output<void>();
+
+  // Reorder controls — canMove* drive visibility; move* emit the task id to the host.
+  // Day-jump inputs are optional: when undefined, no «/» buttons render in the day view.
+  readonly canMoveUp      = input(false);
+  readonly canMoveDown    = input(false);
+  readonly canMovePrevDay = input<boolean | undefined>(undefined);
+  readonly canMoveNextDay = input<boolean | undefined>(undefined);
+
+  readonly moveUp      = output<string>();
+  readonly moveDown    = output<string>();
+  readonly movePrevDay = output<string>();
+  readonly moveNextDay = output<string>();
 
   protected readonly typeBadge = computed(() => TYPE_BADGE_LABELS[this.item().type] ?? null);
 

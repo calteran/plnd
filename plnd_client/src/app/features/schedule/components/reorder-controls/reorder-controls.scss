@@ -1,0 +1,46 @@
+.reorder-controls {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 8px;
+  /* Hidden in the resting UI; revealed when the host row gains focus.
+     visibility (not display) keeps layout stable as focus moves.
+     The reveal rule lives here (not in task-row.scss) because Angular's
+     emulated view encapsulation scopes cross-component descendant selectors
+     to the parent's _ngcontent-* ID, so .reorder-controls inside a child
+     component never matches the parent's scoped selector. :host-context()
+     pierces the encapsulation boundary correctly. */
+  visibility: hidden;
+}
+
+/* Reveal when any ancestor .task-row has focus inside it. */
+:host-context(.task-row:focus-within) .reorder-controls {
+  visibility: visible;
+}
+
+/* Reveal in the weekly day-grid, whose draggable rows are .draggable-task
+   (not .task-row). Same encapsulation-piercing rationale as above. */
+:host-context(.draggable-task:focus-within) .reorder-controls {
+  visibility: visible;
+}
+
+.reorder-btn {
+  border: 1px solid var(--color-border-input);
+  background: var(--color-surface-white);
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  line-height: 1;
+  font-size: 13px;
+  cursor: pointer;
+  color: var(--color-text-body);
+}
+
+.reorder-btn:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.reorder-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

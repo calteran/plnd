@@ -12,10 +12,20 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { AgentService } from '../../../../../core/services/agent.service';
 import { OnboardingStateService } from '../../../onboarding-state.service';
 import { mealsForDate } from '../../../../../core/utils/day-type-utils';
 import { parseDateOnly, addDaysDateOnly } from '../../../../../core/utils/date-only';
+import {
+  stepWithinDay,
+  resolveDayJump,
+  describeMove,
+  describeDayJump,
+  DayLayout,
+  MoveResult,
+} from '../../../../../core/utils/reorder-navigation';
+import { ReorderControlsComponent } from '../../../../schedule/components/reorder-controls/reorder-controls';
 import {
   PlaceTasksRequest,
   PlaceTasksEntry,
@@ -280,7 +290,7 @@ export function buildDaySections(
 @Component({
   selector: 'app-task-placement-review-substep',
   standalone: true,
-  imports: [OnboardingTaskLoadingComponent, DragDropModule],
+  imports: [OnboardingTaskLoadingComponent, DragDropModule, ReorderControlsComponent],
   template: `
     <div class="placement-review">
 
@@ -420,7 +430,7 @@ export function buildDaySections(
                         </div>
                       } @else {
                         <!-- Default task row -->
-                        <div class="task-row">
+                        <div class="task-row" [id]="rowDomId(row.entryIndex)">
                           @if (row.entry.time_window_start) {
                             <span class="task-time">{{ row.entry.time_window_start }}</span>
                           }
@@ -435,6 +445,17 @@ export function buildDaySections(
                               (click)="openEdit(row.entryIndex)"
                               [attr.aria-label]="'Edit ' + row.entry.title"
                             >Edit</button>
+                            <app-reorder-controls
+                              [label]="row.entry.title"
+                              [canUp]="rowCaps(card.date, row.entry).up"
+                              [canDown]="rowCaps(card.date, row.entry).down"
+                              [canPrevDay]="!isFirstDay(card.date)"
+                              [canNextDay]="!isLastDay(card.date)"
+                              (up)="onMove(card.date, row.entry, 'up')"
+                              (down)="onMove(card.date, row.entry, 'down')"
+                              (prevDay)="onDayJump(card.date, row.entry, -1)"
+                              (nextDay)="onDayJump(card.date, row.entry, 1)"
+                            />
                           </div>
                         </div>
                       }
@@ -766,6 +787,7 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
   private readonly stateService = inject(OnboardingStateService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly announcer = inject(LiveAnnouncer);
 
   // ── State signals ─────────────────────────────────────────────────────────
   readonly isLoading = signal(false);
@@ -949,8 +971,27 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
    *   in a single signal mutation to prevent duplicate entries.
    */
   onDrop(event: CdkDragDrop<TaskRow[]>, targetDate: string, targetSlotKey: string): void {
-    const droppedEntry: PlaceTasksEntry = event.item.data;
+    this.applyMove(event.item.data, targetDate, targetSlotKey, event.currentIndex);
+  }
 
+  /**
+   * Move an entry to (targetDate, targetSlotKey) at a 0-based position within
+   * that slot, mutating the `entries` signal atomically (single splice pair so
+   * no duplicate entry can appear). Shared by drag-drop (`onDrop`) and the
+   * keyboard handlers (`onMove`/`onDayJump`) so both paths reorder identically.
+   *
+   * Returns the new global index of the inserted entry in `entries()` so
+   * keyboard handlers can refocus the exact moved row without a title search
+   * (title is not unique — a user can have two tasks with the same name).
+   * Returns -1 if the entry was not found (no-op).
+   */
+  private applyMove(
+    droppedEntry: PlaceTasksEntry,
+    targetDate: string,
+    targetSlotKey: string,
+    index: number,
+  ): number {
+    let insertedListIdx = -1;
     this.entries.update(list => {
       // Find the dropped entry's current index by reference identity
       const fromIdx = list.indexOf(droppedEntry);
@@ -972,23 +1013,182 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       const updated = [...list];
       updated.splice(fromIdx, 1);
 
-      // Insert at the CDK-computed index within the target slot. This handles
+      // Insert at the computed index within the target slot. This handles
       // same-slot reorder AND cross-slot/cross-day moves identically, so a task
       // can be dropped into a specific position even when changing slot/day
       // (consistent with WeekPlanService.updateTaskSlot, which also honours
-      // currentIndex).
+      // the position).
       const slotEntries = updated
         .map((e, i) => ({ e, i }))
         .filter(({ e }) => e.scheduled_date === targetDate && entrySlotKey(e) === targetSlotKey);
 
-      const insertAtSlotIdx = Math.min(event.currentIndex, slotEntries.length);
-      const insertAtListIdx = insertAtSlotIdx < slotEntries.length
+      const insertAtSlotIdx = Math.min(index, slotEntries.length);
+      const computedListIdx = insertAtSlotIdx < slotEntries.length
         ? slotEntries[insertAtSlotIdx].i
         : (slotEntries.length > 0 ? slotEntries[slotEntries.length - 1].i + 1 : updated.length);
-      updated.splice(insertAtListIdx, 0, updatedEntry);
+      updated.splice(computedListIdx, 0, updatedEntry);
+
+      // Capture for the caller — the global index of the newly inserted entry.
+      insertedListIdx = computedListIdx;
 
       return updated;
     });
+    return insertedListIdx;
+  }
+
+  // ── Keyboard reorder + cross-day jump ───────────────────────────────────────
+
+  /** Stable DOM id for a task row, keyed by its current entry index. */
+  rowDomId(entryIndex: number): string {
+    return `onboarding-task-row-${entryIndex}`;
+  }
+
+  /** The day's sections mapped to the reorder-navigation DayLayout shape. */
+  private dayLayoutFor(date: string): DayLayout {
+    const card = this.daySections().find(c => c.date === date);
+    if (!card) return [];
+    return card.sections.map(s => ({
+      slotKey: s.slotKey,
+      kind: s.mealLabel ? 'meal' as const : 'slot' as const,
+      taskIds: s.taskRows.map(r => `${r.entryIndex}`),
+    }));
+  }
+
+  /** Whether the up/down controls are enabled for a row (boundary detection). */
+  rowCaps(date: string, entry: PlaceTasksEntry): { up: boolean; down: boolean } {
+    const idx = this.entries().indexOf(entry);
+    if (idx === -1) return { up: false, down: false };
+    const layout = this.dayLayoutFor(date);
+    const id = `${idx}`;
+    return {
+      up: stepWithinDay(layout, id, 'up') !== null,
+      down: stepWithinDay(layout, id, 'down') !== null,
+    };
+  }
+
+  private allDates(): string[] {
+    return this.daySections().map(c => c.date);
+  }
+
+  isFirstDay(date: string): boolean {
+    return this.allDates()[0] === date;
+  }
+
+  isLastDay(date: string): boolean {
+    return this.allDates().at(-1) === date;
+  }
+
+  /** Step a task one position earlier/later within its day, then refocus + announce. */
+  onMove(date: string, entry: PlaceTasksEntry, dir: 'up' | 'down'): void {
+    const idx = this.entries().indexOf(entry);
+    if (idx === -1) return;
+    const result = stepWithinDay(this.dayLayoutFor(date), `${idx}`, dir);
+    if (!result) return;
+
+    // Capture sourceLabel BEFORE applyMove mutates entries (entry ref is stale after).
+    const sourceLabel = this.slotLabelFor(date, entry);
+    const newEntryIndex = this.applyMove(entry, date, result.slotKey, result.index);
+    // Derive targetLabel from the MoveResult (after applyMove so daySections() is
+    // up-to-date), NOT from the old entry object whose slot fields still reflect the
+    // pre-move state. Using the stale entry would yield undefined for into-meal crossings.
+    const targetLabel = this.slotLabelFromResult(date, result);
+
+    this.announcer.announce(describeMove({
+      crossing: result.crossing,
+      dir,
+      targetLabel,
+      sourceLabel,
+    }), 'polite');
+
+    this.refocusReorderButton(newEntryIndex, dir);
+  }
+
+  /** Move a task to the previous/next day, into the same slot if present else unanchored. */
+  onDayJump(date: string, entry: PlaceTasksEntry, delta: -1 | 1): void {
+    const dates = this.allDates();
+    const targetDate = dates[dates.indexOf(date) + delta];
+    if (!targetDate) return;
+
+    const targetKeys = this.dayLayoutFor(targetDate).map(s => s.slotKey);
+    const targetSlot = resolveDayJump(entrySlotKey(entry), targetKeys);
+    // Append at the end of the resolved slot on the target day.
+    const targetLen = this.dayLayoutFor(targetDate).find(s => s.slotKey === targetSlot)?.taskIds.length ?? 0;
+
+    const newEntryIndex = this.applyMove(entry, targetDate, targetSlot, targetLen);
+
+    // Derive the label directly from the resolved targetSlot key (not from the stale
+    // entry object) so the announcer never emits "undefined".
+    const targetSection = this.daySections().find(c => c.date === targetDate)
+      ?.sections.find(s => s.slotKey === targetSlot);
+    const targetLabel = targetSlot === '<sched>' ? undefined : (targetSection?.mealLabel ?? targetSlot);
+
+    this.announcer.announce(describeDayJump({
+      dayLabel: this.dayLabel(targetDate),
+      targetLabel,
+    }), 'polite');
+
+    this.refocusReorderButton(newEntryIndex, delta === 1 ? 'down' : 'up');
+  }
+
+  /** Human-readable label for an entry's current slot ('unanchored' for <sched>). */
+  private slotLabelFor(date: string, entry: PlaceTasksEntry): string | undefined {
+    const key = entrySlotKey(entry);
+    if (key === '<sched>') return undefined;
+    const section = this.daySections().find(c => c.date === date)?.sections.find(s => s.slotKey === key);
+    return section?.mealLabel ?? key;
+  }
+
+  /**
+   * Human-readable label for the DESTINATION slot as described by a MoveResult.
+   * Must be called AFTER applyMove (so daySections() reflects the new state) to
+   * look up the section by result.slotKey. For a meal section returns the
+   * section's mealLabel; for an unanchored '<sched>' slot returns undefined so
+   * describeMove's 'to-slot' branch reads "Moved to Tasks" via the ?? fallback.
+   * We return 'Tasks' here directly for '<sched>' so the announcer never emits
+   * the literal string "undefined".
+   */
+  private slotLabelFromResult(date: string, result: MoveResult): string | undefined {
+    if (result.slotKey === '<sched>') return 'Tasks';
+    const section = this.daySections().find(c => c.date === date)?.sections.find(s => s.slotKey === result.slotKey);
+    return section?.mealLabel ?? result.slotKey;
+  }
+
+  /** Day label for announcements, e.g. "MONDAY Apr 29". */
+  private dayLabel(date: string): string {
+    return `${getDayName(date)} ${formatDisplayDate(date)}`;
+  }
+
+  /**
+   * Refocus the moved row's reorder control after the re-render. The buttons are
+   * `visibility: hidden` until the row gains `:focus-within`, so we first focus
+   * the always-visible `.edit-btn` to reveal them, then focus the preferred
+   * direction button; if it is disabled at a boundary, fall back to its sibling,
+   * else leave focus on the edit button. Defer with setTimeout(0) so Angular has
+   * updated the `[disabled]` bindings before we read them.
+   *
+   * `newEntryIndex` is the global index returned by `applyMove` — the ACTUAL
+   * position of the moved entry in `entries()` after the move. Using the index
+   * directly (rather than searching by title) is robust when two tasks share the
+   * same title.
+   */
+  private refocusReorderButton(newEntryIndex: number, dir: 'up' | 'down'): void {
+    setTimeout(() => {
+      if (newEntryIndex === -1) return;
+      const row = document.getElementById(this.rowDomId(newEntryIndex));
+      if (!row) return;
+
+      // Reveal the controls: focus an always-visible element to set :focus-within.
+      const editBtn = row.querySelector<HTMLElement>('.edit-btn');
+      editBtn?.focus();
+
+      const same = row.querySelector<HTMLButtonElement>(`[data-testid="reorder-${dir}"]`);
+      if (same && !same.disabled) { same.focus(); return; }
+      const other = row.querySelector<HTMLButtonElement>(
+        `[data-testid="reorder-${dir === 'up' ? 'down' : 'up'}"]`,
+      );
+      if (other && !other.disabled) { other.focus(); return; }
+      // Both disabled — leave focus on the edit button we already focused.
+    }, 0);
   }
 
   // ── Save & Return ─────────────────────────────────────────────────────────

@@ -3,7 +3,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { PlanDayCardComponent } from './plan-day-card';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
@@ -272,6 +274,120 @@ describe('PlanDayCardComponent', () => {
       expect(allWalks[0].date).toBe('2026-03-31');
       // (c) now paired with lunch
       expect(allWalks[0].paired_meal_name).toBe('lunch');
+    });
+  });
+
+  describe('keyboard reorder + day jump', () => {
+    it('keyboard down on a sched task calls reorderTask with the next index', () => {
+      service.initSession('2026-03-19', '2026-03-25');
+      service.addTask({ date: '2026-03-19', title: 'First',  energy: 'low' } as PlannedTask);
+      service.addTask({ date: '2026-03-19', title: 'Second', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      const reorderTaskSpy = vi.spyOn(service, 'reorderTask');
+
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'))[0].nativeElement.click();
+
+      expect(reorderTaskSpy).toHaveBeenCalledWith('2026-03-19', '<sched>', 0, 1);
+    });
+
+    it('next-day jump calls updateTaskSlot with the following date', () => {
+      service.initSession('2026-03-19', '2026-03-20');
+      service.addTask({ date: '2026-03-19', title: 'Only', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      const updateTaskSlotSpy = vi.spyOn(service, 'updateTaskSlot');
+
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-next-day"]'))[0].nativeElement.click();
+
+      expect(updateTaskSlotSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        '2026-03-20',
+        '<sched>',
+        0,
+      );
+    });
+
+    it('day-jump announces a friendly date label (not the raw ISO string)', () => {
+      // 2026-03-20 is a Friday — the announcement must contain a human-readable
+      // weekday/month string and must NOT contain the raw ISO date "2026-03-20".
+      service.initSession('2026-03-19', '2026-03-20');
+      service.addTask({ date: '2026-03-19', title: 'Only', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+
+      const announcer = TestBed.inject(LiveAnnouncer);
+      const announceSpy = vi.spyOn(announcer, 'announce');
+
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-next-day"]'))[0].nativeElement.click();
+
+      expect(announceSpy).toHaveBeenCalled();
+      const announced: string = announceSpy.mock.calls[0][0] as string;
+      // Must contain a weekday abbreviation or month name — not the raw ISO string.
+      expect(announced).not.toContain('2026-03-20');
+      expect(announced).toMatch(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/);
+      expect(announced).toMatch(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/);
+    });
+
+    it('next-day jump lands a drifted-casing meal task in the target day\'s Capitalized slot (#1005)', () => {
+      // A task paired with 'breakfast' (drifted lowercase) jumping to a day whose meal
+      // slot is 'Breakfast' must land in 'Breakfast' (target display casing), not fall
+      // to '<sched>'. With a raw === comparison the old resolveDayJump would have missed.
+      const CAP = [
+        { id: '1', name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
+      ];
+      const mock = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: Mock };
+      mock.mealsForDate.mockReturnValue(CAP);
+
+      service.initSession('2026-03-19', '2026-03-20');
+      service.addTask({ date: '2026-03-19', title: 'Pills', energy: 'low', paired_meal_name: 'breakfast' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      const updateTaskSlotSpy = vi.spyOn(service, 'updateTaskSlot');
+
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-next-day"]'))[0].nativeElement.click();
+
+      expect(updateTaskSlotSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Pills' }),
+        '2026-03-20',
+        'Breakfast',
+        0,
+      );
+    });
+
+    it('clicking a reorder button does NOT collapse the card', () => {
+      service.initSession('2026-03-19', '2026-03-25');
+      service.addTask({ date: '2026-03-19', title: 'First',  energy: 'low' } as PlannedTask);
+      service.addTask({ date: '2026-03-19', title: 'Second', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
+      expect(card.classList.contains('expanded')).toBe(true);
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'))[0].nativeElement.click();
+      fixture.detectChanges();
+
+      expect(card.classList.contains('expanded')).toBe(true);
     });
   });
 
