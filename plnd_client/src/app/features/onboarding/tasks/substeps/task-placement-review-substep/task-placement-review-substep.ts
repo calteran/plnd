@@ -23,6 +23,7 @@ import {
   describeMove,
   describeDayJump,
   DayLayout,
+  MoveResult,
 } from '../../../../../core/utils/reorder-navigation';
 import { ReorderControlsComponent } from '../../../../schedule/components/reorder-controls/reorder-controls';
 import {
@@ -1074,13 +1075,18 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     const result = stepWithinDay(this.dayLayoutFor(date), `${idx}`, dir);
     if (!result) return;
 
+    // Capture sourceLabel BEFORE applyMove mutates entries (entry ref is stale after).
     const sourceLabel = this.slotLabelFor(date, entry);
     this.applyMove(entry, date, result.slotKey, result.index);
+    // Derive targetLabel from the MoveResult (after applyMove so daySections() is
+    // up-to-date), NOT from the old entry object whose slot fields still reflect the
+    // pre-move state. Using the stale entry would yield undefined for into-meal crossings.
+    const targetLabel = this.slotLabelFromResult(date, result);
 
     this.announcer.announce(describeMove({
       crossing: result.crossing,
       dir,
-      targetLabel: this.slotLabelFor(date, entry),
+      targetLabel,
       sourceLabel,
     }), 'polite');
 
@@ -1100,9 +1106,15 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
 
     this.applyMove(entry, targetDate, targetSlot, targetLen);
 
+    // Derive the label directly from the resolved targetSlot key (not from the stale
+    // entry object) so the announcer never emits "undefined".
+    const targetSection = this.daySections().find(c => c.date === targetDate)
+      ?.sections.find(s => s.slotKey === targetSlot);
+    const targetLabel = targetSlot === '<sched>' ? undefined : (targetSection?.mealLabel ?? targetSlot);
+
     this.announcer.announce(describeDayJump({
       dayLabel: this.dayLabel(targetDate),
-      targetLabel: this.slotLabelFor(targetDate, entry),
+      targetLabel,
     }), 'polite');
 
     this.refocusReorderButton(entry, delta === 1 ? 'down' : 'up');
@@ -1114,6 +1126,21 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
     if (key === '<sched>') return undefined;
     const section = this.daySections().find(c => c.date === date)?.sections.find(s => s.slotKey === key);
     return section?.mealLabel ?? key;
+  }
+
+  /**
+   * Human-readable label for the DESTINATION slot as described by a MoveResult.
+   * Must be called AFTER applyMove (so daySections() reflects the new state) to
+   * look up the section by result.slotKey. For a meal section returns the
+   * section's mealLabel; for an unanchored '<sched>' slot returns undefined so
+   * describeMove's 'to-slot' branch reads "Moved to Tasks" via the ?? fallback.
+   * We return 'Tasks' here directly for '<sched>' so the announcer never emits
+   * the literal string "undefined".
+   */
+  private slotLabelFromResult(date: string, result: MoveResult): string | undefined {
+    if (result.slotKey === '<sched>') return 'Tasks';
+    const section = this.daySections().find(c => c.date === date)?.sections.find(s => s.slotKey === result.slotKey);
+    return section?.mealLabel ?? result.slotKey;
   }
 
   /** Day label for announcements, e.g. "MONDAY Apr 29". */

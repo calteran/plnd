@@ -6,6 +6,7 @@ import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { Router } from '@angular/router';
+import { LiveAnnouncer } from '@angular/cdk/a11y';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import {
   TaskPlacementReviewSubstepComponent,
@@ -802,6 +803,46 @@ describe('TaskPlacementReviewSubstepComponent', () => {
 
     expect(component.entries().map(e => e.title)).toEqual(['Second', 'First']);
   });
+
+  // ── Keyboard reorder: into-meal cross-slot announcement ─────────────────────
+
+  it('keyboard down into a meal section announces the meal label, not "undefined"', fakeAsync(() => {
+    // Arrange: one task in the unanchored <sched> slot directly above the BREAKFAST
+    // section. Pressing ↓ once crosses it into the meal section.
+    // The day type mock provides BREAKFAST/LUNCH/DINNER sections for every day.
+    const { httpController, fixture } = setup(['Meds'], PLAN_PERIOD, []);
+    fixture.detectChanges();
+
+    // One task with no anchor — sits in the <sched> slot (before BREAKFAST).
+    const schedEntry: PlaceTasksEntry = {
+      title: 'Meds',
+      scheduled_date: '2026-04-28',
+      task_type: 'general',
+      duration_minutes: 5,
+      energy_required: 'low',
+    };
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([schedEntry]);
+    fixture.detectChanges();
+    tick(10000);
+
+    // Spy on LiveAnnouncer.announce AFTER the TestBed is set up.
+    const announcer = TestBed.inject(LiveAnnouncer);
+    const announceSpy = vi.spyOn(announcer, 'announce');
+
+    // Click the ↓ button for the Meds task — this crosses from <sched> into BREAKFAST.
+    const downBtns = fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'));
+    expect(downBtns.length).toBeGreaterThan(0);
+    downBtns[0].nativeElement.click();
+    fixture.detectChanges();
+
+    // The announcement must name the destination meal section, not "undefined".
+    expect(announceSpy).toHaveBeenCalled();
+    const announced: string = announceSpy.mock.calls[0][0] as string;
+    expect(announced).not.toContain('undefined');
+    // The destination is BREAKFAST (mealLabel from the DaySection).
+    expect(announced.toLowerCase()).toContain('breakfast');
+    expect(announced).toMatch(/moved into/i);
+  }));
 
   // ── Keyboard day-jump: next day ──────────────────────────────────────────────
 
