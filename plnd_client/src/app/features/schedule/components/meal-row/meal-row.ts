@@ -66,6 +66,10 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
             [attr.inert]="isTaskDimmed(task) ? '' : null"
             [item]="task"
             [editing]="editingId() === task.id"
+            [canMoveUp]="taskCaps().get(task.id)?.up ?? false"
+            [canMoveDown]="taskCaps().get(task.id)?.down ?? false"
+            (moveUp)="moveTaskUp.emit($event)"
+            (moveDown)="moveTaskDown.emit($event)"
             (editRequested)="editRequested.emit($event)"
             (save)="save.emit($event)"
             (closed)="closed.emit()"
@@ -109,6 +113,14 @@ export class MealRowComponent {
   // caches the slot hit-rects at drag start — see DayViewComponent.onDragStarted.
   readonly dragStarted = output<void>();
   readonly dragEnded   = output<void>();
+
+  // Keyboard reorder: per-during-meal-task move capability (keyed by task id)
+  // drives the ↑/↓ enablement, and the move outputs re-emit the task id so the
+  // day view can run the same reposition path it uses for slot rows.
+  /** Per-during-meal-task move capability, keyed by task id. */
+  readonly taskCaps = input<Map<string, { up: boolean; down: boolean }>>(new Map());
+  readonly moveTaskUp   = output<string>();
+  readonly moveTaskDown = output<string>();
 
   readonly reviewOpen = signal(false);
 
