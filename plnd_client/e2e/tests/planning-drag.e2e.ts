@@ -16,8 +16,30 @@
 // Per-test user isolation via seedAuth (unique sub per test).
 
 import { test, expect } from '../fixtures';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { seedAuth, API_BASE } from '../helpers/auth';
+
+/**
+ * Resolves a locator's bounding box only once it has stopped moving. The day card
+ * expands via a `max-height` CSS transition (~0.3s, plan-day-card.scss), so reading
+ * coordinates immediately after `aria-expanded` flips would capture mid-animation
+ * positions — the drag would then aim at stale spots and the reorder would silently
+ * not register (unlike the day view, whose list has no expand animation). Polls
+ * until two consecutive samples agree, so the drag math uses the settled layout.
+ */
+async function stableBoundingBox(locator: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  let prev = await locator.boundingBox();
+  for (let i = 0; i < 30; i++) {
+    await locator.page().waitForTimeout(50);
+    const cur = await locator.boundingBox();
+    if (prev && cur && Math.abs(cur.x - prev.x) < 0.5 && Math.abs(cur.y - prev.y) < 0.5) {
+      return cur;
+    }
+    prev = cur;
+  }
+  if (!prev) throw new Error('element never produced a bounding box');
+  return prev;
+}
 
 const PLAN_START = '2026-03-30';
 const PLAN_END   = '2026-04-05';
@@ -120,13 +142,15 @@ test.describe('Planning Wizard Step 5 — drag-reorder tasks in day card', () =>
     // CDK requires a genuine pointer-move past its drag threshold (≥5 px). We
     // replicate the full pointer lifecycle rather than using locator.dragTo(),
     // which does not always cross the threshold reliably in headless Chromium.
-    // Pattern proven in day-view-drag.spec.ts (Task 10).
+    // Pattern proven in day-view-drag.e2e.ts (Task 10).
     const source = taskItems.nth(1); // TASK_B — drag this one up
     const target = taskItems.nth(0); // TASK_A — drop above this one
 
-    const sourceBB = await source.boundingBox();
-    const targetBB = await target.boundingBox();
-    if (!sourceBB || !targetBB) throw new Error('Could not get bounding boxes for drag');
+    // Read coordinates only after the card's expand animation has settled (see
+    // stableBoundingBox) — otherwise CDK's drag-start rect cache and our target
+    // point are computed from moving geometry and the drop lands nowhere.
+    const sourceBB = await stableBoundingBox(source);
+    const targetBB = await stableBoundingBox(target);
 
     const startX = sourceBB.x + sourceBB.width  / 2;
     const startY = sourceBB.y + sourceBB.height / 2;

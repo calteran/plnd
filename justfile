@@ -187,6 +187,23 @@ check-tracing-skip:
 check-color-tokens:
     cd plnd_client && npm run check-color-tokens
 
+# Guard against dormant e2e specs: Playwright's testMatch is '**/*.e2e.ts', so
+# any *.spec.ts under plnd_client/e2e/ is silently never collected — it provides
+# zero coverage while looking like a passing test (see issue #999). Fail loudly
+# if one reappears. (Unit specs legitimately use *.spec.ts, but they live in
+# src/, never under e2e/.)
+check-e2e-naming:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    matches=$(find plnd_client/e2e -name '*.spec.ts' -type f)
+    if [[ -n "$matches" ]]; then
+        echo "✗ Found *.spec.ts under plnd_client/e2e/ — Playwright only collects *.e2e.ts," >&2
+        echo "  so these tests silently never run (see issue #999). Rename to *.e2e.ts:" >&2
+        echo "$matches" | sed 's/^/    /' >&2
+        exit 1
+    fi
+    echo "✓ No dormant *.spec.ts files under plnd_client/e2e/"
+
 # Combined quality check (all quality gates, no tests)
 check:
     just fmt
@@ -194,6 +211,7 @@ check:
     just deny
     just machete
     just check-tracing-skip
+    just check-e2e-naming
     just ts-lint
     just ts-deps
     just check-color-tokens
