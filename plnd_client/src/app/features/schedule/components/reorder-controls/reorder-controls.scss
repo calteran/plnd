@@ -3,8 +3,18 @@
   gap: 2px;
   margin-left: 8px;
   /* Hidden in the resting UI; revealed when the host row gains focus.
-     visibility (not display) keeps layout stable as focus moves. */
+     visibility (not display) keeps layout stable as focus moves.
+     The reveal rule lives here (not in task-row.scss) because Angular's
+     emulated view encapsulation scopes cross-component descendant selectors
+     to the parent's _ngcontent-* ID, so .reorder-controls inside a child
+     component never matches the parent's scoped selector. :host-context()
+     pierces the encapsulation boundary correctly. */
   visibility: hidden;
+}
+
+/* Reveal when any ancestor .task-row has focus inside it. */
+:host-context(.task-row:focus-within) .reorder-controls {
+  visibility: visible;
 }
 
 .reorder-btn {

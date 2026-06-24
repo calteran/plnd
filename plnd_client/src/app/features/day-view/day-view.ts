@@ -227,11 +227,15 @@ export class DayViewComponent implements OnInit, OnDestroy {
 
   /**
    * A stashed focus request that survives the async loadDay re-sync. Set when a
-   * keyboard move runs; cleared once focus lands on the rebuilt row. The
-   * constructor effect re-applies it after slotGroups() re-emits — see
+   * keyboard move runs; cleared after focus has been re-applied following the
+   * loadDay re-sync (i.e., the second applyPendingFocus pass). The constructor
+   * effect re-applies it after slotGroups() re-emits — see
    * refocusReorderButton / applyPendingFocus.
+   *
+   * `appliedOnce` is set to true by the first pass (optimistic); the constructor
+   * effect's setTimeout runs the second pass and clears the request.
    */
-  private readonly pendingFocus = signal<{ taskId: string; dir: 'up' | 'down' } | null>(null);
+  private readonly pendingFocus = signal<{ taskId: string; dir: 'up' | 'down'; appliedOnce: boolean } | null>(null);
 
   constructor() {
     // Rebuild mutable slot map and meal-anchor map whenever the service emits a
@@ -253,9 +257,13 @@ export class DayViewComponent implements OnInit, OnDestroy {
       this.mealAnchorMap.set(mealMap);
 
       // After a loadDay re-sync rebuilds the rows, re-apply any pending keyboard
-      // focus. The microtask defers focus until the new DOM row exists; this
+      // focus. setTimeout(0) defers focus until after Angular's change detection
+      // has run (a microtask would fire before CD, focusing a button that CD then
+      // immediately disables — causing the browser to drop focus to body). This
       // effect re-runs because it reads slotGroups(), which the reload re-emits.
-      queueMicrotask(() => this.applyPendingFocus());
+      // Pass fromReSync=true so applyPendingFocus clears pendingFocus after this
+      // final pass (the optimistic pass left it set with appliedOnce=true).
+      setTimeout(() => this.applyPendingFocus(true), 0);
     });
   }
 
@@ -622,20 +630,52 @@ export class DayViewComponent implements OnInit, OnDestroy {
    * request that the constructor effect re-applies once slotGroups() re-emits.
    */
   private refocusReorderButton(taskId: string, dir: 'up' | 'down'): void {
-    this.pendingFocus.set({ taskId, dir });
-    queueMicrotask(() => this.applyPendingFocus());
+    this.pendingFocus.set({ taskId, dir, appliedOnce: false });
+    // setTimeout(0) rather than queueMicrotask: microtasks fire before Angular's
+    // change detection, so the moved button's [disabled] binding hasn't updated
+    // yet — focusing an about-to-be-disabled button causes the browser to
+    // immediately drop focus to <body> once CD disables it. A macro-task delay
+    // ensures CD has re-rendered the row (with correct disabled states) before
+    // we read them to pick the best focus target.
+    setTimeout(() => this.applyPendingFocus(false), 0);
   }
 
-  private applyPendingFocus(): void {
+  /**
+   * @param fromReSync true when called from the constructor effect after a
+   *   loadDay re-sync; false when called from the initial optimistic pass.
+   *   On the initial pass we mark `appliedOnce` rather than clearing, so the
+   *   effect's second call (after the HTTP round-trip) re-applies focus to the
+   *   rebuilt row — preventing the DOM rebuild from silently dropping focus.
+   */
+  private applyPendingFocus(fromReSync: boolean): void {
     const req = this.pendingFocus();
     if (!req) return;
     const row = document.getElementById(`task-row-${req.taskId}`);
     if (!row) return; // row absent (rolled back / not yet rebuilt) — leave pending for the next pass
+
+    // The reorder buttons have `visibility: hidden` by default and are only
+    // revealed via `:focus-within` on `.task-row`. This means we CANNOT focus
+    // them directly — a `visibility: hidden` element refuses `focus()`.
+    // Strategy: focus the `.label` first (always visible, always focusable),
+    // which gives the row `:focus-within` and makes the buttons visible.
+    // Then focus the preferred button if it is not disabled.
+    const label = row.querySelector<HTMLElement>('.label');
+    label?.focus(); // give the row :focus-within so buttons become focusable
+
     const same = row.querySelector<HTMLButtonElement>(`[data-testid="reorder-${req.dir}"]`);
-    if (same && !same.disabled) { same.focus(); this.pendingFocus.set(null); return; }
+    if (same && !same.disabled) {
+      same.focus();
+      if (fromReSync) { this.pendingFocus.set(null); } else { this.pendingFocus.set({ ...req, appliedOnce: true }); }
+      return;
+    }
     const other = row.querySelector<HTMLButtonElement>(`[data-testid="reorder-${req.dir === 'up' ? 'down' : 'up'}"]`);
-    if (other && !other.disabled) { other.focus(); this.pendingFocus.set(null); return; }
-    row.querySelector<HTMLElement>('.label')?.focus();
+    if (other && !other.disabled) {
+      other.focus();
+      if (fromReSync) { this.pendingFocus.set(null); } else { this.pendingFocus.set({ ...req, appliedOnce: true }); }
+      return;
+    }
+    // Both buttons are disabled (impossible in theory — always one enabled unless
+    // the slot has only one task). Fall back to the label we already focused.
     this.pendingFocus.set(null);
   }
 
