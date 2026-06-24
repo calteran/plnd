@@ -216,6 +216,32 @@ describe('PlanDayCardComponent', () => {
     });
   });
 
+  describe('tasksForSlot() case-insensitive matching (#1005)', () => {
+    const CAPITALIZED_PATTERN: MealPatternEntry[] = [
+      { id: '1', name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
+      { id: '2', name: 'Lunch',     preferred_time: '12:00:00', tolerance_minutes: 60, sort_order: 2, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
+    ];
+
+    it('renders a drifted lower-case task in its Capitalized meal slot (not invisible)', () => {
+      // Production meal names are Capitalized; if the agent drifts to 'breakfast', the task
+      // must still appear in the 'Breakfast' slot. With a raw === comparison it would match
+      // neither the meal slot nor '<sched>' and render in no slot at all.
+      const mock = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: Mock };
+      mock.mealsForDate.mockReturnValue(CAPITALIZED_PATTERN);
+
+      service.initSession('2026-03-31', '2026-04-06');
+      service.addTask({ date: '2026-03-31', title: 'Pills', energy: 'low', paired_meal_name: 'breakfast' } as PlannedTask);
+
+      createComponent('2026-03-31');
+
+      const breakfast = (fixture.componentInstance as unknown as { tasksForSlot(s: string): PlannedTask[] }).tasksForSlot('Breakfast');
+      expect(breakfast.map(t => t.title)).toEqual(['Pills']);
+      // And it is NOT double-counted in the unanchored slot.
+      const sched = (fixture.componentInstance as unknown as { tasksForSlot(s: string): PlannedTask[] }).tasksForSlot('<sched>');
+      expect(sched.map(t => t.title)).toEqual([]);
+    });
+  });
+
   describe('onDrop() same-day cross-slot (into-meal pairing)', () => {
     it('same-day drop from <sched> into meal slot sets paired_meal_name and leaves exactly ONE instance', () => {
       service.initSession('2026-03-31', '2026-04-06');

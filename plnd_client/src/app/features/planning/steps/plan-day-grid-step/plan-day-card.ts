@@ -4,11 +4,7 @@ import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
 import { DayTypesMealsService } from '../../../../core/services/day-types-meals.service';
 import { EnergyLevel, PlannedTask } from '../../../../core/models/week-plan';
-
-/** Derive the slot key from a PlannedTask (matches buildCommitRequest derivation). */
-function taskSlotKey(t: PlannedTask): string {
-  return t.paired_meal_name ?? t.after_anchor ?? '<sched>';
-}
+import { slotKeysMatch } from '../../../../core/utils/slot-key';
 
 /** CDK drop list ID for a (date, slotKey) pair in the wizard day grid. */
 function wizardDropListId(date: string, slotKey: string): string {
@@ -137,9 +133,9 @@ export class PlanDayCardComponent {
 
   protected readonly mealCount = computed(() => this.slots().filter(s => this.getMeal(s.name)).length);
 
-  /** Tasks in a specific slot (meal name or '<sched>' for unanchored). */
+  /** Tasks in a specific slot (meal name or '<sched>' for unanchored), matched case-insensitively. */
   protected tasksForSlot(slotKey: string): PlannedTask[] {
-    return this.tasks().filter(t => taskSlotKey(t) === slotKey);
+    return this.tasks().filter(t => slotKeysMatch(t, slotKey));
   }
 
   /** CDK drop list ID for a slot on this card's date. */
@@ -170,10 +166,12 @@ export class PlanDayCardComponent {
   protected onDrop(event: CdkDragDrop<PlannedTask[]>, targetSlotKey: string): void {
     const task: PlannedTask = event.item.data;
     const prevDate = task.date;
-    const prevSlotKey = taskSlotKey(task);
     const newDate = this.date();
+    // Compare slots case-insensitively; pass the raw targetSlotKey to the service so
+    // paired_meal_name keeps the rendered meal's display casing.
+    const sameSlot = slotKeysMatch(task, targetSlotKey);
 
-    if (prevDate === newDate && prevSlotKey === targetSlotKey) {
+    if (prevDate === newDate && sameSlot) {
       // Pure reorder within the same (date, slot)
       this.weekPlanService.reorderTask(newDate, targetSlotKey, event.previousIndex, event.currentIndex);
     } else {
