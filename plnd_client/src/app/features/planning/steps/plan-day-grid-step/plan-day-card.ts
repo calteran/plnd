@@ -12,6 +12,7 @@ import {
   describeDayJump,
   DayLayout,
 } from '../../../../core/utils/reorder-navigation';
+import { parseDateOnly } from '../../../../core/utils/date-only';
 import { ReorderControlsComponent } from '../../../schedule/components/reorder-controls/reorder-controls';
 
 /** CDK drop list ID for a (date, slotKey) pair in the wizard day grid. */
@@ -257,6 +258,18 @@ export class PlanDayCardComponent {
     return slotKey === '<sched>' ? 'Tasks' : slotKey;
   }
 
+  /**
+   * Friendly day label for announcements, e.g. "Wed Mar 20".
+   * Matches the card header style (EEE + MMM d) rather than a raw ISO string,
+   * so screen readers hear "Wed Mar 20" instead of "2026-03-20".
+   */
+  private dayLabel(isoDate: string): string {
+    const d = parseDateOnly(isoDate);
+    const DAY_ABBREVS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const MONTH_ABBREVS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return `${DAY_ABBREVS[d.getDay()]} ${MONTH_ABBREVS[d.getMonth()]} ${d.getDate()}`;
+  }
+
   /** Step a task one position earlier/later within its day, then announce + refocus. */
   protected onMove(slotKey: string, i: number, dir: 'up' | 'down'): void {
     const result = stepWithinDay(this.dayLayout(), `${slotKey}#${i}`, dir);
@@ -298,7 +311,7 @@ export class PlanDayCardComponent {
     this.weekPlanService.updateTaskSlot(task, targetDate, targetSlot, endIndex);
 
     this.announcer.announce(describeDayJump({
-      dayLabel: targetDate,
+      dayLabel: this.dayLabel(targetDate),
       targetLabel: targetSlot === '<sched>' ? undefined : targetSlot,
     }), 'polite');
 
