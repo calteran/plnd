@@ -112,6 +112,11 @@
   }
 }
 
+// Reveal reorder controls when keyboard focus lands anywhere inside the row.
+.task-row:focus-within app-reorder-controls .reorder-controls {
+  visibility: visible;
+}
+
 .type-badge {
   font-size: 9px;
   font-weight: 600;

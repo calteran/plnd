@@ -165,3 +165,29 @@ describe('TaskRowComponent', () => {
     expect(f.nativeElement.querySelector('app-task-edit-form')).toBeTruthy();
   });
 });
+
+function reorderTask(): ScheduleTask {
+  return { id: 't1', type: 'general', label: 'Take meds', status: 'pending', oneShot: false, floating: true };
+}
+
+describe('TaskRowComponent reorder controls', () => {
+  beforeEach(() => TestBed.resetTestingModule());
+
+  it('emits moveUp with the task id when the up control is clicked', () => {
+    const fixture = TestBed.createComponent(TaskRowComponent);
+    fixture.componentRef.setInput('item', reorderTask());
+    fixture.componentRef.setInput('canMoveUp', true);
+    let emitted: string | undefined;
+    fixture.componentInstance.moveUp.subscribe((id: string) => (emitted = id));
+    fixture.detectChanges();
+    fixture.debugElement.query(By.css('[data-testid="reorder-up"]')).nativeElement.click();
+    expect(emitted).toBe('t1');
+  });
+
+  it('does not render day-jump buttons when canMovePrevDay/NextDay are undefined', () => {
+    const fixture = TestBed.createComponent(TaskRowComponent);
+    fixture.componentRef.setInput('item', reorderTask());
+    fixture.detectChanges();
+    expect(fixture.debugElement.query(By.css('[data-testid="reorder-next-day"]'))).toBeNull();
+  });
+});
