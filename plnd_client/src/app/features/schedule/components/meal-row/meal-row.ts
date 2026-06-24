@@ -59,6 +59,8 @@ import { MealReviewPaneComponent } from '../../../day-view/components/meal-revie
           <app-task-row
             cdkDrag
             [cdkDragData]="task"
+            (cdkDragStarted)="dragStarted.emit()"
+            (cdkDragEnded)="dragEnded.emit()"
             [id]="'task-row-' + task.id"
             [class.dimmed]="isTaskDimmed(task)"
             [attr.inert]="isTaskDimmed(task) ? '' : null"
@@ -99,6 +101,14 @@ export class MealRowComponent {
   readonly connectedTo = input<string[]>([]);
   /** Emitted when a task is dropped into/within this meal's during-meal list. */
   readonly mealDrop    = output<CdkDragDrop<ScheduleTask[]>>();
+
+  // Re-emit CDK's drag lifecycle so the day view can open the floating-task slot
+  // gaps for the duration of a drag that *starts* on a during-meal task (its
+  // target may be an empty slot). Both CDK's events and output.emit are
+  // synchronous, so the day view's classList mutation still lands before CDK
+  // caches the slot hit-rects at drag start — see DayViewComponent.onDragStarted.
+  readonly dragStarted = output<void>();
+  readonly dragEnded   = output<void>();
 
   readonly reviewOpen = signal(false);
 

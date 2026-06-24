@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { CdkDrag, type CdkDragStart, type CdkDragEnd } from '@angular/cdk/drag-drop';
 import { MealRowComponent } from './meal-row';
 import { MealAnchor } from '../../../../core/models/schedule';
 import { ConfigService } from '../../../../core/services/config.service';
@@ -110,6 +111,25 @@ describe('MealRowComponent', () => {
     f.componentInstance.toggled.subscribe((id: string) => emitted = id);
     f.debugElement.query(By.css('app-task-row .checkbox')).nativeElement.click();
     expect(emitted).toBe('dt1');
+  });
+
+  // Re-emitting CDK's drag lifecycle lets the day view open the floating-task
+  // slot gaps while a *during-meal* task is being dragged (its target may be an
+  // empty slot). This wiring has no other automated coverage — the slot-gap e2e
+  // drags a slot task, not a meal task — so guard the re-emit here.
+  it('re-emits dragStarted/dragEnded from a during-meal task drag', async () => {
+    const f = await setup(withTasks);
+    const drag = f.debugElement.query(By.directive(CdkDrag)).injector.get(CdkDrag);
+    let started = false;
+    let ended = false;
+    f.componentInstance.dragStarted.subscribe(() => started = true);
+    f.componentInstance.dragEnded.subscribe(() => ended = true);
+
+    drag.started.emit({ source: drag } as unknown as CdkDragStart);
+    expect(started).toBe(true);
+
+    drag.ended.emit({ source: drag } as unknown as CdkDragEnd);
+    expect(ended).toBe(true);
   });
 
   it('hosts the task-edit form for the during-meal task named by editingId', async () => {

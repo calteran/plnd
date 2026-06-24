@@ -7,9 +7,12 @@
 // The 'start of day' slot renders as a bare .slot-drop-list div with no label.
 // When it holds no tasks it would collapse to zero height, so CDK's drop-target
 // geometry (_canReceive → isInsideClientRect / elementFromPoint) can never match
-// it: a task can't be dropped above the first anchor. The fix is a *permanent*
-// min-height on .slot-drop-list — CDK caches a list's hit-rect at drag start,
-// before a drag-only class would apply, so the height must exist up front.
+// it: a task can't be dropped above the first anchor. The fix gives the slot a
+// min-height while a drag is active — added by a SYNCHRONOUS DOM mutation in the
+// drag-start handler so it's in effect before CDK caches each list's hit-rect at
+// drag start (a class applied on the next change-detection tick lands too late).
+// The companion test day-view-drag-slot-gap.e2e.ts guards that the gap is only
+// present mid-drag (flush at rest); this test guards that the drop still works.
 //
 // We seed a real first anchor (Breakfast) with one floating task in *its* slot —
 // so the start-of-day slot above it starts out empty — then drag the task up into

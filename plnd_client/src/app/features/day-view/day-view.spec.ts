@@ -777,4 +777,36 @@ describe('DayViewComponent (drag-and-drop)', () => {
     expect(clonedMeal.duringMealTasks).not.toBe(serviceOwnedDuringMeal);
     expect(serviceOwnedDuringMeal.length, 'service snapshot must not be mutated').toBe(0);
   });
+
+  // The `dragging` class is what gates the slot min-height (#1001): present only
+  // mid-drag so the resting layout stays flush. onDragStarted/onDragEnded toggle
+  // it via a synchronous DOM mutation — see the handler comment for why it can't
+  // be an Angular binding. (The mid-drag *geometry* is covered end-to-end by
+  // day-view-drag-slot-gap.e2e.ts; here we just lock the toggle itself.)
+  it('toggles the `dragging` class on the schedule list across a drag', async () => {
+    const { f } = await setupDrop([t1, t2]);
+    const list = f.debugElement.query(By.css('.schedule-list')).nativeElement as HTMLElement;
+
+    expect(list.classList.contains('dragging')).toBe(false);
+
+    f.componentInstance.onDragStarted();
+    expect(list.classList.contains('dragging')).toBe(true);
+
+    f.componentInstance.onDragEnded();
+    expect(list.classList.contains('dragging')).toBe(false);
+  });
+
+  it('clears a stuck `dragging` class on a document pointer release (CDK dispose safety net)', async () => {
+    const { f } = await setupDrop([t1, t2]);
+    const list = f.debugElement.query(By.css('.schedule-list')).nativeElement as HTMLElement;
+
+    // Simulate the class being left on by a drag whose cdkDragEnded never fired
+    // (CdkDrag.dispose() completes the emitter without emitting).
+    f.componentInstance.onDragStarted();
+    expect(list.classList.contains('dragging')).toBe(true);
+
+    // A physical pointer release on the document must clear it regardless.
+    document.dispatchEvent(new Event('mouseup'));
+    expect(list.classList.contains('dragging')).toBe(false);
+  });
 });
