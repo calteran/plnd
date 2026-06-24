@@ -21,13 +21,16 @@
 // 'start of day' slot above the first anchor is empty by default, which made it
 // impossible to drag a task above the first anchor of the day.
 //
-// The min-height MUST be permanent (not gated on a drag-only class): CDK caches
-// a drop list's hit-rect at drag *start* (inside _startReceiving, re-measured
-// only on scroll), which happens before Angular can apply a `.cdk-drop-list-*`
-// class — so a drag-only height lands too late and is never seen. A permanent
-// height is captured correctly. Populated slots are already taller, so this only
-// materialises the empty ones.
-.slot-drop-list {
+// The min-height is gated on `.schedule-list.dragging` so empty slots stay flush
+// at rest and only open up while a drag is in progress. The gating class is added
+// by a SYNCHRONOUS DOM mutation in day-view's drag-start handler, NOT an Angular
+// binding — it MUST be in effect before CDK caches each slot's hit-rect at drag
+// start (DropListRef._startReceiving), which a class CDK/Angular toggles on the
+// next change-detection tick would miss (the slot would cache at zero height and
+// stay undroppable — the #1000 bug). See DayViewComponent.onDragStarted for the
+// timing constraint; do not move this height onto a `.cdk-drop-list-*` class.
+// Populated slots are already taller, so this only materialises the empty ones.
+.schedule-list.dragging .slot-drop-list {
   min-height: 1.5rem;
 }
 

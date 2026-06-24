@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnDestroy, OnInit, computed, effect, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, OnDestroy, OnInit, Renderer2, computed, effect, inject, signal, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { forkJoin } from 'rxjs';
@@ -76,7 +76,7 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
             <p>Nothing planned yet. Add something to get started.</p>
           </div>
         } @else {
-          <div class="schedule-list">
+          <div class="schedule-list" #scheduleList>
             @if (zoneView()?.kind === 'travel') {
               <!-- v1: switch row at top of list; finer per-item ordering is a follow-up -->
               <app-timezone-switch-row
@@ -99,6 +99,8 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                     [editingId]="editingId()"
                     [dropListId]="'meal-' + group.anchor.id"
                     [connectedTo]="allDropListIds()"
+                    (dragStarted)="onDragStarted()"
+                    (dragEnded)="onDragEnded()"
                     (mealDrop)="onMealDrop($event, group.anchor.id)"
                     (editRequested)="openEditor($event)"
                     (save)="onEditSave(editingId()!, $event)"
@@ -134,6 +136,8 @@ import { TimezoneWhyComponent } from './components/timezone-why/timezone-why';
                     <app-task-row
                       cdkDrag
                       [cdkDragData]="task"
+                      (cdkDragStarted)="onDragStarted()"
+                      (cdkDragEnded)="onDragEnded()"
                       [id]="'task-row-' + task.id"
                       [class.dimmed]="isSpotlightDimmed(task)"
                       [attr.inert]="isSpotlightDimmed(task) ? '' : null"
@@ -180,6 +184,10 @@ export class DayViewComponent implements OnInit, OnDestroy {
   private  readonly route            = inject(ActivatedRoute);
   private  readonly router           = inject(Router);
   private  readonly destroyRef       = inject(DestroyRef);
+  private  readonly renderer         = inject(Renderer2);
+
+  /** The schedule list element — host of the drag-only `dragging` class. */
+  private readonly scheduleList = viewChild<ElementRef<HTMLElement>>('scheduleList');
 
   readonly isToday = computed(() => this.scheduleService.date() === todayIso());
 
@@ -408,6 +416,53 @@ export class DayViewComponent implements OnInit, OnDestroy {
   closeToast(): void {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastMessage.set(null);
+  }
+
+  /**
+   * Open the floating-task slot gaps for the duration of a drag.
+   *
+   * The class is toggled by a SYNCHRONOUS DOM mutation (Renderer2.addClass),
+   * NOT an Angular binding (`[class.dragging]` / a signal). This is load-bearing,
+   * not a style choice — do not "simplify" it into a binding:
+   *
+   *   CDK caches each slot drop-list's hit-rect at drag *start*, inside
+   *   DropListRef._startReceiving (@angular/cdk drag-drop.mjs ~L1007), which runs
+   *   in the same synchronous tick immediately after `cdkDragStarted` fires
+   *   (~L1003). An empty `.slot-drop-list` is zero-height, so unless the
+   *   `min-height` is already in effect at that instant CDK caches a zero-height
+   *   rect and the slot can never receive a drop (the #1000 bug). A host/class
+   *   binding applies on the *next* change-detection tick — too late. A direct
+   *   classList mutation here lands before the caching, so the CSS rule
+   *   `.schedule-list.dragging .slot-drop-list { min-height }` is live in time.
+   *
+   * `cdkDragStarted`/`cdkDragEnded` are synchronous EventEmitters, and so is the
+   * `dragStarted`/`dragEnded` re-emit from meal-row, so drags originating in a
+   * during-meal list reach this handler synchronously too.
+   */
+  onDragStarted(): void {
+    const el = this.scheduleList()?.nativeElement;
+    if (el) this.renderer.addClass(el, 'dragging');
+  }
+
+  /**
+   * Collapse the slot gaps again once the drag ends — keeps the resting layout tight.
+   *
+   * Also bound to document pointer-release events as a safety net: CDK's
+   * `CdkDrag.dispose()` *completes* the `ended` emitter without emitting, so if
+   * the dragged row is torn down mid-drag (e.g. a `loadDay()` resolves and
+   * `@for…track id` drops it) `(cdkDragEnded)` never fires and the `dragging`
+   * class would stay stuck on, reintroducing the resting gap. A physical release
+   * always fires one of these — the same events CDK itself ends a drag on. Bound
+   * via `@HostListener` (not `Renderer2.listen('document', …)`) so Angular tears
+   * the listeners down on destroy — a routed component would otherwise leak them.
+   * Idempotent with the normal `(cdkDragEnded)` path (`removeClass` no-ops if absent).
+   */
+  @HostListener('document:mouseup')
+  @HostListener('document:touchend')
+  @HostListener('document:touchcancel')
+  onDragEnded(): void {
+    const el = this.scheduleList()?.nativeElement;
+    if (el) this.renderer.removeClass(el, 'dragging');
   }
 
   /** Drop handler for a slot's floating task list. */
