@@ -72,7 +72,7 @@ function wizardDropListId(date: string, slotKey: string): string {
                   (cdkDropListDropped)="onDrop($event, entry.name)"
                   class="slot-drop-list meal-slot-drop-list"
                 >
-                  @for (task of tasksForSlot(entry.name); track task; let i = $index) {
+                  @for (task of tasksForSlot(entry.name); track $index; let i = $index) {
                     <div
                       cdkDrag
                       [cdkDragData]="task"
@@ -115,7 +115,7 @@ function wizardDropListId(date: string, slotKey: string): string {
               (cdkDropListDropped)="onDrop($event, '<sched>')"
               class="slot-drop-list"
             >
-              @for (task of tasksForSlot('<sched>'); track task; let i = $index) {
+              @for (task of tasksForSlot('<sched>'); track $index; let i = $index) {
                 <div
                   cdkDrag
                   [cdkDragData]="task"
@@ -316,6 +316,11 @@ export class PlanDayCardComponent {
    * preferred direction button; if it is disabled at a boundary, fall back to its
    * sibling, else leave focus on the row. Deferred with setTimeout(0) so Angular has
    * applied the `[disabled]` bindings before we read them.
+   *
+   * NOTE: this only works because the task `@for` loops `track $index` (position-
+   * based), so a reorder updates the existing row node IN PLACE. Tracking by object
+   * identity would make Angular physically MOVE the moved task's DOM node (detach +
+   * reattach), which drops focus to <body> and races this deferred re-focus.
    */
   private refocusReorderButton(
     slotKey: string,

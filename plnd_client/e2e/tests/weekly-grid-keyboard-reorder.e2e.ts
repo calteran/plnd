@@ -5,7 +5,8 @@
 // clicks the reorder-down button. Asserts:
 //   - the task order swapped (Beta is now first)
 //   - the card is still expanded (stopPropagation on button click prevents collapse)
-//   - focus stayed within the day card (tolerant: row, button, or child element)
+//   - focus followed the moved task (load-bearing: real activeElement check on the
+//     moved row's reorder buttons or the row element itself — never forces focus)
 //
 // No page.route() mocks on /schedule/* — data flows through the real API.
 // Per-test user isolation via seedAuth (unique sub per test).
@@ -136,43 +137,39 @@ test.describe('Planning Wizard Step 5 — keyboard reorder tasks in day card', (
     // ── Assert card is still expanded (button click did not collapse it) ────────
     await expect(mondayCard).toHaveAttribute('aria-expanded', 'true');
 
-    // ── Tolerant focus assertion ───────────────────────────────────────────────
-    //
-    // After the move, refocusReorderButton() applies focus to the moved task's
-    // row (TASK_A, now at index 1) or one of its reorder buttons via setTimeout(0).
-    // Wait for the setTimeout(0) to fire, then check document.activeElement.
-    // Accept any focused element inside the moved task's row; if not, fall back
-    // to checking the individual buttons directly via :focus (mirrors the tolerant
-    // pattern in onboarding-keyboard-reorder.e2e.ts). reorder-down is disabled
-    // when TASK_A is last (index 1 of 2); reorder-up is the primary expected target.
-    await page.waitForTimeout(100); // give setTimeout(0) time to run
-
-    // ── Tolerant focus assertion ───────────────────────────────────────────────
+    // ── Focus-follows-task assertion (tolerant but load-bearing) ───────────────
     //
     // After the reorder, refocusReorderButton() in the component fires via
-    // setTimeout(0) and attempts to focus the moved task's row then a reorder
-    // button within it. In headless Chromium the programmatic focus call may not
-    // retain focus after CDK re-renders the drag list. The assertion is therefore
-    // intentionally tolerant: we first check if the component's refocus worked
-    // (document.activeElement inside the moved row); if it didn't, we verify the
-    // stronger property — the moved row IS focusable and reveals its reorder
-    // controls. This proves the keyboard affordance is intact for the moved task.
+    // setTimeout(0): it focuses the moved task's always-visible row element (the
+    // `.draggable-task`, tabindex=0) to reveal the controls, then focuses the
+    // preferred reorder button (falling back to its sibling, else leaving focus
+    // on the row). The moved task is TASK_A, now at index 1.
     //
+    // This assertion is REAL — it only inspects document.activeElement / `:focus`
+    // and NEVER calls Playwright `.focus()` itself. It accepts any of the legitimate
+    // landing spots (reorder-up, reorder-down, or the row element) but MUST fail if
+    // the component leaves focus on <body>. reorder-down is disabled when TASK_A is
+    // last (index 1 of 2), so reorder-up is the expected primary target.
+    await page.waitForTimeout(100); // give setTimeout(0) time to run
+
     // Locate the moved task's row (TASK_A moved down to index 1)
     const movedRow = taskItemsAfter.nth(1);
 
+    // Check document.activeElement is the moved row itself or a control inside it.
     const focusIsInMovedRow = await movedRow.evaluate(rowEl => {
       const active = document.activeElement;
-      return active !== null && rowEl.contains(active);
+      return active !== null && (rowEl === active || rowEl.contains(active));
     });
 
     if (!focusIsInMovedRow) {
-      // Component's refocus didn't land (headless limitation). Verify instead
-      // that the moved row is focusable and its reorder controls are operable.
-      // Focus the row directly via Playwright and check controls become visible.
-      await movedRow.focus();
-      // reorder-up should be visible (row is now last — down is disabled, up is enabled)
-      await expect(movedRow.getByTestId('reorder-up')).toBeVisible({ timeout: 3_000 });
+      // Tolerant fallback: check the preferred targets individually via :focus.
+      // No forced focus — these are pure activeElement membership checks.
+      const upFocused   = await movedRow.getByTestId('reorder-up').evaluate(el => el.matches(':focus')).catch(() => false);
+      const downFocused = await movedRow.getByTestId('reorder-down').evaluate(el => el.matches(':focus')).catch(() => false);
+      const rowFocused  = await movedRow.evaluate(el => el.matches(':focus')).catch(() => false);
+      expect(upFocused || downFocused || rowFocused,
+        'Expected focus on reorder-up, reorder-down, or the moved (Alpha) row element',
+      ).toBe(true);
     }
   });
 
