@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { signal, WritableSignal } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
@@ -775,6 +776,50 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     const allWalks = component.entries().filter(e => e.title === 'Walk');
     expect(allWalks.length).toBe(1);
     expect(allWalks[0].scheduled_date).toBe('2026-04-29');
+  });
+
+  // ── Keyboard reorder: within-slot down ───────────────────────────────────────
+
+  it('keyboard down reorders two entries within a slot', async () => {
+    const { component, httpController, fixture } = setup(['First', 'Second'], PLAN_PERIOD, []);
+    fixture.detectChanges();
+
+    // Two unanchored fixed-time tasks in the same <sched> slot on the same date.
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([
+      { title: 'First', scheduled_date: '2026-04-28', time_window_start: '09:00',
+        task_type: 'general', duration_minutes: 15, energy_required: 'low' },
+      { title: 'Second', scheduled_date: '2026-04-28', time_window_start: '10:00',
+        task_type: 'general', duration_minutes: 15, energy_required: 'low' },
+    ] as PlaceTasksEntry[]);
+    fixture.detectChanges();
+
+    const downs = fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'));
+    downs[0].nativeElement.click();
+    fixture.detectChanges();
+
+    const titles = fixture.debugElement.queryAll(By.css('.task-title')).map(d => d.nativeElement.textContent.trim());
+    expect(titles).toEqual(['Second', 'First']);
+
+    expect(component.entries().map(e => e.title)).toEqual(['Second', 'First']);
+  });
+
+  // ── Keyboard day-jump: next day ──────────────────────────────────────────────
+
+  it('next-day jump moves an entry to the following date in the unanchored slot', async () => {
+    const { component, httpController, fixture } = setup(['Solo'], PLAN_PERIOD, []);
+    fixture.detectChanges();
+
+    httpController.expectOne(`${API_BASE}/agent/place-tasks`).flush([
+      { title: 'Solo', scheduled_date: '2026-04-28', time_window_start: '09:00',
+        task_type: 'general', duration_minutes: 15, energy_required: 'low' },
+    ] as PlaceTasksEntry[]);
+    fixture.detectChanges();
+
+    fixture.debugElement.queryAll(By.css('[data-testid="reorder-next-day"]'))[0].nativeElement.click();
+    fixture.detectChanges();
+
+    const entry = component.entries()[0];
+    expect(entry.scheduled_date).toBe('2026-04-29');
   });
 
 });
