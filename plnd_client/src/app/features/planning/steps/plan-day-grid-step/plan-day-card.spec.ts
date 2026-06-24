@@ -3,6 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { signal } from '@angular/core';
+import { By } from '@angular/platform-browser';
 import { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { PlanDayCardComponent } from './plan-day-card';
 import { WeekPlanService } from '../../../../core/services/week-plan.service';
@@ -272,6 +273,65 @@ describe('PlanDayCardComponent', () => {
       expect(allWalks[0].date).toBe('2026-03-31');
       // (c) now paired with lunch
       expect(allWalks[0].paired_meal_name).toBe('lunch');
+    });
+  });
+
+  describe('keyboard reorder + day jump', () => {
+    it('keyboard down on a sched task calls reorderTask with the next index', () => {
+      service.initSession('2026-03-19', '2026-03-25');
+      service.addTask({ date: '2026-03-19', title: 'First',  energy: 'low' } as PlannedTask);
+      service.addTask({ date: '2026-03-19', title: 'Second', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      const reorderTaskSpy = vi.spyOn(service, 'reorderTask');
+
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'))[0].nativeElement.click();
+
+      expect(reorderTaskSpy).toHaveBeenCalledWith('2026-03-19', '<sched>', 0, 1);
+    });
+
+    it('next-day jump calls updateTaskSlot with the following date', () => {
+      service.initSession('2026-03-19', '2026-03-20');
+      service.addTask({ date: '2026-03-19', title: 'Only', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      const updateTaskSlotSpy = vi.spyOn(service, 'updateTaskSlot');
+
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-next-day"]'))[0].nativeElement.click();
+
+      expect(updateTaskSlotSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        '2026-03-20',
+        '<sched>',
+        0,
+      );
+    });
+
+    it('clicking a reorder button does NOT collapse the card', () => {
+      service.initSession('2026-03-19', '2026-03-25');
+      service.addTask({ date: '2026-03-19', title: 'First',  energy: 'low' } as PlannedTask);
+      service.addTask({ date: '2026-03-19', title: 'Second', energy: 'low' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      const card: HTMLElement = fixture.nativeElement.querySelector('.day-card');
+      expect(card.classList.contains('expanded')).toBe(true);
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-down"]'))[0].nativeElement.click();
+      fixture.detectChanges();
+
+      expect(card.classList.contains('expanded')).toBe(true);
     });
   });
 

@@ -17,6 +17,12 @@
   visibility: visible;
 }
 
+/* Reveal in the weekly day-grid, whose draggable rows are .draggable-task
+   (not .task-row). Same encapsulation-piercing rationale as above. */
+:host-context(.draggable-task:focus-within) .reorder-controls {
+  visibility: visible;
+}
+
 .reorder-btn {
   border: 1px solid var(--color-border-input);
   background: var(--color-surface-white);
