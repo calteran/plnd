@@ -231,11 +231,8 @@ export class DayViewComponent implements OnInit, OnDestroy {
    * loadDay re-sync (i.e., the second applyPendingFocus pass). The constructor
    * effect re-applies it after slotGroups() re-emits — see
    * refocusReorderButton / applyPendingFocus.
-   *
-   * `appliedOnce` is set to true by the first pass (optimistic); the constructor
-   * effect's setTimeout runs the second pass and clears the request.
    */
-  private readonly pendingFocus = signal<{ taskId: string; dir: 'up' | 'down'; appliedOnce: boolean } | null>(null);
+  private readonly pendingFocus = signal<{ taskId: string; dir: 'up' | 'down' } | null>(null);
 
   constructor() {
     // Rebuild mutable slot map and meal-anchor map whenever the service emits a
@@ -262,7 +259,7 @@ export class DayViewComponent implements OnInit, OnDestroy {
       // immediately disables — causing the browser to drop focus to body). This
       // effect re-runs because it reads slotGroups(), which the reload re-emits.
       // Pass fromReSync=true so applyPendingFocus clears pendingFocus after this
-      // final pass (the optimistic pass left it set with appliedOnce=true).
+      // second pass (the optimistic pass left it set for the re-sync pass to clear).
       setTimeout(() => this.applyPendingFocus(true), 0);
     });
   }
@@ -627,10 +624,11 @@ export class DayViewComponent implements OnInit, OnDestroy {
    * Re-focus the moved task's control. Runs once immediately (the optimistic
    * re-render already placed the button) AND again after the async loadDay
    * re-sync rebuilds the rows — the second pass is why we stash a pending focus
-   * request that the constructor effect re-applies once slotGroups() re-emits.
+   * request that the constructor effect re-applies (via `fromReSync=true`) once
+   * slotGroups() re-emits. The re-sync pass clears the request after applying it.
    */
   private refocusReorderButton(taskId: string, dir: 'up' | 'down'): void {
-    this.pendingFocus.set({ taskId, dir, appliedOnce: false });
+    this.pendingFocus.set({ taskId, dir });
     // setTimeout(0) rather than queueMicrotask: microtasks fire before Angular's
     // change detection, so the moved button's [disabled] binding hasn't updated
     // yet — focusing an about-to-be-disabled button causes the browser to
@@ -643,9 +641,9 @@ export class DayViewComponent implements OnInit, OnDestroy {
   /**
    * @param fromReSync true when called from the constructor effect after a
    *   loadDay re-sync; false when called from the initial optimistic pass.
-   *   On the initial pass we mark `appliedOnce` rather than clearing, so the
-   *   effect's second call (after the HTTP round-trip) re-applies focus to the
-   *   rebuilt row — preventing the DOM rebuild from silently dropping focus.
+   *   On the initial pass we leave the request set so the effect's second call
+   *   (after the HTTP round-trip) re-applies focus to the rebuilt row — preventing
+   *   the DOM rebuild from silently dropping focus. The re-sync pass clears it.
    */
   private applyPendingFocus(fromReSync: boolean): void {
     const req = this.pendingFocus();
@@ -665,13 +663,13 @@ export class DayViewComponent implements OnInit, OnDestroy {
     const same = row.querySelector<HTMLButtonElement>(`[data-testid="reorder-${req.dir}"]`);
     if (same && !same.disabled) {
       same.focus();
-      if (fromReSync) { this.pendingFocus.set(null); } else { this.pendingFocus.set({ ...req, appliedOnce: true }); }
+      if (fromReSync) { this.pendingFocus.set(null); }
       return;
     }
     const other = row.querySelector<HTMLButtonElement>(`[data-testid="reorder-${req.dir === 'up' ? 'down' : 'up'}"]`);
     if (other && !other.disabled) {
       other.focus();
-      if (fromReSync) { this.pendingFocus.set(null); } else { this.pendingFocus.set({ ...req, appliedOnce: true }); }
+      if (fromReSync) { this.pendingFocus.set(null); }
       return;
     }
     // Both buttons are disabled (impossible in theory — always one enabled unless
