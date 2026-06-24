@@ -341,6 +341,36 @@ describe('PlanDayCardComponent', () => {
       expect(announced).toMatch(/\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/);
     });
 
+    it('next-day jump lands a drifted-casing meal task in the target day\'s Capitalized slot (#1005)', () => {
+      // A task paired with 'breakfast' (drifted lowercase) jumping to a day whose meal
+      // slot is 'Breakfast' must land in 'Breakfast' (target display casing), not fall
+      // to '<sched>'. With a raw === comparison the old resolveDayJump would have missed.
+      const CAP = [
+        { id: '1', name: 'Breakfast', preferred_time: '08:00:00', tolerance_minutes: 60, sort_order: 1, user_id: '', day_type_id: '', created_at: '', updated_at: '' },
+      ];
+      const mock = TestBed.inject(DayTypesMealsService) as unknown as { mealsForDate: Mock };
+      mock.mealsForDate.mockReturnValue(CAP);
+
+      service.initSession('2026-03-19', '2026-03-20');
+      service.addTask({ date: '2026-03-19', title: 'Pills', energy: 'low', paired_meal_name: 'breakfast' } as PlannedTask);
+
+      createComponent('2026-03-19');
+      fixture.componentRef.setInput('horizonDays', ['2026-03-19', '2026-03-20']);
+      const updateTaskSlotSpy = vi.spyOn(service, 'updateTaskSlot');
+
+      fixture.componentInstance['toggle']();
+      fixture.detectChanges();
+
+      fixture.debugElement.queryAll(By.css('[data-testid="reorder-next-day"]'))[0].nativeElement.click();
+
+      expect(updateTaskSlotSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Pills' }),
+        '2026-03-20',
+        'Breakfast',
+        0,
+      );
+    });
+
     it('clicking a reorder button does NOT collapse the card', () => {
       service.initSession('2026-03-19', '2026-03-25');
       service.addTask({ date: '2026-03-19', title: 'First',  energy: 'low' } as PlannedTask);
