@@ -1158,7 +1158,10 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
    */
   private refocusReorderButton(entry: PlaceTasksEntry, dir: 'up' | 'down'): void {
     setTimeout(() => {
-      const newIdx = this.entries().indexOf(entry);
+      // `applyMove` creates a new entry object via spread, so the original `entry`
+      // reference is no longer in the list. Find the moved entry by title (assumed
+      // unique within a plan) so cross-slot and cross-day moves also resolve.
+      const newIdx = this.entries().findIndex(e => e.title === entry.title);
       if (newIdx === -1) return;
       const row = document.getElementById(this.rowDomId(newIdx));
       if (!row) return;
