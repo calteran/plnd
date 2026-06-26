@@ -1,3 +1,4 @@
+mod providers;
 mod telemetry;
 
 use axum::http::{HeaderName, HeaderValue, Method};
@@ -22,7 +23,6 @@ use std::sync::Arc;
 
 use plnd_api::auth::auth_middleware;
 use plnd_api::auth::{JwksCache, JwtService, SessionService};
-use plnd_api::briefing::BriefingState;
 use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
 #[cfg(debug_assertions)]
@@ -33,16 +33,6 @@ use plnd_api::routes::{
     system, tasks, timezone, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
 use plnd_api::state::AppState;
-use plnd_data::cache::SearchCache;
-#[cfg(debug_assertions)]
-use plnd_data::providers::{
-    FixtureNewsProvider, FixtureNutritionProvider, FixtureWeatherProvider, TheMealDbFixtureProvider,
-};
-use plnd_data::providers::{
-    NewsProvider, OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider,
-    UsdaFdcProvider, WeatherProvider,
-};
-use plnd_data::search::ProviderSearchService;
 
 #[tokio::main]
 async fn main() {
@@ -114,46 +104,7 @@ async fn main() {
         .parse()
         .expect("invalid CORS origin in auth.frontend_origin");
 
-    // Construct external providers
-    let nutrition_usda: Arc<dyn plnd_data::providers::NutritionProvider> = Arc::new(
-        UsdaFdcProvider::new(&config.external_providers.usda_fdc_api_key),
-    );
-    let off_basic_auth = if config.external_providers.off_basic_auth_user.is_empty() {
-        None
-    } else {
-        Some((
-            config.external_providers.off_basic_auth_user.clone(),
-            config.external_providers.off_basic_auth_password.clone(),
-        ))
-    };
-    let nutrition_off: Arc<dyn plnd_data::providers::NutritionProvider> = Arc::new(
-        OpenFoodFactsProvider::new(&config.external_providers.off_base_url, off_basic_auth),
-    );
-    let recipe_mdb = Arc::new(TheMealDbProvider::new(
-        &config.external_providers.themealdb_api_key,
-    ));
-
-    if config.external_providers.usda_fdc_api_key.is_empty() {
-        tracing::warn!(
-            "USDA FDC provider: no API key set (will return ConfigurationError at runtime)"
-        );
-    } else {
-        tracing::info!("USDA FDC provider: ready");
-    }
-    tracing::info!(base_url = %config.external_providers.off_base_url, "Open Food Facts provider: ready");
-    tracing::info!("TheMealDB provider: ready");
-
-    // Build the catalog providers once, then share between the seed task and the
-    // search service. When `fixture_path` is set, both paths read from
-    // disk-captured fixtures so the catalog is populated identically to a live
-    // boot — used by `just verify` and CI to avoid burning USDA/OFF/TheMealDB
-    // quota.
-    let catalog_nutrition = build_nutrition_providers(
-        &config.external_providers,
-        nutrition_usda.clone(),
-        nutrition_off.clone(),
-    );
-    let catalog_recipe = build_recipe_providers(&config.external_providers, recipe_mdb.clone());
+    let providers = providers::build(&config.external_providers, &config.llm);
 
     // Seed catalog tables in the background so the server binds immediately.
     // The seed is idempotent — safe to run on every startup. It fails gracefully:
@@ -161,30 +112,13 @@ async fn main() {
     // startup failure.
     {
         let seed_url = config.database.url.clone();
-        let seed_recipe = catalog_recipe.clone();
+        let seed_recipe = providers.catalog_recipe.clone();
         tokio::spawn(async move {
             let corpus_path = plnd_seed::ingredients::resolve_corpus_path();
             if let Err(e) = plnd_seed::run_seed(&seed_url, 3, &seed_recipe, &corpus_path).await {
                 tracing::warn!(error = %e, "catalog seed failed (non-fatal)");
             }
         });
-    }
-
-    let search_cache = SearchCache::new(config.external_providers.search_cache_ttl_hours);
-    let provider_search =
-        ProviderSearchService::new(catalog_nutrition, catalog_recipe, vec![], search_cache);
-
-    let (weather_provider, news_provider) = build_briefing_providers(&config.external_providers);
-    let briefing = BriefingState::new(weather_provider, news_provider);
-    if config.external_providers.fixture_path.is_none() {
-        if config.external_providers.news_feed_urls.is_empty() {
-            tracing::warn!("briefing news feed disabled (news_feed_urls not set)");
-        } else {
-            tracing::info!(
-                feed_count = config.external_providers.news_feed_urls.len(),
-                "briefing news feeds configured"
-            );
-        }
     }
 
     // Per-IP rate limiter for unauthenticated /api/client_error requests.
@@ -200,7 +134,6 @@ async fn main() {
 
     let session = SessionService::with_repo(repos.session.clone());
     let agent = plnd_agent::AgentService::new(&config.llm, repos.clone());
-    let brand_normalizer = build_brand_normalizer(&config.external_providers, &config.llm);
 
     let state = Arc::new(AppState {
         repos,
@@ -208,12 +141,12 @@ async fn main() {
         session,
         jwks,
         oidc_client_id: config.auth.oidc.client_id.clone(),
-        provider_search,
-        briefing,
+        provider_search: providers.search,
+        briefing: providers.briefing,
         client_error_limiter,
         agent_task_limiter,
         agent,
-        brand_normalizer,
+        brand_normalizer: providers.brand_normalizer,
         meal_plan_concurrency: config.agent.meal_plan_concurrency,
     });
 
@@ -465,138 +398,4 @@ async fn main() {
     if let Some(providers) = otel_providers {
         telemetry::shutdown_providers(providers);
     }
-}
-
-/// Constructs the weather + news providers for the briefing handlers.
-///
-/// In debug builds, if `external.fixture_path` is set, returns file-backed
-/// implementations that read captured upstream responses from disk — used by
-/// e2e to keep tests deterministic and offline. Otherwise (and always in
-/// release builds, where the fixture impls do not exist) returns the real
-/// Open-Meteo + RSS providers.
-fn build_briefing_providers(
-    external: &plnd_api::config::settings::ExternalProvidersConfig,
-) -> (Arc<dyn WeatherProvider>, Arc<dyn NewsProvider>) {
-    #[cfg(debug_assertions)]
-    if let Some(fixture_root) = &external.fixture_path {
-        tracing::warn!(
-            path = %fixture_root.display(),
-            "USING FIXTURE PROVIDERS for /briefing/* — debug builds only; never enable in prod"
-        );
-        let weather_path = fixture_root.join("open-meteo/forecast.json");
-        let weather = FixtureWeatherProvider::new(weather_path).unwrap_or_else(|e| {
-            tracing::error!(error = %e, "failed to load fixture weather provider");
-            std::process::exit(1);
-        });
-        let rss_dir = fixture_root.join("rss");
-        let feed_paths: Vec<std::path::PathBuf> = std::fs::read_dir(&rss_dir)
-            .unwrap_or_else(|e| {
-                tracing::error!(path = %rss_dir.display(), error = %e, "failed to read fixture rss dir");
-                std::process::exit(1);
-            })
-            .filter_map(|entry| entry.ok().map(|e| e.path()))
-            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("xml"))
-            .collect();
-        let news = FixtureNewsProvider::new(feed_paths).unwrap_or_else(|e| {
-            tracing::error!(error = %e, "failed to load fixture news provider");
-            std::process::exit(1);
-        });
-        return (Arc::new(weather), Arc::new(news));
-    }
-
-    (
-        Arc::new(OpenMeteoProvider::new()),
-        Arc::new(RssFeedProvider::new(&external.news_feed_urls)),
-    )
-}
-
-/// Constructs the nutrition providers for the search service.
-///
-/// In debug builds, if `external.fixture_path` is set, returns file-backed
-/// implementations that replay captured search results from disk — used by
-/// e2e to keep tests deterministic and offline. Otherwise (and always in
-/// release builds) returns the real USDA FDC + Open Food Facts providers.
-///
-/// The live providers are passed in rather than constructed here because they
-/// are also used by the catalog seed task running concurrently.
-fn build_nutrition_providers(
-    external: &plnd_api::config::settings::ExternalProvidersConfig,
-    usda: Arc<dyn plnd_data::providers::NutritionProvider>,
-    off: Arc<dyn plnd_data::providers::NutritionProvider>,
-) -> Vec<Arc<dyn plnd_data::providers::NutritionProvider>> {
-    #[cfg(debug_assertions)]
-    if let Some(fixture_root) = &external.fixture_path {
-        tracing::warn!(
-            path = %fixture_root.display(),
-            "USING FIXTURE NUTRITION PROVIDERS for catalog seed + /search/ingredients — debug builds only; never enable in prod"
-        );
-        let make = |source: &str, dir: &str| {
-            let search_path = fixture_root.join(dir).join("search.json");
-            let lookup_path = fixture_root.join(dir).join("lookup.json");
-            FixtureNutritionProvider::new(source.to_string(), search_path, lookup_path)
-                .unwrap_or_else(|e| {
-                    tracing::error!(error = %e, "failed to load nutrition fixture");
-                    std::process::exit(1);
-                })
-        };
-        // USDA canonical foods are seeded from the vendored corpus (local hits),
-        // so the debug fan-out only needs the Open Food Facts branded lane.
-        return vec![Arc::new(make("openfoodfacts", "nutrition/open_food_facts"))];
-    }
-    vec![usda, off]
-}
-
-/// Constructs the recipe providers for the catalog seed + search service.
-///
-/// In debug builds, if `external.fixture_path` is set, returns file-backed
-/// implementations that replay captured search + lookup results from disk —
-/// used by e2e to keep tests deterministic and offline. Otherwise (and always
-/// in release builds) returns the real TheMealDB provider.
-fn build_recipe_providers(
-    external: &plnd_api::config::settings::ExternalProvidersConfig,
-    mdb: Arc<dyn plnd_data::providers::RecipeProvider>,
-) -> Vec<Arc<dyn plnd_data::providers::RecipeProvider>> {
-    #[cfg(debug_assertions)]
-    if let Some(fixture_root) = &external.fixture_path {
-        tracing::warn!(
-            path = %fixture_root.display(),
-            "USING FIXTURE RECIPE PROVIDERS for catalog seed + /search/dishes — debug builds only; never enable in prod"
-        );
-        let search_path = fixture_root.join("recipe/themealdb/search.json");
-        let lookup_path = fixture_root.join("recipe/themealdb/lookup.json");
-        let provider =
-            TheMealDbFixtureProvider::new(search_path, lookup_path).unwrap_or_else(|e| {
-                tracing::error!(error = %e, "failed to load recipe fixture");
-                std::process::exit(1);
-            });
-        return vec![Arc::new(provider)];
-    }
-    vec![mdb]
-}
-
-/// Constructs the brand normalizer for the promote path (#913).
-///
-/// In debug builds, if `external.fixture_path` is set, returns the file-backed
-/// `FixtureBrandNormalizer` (deterministic, offline) so e2e never makes a live
-/// LLM call. Otherwise (and always in release builds) returns the LLM-backed
-/// normalizer using the fast-tier provider.
-fn build_brand_normalizer(
-    external: &plnd_api::config::settings::ExternalProvidersConfig,
-    llm: &plnd_agent::LlmConfig,
-) -> Arc<dyn plnd_agent::BrandNormalizer> {
-    #[cfg(debug_assertions)]
-    if let Some(fixture_root) = &external.fixture_path {
-        tracing::warn!(
-            path = %fixture_root.display(),
-            "USING FIXTURE BRAND NORMALIZER for /catalog/ingredients/promote — debug builds only; never enable in prod"
-        );
-        let path = fixture_root.join("brand_normalization.json");
-        let normalizer = plnd_agent::FixtureBrandNormalizer::from_path(&path).unwrap_or_else(|e| {
-            tracing::error!(error = %e, "failed to load brand-normalization fixture");
-            std::process::exit(1);
-        });
-        return Arc::new(normalizer);
-    }
-    let provider = Arc::from(plnd_agent::build_fast_provider(llm));
-    Arc::new(plnd_agent::LlmBrandNormalizer::new(provider))
 }
