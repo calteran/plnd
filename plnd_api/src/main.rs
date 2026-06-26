@@ -1,4 +1,5 @@
 mod providers;
+mod startup;
 mod telemetry;
 
 use axum::http::{HeaderName, HeaderValue, Method};
@@ -6,8 +7,6 @@ use axum::{
     Router, middleware,
     routing::{delete, get, patch, post, put},
 };
-use governor::{Quota, RateLimiter};
-use std::num::NonZeroU32;
 use tower_http::cors::CorsLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
@@ -19,10 +18,8 @@ use plnd_api::middleware::metrics::HttpMetricsLayer;
 use plnd_api::middleware::trace_propagation::extract_trace_context;
 
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use plnd_api::auth::auth_middleware;
-use plnd_api::auth::{JwksCache, JwtService, SessionService};
 use plnd_api::config;
 use plnd_api::openapi::ApiDoc;
 #[cfg(debug_assertions)]
@@ -32,8 +29,6 @@ use plnd_api::routes::{
     meal_pattern, meal_suggestions, preferences, routine, schedule, schedule_anchors, search,
     system, tasks, timezone, user_dish_prefs, user_ingredient_prefs, user_meal_prefs, users,
 };
-use plnd_api::state::AppState;
-
 #[tokio::main]
 async fn main() {
     let config = match config::load_config() {
@@ -56,99 +51,19 @@ async fn main() {
 
     telemetry::init_subscriber(&config.logging, otel_providers.as_ref());
 
-    tracing::info!(
-        api_base_url = %config.api.base_url,
-        log_level = %config.logging.level,
-        otel_enabled = config.otel.endpoint.is_some(),
-        "configuration loaded"
-    );
-
-    let repos = match plnd_data::Repositories::new(
-        &config.database.url,
-        config.database.max_connections as u32,
-    )
-    .await
-    {
-        Ok(r) => r,
+    let state = match startup::build_state(&config).await {
+        Ok(s) => s,
         Err(e) => {
-            tracing::error!(error = %e, "failed to connect to database or run migrations");
+            tracing::error!(error = %e, "failed to build application state");
             std::process::exit(1);
         }
     };
-    tracing::info!("database connected and migrations applied");
-
-    let jwt = JwtService::new(
-        config.auth.jwt.secret.clone(),
-        config.auth.jwt.jwt_expiration,
-    );
-
-    // Build the JWKS cache. The internal_issuer_url (Docker-internal hostname) is used
-    // for server-to-server JWKS fetching; the external issuer_url is used to validate
-    // the `iss` claim that the IdP embeds in tokens.
-    let internal_issuer = if config.auth.oidc.internal_issuer_url.is_empty() {
-        config.auth.oidc.issuer_url.clone()
-    } else {
-        config.auth.oidc.internal_issuer_url.clone()
-    };
-    let jwks = JwksCache::new(config.auth.oidc.issuer_url.clone(), internal_issuer);
-
-    tracing::info!(
-        issuer = %config.auth.oidc.issuer_url,
-        client_id = %config.auth.oidc.client_id,
-        "OIDC configured"
-    );
 
     let cors_origin: HeaderValue = config
         .auth
         .frontend_origin
         .parse()
         .expect("invalid CORS origin in auth.frontend_origin");
-
-    let providers = providers::build(&config.external_providers, &config.llm);
-
-    // Seed catalog tables in the background so the server binds immediately.
-    // The seed is idempotent — safe to run on every startup. It fails gracefully:
-    // a missing API key or network error produces a non-fatal warning, not a
-    // startup failure.
-    {
-        let seed_url = config.database.url.clone();
-        let seed_recipe = providers.catalog_recipe.clone();
-        tokio::spawn(async move {
-            let corpus_path = plnd_seed::ingredients::resolve_corpus_path();
-            if let Err(e) = plnd_seed::run_seed(&seed_url, 3, &seed_recipe, &corpus_path).await {
-                tracing::warn!(error = %e, "catalog seed failed (non-fatal)");
-            }
-        });
-    }
-
-    // Per-IP rate limiter for unauthenticated /api/client_error requests.
-    // 20 requests per minute per IP; authenticated requests bypass this.
-    let client_error_quota = Quota::per_minute(NonZeroU32::new(20).unwrap());
-    let client_error_limiter = Arc::new(RateLimiter::keyed(client_error_quota));
-
-    // Per-user rate limiter for POST /agent/task. Quota is env-driven via
-    // APP_AGENT__RATE_LIMIT_PER_MINUTE (default 10 req/min).
-    let agent_task_quota =
-        Quota::per_minute(NonZeroU32::new(config.agent.rate_limit_per_minute).unwrap());
-    let agent_task_limiter = Arc::new(RateLimiter::keyed(agent_task_quota));
-
-    let session = SessionService::with_repo(repos.session.clone());
-    let agent = plnd_agent::AgentService::new(&config.llm, repos.clone());
-
-    let state = Arc::new(AppState {
-        repos,
-        jwt,
-        session,
-        jwks,
-        oidc_client_id: config.auth.oidc.client_id.clone(),
-        provider_search: providers.search,
-        briefing: providers.briefing,
-        client_error_limiter,
-        agent_task_limiter,
-        agent,
-        brand_normalizer: providers.brand_normalizer,
-        meal_plan_concurrency: config.agent.meal_plan_concurrency,
-    });
 
     let x_request_id = HeaderName::from_static("x-request-id");
 
