@@ -17,7 +17,7 @@ pub struct Providers {
     pub search: ProviderSearchService,
     pub briefing: BriefingState,
     pub brand_normalizer: Arc<dyn plnd_agent::BrandNormalizer>,
-    /// Recipe providers reused by the background catalog seed task (Task 3).
+    /// Recipe providers reused by the background catalog seed task.
     pub catalog_recipe: Vec<Arc<dyn plnd_data::providers::RecipeProvider>>,
 }
 
@@ -25,7 +25,7 @@ pub fn build(
     external: &plnd_api::config::settings::ExternalProvidersConfig,
     llm: &plnd_agent::LlmConfig,
 ) -> Providers {
-    // Construct external providers (moved verbatim from old main.rs:148-174).
+    // Construct external providers.
     let nutrition_usda: Arc<dyn plnd_data::providers::NutritionProvider> =
         Arc::new(UsdaFdcProvider::new(&external.usda_fdc_api_key));
     let off_basic_auth = if external.off_basic_auth_user.is_empty() {

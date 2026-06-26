@@ -94,7 +94,7 @@ pub fn init_providers(
 /// When `otel` is `Some`, OTLP trace + log layers are attached; otherwise a
 /// plain fmt subscriber is installed (stdout-only mode).
 pub fn init_subscriber(
-    logging: &crate::config::settings::LoggingConfig,
+    logging: &plnd_api::config::settings::LoggingConfig,
     otel: Option<&TelemetryProviders>,
 ) {
     let env_filter = || tracing_subscriber::EnvFilter::new(&logging.level);

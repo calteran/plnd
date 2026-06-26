@@ -12,7 +12,7 @@ use crate::providers;
 /// the agent service, external providers, and the background catalog seed.
 ///
 /// Emits the configuration/database/OIDC startup logs. Returns `Err` on a
-/// database-connection failure or an unparseable value; the caller exits.
+/// database-connection failure; the caller exits.
 pub async fn build_state(
     config: &plnd_api::config::settings::AppConfig,
 ) -> Result<Arc<AppState>, Box<dyn std::error::Error + Send + Sync>> {
@@ -50,7 +50,7 @@ pub async fn build_state(
     let providers = providers::build(&config.external_providers, &config.llm);
 
     // Seed catalog tables in the background so the server binds immediately.
-    // Idempotent; failures are non-fatal warnings (moved verbatim from main).
+    // Idempotent; failures are non-fatal warnings.
     {
         let seed_url = config.database.url.clone();
         let seed_recipe = providers.catalog_recipe.clone();
