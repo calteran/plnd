@@ -1,4 +1,6 @@
 use opentelemetry::KeyValue;
+use opentelemetry::trace::TracerProvider as _;
+use opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge;
 use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     Resource,
@@ -7,6 +9,7 @@ use opentelemetry_sdk::{
     trace::SdkTracerProvider,
 };
 use opentelemetry_semantic_conventions::resource::SERVICE_NAME;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 /// Build the OTEL resource. Attaches `verify.run_id` when a run id is provided
 /// (scripts/verify.sh sets `VERIFY_RUN_ID` per run) so concurrent runs are
@@ -83,6 +86,43 @@ pub fn init_providers(
         logger_provider,
         meter_provider,
     }))
+}
+
+/// Build and install the global tracing subscriber.
+///
+/// Each match arm produces a different concrete `Subscriber` type — all valid.
+/// When `otel` is `Some`, OTLP trace + log layers are attached; otherwise a
+/// plain fmt subscriber is installed (stdout-only mode).
+pub fn init_subscriber(
+    logging: &plnd_api::config::settings::LoggingConfig,
+    otel: Option<&TelemetryProviders>,
+) {
+    let env_filter = || tracing_subscriber::EnvFilter::new(&logging.level);
+
+    match (logging.pretty_print, otel) {
+        (true, Some(p)) => tracing_subscriber::registry()
+            .with(env_filter())
+            .with(tracing_subscriber::fmt::layer().pretty().with_target(true))
+            .with(tracing_opentelemetry::layer().with_tracer(p.tracer_provider.tracer("plnd_api")))
+            .with(OpenTelemetryTracingBridge::new(&p.logger_provider))
+            .init(),
+        (false, Some(p)) => tracing_subscriber::registry()
+            .with(env_filter())
+            .with(tracing_subscriber::fmt::layer().json().with_target(true))
+            .with(tracing_opentelemetry::layer().with_tracer(p.tracer_provider.tracer("plnd_api")))
+            .with(OpenTelemetryTracingBridge::new(&p.logger_provider))
+            .init(),
+        (true, None) => tracing_subscriber::fmt()
+            .with_env_filter(env_filter())
+            .with_target(true)
+            .pretty()
+            .init(),
+        (false, None) => tracing_subscriber::fmt()
+            .with_env_filter(env_filter())
+            .with_target(true)
+            .json()
+            .init(),
+    }
 }
 
 /// Flush all OTEL providers before process exit.
