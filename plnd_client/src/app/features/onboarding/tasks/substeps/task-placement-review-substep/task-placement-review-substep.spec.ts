@@ -664,6 +664,26 @@ describe('TaskPlacementReviewSubstepComponent', () => {
     expect(planEntries[0].after_anchor).toBeUndefined();
   });
 
+  // An untimed, unanchored task lives in the before-first-meal slot. Dropping a
+  // floating task into the '<sched>' section (the visual "before breakfast" area)
+  // clears after_anchor/paired_meal_name (applyMove), so without an explicit
+  // default it would commit with every slot field null — an orphan the day view
+  // silently drops (assembleSlotGroups skips entries with no after_anchor). It
+  // must commit as the "start of day" anchor, the same label place_tasks emits
+  // for "before breakfast" and the backend emits in the day-view anchor sequence.
+  it('saves an untimed unanchored task in the "start of day" slot so the day view keeps it', async () => {
+    const { component } = setup();
+    component.entries.set([
+      { title: 'Morning walk', scheduled_date: '2026-06-22', task_type: 'general',
+        duration_minutes: 30, energy_required: 'medium' },
+    ] as PlaceTasksEntry[]);
+
+    const planEntries = component.toPlanEntries();
+    expect(planEntries[0].after_anchor).toBe('start of day');
+    expect(planEntries[0].paired_meal_name).toBeFalsy();
+    expect(planEntries[0].scheduled_start).toBeNull();
+  });
+
   // ── onDrop() same-day cross-slot (into-meal pairing) ─────────────────────────
 
   it('same-day drop into meal slot sets paired_meal_name and leaves exactly ONE instance', async () => {

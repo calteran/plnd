@@ -1207,12 +1207,23 @@ export class TaskPlacementReviewSubstepComponent implements OnInit {
       const slotKey = `${entry.scheduled_date}::${entrySlotKey(entry)}`;
       const pos = posByGroup.get(slotKey) ?? 0;
       posByGroup.set(slotKey, pos + 1);
+      // A task with no paired meal, no anchor, and no fixed time lives in the
+      // "start of day" slot (before the first meal) — the implicit anchor the
+      // place_tasks agent emits for "before breakfast" (place_tasks.md) and the
+      // backend emits in the day-view anchor sequence (anchors.rs). Dropping a
+      // floating task into the '<sched>' section clears its anchor (applyMove),
+      // so without this default it would commit with every slot field null and
+      // the day view's assembleSlotGroups() would silently drop it.
+      const afterAnchor = entry.paired_meal_name
+        ? undefined
+        : (entry.after_anchor ?? (entry.time_window_start ? undefined : 'start of day'));
+      const floating = !!afterAnchor || !!entry.paired_meal_name;
       return {
         date: entry.scheduled_date,
         task_type: entry.task_type,
         title: entry.title,
-        scheduled_start: entry.after_anchor || entry.paired_meal_name ? null : (entry.time_window_start ?? null),
-        after_anchor: entry.paired_meal_name ? undefined : entry.after_anchor,
+        scheduled_start: floating ? null : (entry.time_window_start ?? null),
+        after_anchor: afterAnchor,
         paired_meal_name: entry.paired_meal_name,
         duration_minutes: entry.duration_minutes,
         energy_required: entry.energy_required,
