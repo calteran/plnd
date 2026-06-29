@@ -210,14 +210,23 @@ export function assembleSlotGroups(
     groups.push({ anchorLabel: label, anchor, tasks: floatingByLabel.get(label) ?? [] });
   }
 
-  // Defensive: never silently drop. Orphans surface at the top — in the first
-  // slot group if one exists, else a synthetic start-of-day group so the entry
-  // is rendered even when `anchors` is empty.
+  // Floating tasks whose after_anchor matched no anchor in this day are never
+  // consumed by the loop above; surface them too (parity with assembleScheduleItems).
+  for (const [label, tasks] of floatingByLabel) {
+    if (!seen.has(label)) {
+      console.warn(`Floating task(s) reference unknown anchor "${label}"; rendering at top`);
+      orphans.push(...tasks);
+    }
+  }
+
+  // Defensive: never silently drop. Orphans surface at the very top — merged into
+  // the first slot group when it is the null-anchor start-of-day row, else a fresh
+  // start-of-day group unshifted ahead of every anchor row (also covers empty `anchors`).
   if (orphans.length) {
-    if (groups.length) {
+    if (groups.length && groups[0].anchor === null) {
       groups[0] = { ...groups[0], tasks: [...orphans, ...groups[0].tasks] };
     } else {
-      groups.push({ anchorLabel: 'start of day', anchor: null, tasks: orphans });
+      groups.unshift({ anchorLabel: 'start of day', anchor: null, tasks: orphans });
     }
   }
 

@@ -204,4 +204,15 @@ describe('assembleSlotGroups', () => {
     expect(groups.flatMap(g => g.tasks).map(t => t.label)).toContain('Misfiled');
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('references unknown meal anchor'));
   });
+
+  it('surfaces a floating task referencing an unknown anchor label', () => {
+    const anchors = [anchor('start_of_day', 'start of day', null)];
+    const entries = [entry({ entry_id: 'orphan-4', title: 'Lost float', after_anchor: 'non-existent' })];
+    const warn = vi.spyOn(console, 'warn');
+
+    const groups = assembleSlotGroups(anchors, entries, []);
+
+    expect(groups.flatMap(g => g.tasks).map(t => t.label)).toContain('Lost float');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('reference unknown anchor "non-existent"'));
+  });
 });
