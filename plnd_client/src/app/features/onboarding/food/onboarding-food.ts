@@ -235,7 +235,14 @@ export class OnboardingFoodComponent implements OnInit {
       const slotNames = mealsForDate(date, dayTypes).map(e => e.name);
       for (const slot of slotNames) {
         const planned = daySlots[slot];
-        if (planned && planned.approvalState !== 'skipped' && planned.mealRef) {
+        // Keep any non-skipped slot that carries either a resolved meal ref OR a
+        // title. A custom edit whose agent text-resolution round-trip hasn't landed
+        // yet (or which the agent couldn't match) is 'approved' with a null mealRef
+        // but a non-empty title — dropping it on `&& planned.mealRef` silently loses
+        // the user's last edit. The downstream persist path (onboarding-hub's
+        // buildPlanRequest, mirroring the weekly wizard's buildCommitRequest) already
+        // persists null-ref meals via their title, so include them here too.
+        if (planned && planned.approvalState !== 'skipped' && (planned.mealRef || planned.title?.trim())) {
           meals.push({
             date,
             meal_name: slot,

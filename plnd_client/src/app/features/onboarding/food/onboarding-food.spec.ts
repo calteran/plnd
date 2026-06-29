@@ -13,7 +13,13 @@ describe('OnboardingFoodComponent', () => {
   let fixture: ComponentFixture<OnboardingFoodComponent>;
   let component: OnboardingFoodComponent;
 
-  function buildMocks(planningPrefsComplete: boolean, dayTypes: unknown[] = []) {
+  interface MealPlanOverrides {
+    planStart?: string;
+    horizonDays?: string[];
+    scheduledMeals?: Record<string, unknown>;
+  }
+
+  function buildMocks(planningPrefsComplete: boolean, dayTypes: unknown[] = [], meal: MealPlanOverrides = {}) {
     const mockState = createSpyObj(['markComplete', 'setMealPlan', 'setPlanningPrefsComplete', 'computeAndSetPlanPeriod'],
       {
         planningPrefsComplete: vi.fn().mockReturnValue(planningPrefsComplete),
@@ -21,11 +27,11 @@ describe('OnboardingFoodComponent', () => {
         dayTypes: vi.fn().mockReturnValue(dayTypes),
       });
     const mockWPS = createSpyObj(['initSession'], {
-      planStart: vi.fn().mockReturnValue(''),
+      planStart: vi.fn().mockReturnValue(meal.planStart ?? ''),
       planEnd: vi.fn().mockReturnValue(''),
       isGenerating: vi.fn().mockReturnValue(false),
-      horizonDays: vi.fn().mockReturnValue([]),
-      scheduledMeals: vi.fn().mockReturnValue({}),
+      horizonDays: vi.fn().mockReturnValue(meal.horizonDays ?? []),
+      scheduledMeals: vi.fn().mockReturnValue(meal.scheduledMeals ?? {}),
     });
     const mockPrefs = createSpyObj(['loadPreferences'], {
       preferences: vi.fn().mockReturnValue(null),
@@ -33,8 +39,8 @@ describe('OnboardingFoodComponent', () => {
     return { mockState, mockWPS, mockPrefs };
   }
 
-  async function setup(planningPrefsComplete = false, dayTypes: unknown[] = []) {
-    const { mockState, mockWPS, mockPrefs } = buildMocks(planningPrefsComplete, dayTypes);
+  async function setup(planningPrefsComplete = false, dayTypes: unknown[] = [], meal: MealPlanOverrides = {}) {
+    const { mockState, mockWPS, mockPrefs } = buildMocks(planningPrefsComplete, dayTypes, meal);
     await TestBed.configureTestingModule({
       imports: [OnboardingFoodComponent],
       providers: [
@@ -50,6 +56,7 @@ describe('OnboardingFoodComponent', () => {
     fixture = TestBed.createComponent(OnboardingFoodComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+    return { mockState, mockWPS, mockPrefs };
   }
 
   it('renders SpokeChromeComponent containing "Food"', async () => {
@@ -115,5 +122,48 @@ describe('OnboardingFoodComponent', () => {
     component.activeSubstep.set('day-types');
     component.onSubstepComplete();
     expect(component.activeSubstep()).toBe('plan-meals');
+  });
+
+  // Regression: a custom-edited meal whose agent text-resolution round-trip has not
+  // landed yet (or which the agent could not match) has approvalState 'approved' but a
+  // null mealRef. finalSave() must still persist it (via its title) — otherwise the
+  // user's last edit silently vanishes from the day view. Mirrors the weekly wizard's
+  // buildCommitRequest / the hub's buildPlanRequest, which both keep null-ref meals.
+  it('persists a custom-edited meal that has a title but no resolved mealRef', async () => {
+    const date = '2026-06-30';
+    const dayType = {
+      is_cycle: false,
+      days_bitmask: 0x7f, // every weekday → always covers `date`
+      meals: [
+        { name: 'Breakfast', sort_order: 0, preferred_time: '08:00:00' },
+        { name: 'Lunch', sort_order: 1, preferred_time: '12:00:00' },
+        { name: 'Dinner', sort_order: 2, preferred_time: '18:00:00' },
+      ],
+    };
+    const scheduledMeals = {
+      [date]: {
+        Breakfast: { approvalState: 'approved', mealRef: { type: 'catalog', id: 'm-1' }, title: 'Oatmeal' },
+        // The user's last edit: optimistic state, agent resolution still in flight.
+        Dinner: { approvalState: 'approved', mealRef: null, title: 'Leftover spaghetti' },
+      },
+    };
+
+    const { mockState } = await setup(true, [dayType], {
+      planStart: date,
+      horizonDays: [date],
+      scheduledMeals,
+    });
+
+    component.activeSubstep.set('plan-meals');
+    component.onContinue();
+
+    expect(mockState.setMealPlan).toHaveBeenCalledTimes(1);
+    const plan = mockState.setMealPlan.mock.calls[0][0];
+    const dinner = plan.meals.find(
+      (m: { meal_name: string }) => m.meal_name === 'Dinner',
+    );
+    expect(dinner).toBeDefined();
+    expect(dinner.title).toBe('Leftover spaghetti');
+    expect(dinner.meal_ref).toBeNull();
   });
 });
