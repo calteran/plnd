@@ -1,4 +1,4 @@
-import { Component, ElementRef, afterNextRender, computed, effect, input, output, signal, viewChild, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ElementRef, HostListener, afterNextRender, computed, effect, inject, input, output, signal, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { TitleCasePipe } from '@angular/common';
 import { ItemType, ScheduleTask, TaskEditPatch } from '../../../../core/models/schedule';
 import { EnergyLevel } from '../../../../core/models/week-plan';
@@ -79,6 +79,23 @@ export class TaskEditFormComponent {
   protected readonly title = signal('');
 
   private readonly titleInput = viewChild<ElementRef<HTMLInputElement>>('titleInput');
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  /**
+   * Collapse the editor when a click lands outside it — the same dismissal the
+   * Done button and Escape already provide, all funnelling through `closed`
+   * (→ DayViewComponent.closeEditor). Sibling rows are `inert` while a row is
+   * being edited, so their clicks never reach the document; this fires only for
+   * genuinely off-target clicks (page chrome, blank space). The opening click
+   * has finished propagating before Angular instantiates this component, so the
+   * editor can't immediately close itself.
+   */
+  @HostListener('document:click', ['$event.target'])
+  protected onDocumentClick(target: EventTarget | null): void {
+    if (target instanceof Node && !this.host.nativeElement.contains(target)) {
+      this.closed.emit();
+    }
+  }
 
   protected readonly oneShotLabel = computed(() =>
     this.task().oneShot

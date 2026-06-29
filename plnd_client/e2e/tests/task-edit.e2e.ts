@@ -61,4 +61,35 @@ test.describe('Day View — inline task edit', () => {
     await expect(page.getByText('Call orthodontist')).toBeVisible();
     await expect(page.locator('.one-shot-indicator')).toBeVisible();
   });
+
+  test('clicking off an open editor collapses it, like the Done button', async ({ page }) => {
+    const { sub } = await seedAuth(page);
+    await seedScheduleEntries(sub, {
+      plan_start: PLAN_START,
+      plan_end: PLAN_END,
+      placed_tasks: [
+        {
+          date: DATE,
+          task_type: 'appointment',
+          title: 'Call dentist',
+          scheduled_start: '11:00:00',
+          duration_minutes: 30,
+          energy_required: 'low',
+        },
+      ],
+    });
+
+    const dayView = new DayViewPage(page);
+    await dayView.gotoDate(DATE);
+    await expect(dayView.getScheduleList()).toBeVisible();
+
+    // Open the inline editor and confirm it's expanded.
+    await page.getByText('Call dentist').click();
+    await expect(page.locator('.task-edit-form')).toBeVisible();
+
+    // Click neutral page chrome outside the editor — it should collapse the
+    // editor just as the Done button (or Escape) would.
+    await dayView.getDateText().click();
+    await expect(page.locator('.task-edit-form')).toHaveCount(0);
+  });
 });

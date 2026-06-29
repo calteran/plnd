@@ -345,10 +345,20 @@ export class DayViewComponent implements OnInit, OnDestroy {
     // queued focus call succeeds.
     const id = this.editingId();
     this.editingId.set(null);
-    if (id) {
-      queueMicrotask(() =>
-        document.querySelector<HTMLElement>(`#task-row-${id} .label`)?.focus());
-    }
+    if (!id) return;
+    // ...but only when the close didn't already move focus elsewhere. A
+    // click-off that lands on another focusable control (e.g. the add-entry
+    // field) focuses that control first; pulling focus back to the row label
+    // would defeat the user's click. Keyboard dismissals (Done/Escape) and
+    // clicks on inert chrome leave focus inside the row (or on <body>), so the
+    // restore still runs for them.
+    const active = document.activeElement;
+    const row = document.getElementById(`task-row-${id}`);
+    const focusMovedAway =
+      active instanceof HTMLElement && active !== document.body && !row?.contains(active);
+    if (focusMovedAway) return;
+    queueMicrotask(() =>
+      document.querySelector<HTMLElement>(`#task-row-${id} .label`)?.focus());
   }
   onEditSave(id: string, patch: TaskEditPatch): void { this.scheduleService.updateEntry(id, patch); }
 

@@ -291,6 +291,50 @@ describe('DayViewComponent (inline editor)', () => {
     expect(component.editingId()).toBeNull();
   });
 
+  it('restores focus to the row label on close when nothing else took focus', async () => {
+    const { component } = await setupEditor();
+    const row = document.createElement('div');
+    row.id = 'task-row-entry-1';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.tabIndex = 0;
+    row.appendChild(label);
+    document.body.appendChild(row);
+
+    component.editingId.set('entry-1');
+    component.closeEditor();
+    await Promise.resolve(); // flush the queued focus microtask
+
+    expect(document.activeElement).toBe(label);
+    row.remove();
+  });
+
+  it('does not steal focus on close when a click-off moved focus to an outside control', async () => {
+    const { component } = await setupEditor();
+    const row = document.createElement('div');
+    row.id = 'task-row-entry-1';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.tabIndex = 0;
+    row.appendChild(label);
+    document.body.appendChild(row);
+
+    // Simulate clicking into another focusable control (e.g. the add-entry field):
+    // the browser focuses it before the click-off close fires.
+    const outside = document.createElement('input');
+    document.body.appendChild(outside);
+    outside.focus();
+    expect(document.activeElement).toBe(outside);
+
+    component.editingId.set('entry-1');
+    component.closeEditor();
+    await Promise.resolve(); // flush the queued focus microtask, if any
+
+    expect(document.activeElement).toBe(outside); // focus not yanked back to the label
+    row.remove();
+    outside.remove();
+  });
+
   it('routes a save patch to ScheduleService.updateEntry', async () => {
     const { component } = await setupEditor();
     const spy = vi.spyOn(component['scheduleService'], 'updateEntry');
