@@ -79,6 +79,33 @@
   border-top: 1px solid color-mix(in srgb, var(--color-border-meal) 50%, transparent);
 }
 
+// Paired-task drop zone — droppable when empty.
+//
+// Exactly like the day view's floating-task slots (day-view.scss), an empty
+// `.during-meal` list collapses to zero height, so CDK's drop-target geometry
+// (_canReceive → isInsideClientRect / elementFromPoint) can never match it — you
+// could not drop a task onto a meal that has no paired tasks yet, which is the
+// common case when adding the FIRST task to a meal. Gate a min-height on the same
+// `.schedule-list.dragging` class the day view adds SYNCHRONOUSLY at drag start
+// (see DayViewComponent.onDragStarted for the timing constraint and the
+// #1000/#1001 history): the height must be live before CDK caches this list's
+// hit-rect. `:host-context` reaches the ancestor `.schedule-list` from inside this
+// child component. Populated lists are already taller, so this only materialises
+// the empty ones, and the resting layout stays flush.
+:host-context(.schedule-list.dragging) .during-meal {
+  min-height: 1.5rem;
+}
+
+// Cosmetic affordance mirroring the slot highlight: CDK marks a connected target
+// `.cdk-drop-list-receiving` during a drag. `outline` (not `border`) so it does
+// not alter the box / cached hit-rect.
+.during-meal.cdk-drop-list-receiving {
+  outline: 2px dashed var(--color-accent-border);
+  outline-offset: -2px;
+  border-radius: 8px;
+  background: var(--color-accent-light);
+}
+
 // Spotlight: dim during-meal tasks while a sibling in the same band is edited.
 // Mirrors the day-view row spotlight (day-view.scss); scoped here because that
 // rule can't reach task-rows nested inside this component's template.

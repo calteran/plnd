@@ -58,7 +58,7 @@ function wizardDropListId(date: string, slotKey: string): string {
           <div>
             <div class="body-section-label">Meals</div>
             @for (entry of slots(); track entry.id) {
-              <div class="body-row">
+              <div class="body-row meal-body-row">
                 <span class="slot">{{ entry.name | titlecase }}</span>
                 @if (getMeal(entry.name); as meal) {
                   <span class="val">{{ meal.title }}</span>

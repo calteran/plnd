@@ -586,8 +586,27 @@ export function buildDaySections(
 
     /* ── Drop list sections ── */
 
+    /*
+     * Each meal section (and the unanchored '<sched>' section) is its own CDK
+     * drop list. When empty it collapses to near-zero height, and CDK's
+     * drop-target geometry (elementFromPoint / isInsideClientRect) cannot match a
+     * sub-pixel target — so dragging the FIRST task onto an empty meal section was
+     * effectively impossible (the reported bug). 1.5rem gives a reliably hittable
+     * zone, matching the day view's floating-slot fix (#1000/#1001). Populated
+     * sections are taller, so this only materialises the empty ones.
+     */
     .section-drop-list {
-      min-height: 4px;
+      min-height: 1.5rem;
+    }
+
+    /* Affordance: CDK marks a connected list '.cdk-drop-list-receiving' while a
+     * drag can land there. 'outline' (not 'border') leaves the cached hit-rect
+     * untouched. */
+    .section-drop-list.cdk-drop-list-receiving {
+      outline: 2px dashed var(--color-accent-border);
+      outline-offset: -2px;
+      border-radius: 6px;
+      background: var(--color-accent-light);
     }
 
     /* ── Task rows ── */
