@@ -116,10 +116,12 @@ test.describe('Planning Wizard Step 5 — drag a task onto a meal', () => {
     const sourceBB = await stableBoundingBox(schedTask);
     const targetBB = await stableBoundingBox(breakfastList);
 
-    // Directly guard the fix: the empty meal slot must have a hittable height
-    // (min-height: 1.5rem). Without it the list is zero-area and the drop below
-    // can never register — this assertion fails fast if the min-height regresses.
-    expect(targetBB.height).toBeGreaterThanOrEqual(20);
+    // Directly guard the fix: the empty meal slot must be a hittable inline strip
+    // (min-width 3rem, min-height 1rem) — kept within the row's text height so the
+    // Tasks section below it does not shift. Without area CDK can't match it and
+    // the drop below can never register; this fails fast if the strip regresses.
+    expect(targetBB.height).toBeGreaterThanOrEqual(15);
+    expect(targetBB.width).toBeGreaterThanOrEqual(40);
 
     const startX = sourceBB.x + sourceBB.width / 2;
     const startY = sourceBB.y + sourceBB.height / 2;

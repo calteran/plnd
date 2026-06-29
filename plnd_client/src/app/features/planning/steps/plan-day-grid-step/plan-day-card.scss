@@ -173,23 +173,31 @@
 }
 
 // ── Paired-task (meal) drop zone ──────────────────────────────────────
-// A meal row carries a CDK drop list as its third flex child. Left in the flex
-// row it is squeezed to zero width by `.val { flex: 1 }` — paired tasks render
-// invisibly and, when the list is empty, CDK's drop-target geometry can never
-// match it, so you cannot drag the FIRST task onto a meal (the reported bug;
-// same class of zero-area drop target the day view fixes for `.during-meal` and
-// the #1000/#1001 floating-slot fix). Wrapping the meal row lets the drop list
-// take its own full-width line below the meal name.
-.meal-body-row {
-  flex-wrap: wrap;
+// A meal row carries a CDK drop list as its third flex child. Left at zero size
+// it is both invisible when it holds tasks and undroppable when empty — CDK's
+// drop-target geometry can never match a zero-area element, so you cannot drag
+// the FIRST task onto a meal (the reported bug; same zero-area class the day view
+// fixes for `.during-meal` and the #1000/#1001 floating-slot fix).
+//
+// CRUCIAL: the Meals section sits ABOVE the Tasks ('<sched>') section, so ANY
+// vertical height added to a meal row pushes every task below it down and
+// destabilises drags in that card (it regressed the sibling reorder e2e). So an
+// EMPTY meal zone is a fixed inline strip sized WITHIN the row's existing text
+// height — hittable, but adding no row height. It only wraps onto its own
+// full-width line once it actually holds paired tasks (`.has-tasks`), where the
+// extra height is wanted anyway to show them.
+.meal-slot-drop-list {
+  flex-shrink: 0;
+  min-width: 3rem;
+  min-height: 1rem; // <= the row's ~16px text height, so the row does not grow
 }
 
-// Full width (its own line) + a permanent hittable min-height so the empty zone
-// can receive a drop. Unlike the day view there is no synchronous `dragging`
-// gate here, so the height is permanent (as in the onboarding placement grid);
-// populated lists are already taller, so this only materialises empty ones.
-.meal-slot-drop-list {
+.meal-body-row.has-tasks {
+  flex-wrap: wrap;
+}
+.meal-body-row.has-tasks .meal-slot-drop-list {
   flex-basis: 100%;
+  min-width: 0;
   min-height: 1.5rem;
 }
 
