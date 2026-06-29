@@ -249,7 +249,7 @@ HOOK
     echo "ACTIONS_RUNNER_HOOK_JOB_STARTED=$HOME/actions-runner/_hooks/pre-job-cleanup.sh"  >> "$ENV_FILE"
     echo "ACTIONS_RUNNER_HOOK_JOB_COMPLETED=$HOME/actions-runner/_hooks/post-job-cleanup.sh" >> "$ENV_FILE"
     # (CHROME_BIN/CHROMIUM_FLAGS were dropped with the Karma→Vitest migration; the
-    # grep above still strips any stale values left in an existing runner's .env.)
+    # grep above still strips any stale values left in an existing runner .env file.)
     # Include ~/.local/bin so tools installed there (e.g. junie from JetBrains/junie-github-action)
     # are found in subsequent steps. The runner .env file is read as key=value (not shell), so
     # $HOME is expanded here at setup time rather than job time.
