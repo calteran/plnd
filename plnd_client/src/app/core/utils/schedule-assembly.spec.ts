@@ -159,4 +159,49 @@ describe('assembleSlotGroups', () => {
     expect(lunch.anchor).not.toBeNull();
     expect((lunch.anchor as MealAnchor).name).toBe('Lunch');
   });
+
+  it('surfaces an orphan entry (no anchor/time/meal id) in the first slot instead of dropping it', () => {
+    const anchors = [
+      anchor('start_of_day', 'start of day', null),
+      anchor('meal', 'lunch', 'meal-1'),
+    ];
+    // No after_anchor, no scheduled_start, no slot_meal_anchor_id — the orphan case.
+    const entries = [entry({ entry_id: 'orphan-1', title: 'Stray task' })];
+    const warn = vi.spyOn(console, 'warn');
+
+    const groups = assembleSlotGroups(anchors, entries, []);
+
+    const allTasks = groups.flatMap(g => g.tasks);
+    expect(allTasks.map(t => t.label)).toContain('Stray task');
+    // Parity with assembleScheduleItems: surfaced at the top (first slot).
+    expect(groups[0].tasks.map(t => t.label)).toContain('Stray task');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('neither an anchor nor a fixed start'));
+  });
+
+  it('surfaces an orphan even when there are no anchors at all (synthetic start-of-day group)', () => {
+    const entries = [entry({ entry_id: 'orphan-2', title: 'Lonely task' })];
+    const warn = vi.spyOn(console, 'warn');
+
+    const groups = assembleSlotGroups([], entries, []);
+
+    expect(groups.length).toBe(1);
+    expect(groups[0].anchorLabel).toBe('start of day');
+    expect(groups[0].anchor).toBeNull();
+    expect(groups[0].tasks.map(t => t.label)).toEqual(['Lonely task']);
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it('surfaces a task referencing an unknown meal anchor with a precise warning', () => {
+    const anchors = [
+      anchor('start_of_day', 'start of day', null),
+      anchor('meal', 'lunch', 'meal-1'),
+    ];
+    const entries = [entry({ entry_id: 'orphan-3', title: 'Misfiled', slot_meal_anchor_id: 'meal-gone' })];
+    const warn = vi.spyOn(console, 'warn');
+
+    const groups = assembleSlotGroups(anchors, entries, []);
+
+    expect(groups.flatMap(g => g.tasks).map(t => t.label)).toContain('Misfiled');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('references unknown meal anchor'));
+  });
 });

@@ -159,6 +159,9 @@ export function assembleSlotGroups(
   const scheduledById = new Map<string, ScheduleTask>();
   // Index during-meal tasks by their meal anchor id.
   const duringByMealId = new Map<string, ScheduleTask[]>();
+  // Entries with no anchor, time, or meal id. Surfaced in the first slot below
+  // rather than dropped (parity with assembleScheduleItems' leftover bucket).
+  const orphans: ScheduleTask[] = [];
   for (const e of entries) {
     const mealAnchorId = e.slot_meal_anchor_id;
     if (mealAnchorId && mealAnchorIds.has(mealAnchorId)) {
@@ -167,11 +170,20 @@ export function assembleSlotGroups(
       duringByMealId.set(mealAnchorId, list);
       continue;
     }
+    if (mealAnchorId) {                   // references a meal anchor not in this day
+      console.warn(`Task ${e.entry_id} references unknown meal anchor "${mealAnchorId}"; rendering at top`);
+      orphans.push(mapEntry(e));
+      continue;
+    }
     if (e.scheduled_start) {
       scheduledById.set(e.entry_id, mapEntry(e));
       continue;                          // scheduled — is an anchor itself
     }
-    if (!e.after_anchor) continue;       // orphan — no slot to place it in
+    if (!e.after_anchor) {               // orphan — no slot to place it in
+      console.warn(`Task ${e.entry_id} has neither an anchor nor a fixed start; rendering at top`);
+      orphans.push(mapEntry(e));
+      continue;
+    }
     const key = e.after_anchor.toLowerCase();
     const list = floatingByLabel.get(key) ?? [];
     list.push(mapEntry(e));
@@ -196,6 +208,17 @@ export function assembleSlotGroups(
       anchor = scheduledById.get(a.id) ?? null;
     }
     groups.push({ anchorLabel: label, anchor, tasks: floatingByLabel.get(label) ?? [] });
+  }
+
+  // Defensive: never silently drop. Orphans surface at the top — in the first
+  // slot group if one exists, else a synthetic start-of-day group so the entry
+  // is rendered even when `anchors` is empty.
+  if (orphans.length) {
+    if (groups.length) {
+      groups[0] = { ...groups[0], tasks: [...orphans, ...groups[0].tasks] };
+    } else {
+      groups.push({ anchorLabel: 'start of day', anchor: null, tasks: orphans });
+    }
   }
 
   return groups;
