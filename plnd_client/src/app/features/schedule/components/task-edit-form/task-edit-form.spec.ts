@@ -108,4 +108,34 @@ describe('TaskEditFormComponent', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     expect(toggle.getAttribute('aria-label')?.toLowerCase()).toContain('skip if missed');
   });
+
+  it('emits close when a click lands outside the form (click-off collapses it)', () => {
+    document.body.appendChild(fixture.nativeElement);
+    fixture.componentRef.setInput('task', task());
+    fixture.detectChanges();
+    let closed = false;
+    fixture.componentInstance.closed.subscribe(() => (closed = true));
+
+    const outside = document.createElement('button');
+    document.body.appendChild(outside);
+    outside.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(closed).toBe(true);
+    outside.remove();
+    fixture.nativeElement.remove();
+  });
+
+  it('does not emit close when a click lands inside the form', () => {
+    document.body.appendChild(fixture.nativeElement);
+    fixture.componentRef.setInput('task', task());
+    fixture.detectChanges();
+    let closed = false;
+    fixture.componentInstance.closed.subscribe(() => (closed = true));
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector('input[name="title"]');
+    input.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(closed).toBe(false);
+    fixture.nativeElement.remove();
+  });
 });
