@@ -172,3 +172,42 @@
   flex: 1;
 }
 
+// ── Paired-task (meal) drop zone ──────────────────────────────────────
+// A meal row carries a CDK drop list as its third flex child. Left at zero size
+// it is both invisible when it holds tasks and undroppable when empty — CDK's
+// drop-target geometry can never match a zero-area element, so you cannot drag
+// the FIRST task onto a meal (the reported bug; same zero-area class the day view
+// fixes for `.during-meal` and the #1000/#1001 floating-slot fix).
+//
+// CRUCIAL: the Meals section sits ABOVE the Tasks ('<sched>') section, so ANY
+// vertical height added to a meal row pushes every task below it down and
+// destabilises drags in that card (it regressed the sibling reorder e2e). So an
+// EMPTY meal zone is a fixed inline strip sized WITHIN the row's existing text
+// height — hittable, but adding no row height. It only wraps onto its own
+// full-width line once it actually holds paired tasks (`.has-tasks`), where the
+// extra height is wanted anyway to show them.
+.meal-slot-drop-list {
+  flex-shrink: 0;
+  min-width: 3rem;
+  min-height: 1rem; // <= the row's ~16px text height, so the row does not grow
+}
+
+.meal-body-row.has-tasks {
+  flex-wrap: wrap;
+}
+.meal-body-row.has-tasks .meal-slot-drop-list {
+  flex-basis: 100%;
+  min-width: 0;
+  min-height: 1.5rem;
+}
+
+// Cosmetic affordance: CDK marks a connected list `.cdk-drop-list-receiving`
+// while a drag can land there. `outline` (not `border`) leaves the box / cached
+// hit-rect untouched. Applies to both meal and unanchored slot lists.
+.slot-drop-list.cdk-drop-list-receiving {
+  outline: 2px dashed var(--color-accent-border);
+  outline-offset: -2px;
+  border-radius: 6px;
+  background: var(--color-accent-light);
+}
+
