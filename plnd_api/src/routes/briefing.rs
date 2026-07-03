@@ -43,27 +43,6 @@ fn round_location(loc: Location) -> Location {
 // ── Response types ────────────────────────────────────────────────────────────
 
 #[derive(Debug, Serialize, utoipa::ToSchema)]
-pub struct WeatherResponse {
-    pub temperature_c: f64,
-    pub condition: String,
-    pub high_c: f64,
-    pub low_c: f64,
-    pub precipitation_mm: f64,
-}
-
-impl From<plnd_data::providers::WeatherData> for WeatherResponse {
-    fn from(d: plnd_data::providers::WeatherData) -> Self {
-        Self {
-            temperature_c: d.temperature_c,
-            condition: d.condition,
-            high_c: d.high_c,
-            low_c: d.low_c,
-            precipitation_mm: d.precipitation_mm,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, utoipa::ToSchema)]
 pub struct NewsHeadlineResponse {
     pub title: String,
     pub url: Option<String>,
@@ -92,55 +71,6 @@ pub struct YesterdayResponse {
 }
 
 // ── Handlers ─────────────────────────────────────────────────────────────────
-
-#[utoipa::path(
-    get,
-    path = "/briefing/weather",
-    tag = "Briefing",
-    params(("loc" = String, Query, description = "Location as \"lat,lon\" e.g. \"51.5,-0.1\"")),
-    security(("bearer_auth" = [])),
-    responses(
-        (status = 200, description = "Current weather summary", body = WeatherResponse),
-        (status = 400, description = "Missing or malformed ?loc= parameter"),
-        (status = 401, description = "Unauthorized"),
-        (status = 503, description = "Weather service unavailable"),
-    )
-)]
-#[tracing::instrument(skip_all, fields(user_id = %claims.sub))]
-pub async fn get_weather(
-    State(state): State<Arc<AppState>>,
-    Extension(claims): Extension<Claims>,
-    Query(params): Query<LocQuery>,
-) -> Result<Json<WeatherResponse>, StatusCode> {
-    let _user_id = Uuid::parse_str(&claims.sub).map_err(|_| StatusCode::UNAUTHORIZED)?;
-
-    let loc_str = params.loc.ok_or(StatusCode::BAD_REQUEST)?;
-    let location = parse_loc(&loc_str).ok_or(StatusCode::BAD_REQUEST)?;
-    let location = round_location(location);
-
-    let cache_key = format!("{:.1},{:.1}", location.latitude, location.longitude);
-
-    if let Some(cached) = state.briefing.weather_cache.get(&cache_key).await {
-        return Ok(Json(WeatherResponse::from(cached)));
-    }
-
-    let data = state
-        .briefing
-        .weather
-        .current(location)
-        .await
-        .map_err(|e| {
-            tracing::error!(error = %e, "weather fetch error");
-            StatusCode::SERVICE_UNAVAILABLE
-        })?;
-
-    state
-        .briefing
-        .weather_cache
-        .insert(cache_key, data.clone())
-        .await;
-    Ok(Json(WeatherResponse::from(data)))
-}
 
 #[utoipa::path(
     get,

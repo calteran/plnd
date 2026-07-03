@@ -14,10 +14,6 @@ pub mod recipe;
 pub mod recipe_fixture;
 pub mod themealdb;
 pub mod usda_fdc;
-pub mod weather;
-
-#[cfg(debug_assertions)]
-pub mod weather_fixture;
 
 pub use dtos::Location;
 pub use error::ExternalProviderError;
@@ -37,10 +33,6 @@ pub use recipe_fixture::FixtureRecipeProvider;
 pub use themealdb::TheMealDbFixtureProvider;
 pub use themealdb::TheMealDbProvider;
 pub use usda_fdc::UsdaFdcProvider;
-pub use weather::{OpenMeteoProvider, WeatherData, WeatherProvider};
-
-#[cfg(debug_assertions)]
-pub use weather_fixture::FixtureWeatherProvider;
 
 // TODO: update to production app name/URL before launch (required by Open Food Facts TOS etc.)
 pub(crate) const USER_AGENT: &str = concat!("com.tingeese.plnd-dev/", env!("CARGO_PKG_VERSION"));

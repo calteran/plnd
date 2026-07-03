@@ -21,7 +21,7 @@ use crate::models::{
     UnplannableReason, UpdateMealPatternEntryRequest, UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
-    briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
+    briefing::{NewsHeadlineResponse, NewsResponse, YesterdayResponse},
     catalog_ingest::{
         ContributeIngredientBody, ContributeIngredientResponse, IngestIngredientBody,
         IngestIngredientResponse, PromoteIngredientBody,
@@ -81,7 +81,6 @@ impl Modify for BearerSecurityAddon {
         crate::routes::preferences::patch_preferences,
         crate::routes::preferences::get_preferences,
         // Briefing
-        crate::routes::briefing::get_weather,
         crate::routes::briefing::get_news,
         crate::routes::briefing::get_yesterday,
         // Dietary Restrictions
@@ -180,7 +179,6 @@ impl Modify for BearerSecurityAddon {
         UpdateRestrictionRequest,
         CreateMealPatternEntryRequest,
         UpdateMealPatternEntryRequest,
-        WeatherResponse,
         NewsHeadlineResponse,
         NewsResponse,
         YesterdayResponse,
