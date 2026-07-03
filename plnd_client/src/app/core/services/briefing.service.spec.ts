@@ -12,11 +12,25 @@ const mockConfig = { api: { baseUrl: 'http://localhost:3000' } };
 const TEST_LAT = 51.5;
 const TEST_LON = -0.1;
 
+const OPEN_METEO = {
+  current: { temperature_2m: 14, precipitation: 5.2, weather_code: 61 },
+  daily: { temperature_2m_max: [17], temperature_2m_min: [11] },
+};
+const BIG_DATA_CLOUD = { city: 'Testville', locality: 'Testville' };
+const N = { headlines: [{ title: 'Story A' }, { title: 'Story B' }] };
+const Y = { tasks_done: 4, tasks_total: 6, meals_logged: 2, meals_planned: 3 };
+
+function jsonResponse(body: unknown): Response {
+  return { ok: true, status: 200, json: () => Promise.resolve(body) } as Response;
+}
+
 describe('BriefingService', () => {
   let service: BriefingService;
   let httpMock: HttpTestingController;
+  let fetchMock: Mock;
 
   beforeEach(() => {
+    localStorage.clear();
     TestBed.configureTestingModule({
       providers: [
         provideHttpClient(),
@@ -27,17 +41,19 @@ describe('BriefingService', () => {
     service = TestBed.inject(BriefingService);
     httpMock = TestBed.inject(HttpTestingController);
 
+    fetchMock = vi.fn((url: string) => {
+      if (url.includes('open-meteo.com')) return Promise.resolve(jsonResponse(OPEN_METEO));
+      if (url.includes('bigdatacloud.net')) return Promise.resolve(jsonResponse(BIG_DATA_CLOUD));
+      return Promise.reject(new Error(`unexpected fetch: ${url}`));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
     vi.spyOn(navigator.geolocation, 'getCurrentPosition').mockImplementation(
       (success: PositionCallback) => {
         success({
           coords: {
-            latitude: TEST_LAT,
-            longitude: TEST_LON,
-            accuracy: 0,
-            altitude: null,
-            altitudeAccuracy: null,
-            heading: null,
-            speed: null,
+            latitude: TEST_LAT, longitude: TEST_LON, accuracy: 0,
+            altitude: null, altitudeAccuracy: null, heading: null, speed: null,
           },
           timestamp: 0,
         } as GeolocationPosition);
@@ -45,12 +61,12 @@ describe('BriefingService', () => {
     );
   });
 
-  afterEach(() => httpMock.verify());
+  afterEach(() => {
+    httpMock.verify();
+    vi.unstubAllGlobals();
+  });
 
-  function flushAll(weatherBody: object, newsBody: object, yesterdayBody: object) {
-    httpMock
-      .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/weather'))
-      .flush(weatherBody);
+  function flushServer(newsBody: object, yesterdayBody: object) {
     httpMock
       .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/news'))
       .flush(newsBody);
@@ -59,109 +75,89 @@ describe('BriefingService', () => {
       .flush(yesterdayBody);
   }
 
-  const W = { temperature_c: 14, condition: 'Rainy', high_c: 17, low_c: 11, precipitation_mm: 5.2 };
-  const N = { headlines: [{ title: 'Story A' }, { title: 'Story B' }] };
-  const Y = { tasks_done: 4, tasks_total: 6, meals_logged: 2, meals_planned: 3 };
-
-  it('sets weather signal on successful fetch', () => {
+  it('sets weather signal from a direct Open-Meteo fetch', async () => {
     service.load('2026-04-06');
-    flushAll(W, N, Y);
+    flushServer(N, Y);
+    await vi.waitFor(() => expect(service.weather()).not.toBeNull());
     expect(service.weather()?.temperature_c).toBe(14);
+    expect(service.weather()?.condition).toBe('Rainy');
     expect(service.weatherError()).toBeNull();
   });
 
-  it('sets news signal on successful fetch', () => {
+  it('sets city signal from a direct BigDataCloud fetch', async () => {
     service.load('2026-04-06');
-    flushAll(W, N, Y);
-    expect(service.news()).toEqual([{ title: 'Story A' }, { title: 'Story B' }]);
-    expect(service.newsError()).toBeNull();
+    flushServer(N, Y);
+    await vi.waitFor(() => expect(service.city()).toBe('Testville'));
   });
 
-  it('sets yesterday signal on successful fetch', () => {
+  it('fires weather and city in parallel with rounded coordinates', async () => {
     service.load('2026-04-06');
-    flushAll(W, N, Y);
+    flushServer(N, Y);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const urls = fetchMock.mock.calls.map(c => c[0] as string);
+    expect(urls.some(u => u.includes('open-meteo.com') && u.includes('latitude=51.5') && u.includes('longitude=-0.1'))).toBe(true);
+    expect(urls.some(u => u.includes('bigdatacloud.net') && u.includes('latitude=51.5'))).toBe(true);
+  });
+
+  it('sets weatherError when the weather fetch fails; city still resolves', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.includes('open-meteo.com')
+        ? Promise.resolve({ ok: false, status: 503 } as Response)
+        : Promise.resolve(jsonResponse(BIG_DATA_CLOUD)));
+    service.load('2026-04-06');
+    flushServer(N, Y);
+    await vi.waitFor(() => expect(service.weatherError()).toBe('Weather unavailable'));
+    expect(service.weather()).toBeNull();
+    await vi.waitFor(() => expect(service.city()).toBe('Testville'));
+  });
+
+  it('omits the city silently when the city fetch fails; weather intact', async () => {
+    fetchMock.mockImplementation((url: string) =>
+      url.includes('bigdatacloud.net')
+        ? Promise.reject(new Error('network'))
+        : Promise.resolve(jsonResponse(OPEN_METEO)));
+    service.load('2026-04-06');
+    flushServer(N, Y);
+    await vi.waitFor(() => expect(service.weather()?.temperature_c).toBe(14));
+    expect(service.city()).toBeNull();
+  });
+
+  it('serves weather + city from cache with no second third-party fetch', async () => {
+    service.load('2026-04-06');
+    flushServer(N, Y);
+    await vi.waitFor(() => {
+      expect(service.weather()).not.toBeNull();
+      expect(service.city()).not.toBeNull();
+    });
+
+    // New date resets the in-memory dedupe, but the localStorage cache is warm.
+    service.load('2026-04-07');
+    flushServer(N, Y);
+    await vi.waitFor(() => expect(service.weather()?.temperature_c).toBe(14));
+    expect(service.city()).toBe('Testville');
+    expect(fetchMock).toHaveBeenCalledTimes(2); // no new Open-Meteo/BigDataCloud calls
+  });
+
+  it('sets news and yesterday from the server as before', () => {
+    service.load('2026-04-06');
+    flushServer(N, Y);
+    expect(service.news()).toEqual([{ title: 'Story A' }, { title: 'Story B' }]);
     expect(service.yesterday()?.tasks_done).toBe(4);
-    expect(service.yesterdayError()).toBeNull();
   });
 
-  it('sets weatherError and leaves news intact when weather fails', () => {
-    service.load('2026-04-06');
-    httpMock
-      .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/weather'))
-      .error(new ErrorEvent('Network error'));
-    httpMock
-      .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/news'))
-      .flush(N);
-    httpMock
-      .expectOne('http://localhost:3000/briefing/yesterday')
-      .flush(Y);
-    expect(service.weatherError()).toBe('Weather unavailable');
-    expect(service.weather()).toBeNull();
-    expect(service.news()).toEqual([{ title: 'Story A' }, { title: 'Story B' }]);
-  });
-
-  it('sets newsError and leaves weather intact when news fails', () => {
-    service.load('2026-04-06');
-    httpMock
-      .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/weather'))
-      .flush(W);
-    httpMock
-      .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/news'))
-      .error(new ErrorEvent('Network error'));
-    httpMock
-      .expectOne('http://localhost:3000/briefing/yesterday')
-      .flush(Y);
-    expect(service.newsError()).toBe('Headlines unavailable');
-    expect(service.weather()?.temperature_c).toBe(14);
-  });
-
-  it('does not fire duplicate requests when load() is called twice for the same date', () => {
-    service.load('2026-04-06');
-    service.load('2026-04-06'); // same date — should be a no-op
-    flushAll(W, N, Y);
-    expect(service.weather()?.temperature_c).toBe(14);
-  });
-
-  it('re-fetches and clears stale signals when called for a different date', () => {
-    service.load('2026-04-06');
-    flushAll(W, N, Y);
-    expect(service.weather()?.temperature_c).toBe(14);
-
-    service.load('2026-04-07'); // new date — signals reset immediately, fresh requests fire
-    expect(service.weather()).toBeNull();
-    flushAll(W, N, Y);
-    expect(service.weather()?.temperature_c).toBe(14);
-  });
-
-  it('sets yesterdayError when yesterday fails', () => {
-    service.load('2026-04-06');
-    httpMock
-      .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/weather'))
-      .flush(W);
-    httpMock
-      .expectOne(req => req.url.startsWith('http://localhost:3000/briefing/news'))
-      .flush(N);
-    httpMock
-      .expectOne('http://localhost:3000/briefing/yesterday')
-      .error(new ErrorEvent('Network error'));
-    expect(service.yesterdayError()).toBe('Yesterday unavailable');
-    expect(service.yesterday()).toBeNull();
-  });
-
-  it('sets weatherError and newsError when geolocation is denied', () => {
+  it('sets errors and skips third-party fetches when geolocation is denied', () => {
     (navigator.geolocation.getCurrentPosition as Mock).mockImplementation(
-      (_success: PositionCallback, error?: PositionErrorCallback) => {
+      (_s: PositionCallback, error?: PositionErrorCallback) => {
         error?.({
           code: 1, message: 'Permission denied',
           PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3,
         } as GeolocationPositionError);
-      }
-    );
+      });
     service.load('2026-04-06');
     httpMock.expectOne('http://localhost:3000/briefing/yesterday').flush(Y);
     expect(service.weatherError()).toBe('Location unavailable');
     expect(service.newsError()).toBe('Location unavailable');
     expect(service.weather()).toBeNull();
-    expect(service.news()).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
