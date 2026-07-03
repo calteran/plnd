@@ -2,7 +2,7 @@ pub mod error;
 pub mod settings;
 
 use config::{Config, File};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 pub use settings::AppConfig;
 
 pub fn load_config() -> Result<AppConfig, error::ConfigError> {
