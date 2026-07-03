@@ -148,20 +148,29 @@ Each cache is a **bounded multi-key store** — a JSON map of `locationKey →
 (e.g. on a phone) keep many locations warm, not just their last one; it's cheap
 to store and materially helpful.
 
+- Each entry carries **two timestamps**: `fetchedAt` (freshness — drives TTL,
+  set only when data is written) and `accessedAt` (recency — bumped on every
+  cache **hit**). Keeping them separate is essential: recency-on-read must
+  **not** reset the TTL, or a daily-read city would never refresh past its
+  30-day staleness window.
+- **Access-ordered LRU:** a cache **hit** updates `accessedAt` (and persists),
+  so frequently-used "favorite" locations stay resident and never re-fetch — no
+  lag for the places the user actually returns to. Eviction, when a write would
+  exceed capacity, removes the entry with the **oldest `accessedAt`** (least
+  recently *used*, not least recently *written*).
 - **Capacity:** ~100 entries per cache (mirrors the server's old moka
-  `max_capacity(100)`). On write past capacity, **evict the oldest by `ts`**
-  (simple LRU-by-write-time) so the map stays bounded.
-- **Weather:** entry `{ v: WeatherSummary, ts }`, **TTL 1 hour** (matches the
-  server's old weather TTL).
-- **City:** entry `{ v: string | null, ts }`, **TTL 30 days** (a coordinate's
-  city is effectively static).
+  `max_capacity(100)`), so a roaming phone user keeps many cities warm.
+- **Weather:** entry `{ v: WeatherSummary, fetchedAt, accessedAt }`,
+  **TTL 1 hour** (on `fetchedAt`; matches the server's old weather TTL).
+- **City:** entry `{ v: string | null, fetchedAt, accessedAt }`,
+  **TTL 30 days** (on `fetchedAt`; a coordinate's city is effectively static).
 - Only **successful** responses are written (including a successful "no city"
   → `null`, so we don't re-query a genuinely nameless coordinate). A `fetch`
   error is never cached, so it retries next load.
 - A cache read must distinguish **miss** (absent/expired entry → fetch) from a
-  cached `null` city (hit → use it). The reader returns the entry or a
-  `miss` sentinel accordingly. Expired entries are treated as misses and may be
-  overwritten in place.
+  cached `null` city (hit → use it). The reader returns the entry (bumping
+  `accessedAt`) or a `miss` sentinel. A TTL-expired entry is a miss and may be
+  overwritten in place on the next successful fetch.
 
 This adds cross-session, cross-date, **and cross-location** reuse on top of the
 existing `_loadedForDate` in-memory dedupe (which resets on reload).
