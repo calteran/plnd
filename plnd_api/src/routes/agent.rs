@@ -15,6 +15,7 @@ use crate::models::{
 use crate::routes::meal_promotion::{PromotionOutcome, RawMealRef, promote_new_meal};
 use crate::scheduling::{
     constrained_dates_for_rule, day_type_applies_to, has_floating_instance_in_window,
+    recurrence_frequency_label,
 };
 use crate::state::AppState;
 
@@ -1449,12 +1450,19 @@ fn routine_prior_context(
     let mut floating: Vec<String> = Vec::new();
 
     for t in templates {
+        // Recurrence frequency drives the one-shot decision in `place_tasks.md`
+        // (daily/weekdays → one-shot; weekly and rarer → carry over), so surface
+        // it on the line. Omit the segment when the rule isn't recognizable.
+        let freq = recurrence_frequency_label(&t.recurrence_rule)
+            .map(|f| format!(", {f}"))
+            .unwrap_or_default();
         for date in constrained_dates_for_rule(&t.recurrence_rule, plan_start, plan_end) {
             let hint = time_hint_str(&t.time_window_start, &t.time_window_end);
             constrained.push(format!(
-                "- \"{}\" ({}, {} min, {} energy{}) on {date}",
+                "- \"{}\" ({}{}, {} min, {} energy{}) on {date}",
                 t.title.replace(['\n', '\r'], " "),
                 t.task_type.replace(['\n', '\r'], " "),
+                freq,
                 t.duration_minutes,
                 t.energy_required.replace(['\n', '\r'], " "),
                 hint
@@ -1463,9 +1471,10 @@ fn routine_prior_context(
         if has_floating_instance_in_window(&t.recurrence_rule, plan_start, plan_end) {
             let hint = time_hint_str(&t.time_window_start, &t.time_window_end);
             floating.push(format!(
-                "- \"{}\" ({}, {} min, {} energy{})",
+                "- \"{}\" ({}{}, {} min, {} energy{})",
                 t.title.replace(['\n', '\r'], " "),
                 t.task_type.replace(['\n', '\r'], " "),
+                freq,
                 t.duration_minutes,
                 t.energy_required.replace(['\n', '\r'], " "),
                 hint
@@ -2238,6 +2247,23 @@ mod tests {
         assert!(ctx.contains("on 2026-04-29"));
         assert!(ctx.contains("on 2026-04-30"));
         assert!(!ctx.contains("[Routine instances to place once"));
+        // Frequency label surfaced so the LLM can apply the one-shot rule.
+        assert!(
+            ctx.contains("daily"),
+            "daily routine line must carry its frequency label: {ctx}"
+        );
+    }
+
+    #[test]
+    fn weekdays_template_labels_constrained_lines_weekdays() {
+        let templates = vec![tmpl("Standup", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", None)];
+        // Mon–Fri 2026-04-27..05-01 all fall in this window.
+        let ctx = super::routine_prior_context(&templates, d(2026, 4, 27), d(2026, 5, 1));
+        assert!(ctx.contains("[Routine instances with fixed dates"));
+        assert!(
+            ctx.contains("weekdays"),
+            "weekday routine line must carry its frequency label: {ctx}"
+        );
     }
 
     #[test]
@@ -2247,6 +2273,10 @@ mod tests {
         assert!(ctx.contains("[Routine instances to place once in the window"));
         assert!(ctx.contains("\"Weekly Review\""));
         assert!(!ctx.contains("[Routine instances with fixed dates"));
+        assert!(
+            ctx.contains("weekly"),
+            "weekly routine line must carry its frequency label: {ctx}"
+        );
     }
 
     #[test]
@@ -2262,6 +2292,10 @@ mod tests {
         let ctx = super::routine_prior_context(&templates, d(2026, 4, 28), d(2026, 5, 3));
         assert!(ctx.contains("[Routine instances to place once"));
         assert!(ctx.contains("\"Budget Review\""));
+        assert!(
+            ctx.contains("monthly"),
+            "monthly routine line must carry its frequency label: {ctx}"
+        );
     }
 
     #[test]

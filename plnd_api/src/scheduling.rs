@@ -60,6 +60,41 @@ pub fn has_floating_instance_in_window(rule: &str, start: NaiveDate, end: NaiveD
     }
 }
 
+/// Human-readable recurrence frequency for a routine's RRULE, in the same
+/// vocabulary as the client's `RecurrenceType` (`daily` | `weekdays` | `weekly`
+/// | `monthly` | `yearly`). Returns `None` for rules with no recognizable
+/// `FREQ=` token.
+///
+/// Keys off the `FREQ=` param (like [`constrained_dates_for_rule`]) rather than
+/// exact-string matching, so it still labels the `BYMONTHDAY`/`BYMONTH`-bearing
+/// monthly and yearly rules that reach `routine_prior_context`. A `FREQ=WEEKLY`
+/// rule whose `BYDAY` is exactly the Mon–Fri set is reported as `weekdays`
+/// (near-daily); any other weekly rule is `weekly`.
+pub fn recurrence_frequency_label(rule: &str) -> Option<&'static str> {
+    let rule_uc = rule.to_uppercase();
+    if !rule_uc.starts_with("FREQ=") {
+        return None;
+    }
+    match param_value(&rule_uc, "FREQ")? {
+        "DAILY" => Some("daily"),
+        "WEEKLY" if is_weekday_set(&rule_uc) => Some("weekdays"),
+        "WEEKLY" => Some("weekly"),
+        "MONTHLY" => Some("monthly"),
+        "YEARLY" => Some("yearly"),
+        _ => None,
+    }
+}
+
+/// True if the RRULE's `BYDAY` is exactly the Monday–Friday set (the canonical
+/// `weekdays` recurrence), in any order.
+fn is_weekday_set(rule_uc: &str) -> bool {
+    let Some(byday) = param_value(rule_uc, "BYDAY") else {
+        return false;
+    };
+    let days: std::collections::HashSet<&str> = byday.split(',').map(str::trim).collect();
+    days == std::collections::HashSet::from(["MO", "TU", "WE", "TH", "FR"])
+}
+
 /// True if `date` falls on a weekday in the `BYDAY=` component of an **uppercase** RRULE string.
 pub(crate) fn byday_matches(date: NaiveDate, rule_uc: &str) -> bool {
     let Some(byday_value) = param_value(rule_uc, "BYDAY") else {
@@ -242,6 +277,77 @@ mod tests {
             d(2026, 4, 27),
             d(2026, 5, 3)
         ));
+    }
+
+    // ── recurrence_frequency_label ─────────────────────────────────────────
+
+    #[test]
+    fn label_daily() {
+        assert_eq!(recurrence_frequency_label("FREQ=DAILY"), Some("daily"));
+    }
+
+    #[test]
+    fn label_weekdays_full_mon_fri_set() {
+        assert_eq!(
+            recurrence_frequency_label("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"),
+            Some("weekdays")
+        );
+    }
+
+    #[test]
+    fn label_weekdays_is_order_independent() {
+        assert_eq!(
+            recurrence_frequency_label("FREQ=WEEKLY;BYDAY=FR,MO,TH,TU,WE"),
+            Some("weekdays")
+        );
+    }
+
+    #[test]
+    fn label_weekly_single_day() {
+        assert_eq!(
+            recurrence_frequency_label("FREQ=WEEKLY;BYDAY=MO"),
+            Some("weekly")
+        );
+    }
+
+    #[test]
+    fn label_weekly_partial_multi_day_is_not_weekdays() {
+        assert_eq!(
+            recurrence_frequency_label("FREQ=WEEKLY;BYDAY=MO,WE,FR"),
+            Some("weekly")
+        );
+    }
+
+    #[test]
+    fn label_bare_weekly() {
+        assert_eq!(recurrence_frequency_label("FREQ=WEEKLY"), Some("weekly"));
+    }
+
+    #[test]
+    fn label_monthly_with_bymonthday() {
+        assert_eq!(
+            recurrence_frequency_label("FREQ=MONTHLY;BYMONTHDAY=10"),
+            Some("monthly")
+        );
+    }
+
+    #[test]
+    fn label_yearly_with_bymonth_and_bymonthday() {
+        assert_eq!(
+            recurrence_frequency_label("FREQ=YEARLY;BYMONTH=4;BYMONTHDAY=28"),
+            Some("yearly")
+        );
+    }
+
+    #[test]
+    fn label_is_case_insensitive() {
+        assert_eq!(recurrence_frequency_label("freq=daily"), Some("daily"));
+    }
+
+    #[test]
+    fn label_unrecognized_rule_is_none() {
+        assert_eq!(recurrence_frequency_label("garbage"), None);
+        assert_eq!(recurrence_frequency_label(""), None);
     }
 
     // ── date_matches_recurrence (extracted from schedule.rs) ───────────────
