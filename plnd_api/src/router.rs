@@ -216,7 +216,6 @@ pub fn build(state: Arc<AppState>, cors: CorsLayer) -> Router {
             "/day-types/{id}",
             put(day_types::update_day_type).delete(day_types::delete_day_type),
         )
-        .route("/briefing/weather", get(briefing::get_weather))
         .route("/briefing/news", get(briefing::get_news))
         .route("/briefing/yesterday", get(briefing::get_yesterday))
         .route("/auth/logout", post(auth::logout))

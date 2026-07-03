@@ -11,6 +11,9 @@ import { BriefingService } from '../../../../core/services/briefing.service';
       <div class="briefing-card">
         @if (briefing.weather(); as w) {
           <div class="weather-content">
+            @if (briefing.city(); as c) {
+              <span class="weather-city">{{ c }}</span>
+            }
             <span class="weather-temp">{{ Math.round(w.temperature_c) }}°</span>
             <span class="weather-condition">{{ w.condition }}</span>
             <span class="weather-range">

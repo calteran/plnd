@@ -21,7 +21,7 @@ use crate::models::{
     UnplannableReason, UpdateMealPatternEntryRequest, UpdateScheduleAnchorRequest,
 };
 use crate::routes::{
-    briefing::{NewsHeadlineResponse, NewsResponse, WeatherResponse, YesterdayResponse},
+    briefing::{NewsHeadlineResponse, NewsResponse, YesterdayResponse},
     catalog_ingest::{
         ContributeIngredientBody, ContributeIngredientResponse, IngestIngredientBody,
         IngestIngredientResponse, PromoteIngredientBody,
@@ -81,7 +81,6 @@ impl Modify for BearerSecurityAddon {
         crate::routes::preferences::patch_preferences,
         crate::routes::preferences::get_preferences,
         // Briefing
-        crate::routes::briefing::get_weather,
         crate::routes::briefing::get_news,
         crate::routes::briefing::get_yesterday,
         // Dietary Restrictions
@@ -180,7 +179,6 @@ impl Modify for BearerSecurityAddon {
         UpdateRestrictionRequest,
         CreateMealPatternEntryRequest,
         UpdateMealPatternEntryRequest,
-        WeatherResponse,
         NewsHeadlineResponse,
         NewsResponse,
         YesterdayResponse,
@@ -283,7 +281,7 @@ impl Modify for BearerSecurityAddon {
         (name = "Preferences", description = "User preference settings"),
         (name = "Dietary Restrictions", description = "Dietary restriction management"),
         (name = "Meal Pattern", description = "User meal pattern entries — named meal slots with preferred times"),
-        (name = "Briefing", description = "Morning briefing — weather, news, and yesterday recap"),
+        (name = "Briefing", description = "Morning briefing — news and yesterday recap"),
         (name = "Catalog", description = "Catalog ingredient, dish, and meal lookups and ingest"),
         (name = "My Ingredient Prefs", description = "User ingredient preference management (blocked/notes)"),
         (name = "My Dishes", description = "Personal dish library with fork-and-edit support"),

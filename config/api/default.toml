@@ -46,11 +46,6 @@ off_base_url = "https://world.openfoodfacts.net"
 off_basic_auth_user = "off"
 off_basic_auth_password = "off"
 
-# Morning briefing — weather
-# WGS-84 coordinates used for Open-Meteo proxy. Defaults to London.
-weather_latitude  = 51.5074
-weather_longitude = -0.1278
-
 # Morning briefing — news
 # RSS/Atom feed URLs to aggregate. Headlines are merged and sorted newest-first.
 # Leave empty to disable the headlines card.

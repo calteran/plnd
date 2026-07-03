@@ -118,9 +118,9 @@ pub struct ExternalProvidersConfig {
     #[serde(default)]
     pub news_feed_urls: Vec<String>,
     /// Root directory of captured upstream fixtures. When `Some`, debug builds
-    /// swap `OpenMeteoProvider` and `RssFeedProvider` for file-backed impls that
-    /// read `{root}/open-meteo/forecast.json` and `{root}/rss/*.xml`. Never set
-    /// in production — the fixture impls do not exist in release binaries.
+    /// swap `RssFeedProvider` for a file-backed impl that reads `{root}/rss/*.xml`
+    /// (plus nutrition/recipe fixtures). Never set in production — the fixture
+    /// impls do not exist in release binaries.
     #[serde(default)]
     pub fixture_path: Option<PathBuf>,
 }

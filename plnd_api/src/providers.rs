@@ -3,11 +3,10 @@ use std::sync::Arc;
 use plnd_data::cache::SearchCache;
 #[cfg(debug_assertions)]
 use plnd_data::providers::{
-    FixtureNewsProvider, FixtureNutritionProvider, FixtureWeatherProvider, TheMealDbFixtureProvider,
+    FixtureNewsProvider, FixtureNutritionProvider, TheMealDbFixtureProvider,
 };
 use plnd_data::providers::{
-    NewsProvider, OpenFoodFactsProvider, OpenMeteoProvider, RssFeedProvider, TheMealDbProvider,
-    UsdaFdcProvider, WeatherProvider,
+    NewsProvider, OpenFoodFactsProvider, RssFeedProvider, TheMealDbProvider, UsdaFdcProvider,
 };
 use plnd_data::search::ProviderSearchService;
 
@@ -63,8 +62,8 @@ pub fn build(
         search_cache,
     );
 
-    let (weather_provider, news_provider) = build_briefing_providers(external);
-    let briefing = BriefingState::new(weather_provider, news_provider);
+    let news_provider = build_briefing_providers(external);
+    let briefing = BriefingState::new(news_provider);
     if external.fixture_path.is_none() {
         if external.news_feed_urls.is_empty() {
             tracing::warn!("briefing news feed disabled (news_feed_urls not set)");
@@ -86,27 +85,21 @@ pub fn build(
     }
 }
 
-/// Constructs the weather + news providers for the briefing handlers.
+/// Constructs the news provider for the briefing handlers.
 ///
-/// In debug builds, if `external.fixture_path` is set, returns file-backed
-/// implementations that read captured upstream responses from disk — used by
-/// e2e to keep tests deterministic and offline. Otherwise (and always in
-/// release builds, where the fixture impls do not exist) returns the real
-/// Open-Meteo + RSS providers.
+/// In debug builds, if `external.fixture_path` is set, returns a file-backed
+/// implementation that reads captured RSS/Atom feeds from disk — used by e2e to
+/// keep tests deterministic and offline. Otherwise (and always in release
+/// builds, where the fixture impl does not exist) returns the real RSS provider.
 fn build_briefing_providers(
     external: &plnd_api::config::settings::ExternalProvidersConfig,
-) -> (Arc<dyn WeatherProvider>, Arc<dyn NewsProvider>) {
+) -> Arc<dyn NewsProvider> {
     #[cfg(debug_assertions)]
     if let Some(fixture_root) = &external.fixture_path {
         tracing::warn!(
             path = %fixture_root.display(),
-            "USING FIXTURE PROVIDERS for /briefing/* — debug builds only; never enable in prod"
+            "USING FIXTURE NEWS PROVIDER for /briefing/news — debug builds only; never enable in prod"
         );
-        let weather_path = fixture_root.join("open-meteo/forecast.json");
-        let weather = FixtureWeatherProvider::new(weather_path).unwrap_or_else(|e| {
-            tracing::error!(error = %e, "failed to load fixture weather provider");
-            std::process::exit(1);
-        });
         let rss_dir = fixture_root.join("rss");
         let feed_paths: Vec<std::path::PathBuf> = std::fs::read_dir(&rss_dir)
             .unwrap_or_else(|e| {
@@ -120,13 +113,10 @@ fn build_briefing_providers(
             tracing::error!(error = %e, "failed to load fixture news provider");
             std::process::exit(1);
         });
-        return (Arc::new(weather), Arc::new(news));
+        return Arc::new(news);
     }
 
-    (
-        Arc::new(OpenMeteoProvider::new()),
-        Arc::new(RssFeedProvider::new(&external.news_feed_urls)),
-    )
+    Arc::new(RssFeedProvider::new(&external.news_feed_urls))
 }
 
 /// Constructs the nutrition providers for the search service.
