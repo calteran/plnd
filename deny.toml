@@ -72,7 +72,6 @@ feature-depth = 1
 ignore = [
     # Each ignored advisory MUST reference a tracking GitHub issue (see CLAUDE.md).
     # Object form is used so cargo-deny surfaces the reason + issue in its own output.
-    { id = "RUSTSEC-2021-0141", reason = "dotenv unmaintained — swap to dotenvy (already in tree); tracked in #1027" },
     { id = "RUSTSEC-2023-0071", reason = "rsa Marvin Attack — via jsonwebtoken's rust_crypto backend. RS256 IS used, for OIDC ID-token verification (jwks.rs), but only public-key signature verification — never RSA private-key decryption, which is what Marvin's timing side-channel targets; the vulnerable path is unreachable. No pure-Rust fix; removing rsa from the tree needs the aws_lc_rs backend (adds a C/cmake build dep). Tracked in #1028" },
     { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic-attribute DoS — transitive via feed-rs, no compatible fix yet; tracked in #1026" },
     { id = "RUSTSEC-2026-0195", reason = "quick-xml NsReader memory-exhaustion DoS — transitive via feed-rs, no compatible fix yet; tracked in #1026" },
