@@ -143,19 +143,28 @@ Small TTL cache module (e.g. `core/util/briefing-cache.ts`) backed by
 `localStorage`, wrapped in `try/catch` so private-mode / SSR / quota failures
 degrade to "no cache" rather than throwing.
 
-- **Weather:** keyed by `locationKey`, entry `{ v: WeatherSummary, ts }`,
-  **TTL 1 hour** (matches the server's old weather TTL).
-- **City:** keyed by `locationKey`, entry `{ v: string | null, ts }`,
-  **TTL 30 days** (a coordinate's city is effectively static).
+Each cache is a **bounded multi-key store** — a JSON map of `locationKey →
+{ v, ts }` under a single `localStorage` key. This lets a user who moves around
+(e.g. on a phone) keep many locations warm, not just their last one; it's cheap
+to store and materially helpful.
+
+- **Capacity:** ~100 entries per cache (mirrors the server's old moka
+  `max_capacity(100)`). On write past capacity, **evict the oldest by `ts`**
+  (simple LRU-by-write-time) so the map stays bounded.
+- **Weather:** entry `{ v: WeatherSummary, ts }`, **TTL 1 hour** (matches the
+  server's old weather TTL).
+- **City:** entry `{ v: string | null, ts }`, **TTL 30 days** (a coordinate's
+  city is effectively static).
 - Only **successful** responses are written (including a successful "no city"
   → `null`, so we don't re-query a genuinely nameless coordinate). A `fetch`
   error is never cached, so it retries next load.
-- A cache read must distinguish **miss** (no/expired entry → fetch) from a
-  cached `null` city (hit → use it). The reader returns the entry or `null`-miss
-  sentinel accordingly.
+- A cache read must distinguish **miss** (absent/expired entry → fetch) from a
+  cached `null` city (hit → use it). The reader returns the entry or a
+  `miss` sentinel accordingly. Expired entries are treated as misses and may be
+  overwritten in place.
 
-This adds cross-session and cross-date reuse on top of the existing
-`_loadedForDate` in-memory dedupe (which resets on reload).
+This adds cross-session, cross-date, **and cross-location** reuse on top of the
+existing `_loadedForDate` in-memory dedupe (which resets on reload).
 
 ### 4.7 Rendering
 
