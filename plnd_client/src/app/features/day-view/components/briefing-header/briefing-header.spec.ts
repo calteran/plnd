@@ -7,16 +7,19 @@ import type { NewsHeadline, WeatherSummary } from '../../../../core/models/brief
 
 function makeMockBriefing(overrides: {
   weather?: WeatherSummary | null;
+  city?: string | null;
   news?: NewsHeadline[] | null;
   weatherError?: string | null;
   newsError?: string | null;
 } = {}) {
   const weather      = signal(overrides.weather      ?? null);
+  const city         = signal(overrides.city         ?? null);
   const news         = signal(overrides.news         ?? null);
   const weatherError = signal(overrides.weatherError ?? null);
   const newsError    = signal(overrides.newsError    ?? null);
   return {
     weather:        weather.asReadonly(),
+    city:           city.asReadonly(),
     news:           news.asReadonly(),
     weatherError:   weatherError.asReadonly(),
     newsError:      newsError.asReadonly(),
@@ -46,6 +49,24 @@ describe('BriefingHeaderComponent', () => {
     expect(f.nativeElement.textContent).toContain('14');
     expect(f.nativeElement.textContent).toContain('Rainy');
     expect(f.nativeElement.textContent).toContain('5.2mm');
+  });
+
+  it('renders the city name when present', async () => {
+    const w: WeatherSummary = {
+      temperature_c: 14, condition: 'Rainy', high_c: 17, low_c: 11, precipitation_mm: 5.2,
+    };
+    const f = await setup({ weather: w, city: 'Portland' });
+    const city = f.debugElement.query(By.css('.weather-city'));
+    expect(city).toBeTruthy();
+    expect(city.nativeElement.textContent.trim()).toBe('Portland');
+  });
+
+  it('omits the city label when city is null', async () => {
+    const w: WeatherSummary = {
+      temperature_c: 14, condition: 'Rainy', high_c: 17, low_c: 11, precipitation_mm: 5.2,
+    };
+    const f = await setup({ weather: w });
+    expect(f.debugElement.query(By.css('.weather-city'))).toBeFalsy();
   });
 
   it('does not render precipitation when precipitation_mm is 0', async () => {
