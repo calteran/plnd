@@ -74,6 +74,9 @@ fn rss_entries(channel: &rss::Channel) -> Vec<(i64, NewsHeadline)> {
         .iter()
         .filter_map(|item| {
             let title = item.title()?.to_string();
+            if title.trim().is_empty() {
+                return None;
+            }
             let url = item.link().map(str::to_string);
             // Prefer <pubDate>; fall back to Dublin Core <dc:date>, which many
             // feeds use instead (feed-rs read both).
@@ -103,7 +106,15 @@ fn atom_entries(feed: &atom_syndication::Feed) -> Vec<(i64, NewsHeadline)> {
             if title.trim().is_empty() {
                 return None;
             }
-            let url = entry.links().first().map(|l| l.href().to_string());
+            // Atom entries can carry several links (self, edit, alternate…);
+            // prefer the "alternate" link (the default when `rel` is absent),
+            // falling back to the first link only if none is marked alternate.
+            let url = entry
+                .links()
+                .iter()
+                .find(|l| l.rel() == "alternate" || l.rel().is_empty())
+                .or_else(|| entry.links().first())
+                .map(|l| l.href().to_string());
             // `updated` is mandatory in Atom; prefer `published` when present.
             let ts = entry
                 .published()
@@ -300,6 +311,27 @@ mod tests {
             chrono::DateTime::parse_from_rfc3339("2024-03-04T05:06:07Z")
                 .unwrap()
                 .timestamp()
+        );
+    }
+
+    #[test]
+    fn parse_atom_prefers_alternate_link() {
+        // When an entry has both a self and an alternate link, use the alternate
+        // one (the article URL), not whichever appears first.
+        let atom = br#"<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Example</title><updated>2024-01-02T00:00:00Z</updated><id>urn:f</id>
+  <entry>
+    <title>Linked</title><id>urn:e</id><updated>2024-01-02T00:00:00Z</updated>
+    <link rel="self" href="https://example.com/self"/>
+    <link rel="alternate" href="https://example.com/article"/>
+  </entry>
+</feed>"#;
+        let entries = parse_feed_entries_with_time(atom).unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].1.url.as_deref(),
+            Some("https://example.com/article")
         );
     }
 
