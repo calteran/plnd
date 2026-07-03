@@ -11,6 +11,11 @@ const WEATHER_STORE = 'plnd.briefing.weather';
 const CITY_STORE = 'plnd.briefing.city';
 const WEATHER_TTL_MS = 60 * 60 * 1000;          // 1 hour
 const CITY_TTL_MS = 30 * 24 * 60 * 60 * 1000;   // 30 days
+// Accept a browser-cached position up to 5 min old, else acquire a fresh fix.
+// Bounded (not Infinity) so a user who has travelled resolves to their new
+// location — and thus a fresh city/weather cache key — within minutes rather
+// than being pinned to a stale fix.
+const GEO_MAX_AGE_MS = 5 * 60 * 1000;           // 5 minutes
 
 interface OpenMeteoResponse {
   current: { temperature_2m: number; precipitation: number; weather_code: number };
@@ -49,8 +54,8 @@ export class BriefingService {
    *  third-party APIs (Open-Meteo, BigDataCloud) via native fetch — no auth
    *  header, cached in localStorage — and news from our API. All three
    *  location-based lookups fire in parallel. Location comes from browser
-   *  geolocation (a cached position of any age is accepted — returns
-   *  immediately on revisits; fresh fixes time out after 15 s);
+   *  geolocation (a cached position up to 5 min old is accepted, so travel is
+   *  reflected within minutes; fresh fixes time out after 15 s);
    *  if denied, weather/news are omitted rather than erroring.
    *  No-ops when called again for the same date. */
   load(date: string): void {
@@ -101,7 +106,7 @@ export class BriefingService {
         this._weatherError.set('Location unavailable');
         this._newsError.set('Location unavailable');
       },
-      { maximumAge: Infinity, timeout: 15_000 },
+      { maximumAge: GEO_MAX_AGE_MS, timeout: 15_000 },
     );
   }
 

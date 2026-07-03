@@ -145,6 +145,14 @@ describe('BriefingService', () => {
     expect(service.yesterday()?.tasks_done).toBe(4);
   });
 
+  it('requests a bounded-age geolocation fix (not Infinity), so travel is reflected', () => {
+    service.load('2026-04-06');
+    flushServer(N, Y);
+    const opts = (navigator.geolocation.getCurrentPosition as Mock).mock.calls[0][2] as PositionOptions;
+    expect(Number.isFinite(opts.maximumAge)).toBe(true);
+    expect(opts.maximumAge).toBeGreaterThan(0);
+  });
+
   it('sets errors and skips third-party fetches when geolocation is denied', () => {
     (navigator.geolocation.getCurrentPosition as Mock).mockImplementation(
       (_s: PositionCallback, error?: PositionErrorCallback) => {
