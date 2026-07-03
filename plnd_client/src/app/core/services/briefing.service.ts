@@ -49,7 +49,8 @@ export class BriefingService {
    *  third-party APIs (Open-Meteo, BigDataCloud) via native fetch — no auth
    *  header, cached in localStorage — and news from our API. All three
    *  location-based lookups fire in parallel. Location comes from browser
-   *  geolocation (cached fix up to 60 s old; fresh fixes time out after 15 s);
+   *  geolocation (a cached position of any age is accepted — returns
+   *  immediately on revisits; fresh fixes time out after 15 s);
    *  if denied, weather/news are omitted rather than erroring.
    *  No-ops when called again for the same date. */
   load(date: string): void {

@@ -43,4 +43,12 @@ describe('briefing-cache', () => {
     expect(readCache(STORE, 'c', HOUR)?.v).toBe(3);
     expect(readCache(STORE, 'b', HOUR)).toBeNull();
   });
+
+  it('a read does not extend the TTL (recency is separate from freshness)', () => {
+    writeCache(STORE, 'k', { t: 14 });        // fetchedAt = 0
+    vi.setSystemTime(HOUR - 1);               // still inside TTL
+    expect(readCache<{ t: number }>(STORE, 'k', HOUR)?.v).toEqual({ t: 14 }); // hit → bumps accessedAt only
+    vi.setSystemTime(HOUR + 1);               // past TTL measured from fetchedAt, despite the recent read
+    expect(readCache(STORE, 'k', HOUR)).toBeNull(); // expired — the read did NOT reset freshness
+  });
 });

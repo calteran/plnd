@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-/// Geographic coordinate pair used by weather and news providers.
+/// Geographic coordinate pair used by the news provider.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct Location {
     pub latitude: f64,
