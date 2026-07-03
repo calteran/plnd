@@ -70,8 +70,12 @@ feature-depth = 1
 # A list of advisory IDs to ignore. Note that ignored advisories will still
 # output a note when they are encountered.
 ignore = [
-    "RUSTSEC-2021-0141", # dotenv is used only for development/testing
-    "RUSTSEC-2023-0071", # rsa crate Marvin Attack — we only use HS256, not RSA; no patch available
+    # Each ignored advisory MUST reference a tracking GitHub issue (see CLAUDE.md).
+    # Object form is used so cargo-deny surfaces the reason + issue in its own output.
+    { id = "RUSTSEC-2021-0141", reason = "dotenv unmaintained — swap to dotenvy (already in tree); tracked in #1027" },
+    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin Attack — via jsonwebtoken; we use HS256 only, no patch available; tracked in #1028" },
+    { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic-attribute DoS — transitive via feed-rs, no compatible fix yet; tracked in #1026" },
+    { id = "RUSTSEC-2026-0195", reason = "quick-xml NsReader memory-exhaustion DoS — transitive via feed-rs, no compatible fix yet; tracked in #1026" },
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },
